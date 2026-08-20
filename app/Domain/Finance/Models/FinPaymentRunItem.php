@@ -14,7 +14,9 @@ class FinPaymentRunItem extends Model
 
     protected $fillable = [
         'payment_run_id',
+        'site_id',
         'bill_id',
+        'settlement_bill_id',
         'vendor_id',
         'amount',
         'reference',

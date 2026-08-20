@@ -5,18 +5,26 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Finance\Models\FinManualReceiptIdempotency;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Models\Client;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use LogicException;
 
 class AccountsReceivableService
 {
     public function __construct(
-        private JournalPostingService $journalPostingService,
+        private readonly JournalPostingService $journalPostingService,
+        private readonly PaymentSettlementSiteScope $paymentSiteScope,
+        private readonly PaymentSettlementRecorder $settlementRecorder,
     ) {}
 
     /**
@@ -272,29 +280,103 @@ class AccountsReceivableService
 
     /**
      * Allocate a payment against an invoice and create the GL journal.
+     *
+     * @param  array{invoice_id:int,amount:float|int|string,payment_date:string,idempotency_key:string,notes?:string|null}  $data
      */
-    public function allocatePayment(?int $orgId, array $data): FinPaymentAllocation
+    public function allocatePayment(?int $orgId, User $actor, array $data): FinPaymentAllocation
     {
-        return DB::transaction(function () use ($orgId, $data) {
+        return DB::transaction(function () use ($orgId, $actor, $data) {
             $invoice = FinInvoice::where('organization_id', $orgId)
                 ->where('id', $data['invoice_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->paymentSiteScope->assertCanAccessInvoice($actor, $invoice);
+
+            $idempotencyKey = strtolower(trim((string) ($data['idempotency_key'] ?? '')));
+            if (! Str::isUuid($idempotencyKey)) {
+                throw new InvalidArgumentException('A valid receipt idempotency key is required.');
+            }
+
+            $amount = number_format((float) $data['amount'], 2, '.', '');
+            if (bccomp($amount, '0.00', 2) <= 0) {
+                throw new InvalidArgumentException('Payment amount must be greater than zero.');
+            }
+
+            $paymentDate = Carbon::parse((string) $data['payment_date'])->toDateString();
+            $notes = isset($data['notes']) && trim((string) $data['notes']) !== ''
+                ? (string) $data['notes']
+                : null;
+            $requestHash = hash('sha256', json_encode([
+                'amount' => $amount,
+                'payment_date' => $paymentDate,
+                'notes' => $notes,
+            ], JSON_THROW_ON_ERROR));
+
+            $existingRequest = FinManualReceiptIdempotency::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingRequest !== null) {
+                return $this->resolveManualReceiptReplay(
+                    $existingRequest,
+                    $orgId,
+                    $actor,
+                    $invoice,
+                    $requestHash,
+                );
+            }
+
+            if (! in_array($invoice->status, ['sent', 'viewed', 'overdue'], true)) {
+                throw new InvalidArgumentException('The invoice is not in a receivable state.');
+            }
+
             $amountDue = $this->calculateAmountDue($invoice);
 
-            if (bccomp((string) $data['amount'], (string) $amountDue, 2) > 0) {
-                throw new \InvalidArgumentException(
-                    "Payment amount ({$data['amount']}) exceeds the outstanding balance ({$amountDue})."
+            if (bccomp($amount, (string) $amountDue, 2) > 0) {
+                throw new InvalidArgumentException(
+                    "Payment amount ({$amount}) exceeds the outstanding balance ({$amountDue})."
+                );
+            }
+
+            try {
+                $idempotency = FinManualReceiptIdempotency::query()->create([
+                    'idempotency_key' => $idempotencyKey,
+                    'organization_id' => $orgId,
+                    'invoice_id' => $invoice->id,
+                    'request_hash' => $requestHash,
+                    'created_by' => $actor->id,
+                ]);
+            } catch (QueryException $exception) {
+                if (! $this->isManualReceiptKeyCollision($exception)) {
+                    throw $exception;
+                }
+
+                $existingRequest = FinManualReceiptIdempotency::query()
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->lockForUpdate()
+                    ->first();
+                if ($existingRequest === null) {
+                    throw $exception;
+                }
+
+                return $this->resolveManualReceiptReplay(
+                    $existingRequest,
+                    $orgId,
+                    $actor,
+                    $invoice,
+                    $requestHash,
                 );
             }
 
             $bankAccount = $this->findBankAccount($orgId);
             $arAccount = $this->findArAccount($orgId);
+            $siteId = $this->paymentSiteScope->invoiceSiteId($invoice);
 
             // Create the GL journal: DR Bank, CR Accounts Receivable
             $journal = $this->journalPostingService->createAndPost($orgId, [
-                'journal_date' => $data['payment_date'],
+                'journal_date' => $paymentDate,
                 'type' => 'standard',
                 'reference' => "PMT-{$invoice->invoice_number}",
                 'description' => "Payment received for invoice {$invoice->invoice_number}",
@@ -304,30 +386,32 @@ class AccountsReceivableService
                     [
                         'account_id' => $bankAccount->id,
                         'description' => "Payment received — Invoice {$invoice->invoice_number}",
-                        'debit' => $data['amount'],
+                        'debit' => $amount,
                         'credit' => 0,
+                        'site_id' => $siteId,
                     ],
                     [
                         'account_id' => $arAccount->id,
                         'description' => "Payment received — Invoice {$invoice->invoice_number}",
                         'debit' => 0,
-                        'credit' => $data['amount'],
+                        'credit' => $amount,
+                        'site_id' => $siteId,
                     ],
                 ],
             ]);
 
-            // Create the payment allocation record
-            $allocation = FinPaymentAllocation::create([
-                'organization_id' => $orgId,
-                'type' => 'receivable',
-                'payment_date' => $data['payment_date'],
-                'amount' => $data['amount'],
-                'allocatable_type' => FinInvoice::class,
-                'allocatable_id' => $invoice->id,
-                'journal_id' => $journal->id,
-                'notes' => $data['notes'] ?? null,
-                'created_by' => Auth::id(),
-            ]);
+            $allocation = $this->settlementRecorder->record(
+                target: $invoice,
+                journal: $journal,
+                source: $journal,
+                siteId: $siteId,
+                amount: $amount,
+                paymentDate: $paymentDate,
+                actor: $actor,
+                notes: $notes,
+            );
+
+            $idempotency->update(['allocation_id' => $allocation->id]);
 
             // Check if invoice is fully paid
             $totalPaid = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
@@ -337,12 +421,45 @@ class AccountsReceivableService
             if (bccomp((string) $totalPaid, (string) $invoice->total_amount, 2) >= 0) {
                 $invoice->update([
                     'status' => 'paid',
-                    'paid_at' => $data['payment_date'],
+                    'paid_at' => $paymentDate,
                 ]);
             }
 
             return $allocation;
-        });
+        }, attempts: 3);
+    }
+
+    private function resolveManualReceiptReplay(
+        FinManualReceiptIdempotency $request,
+        ?int $orgId,
+        User $actor,
+        FinInvoice $invoice,
+        string $requestHash,
+    ): FinPaymentAllocation {
+        if ((int) $request->organization_id !== (int) $orgId
+            || (int) $request->invoice_id !== (int) $invoice->id
+            || (int) $request->created_by !== (int) $actor->id
+            || ! hash_equals($request->request_hash, $requestHash)) {
+            throw new InvalidArgumentException(
+                'The receipt idempotency key has already been used for a different request.'
+            );
+        }
+
+        $allocation = $request->allocation()->first();
+        if ($allocation === null
+            || (int) $allocation->organization_id !== (int) $orgId
+            || $allocation->allocatable_type !== $invoice->getMorphClass()
+            || (int) $allocation->allocatable_id !== (int) $invoice->id) {
+            throw new LogicException('The original manual receipt allocation is unavailable.');
+        }
+
+        return $allocation;
+    }
+
+    private function isManualReceiptKeyCollision(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1062
+            && str_contains($exception->getMessage(), 'fin_manual_receipt_key_unique');
     }
 
     /**

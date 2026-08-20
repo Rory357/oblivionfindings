@@ -14,6 +14,7 @@ use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Domain\Finance\Services\FinInvoiceJournalService;
 use App\Domain\Finance\Services\InvoicePdfService;
+use App\Domain\Finance\Services\PaymentSettlementSiteScope;
 use App\Http\Controllers\Controller;
 use App\Models\BillingEntry;
 use App\Models\Client;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -527,12 +529,17 @@ class InvoiceController extends Controller
         );
     }
 
-    public function markPaid(Request $request, int $invoiceId, AccountsReceivableService $arService)
-    {
+    public function markPaid(
+        Request $request,
+        int $invoiceId,
+        AccountsReceivableService $arService,
+        PaymentSettlementSiteScope $paymentSiteScope,
+    ) {
         $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
         $invoice = FinInvoice::forOrganization($orgId)->findOrFail($invoiceId);
 
         $this->authorize('update', $invoice);
+        $paymentSiteScope->assertCanAccessInvoice($request->user(), $invoice);
 
         if ($invoice->status === 'cancelled') {
             return back()->withErrors(['invoice' => 'Cannot mark a cancelled invoice as paid.']);
@@ -555,15 +562,20 @@ class InvoiceController extends Controller
 
         try {
             if (bccomp($amountDue, '0', 2) > 0) {
-                $arService->allocatePayment($orgId, [
+                $arService->allocatePayment($orgId, $request->user(), [
                     'invoice_id' => $invoice->id,
                     'amount' => $amountDue,
                     'payment_date' => now()->toDateString(),
+                    'idempotency_key' => (string) Str::uuid(),
                     'notes' => 'Marked as paid',
                 ]);
             } else {
                 // Fully allocated already; just flag the status.
-                $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+                DB::transaction(function () use ($invoice, $request, $paymentSiteScope): void {
+                    $lockedInvoice = FinInvoice::query()->lockForUpdate()->findOrFail($invoice->id);
+                    $paymentSiteScope->assertCanAccessInvoice($request->user(), $lockedInvoice);
+                    $lockedInvoice->update(['status' => 'paid', 'paid_at' => now()]);
+                });
             }
         } catch (\Throwable $e) {
             return back()->withErrors(['invoice' => 'Could not record the receipt: '.$e->getMessage()]);
@@ -573,29 +585,57 @@ class InvoiceController extends Controller
             ->with('success', 'Invoice marked as paid.');
     }
 
-    public function cancel(Request $request, FinInvoice $invoice, FinInvoiceJournalService $journalService)
-    {
+    public function cancel(
+        Request $request,
+        FinInvoice $invoice,
+        FinInvoiceJournalService $journalService,
+        PaymentSettlementSiteScope $paymentSiteScope,
+    ) {
         $this->authorize('update', $invoice);
 
-        if ($invoice->status === 'paid') {
-            return back()->withErrors(['invoice' => 'Cannot cancel a paid invoice.']);
+        try {
+            $alreadyCancelled = DB::transaction(function () use (
+                $invoice,
+                $journalService,
+                $paymentSiteScope,
+                $request,
+            ): bool {
+                $invoice = FinInvoice::query()
+                    ->where('organization_id', $request->user()->organization_id)
+                    ->lockForUpdate()
+                    ->findOrFail($invoice->id);
+                $paymentSiteScope->assertCanAccessInvoice($request->user(), $invoice);
+
+                if ($invoice->status === 'cancelled') {
+                    return true;
+                }
+
+                $hasSettlement = FinPaymentAllocation::forOrganization($invoice->organization_id)
+                    ->where('allocatable_type', FinInvoice::class)
+                    ->where('allocatable_id', $invoice->id)
+                    ->exists();
+
+                if ($invoice->status === 'paid' || $invoice->paid_at !== null || $hasSettlement) {
+                    throw new \InvalidArgumentException('Cannot cancel an invoice with recorded payments.');
+                }
+
+                if ($invoice->journal_id !== null) {
+                    $journalService->reverseInvoiceJournal($invoice);
+                    $invoice->refresh();
+                }
+
+                $invoice->update(['status' => 'cancelled']);
+
+                return false;
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['invoice' => $e->getMessage()]);
         }
 
-        if ($invoice->status === 'cancelled') {
+        if ($alreadyCancelled) {
             return redirect()->route('finance.invoices.show', $invoice)
                 ->with('success', 'Invoice already cancelled.');
         }
-
-        DB::transaction(function () use ($invoice, $journalService) {
-            $invoice->refresh();
-
-            if ($invoice->journal_id !== null) {
-                $journalService->reverseInvoiceJournal($invoice);
-                $invoice->refresh();
-            }
-
-            $invoice->update(['status' => 'cancelled']);
-        });
 
         return redirect()->route('finance.invoices.show', $invoice)
             ->with('success', 'Invoice cancelled.');

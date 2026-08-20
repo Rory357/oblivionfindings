@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Governance\Models\SpendApproval;
@@ -315,7 +316,7 @@ class AccountsPayableService
                 continue;
             }
 
-            \App\Domain\Finance\Models\FinCostAllocation::create([
+            FinCostAllocation::create([
                 'journal_id' => $journal->id,
                 'journal_line_id' => $journalLine->id,
                 'financial_event_id' => null,
@@ -383,21 +384,48 @@ class AccountsPayableService
      */
     public function recordPayment(FinBill $bill, float $amount): FinBill
     {
-        $newPaid = bcadd((string) $bill->amount_paid, (string) $amount, 2);
-
-        $status = $bill->status;
-        if (bccomp($newPaid, (string) $bill->total_amount, 2) >= 0) {
-            $status = 'paid';
-        } else {
-            $status = 'partially_paid';
+        if (! is_finite($amount)) {
+            throw new InvalidArgumentException('Payment amount must be a positive finite value.');
         }
 
-        $bill->update([
-            'amount_paid' => $newPaid,
-            'status' => $status,
-        ]);
+        $paymentAmount = number_format($amount, 2, '.', '');
+        if (bccomp($paymentAmount, '0.00', 2) <= 0) {
+            throw new InvalidArgumentException('Payment amount must be greater than zero.');
+        }
 
-        return $bill->refresh();
+        return DB::transaction(function () use ($bill, $paymentAmount): FinBill {
+            $lockedBill = FinBill::query()
+                ->lockForUpdate()
+                ->findOrFail($bill->getKey());
+
+            if (! in_array($lockedBill->status, ['approved', 'partially_paid'], true)) {
+                throw new InvalidArgumentException(
+                    "Bill {$lockedBill->bill_number} is not in a payable state."
+                );
+            }
+
+            $amountDue = bcsub(
+                (string) $lockedBill->total_amount,
+                (string) $lockedBill->amount_paid,
+                2,
+            );
+
+            if (bccomp($paymentAmount, $amountDue, 2) > 0) {
+                throw new InvalidArgumentException(
+                    "Payment amount {$paymentAmount} exceeds bill amount due {$amountDue}."
+                );
+            }
+
+            $newPaid = bcadd((string) $lockedBill->amount_paid, $paymentAmount, 2);
+            $lockedBill->forceFill([
+                'amount_paid' => $newPaid,
+                'status' => bccomp($newPaid, (string) $lockedBill->total_amount, 2) === 0
+                    ? 'paid'
+                    : 'partially_paid',
+            ])->save();
+
+            return $lockedBill->refresh();
+        });
     }
 
     /**

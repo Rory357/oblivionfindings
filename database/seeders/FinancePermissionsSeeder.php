@@ -19,6 +19,8 @@ class FinancePermissionsSeeder extends Seeder
             // Dashboard
             ['key' => 'finance.dashboard', 'description' => 'View the finance dashboard'],
             ['key' => 'finance.insights.viewAllSites', 'description' => 'View Financial Insights across all active Sites'],
+            ['key' => 'finance.payments.viewAllSites', 'description' => 'View payment allocation history across all active Sites'],
+            ['key' => 'finance.payments.manageAllSites', 'description' => 'Manage payment settlement across all active Sites'],
 
             // General Ledger
             ['key' => 'finance.ledger.view', 'description' => 'View chart of accounts, journals, and ledger entries'],
@@ -78,6 +80,7 @@ class FinancePermissionsSeeder extends Seeder
         $viewOnlyKeys = [
             'finance.dashboard',
             'finance.insights.viewAllSites',
+            'finance.payments.viewAllSites',
             'finance.ledger.view',
             'finance.ap.view',
             'finance.ar.view',

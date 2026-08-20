@@ -325,10 +325,10 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // ── Payment Allocations ─────────────────────────────────────────────
     Route::get('/payment-allocations', [PaymentAllocationController::class, 'index'])
         ->name('payment-allocations.index')
-        ->middleware('permission:finance.ar.view');
-    Route::post('/payment-allocations', [PaymentAllocationController::class, 'store'])
-        ->name('payment-allocations.store')
-        ->middleware('permission:finance.ar.manage');
+        ->middleware('permission:finance.ar.view|finance.ap.view');
+    // Allocation history is intentionally read-only. New receipts and bill
+    // settlements belong to the canonical AR allocation and AP matching/run
+    // workflows below; there is no generic polymorphic allocation write route.
 
     // ── Accounts Receivable ─────────────────────────────────────────────
     Route::middleware('permission:finance.ar.view')->group(function () {

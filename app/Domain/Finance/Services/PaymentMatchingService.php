@@ -7,9 +7,11 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinInvoice;
-use App\Domain\Finance\Models\FinMatchRule;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinPaymentMatch;
+use App\Models\User;
+use App\Services\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,14 +22,26 @@ class PaymentMatchingService
     public function __construct(
         private readonly JournalPostingService $journalPostingService,
         private readonly AccountsPayableService $accountsPayableService,
+        private readonly PaymentSettlementSiteScope $paymentSiteScope,
+        private readonly PaymentSettlementRecorder $settlementRecorder,
     ) {}
 
     /**
      * Find potential matches for a single bank transaction.
      */
-    public function findMatches(?int $orgId, FinBankTransaction $transaction): Collection
+    public function findMatches(?int $orgId, FinBankTransaction $transaction, ?User $actor = null): Collection
     {
-        $candidates = $this->getCandidates($orgId, $transaction);
+        if ((int) $transaction->organization_id !== (int) $orgId) {
+            abort(404);
+        }
+        $transaction->loadMissing('bankAccount:id,organization_id');
+        abort_unless(
+            $transaction->bankAccount !== null
+                && (int) $transaction->bankAccount->organization_id === (int) $orgId,
+            404,
+        );
+
+        $candidates = $this->getCandidates($orgId, $transaction, $actor);
         $scores = collect();
 
         foreach ($candidates as $candidate) {
@@ -46,6 +60,51 @@ class PaymentMatchingService
         return $scores->sortByDesc('confidence_score')->values();
     }
 
+    public function suggestForTransaction(?int $orgId, FinBankTransaction $transaction, User $actor): int
+    {
+        return DB::transaction(function () use ($orgId, $transaction, $actor): int {
+            $transaction = FinBankTransaction::query()
+                ->where('organization_id', $orgId)
+                ->lockForUpdate()
+                ->findOrFail($transaction->id);
+
+            $created = 0;
+            foreach ($this->findMatches($orgId, $transaction, $actor) as $match) {
+                $siteId = $this->candidateSiteId($match['matchable_type'], (int) $match['matchable_id'], $orgId);
+                $suggestionKey = $this->nextSuggestionKey(
+                    $orgId,
+                    $transaction->id,
+                    $match['matchable_type'],
+                    (int) $match['matchable_id'],
+                );
+
+                if ($suggestionKey === null) {
+                    continue;
+                }
+
+                FinPaymentMatch::create([
+                    'organization_id' => $orgId,
+                    'site_id' => $siteId,
+                    'bank_transaction_id' => $transaction->id,
+                    'matchable_type' => $match['matchable_type'],
+                    'matchable_id' => $match['matchable_id'],
+                    'suggestion_key' => $suggestionKey,
+                    'confidence_score' => $match['confidence_score'],
+                    'match_reasons' => $match['match_reasons'],
+                    'status' => 'suggested',
+                ]);
+                $created++;
+            }
+
+            return $created;
+        });
+    }
+
+    public function scopeMatchesForActor(Builder $query, User $actor): Builder
+    {
+        return $this->paymentSiteScope->applyPaymentMatchScope($query, $actor);
+    }
+
     /**
      * Calculate a match score between a transaction and a candidate bill/invoice.
      */
@@ -53,8 +112,8 @@ class PaymentMatchingService
     {
         $score = 0;
         $reasons = [];
-        // The FinMatchRule rule_type dimensions this candidate satisfied — the
-        // match-rule engine governs the auto-confirm threshold off these.
+        // Dimensions remain explanatory ranking evidence only. They never grant
+        // authority to settle without an actor-confirmed Site-scoped command.
         $dimensions = [];
 
         // 1. Exact amount match (40 points)
@@ -144,19 +203,22 @@ class PaymentMatchingService
     /**
      * Get candidate bills/invoices that could match a transaction.
      */
-    private function getCandidates(?int $orgId, FinBankTransaction $transaction): Collection
+    private function getCandidates(?int $orgId, FinBankTransaction $transaction, ?User $actor): Collection
     {
         if (bccomp((string) $transaction->amount, '0', 2) < 0) {
-            return FinBill::forOrganization($orgId)
+            $query = FinBill::forOrganization($orgId)
                 ->whereIn('status', ['approved', 'partially_paid'])
                 ->whereColumn('amount_paid', '<', 'total_amount')
-                ->with('vendor')
-                ->get();
+                ->with('vendor');
+
+            return ($actor ? $this->paymentSiteScope->applyBillScope($query, $actor) : $query)->get();
         }
 
         if (bccomp((string) $transaction->amount, '0', 2) > 0) {
-            return FinInvoice::forOrganization($orgId)
-                ->whereIn('status', ['sent', 'viewed', 'overdue'])
+            $query = FinInvoice::forOrganization($orgId)
+                ->whereIn('status', ['sent', 'viewed', 'overdue']);
+
+            return ($actor ? $this->paymentSiteScope->applyInvoiceScope($query, $actor) : $query)
                 ->get()
                 ->filter(fn (FinInvoice $invoice) => bccomp($this->amountDueFor($invoice), '0', 2) > 0)
                 ->values();
@@ -168,48 +230,64 @@ class PaymentMatchingService
     /**
      * Run matching for all unmatched withdrawal transactions in an organisation.
      */
-    public function matchUnmatchedTransactions(?int $orgId): array
+    public function matchUnmatchedTransactions(?int $orgId, ?User $actor = null): array
     {
         $unmatched = FinBankTransaction::whereHas('bankAccount', fn ($q) => $q->forOrganization($orgId))
+            ->where('organization_id', $orgId)
             ->whereDoesntHave('paymentMatches', fn ($q) => $q->whereIn('status', ['confirmed', 'auto_confirmed']))
             ->where('amount', '!=', 0)
+            ->orderBy('id')
             ->get();
 
         $results = ['matched' => 0, 'auto_confirmed' => 0, 'suggested' => 0];
-        $rules = FinMatchRule::forOrganization($orgId)->active()->byPriority()->get();
-        $defaultThreshold = 95;
 
         foreach ($unmatched as $txn) {
-            $matches = $this->findMatches($orgId, $txn);
+            $created = DB::transaction(function () use ($orgId, $actor, $txn): bool {
+                $lockedTransaction = FinBankTransaction::query()
+                    ->where('organization_id', $orgId)
+                    ->lockForUpdate()
+                    ->findOrFail($txn->id);
 
-            foreach ($matches as $match) {
-                // The governing rule is the highest-priority active rule whose
-                // rule_type the candidate actually satisfied (+ whose conditions
-                // hold). It sets the auto-confirm threshold; without one we fall
-                // back to the conservative default.
-                $rule = $this->governingRule($rules, $txn, $match['dimensions']);
-                $autoThreshold = $rule ? (float) $rule->auto_confirm_threshold : $defaultThreshold;
+                if ($lockedTransaction->paymentMatches()
+                    ->whereIn('status', ['suggested', 'confirmed', 'auto_confirmed'])
+                    ->exists()) {
+                    return false;
+                }
 
-                $pm = FinPaymentMatch::create([
+                $match = $this->findMatches($orgId, $lockedTransaction, $actor)->first();
+                if ($match === null) {
+                    return false;
+                }
+
+                $siteId = $this->candidateSiteId($match['matchable_type'], (int) $match['matchable_id'], $orgId);
+                $suggestionKey = $this->nextSuggestionKey(
+                    $orgId,
+                    $lockedTransaction->id,
+                    $match['matchable_type'],
+                    (int) $match['matchable_id'],
+                );
+                if ($suggestionKey === null) {
+                    return false;
+                }
+
+                FinPaymentMatch::create([
                     'organization_id' => $orgId,
-                    'bank_transaction_id' => $txn->id,
+                    'site_id' => $siteId,
+                    'bank_transaction_id' => $lockedTransaction->id,
                     'matchable_type' => $match['matchable_type'],
                     'matchable_id' => $match['matchable_id'],
+                    'suggestion_key' => $suggestionKey,
                     'confidence_score' => $match['confidence_score'],
                     'match_reasons' => $match['match_reasons'],
-                    'status' => $match['confidence_score'] >= $autoThreshold ? 'auto_confirmed' : 'suggested',
+                    'status' => 'suggested',
                 ]);
 
-                if ($pm->status === 'auto_confirmed') {
-                    $this->confirmAndPost($pm, null, 'auto_confirmed');
-                    // Credit the rule that drove the auto-confirm.
-                    $rule?->increment('match_count');
-                    $results['auto_confirmed']++;
-                } else {
-                    $results['suggested']++;
-                }
+                return true;
+            });
+
+            if ($created) {
+                $results['suggested']++;
                 $results['matched']++;
-                break; // Only best match per transaction
             }
         }
 
@@ -217,88 +295,116 @@ class PaymentMatchingService
     }
 
     /**
-     * The highest-priority active rule that governs this match: its rule_type must
-     * be one of the dimensions the candidate satisfied, and its (optional) JSON
-     * conditions must hold for the transaction. Rules are pre-sorted by priority
-     * desc, so the first qualifying rule wins.
-     */
-    private function governingRule(Collection $rules, FinBankTransaction $txn, array $dimensions): ?FinMatchRule
-    {
-        return $rules->first(
-            fn (FinMatchRule $rule) => in_array($rule->rule_type, $dimensions, true)
-                && $this->ruleConditionsMet($rule, $txn)
-        );
-    }
-
-    /**
-     * Evaluate a rule's optional JSON conditions against the transaction. Supported
-     * keys (all optional): min_amount, max_amount, description_contains. An empty
-     * conditions set always passes.
-     */
-    private function ruleConditionsMet(FinMatchRule $rule, FinBankTransaction $txn): bool
-    {
-        $conditions = $rule->conditions ?? [];
-        $amount = abs((float) $txn->amount);
-
-        if (isset($conditions['min_amount']) && $amount < (float) $conditions['min_amount']) {
-            return false;
-        }
-
-        if (isset($conditions['max_amount']) && $amount > (float) $conditions['max_amount']) {
-            return false;
-        }
-
-        if (! empty($conditions['description_contains'])
-            && ! str_contains(strtolower((string) $txn->description), strtolower((string) $conditions['description_contains']))) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * Confirm a suggested payment match.
      */
-    public function confirmMatch(FinPaymentMatch $match, ?int $userId): FinPaymentMatch
+    public function confirmMatch(FinPaymentMatch $match, User $actor): FinPaymentMatch
     {
-        return $this->confirmAndPost($match, $userId, 'confirmed');
+        return $this->confirmAndPost($match, $actor);
     }
 
     /**
      * Reject a suggested payment match.
      */
-    public function rejectMatch(FinPaymentMatch $match): FinPaymentMatch
-    {
-        $match->update(['status' => 'rejected']);
+    public function rejectMatch(
+        FinPaymentMatch $match,
+        User $actor,
+        ?string $reason = null,
+    ): FinPaymentMatch {
+        $reason = $reason === null ? null : trim($reason);
+        $reason = $reason === '' ? null : $reason;
+        if ($reason !== null && mb_strlen($reason) > 500) {
+            throw new InvalidArgumentException('The rejection reason may not exceed 500 characters.');
+        }
 
-        return $match;
-    }
-
-    private function confirmAndPost(FinPaymentMatch $match, ?int $userId, string $status): FinPaymentMatch
-    {
-        return DB::transaction(function () use ($match, $userId, $status) {
+        return DB::transaction(function () use ($match, $actor, $reason): FinPaymentMatch {
             $match = FinPaymentMatch::query()
-                ->with(['bankTransaction.bankAccount.glAccount', 'matchable'])
+                ->with('matchable')
                 ->lockForUpdate()
                 ->findOrFail($match->id);
 
-            if ($match->status === 'rejected') {
-                throw new InvalidArgumentException('Rejected payment matches cannot be confirmed.');
+            abort_unless((int) $match->organization_id === (int) $actor->organization_id, 404);
+            $this->paymentSiteScope->assertStoredMatchSiteIsCurrent($match);
+            $this->assertActorCanAccessTarget($actor, $match->matchable);
+
+            if ($match->status !== 'suggested' || $match->journal_id !== null) {
+                throw new InvalidArgumentException('Only an unsettled suggested match can be rejected.');
             }
 
-            $journal = $match->journal_id
-                ? null
-                : $this->postJournalForMatch($match, $userId);
+            $match->update([
+                'status' => 'rejected',
+                'rejected_by' => $actor->id,
+                'rejected_at' => now(),
+                'rejection_reason' => $reason,
+            ]);
+
+            AuditLogger::logOrFail('finance.payment_match.rejected', $match, [
+                'actor_id' => $actor->id,
+                'site_id' => $match->site_id,
+                'bank_transaction_id' => $match->bank_transaction_id,
+                'suggestion_key' => $match->suggestion_key,
+                'reason' => $reason,
+            ]);
+
+            return $match->refresh();
+        });
+    }
+
+    private function confirmAndPost(FinPaymentMatch $match, User $actor): FinPaymentMatch
+    {
+        return DB::transaction(function () use ($match, $actor) {
+            $match = FinPaymentMatch::query()
+                ->lockForUpdate()
+                ->findOrFail($match->id);
+
+            abort_unless((int) $match->organization_id === (int) $actor->organization_id, 404);
+
+            if (in_array($match->status, ['confirmed', 'auto_confirmed'], true)) {
+                $match->load('matchable');
+                $this->paymentSiteScope->assertStoredMatchSiteIsCurrent($match);
+                $this->assertActorCanAccessTarget($actor, $match->matchable);
+                $evidenceExists = $match->journal_id !== null
+                    && $match->allocation()
+                        ->where('integrity_state', FinPaymentAllocation::INTEGRITY_TRACEABLE)
+                        ->exists();
+                if (! $evidenceExists) {
+                    throw new InvalidArgumentException('Confirmed payment match is missing canonical settlement evidence.');
+                }
+
+                return $match;
+            }
+
+            if ($match->status !== 'suggested') {
+                throw new InvalidArgumentException('Only a suggested payment match can be confirmed.');
+            }
+
+            $transaction = FinBankTransaction::query()
+                ->with('bankAccount.glAccount')
+                ->where('organization_id', $match->organization_id)
+                ->lockForUpdate()
+                ->findOrFail($match->bank_transaction_id);
+
+            abort_if(
+                FinPaymentAllocation::query()
+                    ->where('bank_transaction_id', $transaction->id)
+                    ->exists(),
+                409,
+                'This bank transaction has already been settled.',
+            );
+
+            $target = $this->lockMatchable($match);
+            $match->setRelation('bankTransaction', $transaction);
+            $match->setRelation('matchable', $target);
+            $this->paymentSiteScope->assertStoredMatchSiteIsCurrent($match);
+            $this->assertActorCanAccessTarget($actor, $target);
+
+            $journal = $this->postJournalForMatch($match, $actor);
 
             $updates = [
-                'status' => $status,
-                'confirmed_by' => $userId,
-                'confirmed_at' => $match->confirmed_at ?? now(),
+                'status' => 'confirmed',
+                'confirmed_by' => $actor->id,
+                'confirmed_at' => now(),
+                'journal_id' => $journal->id,
             ];
-
-            if ($journal) {
-                $updates['journal_id'] = $journal->id;
-            }
 
             $match->forceFill($updates)->save();
 
@@ -306,24 +412,31 @@ class PaymentMatchingService
         });
     }
 
-    private function postJournalForMatch(FinPaymentMatch $match, ?int $userId)
+    private function postJournalForMatch(FinPaymentMatch $match, User $actor)
     {
         $matchable = $match->matchable;
 
         if ($matchable instanceof FinBill) {
-            return $this->postBillPaymentJournal($match, $matchable, $userId);
+            return $this->postBillPaymentJournal($match, $matchable, $actor);
         }
 
         if ($matchable instanceof FinInvoice) {
-            return $this->postInvoiceReceiptJournal($match, $matchable, $userId);
+            return $this->postInvoiceReceiptJournal($match, $matchable, $actor);
         }
 
-        return null;
+        abort(404);
     }
 
-    private function postBillPaymentJournal(FinPaymentMatch $match, FinBill $bill, ?int $userId)
+    private function postBillPaymentJournal(FinPaymentMatch $match, FinBill $bill, User $actor)
     {
         $transaction = $match->bankTransaction;
+
+        $bill->loadMissing('vendor');
+        abort_unless(
+            $bill->vendor !== null
+                && (int) $bill->vendor->organization_id === (int) $bill->organization_id,
+            404,
+        );
 
         if (bccomp((string) $transaction->amount, '0', 2) >= 0) {
             throw new InvalidArgumentException('Bill payment matches must be linked to withdrawal bank transactions.');
@@ -338,6 +451,7 @@ class PaymentMatchingService
 
         $bankAccount = $this->resolveBankGlAccount($transaction);
         $apAccount = $this->findAccountByCode($bill->organization_id, '2000');
+        $siteId = $this->paymentSiteScope->billSiteId($bill);
 
         $journal = $this->journalPostingService->createAndPost($bill->organization_id, [
             'journal_date' => $transaction->transaction_date->toDateString(),
@@ -352,38 +466,42 @@ class PaymentMatchingService
                     'description' => "Payment matched to bill {$bill->bill_number}",
                     'debit' => $amount,
                     'credit' => 0,
+                    'site_id' => $siteId,
                 ],
                 [
                     'account_id' => $bankAccount->id,
                     'description' => "Bank payment for bill {$bill->bill_number}",
                     'debit' => 0,
                     'credit' => $amount,
+                    'site_id' => $siteId,
                 ],
             ],
         ]);
 
-        FinPaymentAllocation::create([
-            'organization_id' => $bill->organization_id,
-            'type' => 'payable',
-            'payment_date' => $transaction->transaction_date->toDateString(),
-            'amount' => $amount,
-            'allocatable_type' => FinBill::class,
-            'allocatable_id' => $bill->id,
-            'source_type' => FinPaymentMatch::class,
-            'source_id' => $match->id,
-            'journal_id' => $journal->id,
-            'notes' => "Matched bank transaction #{$transaction->id}",
-            'created_by' => $userId,
-        ]);
-
         $this->accountsPayableService->recordPayment($bill, (float) $amount);
+
+        $this->settlementRecorder->record(
+            target: $bill,
+            journal: $journal,
+            source: $match,
+            siteId: $siteId,
+            amount: $amount,
+            paymentDate: $transaction->transaction_date->toDateString(),
+            actor: $actor,
+            bankTransaction: $transaction,
+            notes: "Matched bank transaction #{$transaction->id}",
+        );
 
         return $journal;
     }
 
-    private function postInvoiceReceiptJournal(FinPaymentMatch $match, FinInvoice $invoice, ?int $userId)
+    private function postInvoiceReceiptJournal(FinPaymentMatch $match, FinInvoice $invoice, User $actor)
     {
         $transaction = $match->bankTransaction;
+
+        if (! in_array($invoice->status, ['sent', 'viewed', 'overdue'], true)) {
+            throw new InvalidArgumentException('The invoice is not in a receivable state.');
+        }
 
         if (bccomp((string) $transaction->amount, '0', 2) <= 0) {
             throw new InvalidArgumentException('Invoice receipt matches must be linked to deposit bank transactions.');
@@ -398,6 +516,7 @@ class PaymentMatchingService
 
         $bankAccount = $this->resolveBankGlAccount($transaction);
         $arAccount = $this->findAccountByCode($invoice->organization_id, '1100');
+        $siteId = $this->paymentSiteScope->invoiceSiteId($invoice);
 
         $journal = $this->journalPostingService->createAndPost($invoice->organization_id, [
             'journal_date' => $transaction->transaction_date->toDateString(),
@@ -412,29 +531,29 @@ class PaymentMatchingService
                     'description' => "Bank receipt for invoice {$invoice->invoice_number}",
                     'debit' => $amount,
                     'credit' => 0,
+                    'site_id' => $siteId,
                 ],
                 [
                     'account_id' => $arAccount->id,
                     'description' => "Receipt matched to invoice {$invoice->invoice_number}",
                     'debit' => 0,
                     'credit' => $amount,
+                    'site_id' => $siteId,
                 ],
             ],
         ]);
 
-        FinPaymentAllocation::create([
-            'organization_id' => $invoice->organization_id,
-            'type' => 'receivable',
-            'payment_date' => $transaction->transaction_date->toDateString(),
-            'amount' => $amount,
-            'allocatable_type' => FinInvoice::class,
-            'allocatable_id' => $invoice->id,
-            'source_type' => FinPaymentMatch::class,
-            'source_id' => $match->id,
-            'journal_id' => $journal->id,
-            'notes' => "Matched bank transaction #{$transaction->id}",
-            'created_by' => $userId,
-        ]);
+        $this->settlementRecorder->record(
+            target: $invoice,
+            journal: $journal,
+            source: $match,
+            siteId: $siteId,
+            amount: $amount,
+            paymentDate: $transaction->transaction_date->toDateString(),
+            actor: $actor,
+            bankTransaction: $transaction,
+            notes: "Matched bank transaction #{$transaction->id}",
+        );
 
         $totalPaid = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
             ->where('allocatable_id', $invoice->id)
@@ -448,6 +567,89 @@ class PaymentMatchingService
         }
 
         return $journal;
+    }
+
+    private function lockMatchable(FinPaymentMatch $match): FinBill|FinInvoice
+    {
+        $query = match ($match->matchable_type) {
+            FinBill::class => FinBill::query(),
+            FinInvoice::class => FinInvoice::query(),
+            default => abort(404),
+        };
+
+        return $query
+            ->where('organization_id', $match->organization_id)
+            ->lockForUpdate()
+            ->findOrFail($match->matchable_id);
+    }
+
+    private function assertActorCanAccessTarget(User $actor, FinBill|FinInvoice $target): void
+    {
+        if ($target instanceof FinBill) {
+            $this->paymentSiteScope->assertCanAccessBill($actor, $target);
+
+            return;
+        }
+
+        $this->paymentSiteScope->assertCanAccessInvoice($actor, $target);
+    }
+
+    private function candidateSiteId(string $type, int $id, ?int $orgId): int
+    {
+        $candidate = match ($type) {
+            FinBill::class => FinBill::forOrganization($orgId)->findOrFail($id),
+            FinInvoice::class => FinInvoice::forOrganization($orgId)->findOrFail($id),
+            default => abort(404),
+        };
+
+        return $candidate instanceof FinBill
+            ? $this->paymentSiteScope->billSiteId($candidate)
+            : $this->paymentSiteScope->invoiceSiteId($candidate);
+    }
+
+    private function suggestionKey(int $transactionId, string $type, int $id): string
+    {
+        return $transactionId.':'.$type.':'.$id;
+    }
+
+    private function nextSuggestionKey(
+        ?int $orgId,
+        int $transactionId,
+        string $matchableType,
+        int $matchableId,
+    ): ?string {
+        $baseKey = $this->suggestionKey($transactionId, $matchableType, $matchableId);
+        $proposals = FinPaymentMatch::query()
+            ->where('organization_id', $orgId)
+            ->where('bank_transaction_id', $transactionId)
+            ->where('matchable_type', $matchableType)
+            ->where('matchable_id', $matchableId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['status', 'suggestion_key']);
+
+        if ($proposals->contains(fn (FinPaymentMatch $proposal): bool => $proposal->status !== 'rejected')) {
+            return null;
+        }
+        if ($proposals->isEmpty()) {
+            return $baseKey;
+        }
+
+        $latestVersion = $proposals->reduce(
+            function (int $latest, FinPaymentMatch $proposal) use ($baseKey): int {
+                if ($proposal->suggestion_key === $baseKey) {
+                    return max($latest, 1);
+                }
+                if (preg_match('/^'.preg_quote($baseKey, '/').':v(\d+)$/', (string) $proposal->suggestion_key, $matches)) {
+                    return max($latest, (int) $matches[1]);
+                }
+
+                return $latest;
+            },
+            1,
+        );
+
+        return $baseKey.':v'.($latestVersion + 1);
     }
 
     private function amountDueFor($candidate): string
@@ -474,7 +676,14 @@ class PaymentMatchingService
 
     private function resolveBankGlAccount(FinBankTransaction $transaction): FinAccount
     {
-        if ($transaction->bankAccount?->glAccount?->is_active) {
+        abort_unless(
+            $transaction->bankAccount !== null
+                && (int) $transaction->bankAccount->organization_id === (int) $transaction->organization_id,
+            404,
+        );
+
+        if ($transaction->bankAccount->glAccount?->is_active
+            && (int) $transaction->bankAccount->glAccount->organization_id === (int) $transaction->organization_id) {
             return $transaction->bankAccount->glAccount;
         }
 

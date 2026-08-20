@@ -119,13 +119,16 @@ class AccountsReceivableController extends Controller
             'invoice_id' => 'required|exists:fin_invoices,id',
             'amount' => 'required|numeric|min:0.01',
             'payment_date' => 'required|date',
+            'idempotency_key' => 'required|uuid',
             'notes' => 'nullable|string',
         ]);
 
-        $orgId = $request->user()->organization_id;
-
         try {
-            $this->service->allocatePayment($orgId, $validated);
+            $this->service->allocatePayment(
+                $request->user()->organization_id,
+                $request->user(),
+                $validated,
+            );
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['amount' => $e->getMessage()]);
         }

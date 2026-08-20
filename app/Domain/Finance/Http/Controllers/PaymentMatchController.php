@@ -3,7 +3,6 @@
 namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinBankTransaction;
-use App\Domain\Finance\Models\FinMatchRule;
 use App\Domain\Finance\Models\FinPaymentMatch;
 use App\Domain\Finance\Services\PaymentMatchingService;
 use App\Http\Controllers\Controller;
@@ -23,7 +22,10 @@ class PaymentMatchController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $matches = FinPaymentMatch::forOrganization($orgId)
+        $matches = $this->service->scopeMatchesForActor(
+            FinPaymentMatch::forOrganization($orgId),
+            $request->user(),
+        )
             ->with([
                 'bankTransaction:id,bank_account_id,transaction_date,description,reference,amount',
                 'bankTransaction.bankAccount:id,name',
@@ -94,31 +96,7 @@ class PaymentMatchController extends Controller
     public function suggest(Request $request, FinBankTransaction $transaction)
     {
         $orgId = $request->user()->organization_id;
-        $matches = $this->service->findMatches($orgId, $transaction);
-
-        // Store suggested matches
-        $created = 0;
-        foreach ($matches as $match) {
-            // Don't create duplicate suggestions
-            $exists = FinPaymentMatch::where('bank_transaction_id', $transaction->id)
-                ->where('matchable_type', $match['matchable_type'])
-                ->where('matchable_id', $match['matchable_id'])
-                ->whereIn('status', ['suggested', 'confirmed', 'auto_confirmed'])
-                ->exists();
-
-            if (!$exists) {
-                FinPaymentMatch::create([
-                    'organization_id' => $orgId,
-                    'bank_transaction_id' => $transaction->id,
-                    'matchable_type' => $match['matchable_type'],
-                    'matchable_id' => $match['matchable_id'],
-                    'confidence_score' => $match['confidence_score'],
-                    'match_reasons' => $match['match_reasons'],
-                    'status' => 'suggested',
-                ]);
-                $created++;
-            }
-        }
+        $created = $this->service->suggestForTransaction($orgId, $transaction, $request->user());
 
         return redirect()->back()
             ->with('success', "{$created} potential match(es) found for transaction.");
@@ -130,7 +108,7 @@ class PaymentMatchController extends Controller
     public function matchAll(Request $request)
     {
         $orgId = $request->user()->organization_id;
-        $results = $this->service->matchUnmatchedTransactions($orgId);
+        $results = $this->service->matchUnmatchedTransactions($orgId, $request->user());
 
         $message = "Matching complete: {$results['matched']} match(es) found";
         if ($results['auto_confirmed'] > 0) {
@@ -140,7 +118,7 @@ class PaymentMatchController extends Controller
             $message .= ", {$results['suggested']} awaiting review";
         }
 
-        return redirect()->back()->with('success', $message . '.');
+        return redirect()->back()->with('success', $message.'.');
     }
 
     /**
@@ -148,7 +126,11 @@ class PaymentMatchController extends Controller
      */
     public function confirm(Request $request, FinPaymentMatch $match)
     {
-        $this->service->confirmMatch($match, $request->user()->id);
+        try {
+            $this->service->confirmMatch($match, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['match' => $e->getMessage()]);
+        }
 
         return redirect()->back()
             ->with('success', 'Payment match confirmed.');
@@ -159,7 +141,15 @@ class PaymentMatchController extends Controller
      */
     public function reject(Request $request, FinPaymentMatch $match)
     {
-        $this->service->rejectMatch($match);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $this->service->rejectMatch($match, $request->user(), $data['reason'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['match' => $e->getMessage()]);
+        }
 
         return redirect()->back()
             ->with('success', 'Payment match rejected.');

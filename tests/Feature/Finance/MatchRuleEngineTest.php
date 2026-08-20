@@ -5,16 +5,16 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinInvoice;
-use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinMatchRule;
+use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinPaymentMatch;
 use App\Domain\Finance\Services\PaymentMatchingService;
+use App\Models\Client;
+use App\Models\Site;
 
 /**
- * The auto-match engine ignored the configured match rules (only the global max
- * threshold) and never credited match_count. Now the highest-priority active rule
- * whose rule_type the candidate satisfied governs the auto-confirm threshold and
- * has its match_count incremented.
+ * Scheduled matching is deliberately suggestion-only. A confidence rule may
+ * rank a candidate, but it cannot settle money without a Site-authorized actor.
  */
 beforeEach(function () {
     foreach ([['1000', 'Bank', 'asset'], ['1100', 'Accounts Receivable', 'asset']] as [$code, $name, $type]) {
@@ -30,11 +30,13 @@ beforeEach(function () {
     ]);
 
     $this->bankAccount = FinBankAccount::factory()->create(['organization_id' => 1, 'is_active' => true]);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
 
     // A $100 invoice and a matching $100 deposit referencing it on the due date:
     // exact amount (40) + reference (30) + date proximity (10) = score 80.
     $this->invoice = FinInvoice::factory()->create([
-        'organization_id' => 1, 'invoice_number' => 'INV-MATCH01', 'status' => 'sent',
+        'organization_id' => 1, 'client_id' => $client->id, 'invoice_number' => 'INV-MATCH01', 'status' => 'sent',
         'total_amount' => '100.00', 'invoice_date' => now()->subDays(2)->toDateString(),
         'due_date' => now()->toDateString(),
     ]);
@@ -53,7 +55,7 @@ it('leaves an 80-score match merely suggested with no governing rule', function 
         ->and((float) $pm->confidence_score)->toBe(80.0);
 });
 
-it('auto-confirms via an exact_amount rule and increments its match_count', function () {
+it('does not let an exact-amount rule auto-settle without an actor', function () {
     $rule = FinMatchRule::create([
         'organization_id' => 1, 'name' => 'Auto exact amounts', 'priority' => 10,
         'rule_type' => 'exact_amount', 'conditions' => [], 'auto_confirm_threshold' => 75.00, 'is_active' => true,
@@ -62,17 +64,13 @@ it('auto-confirms via an exact_amount rule and increments its match_count', func
     app(PaymentMatchingService::class)->matchUnmatchedTransactions(1);
 
     $pm = FinPaymentMatch::where('bank_transaction_id', $this->txn->id)->firstOrFail();
-    expect($pm->status)->toBe('auto_confirmed')
-        ->and($rule->fresh()->match_count)->toBe(1);
-
-    // The auto-confirm posted a balanced DR Bank / CR AR receipt journal.
-    $journal = FinJournal::where('source_type', FinPaymentMatch::class)->where('source_id', $pm->id)->firstOrFail()->load('lines');
-    $debits = $journal->lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->debit, 2), '0');
-    $credits = $journal->lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->credit, 2), '0');
-    expect(bccomp($debits, $credits, 2))->toBe(0)->and($debits)->toBe('100.00');
+    expect($pm->status)->toBe('suggested')
+        ->and($rule->fresh()->match_count)->toBe(0)
+        ->and($pm->journal_id)->toBeNull()
+        ->and(FinPaymentAllocation::query()->count())->toBe(0);
 });
 
-it('does not auto-confirm when the governing rule threshold is above the score', function () {
+it('keeps strict-rule candidates as suggestions', function () {
     FinMatchRule::create([
         'organization_id' => 1, 'name' => 'Strict exact amounts', 'priority' => 10,
         'rule_type' => 'exact_amount', 'conditions' => [], 'auto_confirm_threshold' => 90.00, 'is_active' => true,
