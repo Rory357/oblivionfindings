@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Privacy\Services\StatutoryDueDate;
 use App\Models\Concerns\AuditableChanges;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,8 @@ class DataSubjectRequest extends Model
         'completed_at',
         'completed_by_user_id',
         'completion_notes',
+        'refused_at',
+        'refused_by_user_id',
         'export_path',
         'export_generated_at',
         'export_accessed_at',
@@ -59,6 +62,7 @@ class DataSubjectRequest extends Model
         'extended_due_date' => 'date',
         'assigned_at' => 'datetime',
         'completed_at' => 'datetime',
+        'refused_at' => 'datetime',
         'export_generated_at' => 'datetime',
         'export_accessed_at' => 'datetime',
         'extension_requested' => 'boolean',
@@ -95,7 +99,7 @@ class DataSubjectRequest extends Model
      */
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('DSR');
+        return app(ReferenceNumberGenerator::class)->next('DSR');
     }
 
     /**
@@ -136,6 +140,14 @@ class DataSubjectRequest extends Model
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by_user_id');
+    }
+
+    /**
+     * User who refused the request.
+     */
+    public function refusedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'refused_by_user_id');
     }
 
     /**

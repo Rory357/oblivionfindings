@@ -7,6 +7,7 @@ use App\Models\DataBreachLog;
 use App\Models\DataRetentionPolicy;
 use App\Models\DataSubjectRequest;
 use App\Models\LegalHold;
+use App\Models\Permission;
 use App\Models\PrivacyImpactAssessment;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
@@ -597,7 +598,12 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dsr_complete_marks_request_completed(): void
     {
-        $dsr = $this->createDSR(['status' => 'in_progress']);
+        $dsr = $this->createDSR([
+            'status' => 'in_progress',
+            'identity_verified' => 'verified',
+            'identity_verified_at' => now(),
+            'verified_by_user_id' => $this->admin->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/privacy/requests/{$dsr->id}/complete", [
@@ -667,7 +673,12 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dsr_refuse_sets_rejected_status(): void
     {
-        $dsr = $this->createDSR(['status' => 'in_progress']);
+        $dsr = $this->createDSR([
+            'status' => 'in_progress',
+            'identity_verified' => 'verified',
+            'identity_verified_at' => now(),
+            'verified_by_user_id' => $this->admin->id,
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/privacy/requests/{$dsr->id}/refuse", [
@@ -2134,7 +2145,7 @@ class PrivacyControllerTest extends TestCase
             ->assertSessionHasErrors(['status']);
     }
 
-    public function test_dsr_update_allows_valid_status_values(): void
+    public function test_dsr_update_rejects_all_lifecycle_status_values(): void
     {
         $validStatuses = ['received', 'under_review', 'identity_verification', 'in_progress', 'completed', 'rejected', 'withdrawn'];
 
@@ -2145,7 +2156,9 @@ class PrivacyControllerTest extends TestCase
                 ->put("/privacy/requests/{$dsr->id}", [
                     'status' => $status,
                 ])
-                ->assertRedirect();
+                ->assertSessionHasErrors(['status']);
+
+            $this->assertSame('identity_verification', $dsr->fresh()->status);
         }
     }
 
@@ -2168,6 +2181,8 @@ class PrivacyControllerTest extends TestCase
     {
         $dsr = $this->createDSR();
         $assignee = User::factory()->create(['approved_at' => now()]);
+        $permission = Permission::where('key', 'privacy.processRequests')->firstOrFail();
+        $assignee->permissionOverrides()->attach($permission->id, ['allowed' => true]);
 
         $this->actingAs($this->admin)
             ->put("/privacy/requests/{$dsr->id}", [

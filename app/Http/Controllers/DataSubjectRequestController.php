@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Privacy\Services\DataSubjectRequestLifecycleService;
+use App\Models\ClientConsent;
 use App\Models\DataSubjectRequest;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
@@ -16,6 +18,10 @@ use Inertia\Response;
 
 class DataSubjectRequestController extends Controller
 {
+    public function __construct(
+        private readonly DataSubjectRequestLifecycleService $lifecycle,
+    ) {}
+
     /**
      * Display a listing of privacy requests.
      */
@@ -96,10 +102,17 @@ class DataSubjectRequestController extends Controller
             'verification_method' => 'nullable|string|max:255',
         ]);
 
-        $validated['created_by'] = auth()->id();
-        $validated['status'] = 'identity_verification';
+        $assigneeId = $validated['assigned_to_user_id'] ?? null;
+        $verificationMethod = trim((string) ($validated['verification_method'] ?? ''));
+        unset($validated['assigned_to_user_id'], $validated['verification_method']);
 
-        $dsr = DataSubjectRequest::create($validated);
+        $dsr = $this->lifecycle->intake(
+            $request->user(),
+            $validated,
+            'privacy.command_centre',
+            $assigneeId !== null ? (int) $assigneeId : null,
+            $verificationMethod !== '' ? $verificationMethod : null,
+        );
 
         $message = 'Privacy request created with reference: '.$dsr->reference_number;
 
@@ -142,18 +155,31 @@ class DataSubjectRequestController extends Controller
         $this->authorizePermission($request, 'privacy.processRequests');
 
         $validated = $request->validate([
-            'status' => 'sometimes|in:received,under_review,identity_verification,in_progress,completed,rejected,withdrawn',
-            'assigned_to_user_id' => 'nullable|exists:users,id',
-            'completion_notes' => 'nullable|string',
+            'assigned_to_user_id' => 'sometimes|nullable|exists:users,id',
+            'status' => 'prohibited',
+            'completion_notes' => 'prohibited',
+            'completed_at' => 'prohibited',
+            'completed_by_user_id' => 'prohibited',
+            'identity_verified' => 'prohibited',
+            'identity_verified_at' => 'prohibited',
+            'verified_by_user_id' => 'prohibited',
+            'verification_method' => 'prohibited',
+            'extension_requested' => 'prohibited',
+            'extended_due_date' => 'prohibited',
+            'extension_reason' => 'prohibited',
+            'rejection_reason' => 'prohibited',
+            'rejection_legal_basis' => 'prohibited',
+            'refused_at' => 'prohibited',
+            'refused_by_user_id' => 'prohibited',
         ]);
 
-        $validated['updated_by'] = auth()->id();
-
-        if (isset($validated['assigned_to_user_id']) && ! $dsRequest->assigned_at) {
-            $validated['assigned_at'] = now();
+        if (array_key_exists('assigned_to_user_id', $validated)) {
+            $this->lifecycle->assign(
+                $dsRequest,
+                $request->user(),
+                $validated['assigned_to_user_id'],
+            );
         }
-
-        $dsRequest->update($validated);
 
         return back()->with('success', 'Request updated successfully.');
     }
@@ -169,14 +195,11 @@ class DataSubjectRequestController extends Controller
             'verification_method' => 'required|string|max:255',
         ]);
 
-        $dsRequest->update([
-            'identity_verified' => 'verified',
-            'identity_verified_at' => now(),
-            'verified_by_user_id' => auth()->id(),
-            'verification_method' => $request->verification_method,
-            'status' => 'in_progress',
-            'updated_by' => auth()->id(),
-        ]);
+        $this->lifecycle->verifyIdentity(
+            $dsRequest,
+            $request->user(),
+            $request->string('verification_method')->toString(),
+        );
 
         return back()->with('success', 'Identity verified successfully.');
     }
@@ -193,12 +216,12 @@ class DataSubjectRequestController extends Controller
             'extended_due_date' => 'required|date|after:today',
         ]);
 
-        $dsRequest->update([
-            'extension_requested' => true,
-            'extension_reason' => $request->extension_reason,
-            'extended_due_date' => $request->extended_due_date,
-            'updated_by' => auth()->id(),
-        ]);
+        $this->lifecycle->extend(
+            $dsRequest,
+            $request->user(),
+            $request->string('extension_reason')->toString(),
+            $request->string('extended_due_date')->toString(),
+        );
 
         return back()->with('success', 'Deadline extended successfully.');
     }
@@ -214,13 +237,11 @@ class DataSubjectRequestController extends Controller
             'completion_notes' => 'nullable|string',
         ]);
 
-        $dsRequest->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by_user_id' => auth()->id(),
-            'completion_notes' => $request->completion_notes,
-            'updated_by' => auth()->id(),
-        ]);
+        $this->lifecycle->complete(
+            $dsRequest,
+            $request->user(),
+            $request->input('completion_notes'),
+        );
 
         return back()->with('success', 'Request marked as completed.');
     }
@@ -237,12 +258,12 @@ class DataSubjectRequestController extends Controller
             'rejection_legal_basis' => 'required|string',
         ]);
 
-        $dsRequest->update([
-            'status' => 'rejected',
-            'rejection_reason' => $request->rejection_reason,
-            'rejection_legal_basis' => $request->rejection_legal_basis,
-            'updated_by' => auth()->id(),
-        ]);
+        $this->lifecycle->refuse(
+            $dsRequest,
+            $request->user(),
+            $request->string('rejection_reason')->toString(),
+            $request->string('rejection_legal_basis')->toString(),
+        );
 
         return back()->with('success', 'Request refused.');
     }
@@ -333,7 +354,7 @@ class DataSubjectRequestController extends Controller
             ])->toArray();
 
             // Consent records
-            $consents = \App\Models\ClientConsent::where('client_id', $client->id)
+            $consents = ClientConsent::where('client_id', $client->id)
                 ->with('consentType')
                 ->get();
 

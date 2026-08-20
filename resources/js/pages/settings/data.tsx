@@ -417,6 +417,10 @@ type DataSettingsPageProps = {
         require_privacy_officer_approval: boolean;
         log_medical_access: boolean;
     };
+    privacy_capabilities?: {
+        view_requests: boolean;
+        process_requests: boolean;
+    };
     dsar_requests?: DsarRequest[];
     breaches?: DataBreach[];
     processors?: DataProcessor[];
@@ -699,6 +703,10 @@ export default function Data() {
         retention_values = {},
         privacy_settings,
         compliance_settings,
+        privacy_capabilities = {
+            view_requests: false,
+            process_requests: false,
+        },
         dsar_requests = [],
         breaches: breachProps = [],
         processors: processorProps = [],
@@ -1919,7 +1927,8 @@ export default function Data() {
                         {/* ==========================================================
                         SECTION 2 -- Privacy Access and Correction Requests
                     ========================================================== */}
-                        <Card>
+                        {privacy_capabilities.view_requests && (
+                            <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -1939,14 +1948,18 @@ export default function Data() {
                                             </CardDescription>
                                         </div>
                                     </div>
-                                    <Button
-                                        dusk="data-dsar-open"
-                                        className="bg-primary hover:bg-primary"
-                                        onClick={() => setShowDsarDialog(true)}
-                                    >
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        New Request
-                                    </Button>
+                                    {privacy_capabilities.process_requests && (
+                                        <Button
+                                            dusk="data-dsar-open"
+                                            className="bg-primary hover:bg-primary"
+                                            onClick={() =>
+                                                setShowDsarDialog(true)
+                                            }
+                                        >
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            New Request
+                                        </Button>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
@@ -2069,7 +2082,8 @@ export default function Data() {
                                     </table>
                                 </div>
                             </CardContent>
-                        </Card>
+                            </Card>
+                        )}
 
                         {/* ==========================================================
                         SECTION 3 -- Data Breach Management
@@ -3080,7 +3094,9 @@ export default function Data() {
                 </Dialog>
 
                 {/* DSAR New Request dialog */}
-                <Dialog
+                {privacy_capabilities.view_requests &&
+                    privacy_capabilities.process_requests && (
+                        <Dialog
                     open={showDsarDialog}
                     onOpenChange={(open) => {
                         setShowDsarDialog(open);
@@ -3306,7 +3322,8 @@ export default function Data() {
                             </Button>
                         </DialogFooter>
                     </DialogContent>
-                </Dialog>
+                        </Dialog>
+                    )}
 
                 {/* Data Breach Report dialog */}
                 <Dialog
