@@ -2652,6 +2652,7 @@ class IncidentControllerTest extends TestCase
             'site_id' => $this->client->site_id,
             'severity' => 'high',
             'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
+            'submitted_at' => now()->subDay(),
         ]);
         $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
@@ -2661,6 +2662,12 @@ class IncidentControllerTest extends TestCase
 
         // Run the investigation to completion through the real service.
         $this->actingAs($this->admin);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
         $service = app(HsInvestigationService::class);
         $investigation = $service->create($hsEvent, [
             'methodology' => '5_whys',
@@ -2671,12 +2678,84 @@ class IncidentControllerTest extends TestCase
             'findings_summary' => 'Root cause established.',
             'recommendations' => [['description' => 'Refresh the support plan']],
         ]);
-        $service->submitForReview($investigation);
-        $service->complete($investigation, ['approved_by_id' => $this->admin->id]);
+        $service->submitForReview($investigation, $this->admin);
+        $reviewer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $reviewer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $reviewer->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $approver = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $approver->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $approver->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $this->actingAs($reviewer);
+        $service->review($investigation, $reviewer);
+        $this->actingAs($approver);
+        $service->complete($investigation, $approver);
 
         // The lifecycle sync mirrors completion onto the incident column.
         $this->assertSame('completed', $incident->fresh()->investigation_status);
-        $this->markLinkedHealthSafetyGovernanceClosed($incident);
+        $eventService = app(HsEventService::class);
+        $eventService->acceptHandover(
+            $hsEvent->fresh(),
+            $approver,
+            $approver,
+            'Investigation completed and governance accepted for closure.',
+        );
+        $eventService->recordWorksafeDecision(
+            $hsEvent->fresh(),
+            false,
+            'No WorkSafe notification is required for this incident fixture.',
+            $approver,
+        );
+        $service->dispositionRecommendation(
+            $investigation->fresh(),
+            0,
+            HsRecommendationDisposition::DISPOSITION_NO_ACTION,
+            $approver,
+            'The completed investigation does not require a separate corrective action.',
+        );
+        $alert = ControlRoomAlert::query()->findOrFail($hsEvent->control_room_alert_id);
+        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
+        $this->actingAs($this->admin);
+        $alertLifecycle = app(ControlRoomAlertLifecycleService::class);
+        $alert = $alertLifecycle->acknowledge(
+            $alert,
+            $this->admin,
+            'Operational response acknowledged for the completed investigation.',
+        );
+        $alert = $alertLifecycle->startTriage(
+            $alert,
+            $this->admin,
+            'Operational review confirmed the investigation outcome.',
+        );
+        $alertLifecycle->resolve(
+            $alert,
+            $this->admin,
+            'Operational response resolved after the H&S investigation was accepted.',
+            'controlled',
+        );
+        $this->actingAs($approver);
+        app(HsEventClosureService::class)->closeEvent(
+            $hsEvent->fresh(),
+            'Governance closed through the canonical H&S lifecycle.',
+            $approver,
+        );
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Investigated and resolved'])

@@ -60,6 +60,8 @@ class HsInvestigationFactory extends Factory
         return $this->withFindings()->state(fn () => [
             'status' => HsInvestigation::STATUS_COMPLETED,
             'completed_at' => now(),
+            'submitted_by_id' => User::factory(),
+            'submitted_at' => now()->subHours(2),
             'reviewed_by_id' => User::factory(),
             'reviewed_at' => now()->subHour(),
             'approved_by_id' => User::factory(),

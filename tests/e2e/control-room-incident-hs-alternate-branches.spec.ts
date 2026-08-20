@@ -541,6 +541,12 @@ echo json_encode([
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/submit`,
         );
+        await loginAsFixture(page, manifest.users.reviewer);
+        await postLaravel(
+            page,
+            `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,
+        );
+        await loginAsFixture(page, manifest.users.verifier);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,

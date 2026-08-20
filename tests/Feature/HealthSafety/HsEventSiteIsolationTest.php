@@ -83,7 +83,10 @@ class HsEventSiteIsolationTest extends TestCase
     {
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
-        $user = $this->siteBoundUser($siteA, ['hazards.manage']);
+        $user = $this->siteBoundUser($siteA, [
+            'hazards.manage',
+            'healthSafety.events.close',
+        ]);
         $hidden = HsEvent::factory()->create(['site_id' => $siteB->id]);
 
         $this->actingAs($user)
@@ -238,17 +241,41 @@ class HsEventSiteIsolationTest extends TestCase
 
         $this->assertSame(HsCorrectiveAction::STATUS_OPEN, $action->fresh()->status);
 
+    }
+
+    public function test_explicit_global_hs_actor_can_approve_another_sites_investigation(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $lead = $this->siteBoundUser($siteB, ['hazards.manage']);
+        $globalReviewer = $this->siteBoundUser($siteA, [
+            'hazards.manage',
+            'healthSafety.viewAllSites',
+        ]);
+        $globalApprover = $this->siteBoundUser($siteA, [
+            'hazards.manage',
+            'healthSafety.viewAllSites',
+        ]);
+        $event = HsEvent::factory()->high()->create(['site_id' => $siteB->id]);
         $investigation = HsInvestigation::factory()->withFindings()->create([
             'hs_event_id' => $event->id,
             'status' => HsInvestigation::STATUS_UNDER_REVIEW,
+            'lead_investigator_id' => $lead->id,
+            'submitted_by_id' => $lead->id,
+            'submitted_at' => now()->subMinute(),
+            'updated_by' => $lead->id,
         ]);
-        $this->actingAs($manager)
-            ->post("/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete", [
-                'approved_by_id' => $otherSiteManager->id,
-            ])
-            ->assertSessionHasErrors('approved_by_id');
 
-        $this->assertSame(HsInvestigation::STATUS_UNDER_REVIEW, $investigation->fresh()->status);
+        $this->actingAs($globalReviewer)
+            ->post("/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete")
+            ->assertSessionHas('success');
+        $this->actingAs($globalApprover)
+            ->post("/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete")
+            ->assertSessionHas('success');
+
+        $investigation->refresh();
+        $this->assertSame(HsInvestigation::STATUS_COMPLETED, $investigation->status);
+        $this->assertSame($globalApprover->id, $investigation->approved_by_id);
     }
 
     public function test_site_bound_manager_cannot_notify_or_acknowledge_worksafe_for_another_sites_event(): void
@@ -285,7 +312,10 @@ class HsEventSiteIsolationTest extends TestCase
     public function test_hs_event_mutations_return_not_found_for_a_nonexistent_event_id(): void
     {
         $site = Site::factory()->create();
-        $user = $this->siteBoundUser($site, ['hazards.manage']);
+        $user = $this->siteBoundUser($site, [
+            'hazards.manage',
+            'healthSafety.events.close',
+        ]);
         $missingEventId = ((int) HsEvent::query()->max('id')) + 1000;
 
         $this->assertDatabaseMissing('hs_events', ['id' => $missingEventId]);
