@@ -21,6 +21,8 @@ export const JOURNEY_ACTIVITY_LABELS: Record<string, string> = {
     'controlRoom.alert.resolve': 'Alert operationally resolved',
     'controlRoom.alert.close': 'Alert closed',
     'controlRoom.alert.reopenForIncident': 'Alert reopened for incident review',
+    'controlRoom.alert.reopenFromIncidentSignal':
+        'Alert reopened for incident review',
     'controlRoom.alert.addNote': 'Operator note added',
     'controlRoom.task.created': 'Control Room task created',
     'controlRoom.task.updated': 'Control Room task updated',

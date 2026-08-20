@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Incidents;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
 use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
@@ -33,6 +34,7 @@ use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
+use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
@@ -216,8 +218,20 @@ class IncidentJourneyServiceTest extends TestCase
 
     public function test_incident_close_gate_requires_review_followups_investigation_and_linked_hs_closure(): void
     {
-        $actor = User::factory()->create();
+        $this->seed(RbacSeeder::class);
         $site = Site::factory()->create();
+        $actor = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $actor->roles()->attach(Role::query()->where('name', 'health_safety_officer')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'position_role' => 'health_safety_officer',
+        ]);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
             'status' => 'reviewed',
@@ -230,10 +244,14 @@ class IncidentJourneyServiceTest extends TestCase
             'client_incident_id' => $incident->id,
             'completed_at' => null,
         ]);
-        $event = HsEvent::factory()->forClientIncident($incident)->create([
-            'status' => HsEvent::STATUS_OPEN,
-            'investigation_required' => true,
-        ]);
+        $event = HsEvent::factory()
+            ->forClientIncident($incident)
+            ->handoverAccepted($actor, $actor)
+            ->worksafeNotNotifiable($actor)
+            ->create([
+                'status' => HsEvent::STATUS_OPEN,
+                'investigation_required' => true,
+            ]);
         $investigation = HsInvestigation::factory()->create([
             'hs_event_id' => $event->id,
         ]);
@@ -261,12 +279,11 @@ class IncidentJourneyServiceTest extends TestCase
             'status' => HsInvestigation::STATUS_COMPLETED,
             'completed_at' => now(),
         ])->save();
-        $event->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => 'Governance work is complete.',
-        ])->saveQuietly();
+        app(HsEventClosureService::class)->closeEvent(
+            $event,
+            'Governance work is complete.',
+            $actor,
+        );
 
         $ready = $service->closeGate($incident->fresh());
         $this->assertTrue($ready->allowed);

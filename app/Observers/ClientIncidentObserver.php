@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Models\ClientIncident;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
+use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Support\Facades\Log;
 
@@ -30,6 +31,7 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
         private readonly IncidentEscalationService $governanceEscalation,
+        private readonly IncidentAlertLifecycleSignalService $lifecycleSignals,
     ) {}
 
     public function created(ClientIncident $incident): void
@@ -45,12 +47,43 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
 
     public function updated(ClientIncident $incident): void
     {
+        $this->recoverLifecycleSignal($incident);
+
         if ($incident->status === 'draft' || ! $this->journeyNeedsSynchronising($incident)) {
             return;
         }
 
         if ($this->ensureJourney($incident)) {
             $this->maybeEscalateToGovernance($incident);
+        }
+    }
+
+    private function recoverLifecycleSignal(ClientIncident $incident): void
+    {
+        if (! $incident->wasChanged('status')
+            || ! in_array($incident->status, ['closed', 'reviewed'], true)) {
+            return;
+        }
+        if ($incident->status === 'reviewed'
+            && $incident->getOriginal('status') !== 'closed') {
+            return;
+        }
+
+        try {
+            $outbox = $this->lifecycleSignals->reconcileLatestTransition($incident);
+            if ($outbox !== null) {
+                $this->lifecycleSignals->dispatch($outbox->id);
+            }
+        } catch (\Throwable $exception) {
+            // Route writers already persisted their outbox atomically. This is
+            // the compatibility safety net for event-driven legacy origins; the
+            // scheduled reconciler will retry a failed or missing intent.
+            Log::error('incident_lifecycle_signal_repair_required', [
+                'incident_id' => $incident->id,
+                'status' => $incident->status,
+                'exception' => $exception::class,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

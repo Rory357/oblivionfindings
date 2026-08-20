@@ -8,7 +8,6 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\ControlRoom\EvidenceItem;
-use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationError;
@@ -16,10 +15,9 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\AuditLogger;
-use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
@@ -42,6 +40,7 @@ class IncidentController extends Controller
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
         private readonly IncidentJourneyPresenter $journeyPresenter,
+        private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
     ) {}
 
     /**
@@ -1613,7 +1612,16 @@ class IncidentController extends Controller
 
         $actor = $request->user();
         abort_unless($actor, 403);
-        [$incident, $closeError] = DB::transaction(function () use ($actor, $incident, $data): array {
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
+        $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
+        [$incident, $closeError, $outboxId] = DB::transaction(function () use (
+            $actor,
+            $incident,
+            $data,
+            $siteAccess,
+            $siteBypassPermissions,
+        ): array {
             $lockedIncident = ClientIncident::query()
                 ->whereKey($incident->id)
                 ->lockForUpdate()
@@ -1622,35 +1630,55 @@ class IncidentController extends Controller
             // Every close/follow-up writer locks this parent first. Whichever
             // operation wins is visible to the other before it can continue.
             $this->authorize('close', $lockedIncident);
+            $siteAccess->assertCanAccessClientIncident($actor, $lockedIncident, $siteBypassPermissions);
             abort_unless($lockedIncident->status === 'reviewed', 403);
 
-            $gate = $this->journeys->closeGate($lockedIncident);
+            try {
+                // Lock and canonicalise the H&S/alert parents before evaluating
+                // closure. The gate is then protected from a concurrent H&S
+                // transition until the source signal has been recorded.
+                $journey = $this->journeys->ensureForSubmittedIncident(
+                    $lockedIncident,
+                    $actor,
+                );
+                $lockedIncident = $journey->incident;
+                $gate = $this->journeys->closeGate($lockedIncident);
+            } catch (\DomainException) {
+                abort(404);
+            }
             if (! $gate->allowed) {
                 return [
                     $lockedIncident,
                     implode(' ', $gate->blockers()),
+                    null,
                 ];
             }
 
+            $at = now()->startOfSecond();
             $lockedIncident->update([
                 'status' => 'closed',
                 'closed_by' => $actor->id,
-                'closed_at' => now(),
+                'closed_at' => $at,
                 'closed_outcome' => $data['closed_outcome'],
                 'closed_notes' => $data['closed_notes'] ?? null,
             ]);
 
-            $journey = $this->journeys->ensureForSubmittedIncident(
+            $outbox = $this->incidentAlertSignals->recordClose(
                 $lockedIncident,
+                $journey,
                 $actor,
+                $at,
+                $data,
             );
 
-            return [$journey->incident, null];
+            return [$lockedIncident, null, $outbox->id];
         }, 3);
 
         if ($closeError !== null) {
             return back()->with('error', $closeError);
         }
+
+        $this->incidentAlertSignals->dispatch($outboxId);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
@@ -1694,25 +1722,15 @@ class IncidentController extends Controller
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
-        $incident = DB::transaction(function () use (
+        [$incident, $outboxId] = DB::transaction(function () use (
             $incident,
             $data,
             $actor,
             $siteAccess,
             $siteBypassPermissions,
-        ): ClientIncident {
-            // Every cross-record workflow uses the same alert-first lock order.
-            // The route-bound incident is only an identity hint; all mutable
-            // state is re-read under lock before either record is changed.
-            $alert = null;
-            if ($incident->control_room_alert_id) {
-                $alertQuery = ControlRoomAlert::query();
-                $siteAccess->applyAlertScope($alertQuery, $actor, $siteBypassPermissions);
-                $alert = $alertQuery
-                    ->whereKey($incident->control_room_alert_id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-            }
+        ): array {
+            // The incident is the source-authoritative parent. Alert state is
+            // requested through a durable signal and changed only by Control Room.
             $lockedIncident = ClientIncident::query()
                 ->whereKey($incident->id)
                 ->lockForUpdate()
@@ -1721,36 +1739,11 @@ class IncidentController extends Controller
             abort_unless($actor->can('reopen', $lockedIncident), 403);
             $siteAccess->assertCanAccessClientIncident($actor, $lockedIncident, $siteBypassPermissions);
             abort_unless($lockedIncident->status === 'closed', 403);
-            if ($lockedIncident->control_room_alert_id !== null) {
-                abort_unless(
-                    $alert
-                        && (int) $lockedIncident->control_room_alert_id === (int) $alert->id,
-                    409,
-                );
 
-                $lockedIncident->loadMissing([
-                    'client:id,site_id',
-                    'shift.client:id,site_id',
-                ]);
-                $incidentSiteId = $lockedIncident->site_id
-                    ?: $lockedIncident->client?->site_id
-                    ?: $lockedIncident->shift?->site_id
-                    ?: $lockedIncident->shift?->client?->site_id;
-                try {
-                    app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
-                        $alert,
-                        (int) $lockedIncident->client_id,
-                        $incidentSiteId ? (int) $incidentSiteId : null,
-                    );
-                } catch (\DomainException) {
-                    abort(404);
-                }
-            }
-
-            $at = now();
+            $at = now()->startOfSecond();
             $lockedIncident->update([
                 'status' => 'reviewed',
-                'reopened_by' => $actor?->id,
+                'reopened_by' => $actor->id,
                 'reopened_at' => $at,
                 'reopened_reason' => $data['reopened_reason'],
 
@@ -1761,41 +1754,23 @@ class IncidentController extends Controller
                 'closed_notes' => null,
             ]);
 
-            // Reopening the factual incident does not silently mutate the
-            // operational or H&S lifecycle. The marker and incident update are
-            // one transaction so an operator never sees half a handover.
-            if ($alert) {
-                $requiresOperationalReopen = $alert->isTerminal();
-                $context = $alert->context ?? [];
-                $context['journey_attention'] = [
-                    'type' => 'incident_reopened',
-                    'incident_id' => $lockedIncident->id,
-                    'reason' => $data['reopened_reason'],
-                    'actor_id' => $actor?->id,
-                    'actor_name' => $actor?->name,
-                    'requested_at' => $at->toIso8601String(),
-                    'requires_operational_reopen' => $requiresOperationalReopen,
-                ];
-                $alert->update(['context' => $context]);
-
-                AuditLogger::logOrFail('controlRoom.alert.incidentReopenedAttention', $alert, [
-                    'actor_id' => $actor?->id,
-                    'alert_id' => $alert->id,
-                    'incident_id' => $lockedIncident->id,
-                    'reason' => $data['reopened_reason'],
-                    'requires_operational_reopen' => $requiresOperationalReopen,
-                ]);
+            try {
+                $journey = $this->journeys->ensureForSubmittedIncident($lockedIncident, $actor);
+            } catch (\DomainException) {
+                abort(404);
             }
+            $outbox = $this->incidentAlertSignals->recordReopen(
+                $journey->incident,
+                $journey,
+                $actor,
+                $at,
+                $data['reopened_reason'],
+            );
 
-            // Verify and repair only the canonical links inside this transaction.
-            // attachAlertToIncident/ensureForSubmittedIncident never reopen the
-            // independently governed H&S, Control Room, or linked IT lifecycles.
-            $journey = $alert
-                ? $this->journeys->attachAlertToIncident($lockedIncident, $alert, $actor)
-                : $this->journeys->ensureForSubmittedIncident($lockedIncident, $actor);
-
-            return $journey->incident;
+            return [$journey->incident, $outbox->id];
         }, 3);
+
+        $this->incidentAlertSignals->dispatch($outboxId);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
