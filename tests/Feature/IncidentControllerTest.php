@@ -6,10 +6,14 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
 use App\Models\IncidentFollowup;
+use App\Models\IncidentLifecycleSignal;
+use App\Models\IncidentLifecycleSignalOutbox;
 use App\Models\IncidentTemplate;
 use App\Models\ItTicket;
 use App\Models\Permission;
@@ -18,6 +22,9 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\HsInvestigationService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
@@ -2280,6 +2287,7 @@ class IncidentControllerTest extends TestCase
         $hsEvent = $incident->fresh()->hsEvent()->firstOrFail();
         $originalHsStatus = $hsEvent->status;
         $originalHsSummary = $hsEvent->closure_summary;
+        $originalHsAcceptanceNotes = $hsEvent->acceptance_notes;
 
         $journeys = \Mockery::mock(IncidentJourneyService::class);
         $journeys->shouldReceive('ensureForSubmittedIncident')
@@ -2287,8 +2295,7 @@ class IncidentControllerTest extends TestCase
             ->andReturnUsing(function (ClientIncident $lockedIncident) use ($hsEvent): never {
                 $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
                 $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
-                    'status' => HsEvent::STATUS_CLOSED,
-                    'closure_summary' => 'Injected partial review mutation.',
+                    'acceptance_notes' => 'Injected partial review mutation.',
                 ]);
 
                 throw new \RuntimeException('Injected review journey failure');
@@ -2314,6 +2321,7 @@ class IncidentControllerTest extends TestCase
         $this->assertSame($hsEvent->id, $incident->hs_event_id);
         $this->assertSame($originalHsStatus, $hsEvent->fresh()->status);
         $this->assertSame($originalHsSummary, $hsEvent->fresh()->closure_summary);
+        $this->assertSame($originalHsAcceptanceNotes, $hsEvent->fresh()->acceptance_notes);
     }
 
     public function test_review_sends_notification(): void
@@ -2389,6 +2397,7 @@ class IncidentControllerTest extends TestCase
     public function test_close_changes_status_to_closed(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2413,6 +2422,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_close_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -2420,20 +2430,18 @@ class IncidentControllerTest extends TestCase
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
         $incident->refresh();
         $hsEvent = $incident->hsEvent()->firstOrFail();
-        $originalHsSummary = $hsEvent->closure_summary;
+        $originalHsAcceptanceNotes = $hsEvent->acceptance_notes;
         $closeGate = app(IncidentJourneyService::class)->closeGate($incident);
         $this->assertTrue($closeGate->allowed);
 
         $journeys = \Mockery::mock(IncidentJourneyService::class);
-        $journeys->shouldReceive('closeGate')
-            ->once()
-            ->andReturn($closeGate);
+        $journeys->shouldNotReceive('closeGate');
         $journeys->shouldReceive('ensureForSubmittedIncident')
             ->once()
             ->andReturnUsing(function (ClientIncident $lockedIncident) use ($hsEvent): never {
                 $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
                 $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
-                    'closure_summary' => 'Injected partial close mutation.',
+                    'acceptance_notes' => 'Injected partial close mutation.',
                 ]);
 
                 throw new \RuntimeException('Injected close journey failure');
@@ -2460,12 +2468,13 @@ class IncidentControllerTest extends TestCase
         $this->assertNull($incident->closed_notes);
         $this->assertSame($hsEvent->id, $incident->hs_event_id);
         $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
-        $this->assertSame($originalHsSummary, $hsEvent->fresh()->closure_summary);
+        $this->assertSame($originalHsAcceptanceNotes, $hsEvent->fresh()->acceptance_notes);
     }
 
-    public function test_closing_incident_does_not_silently_resolve_linked_control_room_alert(): void
+    public function test_closing_incident_emits_a_durable_signal_that_control_room_uses_to_resolve_the_alert(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $alert = ControlRoomAlert::factory()->open()->create([
             'client_id' => $this->client->id,
@@ -2476,22 +2485,69 @@ class IncidentControllerTest extends TestCase
             'site_id' => $this->site->id,
             'control_room_alert_id' => $alert->id,
         ]);
+
+        $alertLifecycle = app(ControlRoomAlertLifecycleService::class);
+        $alert = $alertLifecycle->acknowledge(
+            $alert,
+            $this->admin,
+            'Operational response acknowledged before H&S closure.',
+        );
+        $alert = $alertLifecycle->startTriage(
+            $alert,
+            $this->admin,
+            'Operational controls reviewed before H&S closure.',
+        );
+        $alert = $alertLifecycle->resolve(
+            $alert,
+            $this->admin,
+            'Operational response completed before H&S governance closure.',
+            'controlled',
+        );
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [
-                'closed_outcome' => 'Resolved',
+                'closed_outcome' => 'Initial incident closure',
+            ])
+            ->assertRedirect();
+
+        SlaDefinition::query()->create([
+            'name' => 'Incident close propagation fixture',
+            'code' => 'incident-close-propagation-'.$alert->id,
+            'alert_types' => [$alert->alert_type],
+            'severities' => [$alert->severity],
+            'sources' => [$alert->source],
+            'acknowledge_target_minutes' => 5,
+            'response_target_minutes' => 10,
+            'resolution_target_minutes' => 30,
+            'is_active' => true,
+        ]);
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/reopen", [
+                'reopened_reason' => 'New evidence required another operational response.',
+            ])
+            ->assertRedirect();
+        $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->fresh()->status);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/close", [
+                'closed_outcome' => 'Reopened evidence reviewed and controlled',
             ])
             ->assertRedirect();
 
         $this->assertSame('closed', $incident->fresh()->status);
-        // Incident review and operational response are independently truthful.
-        // An operator must use the gated Control Room lifecycle to resolve it.
         $alert->refresh();
-        $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);
-        $this->assertNull($alert->resolved_at);
-        $this->assertNull($alert->resolved_by_user_id);
-        $this->assertNull($alert->resolution_code);
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->status);
+        $this->assertNotNull($alert->resolved_at);
+        $this->assertSame($this->coordinator->id, $alert->resolved_by_user_id);
+        $this->assertSame('incident_closed', $alert->resolution_code);
+        $signal = IncidentLifecycleSignal::query()->latest('sequence')->firstOrFail();
+        $this->assertSame(IncidentLifecycleSignal::TYPE_CLOSED, $signal->signal_type);
+        $this->assertSame('manual', $signal->incident_source);
+        $this->assertSame($incident->id, $signal->client_incident_id);
+        $this->assertSame($this->site->id, $signal->site_id);
+        $this->assertSame($alert->id, $signal->control_room_alert_id);
+        $this->assertSame('sent', $signal->outbox->status);
     }
 
     // ── Corrective actions (Option B: raised from the incident, governed in H&S) ──
@@ -2569,6 +2625,7 @@ class IncidentControllerTest extends TestCase
     public function test_high_severity_close_blocked_without_completed_investigation(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2576,7 +2633,6 @@ class IncidentControllerTest extends TestCase
             'severity' => 'high',
             'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
         ]);
-        $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", ['closed_outcome' => 'Attempted close'])
@@ -2589,6 +2645,7 @@ class IncidentControllerTest extends TestCase
     public function test_completing_the_hs_investigation_and_closing_governance_unlocks_high_severity_close(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2634,6 +2691,7 @@ class IncidentControllerTest extends TestCase
         // Simulates rows written before the status sync existed: the H&S
         // investigation is completed but the incident column was never mirrored.
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2710,6 +2768,7 @@ class IncidentControllerTest extends TestCase
     public function test_cannot_close_with_open_followups(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2736,6 +2795,7 @@ class IncidentControllerTest extends TestCase
     public function test_can_close_when_all_followups_are_completed(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2761,6 +2821,7 @@ class IncidentControllerTest extends TestCase
     public function test_task7_final_gap_sequential_followup_and_close_orderings_never_leave_closed_with_open_work(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         $followupFirst = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -2808,6 +2869,7 @@ class IncidentControllerTest extends TestCase
     public function test_task7_final_gap_followup_store_and_close_lock_the_incident_before_dependent_work(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
         $storeIncident = ClientIncident::factory()->submitted()->create([
             'client_id' => $this->client->id,
         ]);
@@ -2840,10 +2902,12 @@ class IncidentControllerTest extends TestCase
         $closeSql = collect($closeQueries)->pluck('query')->map($this->normaliseIncidentBoundarySql(...))->values();
         $closeLock = $closeSql->search(fn (string $sql): bool => str_contains($sql, 'from client_incidents')
             && str_contains($sql, 'for update'));
-        $followupCheck = $closeSql->search(fn (string $sql): bool => str_contains($sql, 'from incident_followups'));
         $incidentUpdate = $closeSql->search(fn (string $sql): bool => str_starts_with($sql, 'update client_incidents'));
 
         $this->assertNotFalse($closeLock, 'Closure must lock the parent incident.');
+        $followupCheck = $closeSql
+            ->slice((int) $closeLock + 1)
+            ->search(fn (string $sql): bool => str_contains($sql, 'from incident_followups'));
         $this->assertNotFalse($followupCheck);
         $this->assertNotFalse($incidentUpdate);
         $this->assertLessThan($followupCheck, $closeLock);
@@ -2893,11 +2957,22 @@ class IncidentControllerTest extends TestCase
         $this->assertNull($incident->closed_notes);
     }
 
-    public function test_reopen_preserves_terminal_health_safety_and_control_room_lifecycles(): void
+    public function test_reopen_preserves_hs_and_it_history_while_control_room_reactivates_its_alert(): void
     {
         $this->mockNotificationService();
         $this->assignCoordinatorToPrimarySite();
         [$incident, $hsEvent, $alert] = $this->closedCanonicalIncidentJourney();
+        SlaDefinition::query()->create([
+            'name' => 'Incident lifecycle reopen fixture',
+            'code' => 'incident-lifecycle-reopen-'.$alert->id,
+            'alert_types' => [$alert->alert_type],
+            'severities' => [$alert->severity],
+            'sources' => [$alert->source],
+            'acknowledge_target_minutes' => 5,
+            'response_target_minutes' => 10,
+            'resolution_target_minutes' => 30,
+            'is_active' => true,
+        ]);
         $itTicket = ItTicket::factory()->create([
             'requester_user_id' => $this->coordinator->id,
             'site_id' => $this->site->id,
@@ -2920,12 +2995,20 @@ class IncidentControllerTest extends TestCase
 
         $this->assertSame('reviewed', $incident->fresh()->status);
         $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
-        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->fresh()->status);
+        $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->fresh()->status);
         $this->assertSame('closed', $itTicket->fresh()->status);
         $this->assertNotNull($itTicket->fresh()->closed_at);
         $this->assertTrue($itTicket->links()->where('linkable_id', $alert->id)->exists());
-        $this->assertSame('incident_reopened', data_get($alert->fresh()->context, 'journey_attention.type'));
-        $this->assertTrue((bool) data_get($alert->fresh()->context, 'journey_attention.requires_operational_reopen'));
+        $this->assertNull(data_get($alert->fresh()->context, 'journey_attention'));
+        $this->assertSame(
+            $hsEvent->id,
+            data_get($alert->fresh()->context, 'operational_reopen_history.0.hs_event_id'),
+        );
+        $this->assertSame(
+            HsEvent::STATUS_CLOSED,
+            data_get($alert->fresh()->context, 'operational_reopen_history.0.hs_event_status'),
+        );
+        $this->assertSame('sent', IncidentLifecycleSignalOutbox::query()->latest('id')->firstOrFail()->status);
     }
 
     public function test_reopen_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
@@ -2934,29 +3017,27 @@ class IncidentControllerTest extends TestCase
         [$incident, $hsEvent, $alert] = $this->closedCanonicalIncidentJourney();
         $originalAlertContext = $alert->context;
         $originalClosedAt = $incident->closed_at?->getTimestamp();
+        $originalHsAcceptanceNotes = $hsEvent->acceptance_notes;
 
         $journeys = \Mockery::mock(IncidentJourneyService::class);
-        $journeys->shouldReceive('attachAlertToIncident')
+        $journeys->shouldReceive('ensureForSubmittedIncident')
             ->once()
             ->andReturnUsing(function (
                 ClientIncident $lockedIncident,
-                ControlRoomAlert $lockedAlert,
-            ) use ($hsEvent): never {
+            ) use ($hsEvent, $alert): never {
                 $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
                 $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
-                    'status' => HsEvent::STATUS_OPEN,
-                    'closure_summary' => 'Injected partial reopen mutation.',
+                    'acceptance_notes' => 'Injected partial reopen mutation.',
                 ]);
-                $lockedAlert->forceFill([
+                $alert->forceFill([
                     'status' => ControlRoomAlert::STATUS_OPEN,
-                    'context' => array_replace((array) $lockedAlert->context, [
+                    'context' => array_replace((array) $alert->context, [
                         'injected_partial_reopen' => true,
                     ]),
                 ])->saveQuietly();
 
                 throw new \RuntimeException('Injected reopen journey failure');
             });
-        $journeys->shouldNotReceive('ensureForSubmittedIncident');
         $this->app->instance(IncidentJourneyService::class, $journeys);
         $this->withoutExceptionHandling();
 
@@ -2980,6 +3061,7 @@ class IncidentControllerTest extends TestCase
         $this->assertNull($incident->reopened_reason);
         $this->assertSame($hsEvent->id, $incident->hs_event_id);
         $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
+        $this->assertSame($originalHsAcceptanceNotes, $hsEvent->fresh()->acceptance_notes);
         $this->assertSame('Closed H&S journey fixture.', $hsEvent->fresh()->closure_summary);
         $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->fresh()->status);
         $this->assertSame($originalAlertContext, $alert->fresh()->context);
@@ -3049,6 +3131,7 @@ class IncidentControllerTest extends TestCase
     public function test_full_lifecycle_draft_submit_review_close(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
         // 1. Create (draft)
         $this->actingAs($this->staff)
@@ -3743,6 +3826,7 @@ class IncidentControllerTest extends TestCase
     {
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
+        $this->assignCoordinatorToPrimarySite();
 
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
@@ -3891,18 +3975,124 @@ class IncidentControllerTest extends TestCase
             return;
         }
 
-        $event->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $this->coordinator->id,
-            'closure_summary' => 'Governance closed for the incident closure fixture.',
-        ])->saveQuietly();
+        if ($event->status === HsEvent::STATUS_CLOSED) {
+            return;
+        }
+
+        if ($incident->submitted_at === null) {
+            $incident->forceFill([
+                'submitted_at' => $incident->reviewed_at ?? now()->subDay(),
+            ])->saveQuietly();
+        }
+
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+        ]);
+        $officer->roles()->attach(Role::query()->where('name', 'health_safety_officer')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $officer->id,
+            'primary_site_id' => $event->site_id,
+            'secondary_site_ids' => [],
+            'position_role' => 'health_safety_officer',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $this->actingAs($officer);
+
+        $events = app(HsEventService::class);
+        $events->acceptHandover(
+            $event->fresh(),
+            $officer,
+            $officer,
+            'Governance accepted for the incident closure fixture.',
+        );
+        $events->recordWorksafeDecision(
+            $event->fresh(),
+            false,
+            'The fixture does not meet the WorkSafe notification threshold.',
+            $officer,
+        );
+        $investigations = app(HsInvestigationService::class);
+        if ($event->investigation_required && ! $event->hasCompletedInvestigation()) {
+            $investigation = $event->investigations()
+                ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
+                ->oldest('id')
+                ->first();
+            $investigation ??= $investigations->create($event->fresh(), [
+                'methodology' => HsInvestigation::METHODOLOGY_5_WHYS,
+                'lead_investigator_id' => $officer->id,
+                'created_by' => $officer->id,
+            ]);
+
+            if ($investigation->status === HsInvestigation::STATUS_DRAFT) {
+                $investigation = $investigations->start($investigation, $officer->id);
+            }
+            if ($investigation->status === HsInvestigation::STATUS_IN_PROGRESS) {
+                $investigation = $investigations->recordFindings($investigation, [
+                    'findings_summary' => 'The incident controls and contributing factors were reviewed.',
+                    'recommendations' => [[
+                        'description' => 'Retain the verified controls documented for this incident.',
+                    ]],
+                ]);
+            }
+            if ($investigation->status === HsInvestigation::STATUS_FINDINGS_RECORDED) {
+                $investigation = $investigations->submitForReview($investigation);
+            }
+            if ($investigation->status === HsInvestigation::STATUS_UNDER_REVIEW) {
+                $investigations->complete($investigation, [
+                    'reviewed_by_id' => $officer->id,
+                    'approved_by_id' => $officer->id,
+                ]);
+            }
+        }
+        foreach ($event->investigations()->where('status', HsInvestigation::STATUS_COMPLETED)->get() as $investigation) {
+            foreach ($investigations->undispositionedRecommendationIndexes($investigation) as $index) {
+                $investigations->dispositionRecommendation(
+                    $investigation,
+                    $index,
+                    HsRecommendationDisposition::DISPOSITION_NO_ACTION,
+                    $officer,
+                    'The completed fixture recommendation was reviewed and requires no further action.',
+                );
+            }
+        }
+        $alert = $event->controlRoomAlert()->first();
+        if ($alert !== null && ! $alert->isTerminal()) {
+            $alerts = app(ControlRoomAlertLifecycleService::class);
+            if ($alert->status === ControlRoomAlert::STATUS_OPEN) {
+                $alert = $alerts->acknowledge(
+                    $alert,
+                    $officer,
+                    'Operational response acknowledged before H&S fixture closure.',
+                );
+            }
+            if ($alert->status === ControlRoomAlert::STATUS_ACK) {
+                $alert = $alerts->startTriage(
+                    $alert,
+                    $officer,
+                    'Operational controls verified before H&S fixture closure.',
+                );
+            }
+            $alerts->resolve(
+                $alert,
+                $officer,
+                'Operational response completed before H&S fixture closure.',
+                'controlled',
+            );
+        }
+        app(HsEventClosureService::class)->closeEvent(
+            $event->fresh(),
+            'Governance closed through the canonical H&S lifecycle for this fixture.',
+            $officer,
+        );
     }
 
     /** @return array{0: ClientIncident, 1: HsEvent, 2: ControlRoomAlert} */
     private function closedCanonicalIncidentJourney(): array
     {
-        $incident = ClientIncident::factory()->highSeverity()->create([
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->highSeverity()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
             'reported_by' => $this->coordinator->id,
@@ -3914,22 +4104,42 @@ class IncidentControllerTest extends TestCase
             'closed_by' => $this->coordinator->id,
             'closed_at' => now()->subDay(),
             'closed_outcome' => 'Previously resolved',
-        ])->fresh();
-        $hsEvent = $incident->hsEvent()->firstOrFail();
-        $alert = $incident->controlRoomAlert()->firstOrFail();
-
-        $hsEvent->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now()->subDay(),
-            'closed_by' => $this->coordinator->id,
-            'closure_summary' => 'Closed H&S journey fixture.',
-        ])->saveQuietly();
+        ]));
+        $hsEvent = HsEvent::withoutEvents(fn () => HsEvent::factory()
+            ->forClientIncident($incident)
+            ->high()
+            ->closed()
+            ->handoverAccepted($this->coordinator, $this->coordinator)
+            ->worksafeNotNotifiable($this->coordinator)
+            ->create([
+                'site_id' => $incident->site_id,
+                'client_id' => $incident->client_id,
+                'staff_id' => $incident->reported_by,
+                'created_by' => $this->coordinator->id,
+                'closed_by' => $this->coordinator->id,
+                'closed_at' => now()->subDay(),
+                'closure_summary' => 'Closed H&S journey fixture.',
+            ]));
+        $incident->forceFill(['hs_event_id' => $hsEvent->id])->saveQuietly();
+        HsInvestigation::query()->create([
+            'hs_event_id' => $hsEvent->id,
+            'reference_number' => HsInvestigation::generateReferenceNumber(),
+            'investigation_type' => 'standard',
+            'status' => HsInvestigation::STATUS_COMPLETED,
+            'completed_at' => now()->subDays(2),
+        ]);
+        $journey = app(IncidentJourneyService::class)->ensureAlertForIncident(
+            $incident,
+            $this->coordinator,
+            'Historical terminal incident journey fixture.',
+        );
+        $alert = $journey->alert;
         $alert->forceFill([
             'status' => ControlRoomAlert::STATUS_CLOSED,
+            'closed_at' => now()->subDay(),
             'resolved_at' => now()->subDays(2),
             'resolved_by_user_id' => $this->coordinator->id,
             'resolution_code' => 'resolved',
-            'closed_at' => now()->subDay(),
             'closed_by_user_id' => $this->coordinator->id,
             'context' => array_replace((array) $alert->context, [
                 'fixture_marker' => 'preserved',

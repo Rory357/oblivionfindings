@@ -11,7 +11,7 @@ class RecoverSafetySignalDeliveries extends Command
         {--limit=100 : Maximum rows per source to reconcile and dispatch}
         {--report-only : Report persisted failures without dispatching}';
 
-    protected $description = 'Recover stranded fleet, shift, and device-event Control Room signal deliveries';
+    protected $description = 'Recover stranded fleet, shift, device-event, and incident-lifecycle Control Room signal deliveries';
 
     public function handle(SafetySignalDeliveryRecoveryService $recovery): int
     {
@@ -20,7 +20,7 @@ class RecoverSafetySignalDeliveries extends Command
             (bool) $this->option('report-only'),
         );
 
-        foreach (['fleet', 'shift', 'device'] as $source) {
+        foreach (['fleet', 'shift', 'device', 'incident'] as $source) {
             $this->line(sprintf(
                 '%s: %d reconciled, %d queued, %d failed/dead-letter/unroutable',
                 $source,

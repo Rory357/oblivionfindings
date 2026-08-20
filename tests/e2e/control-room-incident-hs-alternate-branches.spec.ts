@@ -286,14 +286,6 @@ echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
                     'New witness evidence changes the immediate risk picture.',
             },
         );
-        await loginAsFixture(page, manifest.users.operator);
-        await postLaravel(
-            page,
-            `/control-room/alerts/${reopenId}/reopen-for-incident`,
-            {
-                reason: 'Restart operational controls for the new witness evidence.',
-            },
-        );
         const reopened = scalar<{
             alert_status: string;
             incident_status: string;
@@ -313,7 +305,7 @@ echo json_encode([
     'reopen_audits' => \\App\\Models\\AuditLog::query()
         ->where('auditable_type', $alert->getMorphClass())
         ->where('auditable_id', $alert->id)
-        ->where('action', 'controlRoom.alert.reopenForIncident')
+        ->where('action', 'controlRoom.alert.reopenFromIncidentSignal')
         ->count(),
 ], JSON_THROW_ON_ERROR);
 `);

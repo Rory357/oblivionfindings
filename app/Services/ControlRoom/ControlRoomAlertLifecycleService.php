@@ -11,6 +11,7 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\IncidentLifecycleSignal;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsCorrectiveActionService;
@@ -352,6 +353,279 @@ class ControlRoomAlertLifecycleService
 
             return $locked->refresh();
         }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Consume the latest immutable incident close/reopen request. Control Room
+     * owns the alert mutation and revalidates source state, canonical Site/client
+     * provenance, actor access, H&S linkage and alert provenance under locks.
+     *
+     * @return array{status: 'sent'|'superseded', alert_id: int|null}
+     */
+    public function applyIncidentLifecycleSignal(IncidentLifecycleSignal $signal): array
+    {
+        return DB::transaction(function () use ($signal): array {
+            $source = IncidentLifecycleSignal::query()->findOrFail($signal->id);
+            $incident = ClientIncident::query()
+                ->whereKey($source->client_incident_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $latestSequence = (int) IncidentLifecycleSignal::query()
+                ->where('client_incident_id', $incident->id)
+                ->max('sequence');
+            if ((int) $source->sequence !== $latestSequence) {
+                return ['status' => 'superseded', 'alert_id' => null];
+            }
+
+            $actor = User::query()->find($source->actor_user_id);
+            if ($actor === null) {
+                throw new InvalidArgumentException('The incident lifecycle actor is unavailable.');
+            }
+
+            $this->assertIncidentLifecycleSource($source, $incident, $actor);
+            $reason = $source->signal_type === IncidentLifecycleSignal::TYPE_REOPENED
+                ? trim((string) data_get($source->payload, 'reopened_reason'))
+                : null;
+            $journey = $source->signal_type === IncidentLifecycleSignal::TYPE_REOPENED
+                ? $this->journeys->ensureAlertForIncident(
+                    $incident,
+                    $actor,
+                    $reason,
+                )
+                : $this->journeys->ensureForSubmittedIncident($incident, $actor);
+
+            if ($journey->hsEvent === null
+                || (int) $journey->hsEvent->id !== (int) $source->hs_event_id
+                || (int) $journey->hsEvent->client_id !== (int) $source->client_id
+                || (int) $journey->hsEvent->site_id !== (int) $source->site_id) {
+                throw new InvalidArgumentException('The incident lifecycle signal does not match the canonical H&S event.');
+            }
+            if ($source->signal_type === IncidentLifecycleSignal::TYPE_CLOSED
+                && $journey->hsEvent->status !== HsEvent::STATUS_CLOSED) {
+                throw new InvalidArgumentException('The canonical H&S event is no longer closed.');
+            }
+
+            $alert = $journey->alert;
+            if ($source->control_room_alert_id !== null
+                && (int) $source->control_room_alert_id !== (int) $alert?->id) {
+                throw new InvalidArgumentException('The incident lifecycle signal claims another operational alert.');
+            }
+            if ($alert === null) {
+                return ['status' => 'sent', 'alert_id' => null];
+            }
+
+            $this->siteAccess->assertCanAccessAlert(
+                $actor,
+                $alert,
+                ['healthSafety.viewAllSites', 'reports.viewAny'],
+            );
+            try {
+                $this->provenance->assertIncidentTuple(
+                    $alert,
+                    (int) $incident->client_id,
+                    (int) $source->site_id,
+                );
+            } catch (DomainException $exception) {
+                throw new InvalidArgumentException(
+                    'The incident lifecycle signal does not match the operational alert provenance.',
+                    previous: $exception,
+                );
+            }
+
+            if ($source->signal_type === IncidentLifecycleSignal::TYPE_CLOSED) {
+                $alert = $this->resolveAutomatically(
+                    $alert,
+                    'The authoritative incident was closed: '.trim((string) data_get($source->payload, 'closed_outcome')),
+                    'incident_closed',
+                    'incident_lifecycle_signal',
+                    [
+                        'resolved_by_user_id' => $actor->id,
+                        'incident_lifecycle_signal_id' => $source->id,
+                        'incident_lifecycle_idempotency_key' => $source->idempotency_key,
+                        'incident_lifecycle_actor_user_id' => $actor->id,
+                        'incident_lifecycle_actor_name' => data_get($source->payload, 'actor_name'),
+                        'incident_id' => $incident->id,
+                        'incident_origin' => $source->incident_source,
+                        'incident_effective_at' => $source->effective_at?->toIso8601String(),
+                        'hs_event_id' => $journey->hsEvent->id,
+                        'hs_event_status' => $journey->hsEvent->status,
+                    ],
+                );
+            } elseif ($alert->isTerminal()) {
+                $alert = $this->reopenLockedFromIncidentSignal(
+                    $alert,
+                    $incident,
+                    $journey->hsEvent,
+                    $source,
+                    $actor,
+                    (string) $reason,
+                );
+            }
+
+            return ['status' => 'sent', 'alert_id' => (int) $alert->id];
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    private function assertIncidentLifecycleSource(
+        IncidentLifecycleSignal $signal,
+        ClientIncident $incident,
+        User $actor,
+    ): void {
+        try {
+            $siteId = $this->siteAccess->effectiveClientIncidentSiteId($incident);
+        } catch (\LogicException $exception) {
+            throw new InvalidArgumentException(
+                'The incident lifecycle signal has conflicting Site provenance.',
+                previous: $exception,
+            );
+        }
+
+        $this->siteAccess->assertCanAccessClientIncident(
+            $actor,
+            $incident,
+            ['healthSafety.viewAllSites', 'reports.viewAny'],
+        );
+        if ((int) $signal->client_id !== (int) $incident->client_id
+            || (int) $signal->site_id !== $siteId
+            || (string) $signal->incident_source !== (string) ($incident->source ?: 'unknown')) {
+            throw new InvalidArgumentException('The incident lifecycle signal does not match its source record.');
+        }
+
+        $expectedIdempotencyKey = hash('sha256', implode('|', [
+            'client-incident',
+            $incident->id,
+            'lifecycle',
+            $signal->sequence,
+            $signal->signal_type,
+        ]));
+        if (! hash_equals($expectedIdempotencyKey, (string) $signal->idempotency_key)) {
+            throw new InvalidArgumentException('The incident lifecycle signal identity is invalid.');
+        }
+
+        $effectiveAt = $signal->effective_at?->format('Y-m-d H:i:s');
+        if ($signal->signal_type === IncidentLifecycleSignal::TYPE_CLOSED) {
+            if ($signal->from_status !== 'reviewed'
+                || $signal->target_status !== 'closed'
+                || $incident->status !== 'closed'
+                || (int) $incident->closed_by !== (int) $actor->id
+                || $incident->closed_at?->format('Y-m-d H:i:s') !== $effectiveAt
+                || trim((string) $incident->closed_outcome) !== trim((string) data_get($signal->payload, 'closed_outcome'))) {
+                throw new InvalidArgumentException('The incident close signal is stale or does not match the source transition.');
+            }
+
+            return;
+        }
+
+        if ($signal->signal_type === IncidentLifecycleSignal::TYPE_REOPENED) {
+            if ($signal->from_status !== 'closed'
+                || $signal->target_status !== 'reviewed'
+                || $incident->status !== 'reviewed'
+                || (int) $incident->reopened_by !== (int) $actor->id
+                || $incident->reopened_at?->format('Y-m-d H:i:s') !== $effectiveAt
+                || trim((string) $incident->reopened_reason) !== trim((string) data_get($signal->payload, 'reopened_reason'))) {
+                throw new InvalidArgumentException('The incident reopen signal is stale or does not match the source transition.');
+            }
+
+            return;
+        }
+
+        throw new InvalidArgumentException('The incident lifecycle signal type is unsupported.');
+    }
+
+    private function reopenLockedFromIncidentSignal(
+        ControlRoomAlert $alert,
+        ClientIncident $incident,
+        HsEvent $hsEvent,
+        IncidentLifecycleSignal $signal,
+        User $actor,
+        string $reason,
+    ): ControlRoomAlert {
+        $fromStatus = (string) $alert->status;
+        $this->assertStatus($alert, [
+            ControlRoomAlert::STATUS_RESOLVED,
+            ControlRoomAlert::STATUS_CLOSED,
+        ], 'reopen from incident lifecycle signal');
+
+        $definition = SlaDefinition::findForAlert(
+            (string) $alert->alert_type,
+            (string) $alert->severity,
+            (string) $alert->source,
+        );
+        if ($definition === null) {
+            throw new InvalidArgumentException(
+                'This alert has no active matching SLA definition. Configure its SLA before replaying the incident reopen signal.',
+            );
+        }
+
+        $at = now();
+        $context = $alert->context ?? [];
+        $history = $context['operational_reopen_history'] ?? [];
+        $history[] = [
+            'incident_id' => $incident->id,
+            'incident_lifecycle_signal_id' => $signal->id,
+            'incident_lifecycle_idempotency_key' => $signal->idempotency_key,
+            'incident_origin' => $signal->incident_source,
+            'incident_effective_at' => $signal->effective_at?->toIso8601String(),
+            'hs_event_id' => $hsEvent->id,
+            'hs_event_status' => $hsEvent->status,
+            'reason' => $reason,
+            'actor_id' => $actor->id,
+            'actor_name' => data_get($signal->payload, 'actor_name'),
+            'reopened_at' => $at->toIso8601String(),
+            'from_status' => $fromStatus,
+            'terminal_state' => [
+                'resolved_at' => $alert->resolved_at?->toIso8601String(),
+                'resolved_by_user_id' => $alert->resolved_by_user_id,
+                'closed_at' => $alert->closed_at?->toIso8601String(),
+                'closed_by_user_id' => $alert->closed_by_user_id,
+                'resolution_code' => $alert->resolution_code,
+            ],
+        ];
+        $context['operational_reopen_history'] = $history;
+        unset($context['journey_attention']);
+        $context = $this->appendActivity($context, $actor, $reason, 'incident_reopen', $at);
+
+        $alert->forceFill([
+            'status' => ControlRoomAlert::STATUS_TRIAGING,
+            'resolved_at' => null,
+            'resolved_by_user_id' => null,
+            'closed_at' => null,
+            'closed_by_user_id' => null,
+            'resolution_code' => null,
+            'snoozed_until' => null,
+            'snoozed_by_user_id' => null,
+            'context' => $context,
+        ])->save();
+
+        $sla = $alert->sla()->lockForUpdate()->first();
+        if ($sla === null) {
+            $sla = AlertSla::createFromDefinition($alert, $definition, $at);
+        } else {
+            $sla->restartForReopen($at, $definition);
+        }
+        $sla->recordAcknowledge($at);
+        $sla->recordResponse($at);
+
+        AuditLogger::logOrFail('controlRoom.alert.reopenFromIncidentSignal', $alert, [
+            'actor_id' => $actor->id,
+            'alert_id' => $alert->id,
+            'incident_id' => $incident->id,
+            'incident_lifecycle_signal_id' => $signal->id,
+            'incident_lifecycle_idempotency_key' => $signal->idempotency_key,
+            'incident_origin' => $signal->incident_source,
+            'incident_effective_at' => $signal->effective_at?->toIso8601String(),
+            'hs_event_id' => $hsEvent->id,
+            'hs_event_status' => $hsEvent->status,
+            'reason' => $reason,
+            'from_status' => $fromStatus,
+            'to_status' => ControlRoomAlert::STATUS_TRIAGING,
+            'sla_cycle_number' => $sla->cycle_number,
+            'sla_definition_id' => $sla->sla_definition_id,
+            'transitioned_at' => $at->toIso8601String(),
+        ]);
+
+        return $alert->refresh();
     }
 
     public function reopenForIncident(

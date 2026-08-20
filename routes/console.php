@@ -173,7 +173,7 @@ app(Schedule::class)
     ->everyMinute()
     ->withoutOverlapping();
 
-// Fleet, shift and device-event source rows are durable delivery intents.
+// Fleet, shift, device-event and incident-lifecycle source rows are durable delivery intents.
 // Reconcile any missing outbox and retry transiently stranded routing work.
 app(Schedule::class)
     ->command('safety-signals:recover --limit=100')

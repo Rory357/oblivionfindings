@@ -2,18 +2,20 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Jobs\DispatchIncidentLifecycleSignalOutbox;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
+use App\Models\IncidentLifecycleSignalOutbox;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 use Tests\TestCase;
 
 class ControlRoomIncidentReopenGateTest extends TestCase
@@ -34,6 +36,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         $this->admin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
+            'email_verified_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->site = Site::factory()->create();
@@ -69,7 +72,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         $this->assertSame('preserved', data_get($alert->context, 'source_marker'));
     }
 
-    public function test_incident_and_attention_marker_roll_back_together_when_attention_cannot_be_saved(): void
+    public function test_incident_reopen_commits_its_outbox_without_mutating_the_alert_before_delivery(): void
     {
         $alert = ControlRoomAlert::factory()->closed()->create($this->alertProvenance());
         $incident = ClientIncident::factory()->create([
@@ -81,37 +84,23 @@ class ControlRoomIncidentReopenGateTest extends TestCase
             'closed_outcome' => 'Original closure outcome',
             'closed_notes' => 'Original closure notes',
         ]);
+        Bus::fake([DispatchIncidentLifecycleSignalOutbox::class]);
 
-        $rejectAttentionWrite = true;
-        ControlRoomAlert::updating(function (ControlRoomAlert $updating) use (&$rejectAttentionWrite, $alert): void {
-            if ($rejectAttentionWrite && $updating->is($alert)) {
-                throw new RuntimeException('Simulated attention write failure.');
-            }
-        });
-
-        try {
-            $this->withoutExceptionHandling()
-                ->actingAs($this->admin)
-                ->post("/incidents/{$incident->id}/reopen", [
-                    'reopened_reason' => 'A material witness statement was received.',
-                ]);
-
-            $this->fail('The simulated alert update failure should escape the request.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('Simulated attention write failure.', $exception->getMessage());
-        } finally {
-            $rejectAttentionWrite = false;
-        }
+        $this->actingAs($this->admin)
+            ->post("/incidents/{$incident->id}/reopen", [
+                'reopened_reason' => 'A material witness statement was received.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
 
         $incident->refresh();
-        $this->assertSame('closed', $incident->status);
-        $this->assertNull($incident->reopened_at);
-        $this->assertNull($incident->reopened_by);
-        $this->assertNull($incident->reopened_reason);
-        $this->assertSame($this->admin->id, $incident->closed_by);
-        $this->assertNotNull($incident->closed_at);
-        $this->assertSame('Original closure outcome', $incident->closed_outcome);
-        $this->assertSame('Original closure notes', $incident->closed_notes);
+        $this->assertSame('reviewed', $incident->status);
+        $this->assertSame($this->admin->id, $incident->reopened_by);
+        $this->assertSame('A material witness statement was received.', $incident->reopened_reason);
+        $this->assertNull($incident->closed_by);
+        $this->assertNull($incident->closed_at);
+        $this->assertSame('pending', IncidentLifecycleSignalOutbox::query()->sole()->status);
+        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->fresh()->status);
         $this->assertArrayNotHasKey('journey_attention', $alert->fresh()->context ?? []);
     }
 
@@ -152,7 +141,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         $this->assertArrayNotHasKey('journey_attention', $foreignAlert->context ?? []);
     }
 
-    public function test_incident_and_operational_reopen_paths_follow_alert_before_incident_lock_order(): void
+    public function test_incident_reopen_locks_the_source_parent_before_validating_its_alert_link(): void
     {
         $alert = ControlRoomAlert::factory()->closed()->create($this->alertProvenance());
         SlaDefinition::create([
@@ -175,6 +164,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         DB::listen(function (QueryExecuted $query) use (&$queries): void {
             $queries[] = strtolower(str_replace(['`', '"'], '', $query->sql));
         });
+        Bus::fake([DispatchIncidentLifecycleSignalOutbox::class]);
 
         $this->actingAs($this->admin)
             ->post("/incidents/{$incident->id}/reopen", [
@@ -183,17 +173,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors();
 
-        $this->assertAlertBeforeIncidentLocks($queries, 'incident reopen');
-
-        $queries = [];
-        $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/reopen-for-incident", [
-                'reason' => 'Restart operational controls for the new evidence.',
-            ])
-            ->assertRedirect()
-            ->assertSessionDoesntHaveErrors();
-
-        $this->assertAlertBeforeIncidentLocks($queries, 'operational reopen');
+        $this->assertIncidentBeforeAlertLocks($queries, 'incident reopen');
     }
 
     public function test_operational_reopen_rejects_a_foreign_incident_that_claims_the_local_alert(): void
@@ -242,7 +222,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
     }
 
     /** @param array<int, string> $queries */
-    private function assertAlertBeforeIncidentLocks(array $queries, string $operation): void
+    private function assertIncidentBeforeAlertLocks(array $queries, string $operation): void
     {
         $alertLock = collect($queries)->search(
             fn (string $query): bool => str_contains($query, 'from control_room_alerts')
@@ -256,9 +236,9 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         $this->assertNotFalse($alertLock, "The {$operation} must lock its Control Room alert.");
         $this->assertNotFalse($incidentLock, "The {$operation} must lock its incident.");
         $this->assertLessThan(
-            $incidentLock,
             $alertLock,
-            "The {$operation} must use the canonical alert-before-incident lock order.",
+            $incidentLock,
+            "The {$operation} must lock its source incident before its linked alert.",
         );
     }
 

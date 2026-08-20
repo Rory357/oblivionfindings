@@ -17,6 +17,8 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Support\Journeys\JourneyGate;
 use Database\Factories\ControlRoomAlertFactory;
 use Database\Factories\HsEventFactory;
@@ -48,6 +50,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             'organization_id' => 1,
             'role' => 'admin',
             'approved_at' => now(),
+            'email_verified_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         HrEmployeeProfile::factory()->create([
@@ -200,10 +203,24 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             'reviewed_by' => $this->admin->id,
             'control_room_alert_id' => $alert->id,
         ]));
-        $event = $this->hsEventFactory($alert)->forClientIncident($incident)->create([
-            'control_room_alert_id' => $alert->id,
-            'status' => HsEvent::STATUS_OPEN,
+        $officer = User::factory()->create([
+            'role' => 'health_safety_officer',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
         ]);
+        $officer->roles()->attach(Role::query()->where('name', 'health_safety_officer')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $officer->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+        $event = $this->hsEventFactory($alert)
+            ->forClientIncident($incident)
+            ->awaitingHandoverAcceptance($officer)
+            ->create([
+                'control_room_alert_id' => $alert->id,
+                'status' => HsEvent::STATUS_OPEN,
+            ]);
         $incident->updateQuietly(['hs_event_id' => $event->id]);
         $lifecycle = app(ControlRoomAlertLifecycleService::class);
 
@@ -258,12 +275,24 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             $this->assertStringContainsString('linked incident', strtolower($exception->getMessage()));
         }
 
-        $event->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $this->admin->id,
-            'closure_summary' => 'Governance work is complete.',
-        ])->saveQuietly();
+        $events = app(HsEventService::class);
+        $events->acceptHandover(
+            $event->fresh(),
+            $officer,
+            $officer,
+            'The Site-authorized H&S owner accepted the incident handover.',
+        );
+        $events->recordWorksafeDecision(
+            $event->fresh(),
+            false,
+            'The event does not meet the WorkSafe notification threshold.',
+            $officer,
+        );
+        app(HsEventClosureService::class)->closeEvent(
+            $event->fresh(),
+            'Governance work is complete.',
+            $officer,
+        );
         $incident->forceFill([
             'status' => 'closed',
             'closed_at' => now(),
@@ -632,7 +661,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $this->assertNotSame($task->assigned_to_user_id, $action->assigned_to_user_id);
     }
 
-    public function test_incident_reopen_marks_attention_until_operator_explicitly_reopens_response(): void
+    public function test_incident_reopen_durably_reactivates_the_operational_response(): void
     {
         $alert = $this->alertFactory()->closed()->create(['context' => ['existing_key' => 'preserved']]);
         SlaDefinition::create([
@@ -661,21 +690,13 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             ->assertSessionDoesntHaveErrors();
 
         $alert->refresh();
-        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->status);
-        $this->assertSame('preserved', $alert->context['existing_key'] ?? null);
-        $this->assertSame($incident->id, $alert->context['journey_attention']['incident_id'] ?? null);
-
-        $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/reopen-for-incident", [
-                'reason' => 'Reassess immediate controls against the new witness information.',
-            ])
-            ->assertRedirect()
-            ->assertSessionDoesntHaveErrors();
-
-        $alert->refresh();
         $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->status);
-        $this->assertArrayNotHasKey('journey_attention', $alert->context ?? []);
         $this->assertSame('preserved', $alert->context['existing_key'] ?? null);
+        $this->assertArrayNotHasKey('journey_attention', $alert->context ?? []);
+        $this->assertSame(
+            $incident->id,
+            data_get($alert->context, 'operational_reopen_history.0.incident_id'),
+        );
     }
 
     private function makeTask(ControlRoomAlert $alert, string $status, array $overrides = []): AlertTask

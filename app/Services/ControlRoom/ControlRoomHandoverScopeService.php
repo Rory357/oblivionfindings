@@ -41,6 +41,7 @@ class ControlRoomHandoverScopeService
         'controlRoom.alert.updateMeta',
         'controlRoom.alert.addNote',
         'controlRoom.alert.reopenForIncident',
+        'controlRoom.alert.reopenFromIncidentSignal',
         'controlRoom.watcher.added',
         'controlRoom.watcher.removed',
     ];
