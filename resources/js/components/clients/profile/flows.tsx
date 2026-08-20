@@ -2121,18 +2121,11 @@ const consentRecord: FlowFactory = (ctx) => ({
         },
         {
             key: 'evidence',
-            label: 'Evidence & capacity',
+            label: 'Evidence',
             icon: FileCheck,
-            blurb: 'Capacity & paperwork',
-            heading: 'Evidence & capacity',
+            blurb: 'Signed form & conditions',
+            heading: 'Evidence',
             fields: [
-                {
-                    key: 'capacity_assessed',
-                    label: 'Capacity assessed',
-                    desc: `${ctx.preferredName}'s capacity to consent was considered and recorded.`,
-                    type: 'checkbox',
-                    full: true,
-                },
                 {
                     key: 'signed_document',
                     label: 'Signed form / evidence',
@@ -2186,7 +2179,6 @@ const consentRecord: FlowFactory = (ctx) => ({
                 given_notes: opt(values.given_notes),
                 special_conditions: opt(values.special_conditions),
                 expires_at: opt(values.expires_at),
-                capacity_assessed: Boolean(values.capacity_assessed),
                 signed_document:
                     values.signed_document instanceof File
                         ? values.signed_document

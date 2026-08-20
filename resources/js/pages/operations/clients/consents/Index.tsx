@@ -77,6 +77,36 @@ type Props = {
     consent_types: any[];
 };
 
+type DirectConsentFormData = {
+    consent_type_id: string;
+    status: string;
+    given_method: string;
+    given_at: string;
+    given_by_relationship: string;
+    given_notes: string;
+    expires_at: string;
+    evidence_type: string;
+    refusal_reason: string;
+};
+
+export function buildDirectConsentPayload(
+    formData: DirectConsentFormData,
+    signedDocument: File | null,
+) {
+    return {
+        consent_type_id: formData.consent_type_id,
+        status: formData.status,
+        given_method: formData.given_method,
+        given_at: formData.given_at,
+        given_by_relationship: formData.given_by_relationship,
+        given_notes: formData.given_notes,
+        expires_at: formData.expires_at,
+        evidence_type: formData.evidence_type,
+        refusal_reason: formData.refusal_reason,
+        ...(signedDocument ? { signed_document: signedDocument } : {}),
+    };
+}
+
 export default function ConsentsIndex({
     client,
     consents = [],
@@ -98,9 +128,6 @@ export default function ConsentsIndex({
         given_notes: '',
         expires_at: '',
         evidence_type: '',
-        capacity_assessed: false,
-        capacity_outcome: '',
-        capacity_notes: '',
         refusal_reason: '',
     });
     const [withdrawReason, setWithdrawReason] = useState('');
@@ -115,8 +142,7 @@ export default function ConsentsIndex({
     };
 
     const submitConsent = () => {
-        const payload: any = { ...formData };
-        if (consentFile) payload.signed_document = consentFile;
+        const payload = buildDirectConsentPayload(formData, consentFile);
         router.post(`/operations/clients/${client.id}/consents`, payload, {
             forceFormData: !!consentFile,
             preserveScroll: true,
@@ -128,8 +154,6 @@ export default function ConsentsIndex({
                     consent_type_id: '',
                     given_notes: '',
                     expires_at: '',
-                    capacity_assessed: false,
-                    capacity_notes: '',
                     refusal_reason: '',
                 });
             },

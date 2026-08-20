@@ -54,6 +54,37 @@ class ConsentRequest extends Model
         self::RELATION_COURT_APPOINTED,
     ];
 
+    private const DECISION_EVIDENCE_IMMUTABLE_FIELDS = [
+        'capacity_outcome',
+        'capacity_assessor_user_id',
+        'capacity_assessed_at',
+        'capacity_assessment_expires_at',
+        'capacity_assessment_reason',
+        'capacity_evidence_type',
+        'capacity_evidence_reference',
+        'best_interests_process_reason',
+        'best_interests_evidence_type',
+        'best_interests_evidence_reference',
+        'best_interests_consultees',
+        'decision_evidence_recorded_by_user_id',
+        'decision_evidence_recorded_at',
+        'decision_scope_digest',
+    ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (ConsentRequest $request): void {
+            if (
+                $request->getOriginal('decision_scope_digest') !== null
+                && $request->isDirty(self::DECISION_EVIDENCE_IMMUTABLE_FIELDS)
+            ) {
+                throw new \LogicException(
+                    'Recorded consent decision evidence is immutable; revoke the request and record new evidence.',
+                );
+            }
+        });
+    }
+
     protected $fillable = [
         'client_id',
         'consent_type_id',
@@ -61,6 +92,25 @@ class ConsentRequest extends Model
         'recipient_user_id',
         'recipient_relationship',
         'authority_next_of_kin_id',
+        'capacity_outcome',
+        'capacity_assessor_user_id',
+        'capacity_assessed_at',
+        'capacity_assessment_expires_at',
+        'capacity_assessment_reason',
+        'capacity_evidence_type',
+        'capacity_evidence_reference',
+        'best_interests_process_reason',
+        'best_interests_evidence_type',
+        'best_interests_evidence_reference',
+        'best_interests_consultees',
+        'decision_evidence_recorded_by_user_id',
+        'decision_evidence_recorded_at',
+        'decision_scope_digest',
+        'decision_evidence_accepted_by_user_id',
+        'decision_evidence_accepted_at',
+        'decision_evidence_revoked_by_user_id',
+        'decision_evidence_revoked_at',
+        'decision_evidence_revocation_reason',
         'triggering_subject_type',
         'triggering_subject_id',
         'purpose',
@@ -88,6 +138,12 @@ class ConsentRequest extends Model
         'viewed_at' => 'datetime',
         'responded_at' => 'datetime',
         'expires_at' => 'datetime',
+        'capacity_assessed_at' => 'datetime',
+        'capacity_assessment_expires_at' => 'datetime',
+        'best_interests_consultees' => 'array',
+        'decision_evidence_recorded_at' => 'datetime',
+        'decision_evidence_accepted_at' => 'datetime',
+        'decision_evidence_revoked_at' => 'datetime',
         'retention_period_days' => 'integer',
         'audit_trail' => 'array',
     ];
@@ -117,6 +173,26 @@ class ConsentRequest extends Model
     public function authorityNextOfKin(): BelongsTo
     {
         return $this->belongsTo(NextOfKin::class, 'authority_next_of_kin_id');
+    }
+
+    public function capacityAssessor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'capacity_assessor_user_id');
+    }
+
+    public function decisionEvidenceRecorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decision_evidence_recorded_by_user_id');
+    }
+
+    public function decisionEvidenceAcceptor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decision_evidence_accepted_by_user_id');
+    }
+
+    public function decisionEvidenceRevoker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decision_evidence_revoked_by_user_id');
     }
 
     public function triggeringSubject(): MorphTo

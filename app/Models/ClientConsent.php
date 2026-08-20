@@ -16,6 +16,8 @@ class ClientConsent extends Model
         'client_id',
         'consent_type_id',
         'consent_type_version_id',
+        'consent_request_id',
+        'decision_evidence_digest',
         'status',
         'given_at',
         'given_by_user_id',
@@ -85,6 +87,11 @@ class ClientConsent extends Model
     public function consentTypeVersion(): BelongsTo
     {
         return $this->belongsTo(ConsentTypeVersion::class);
+    }
+
+    public function consentRequest(): BelongsTo
+    {
+        return $this->belongsTo(ConsentRequest::class);
     }
 
     /**
