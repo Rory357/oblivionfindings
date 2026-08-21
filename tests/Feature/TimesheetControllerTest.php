@@ -13,10 +13,12 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Operations\TimesheetReconciliationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -327,6 +329,47 @@ class TimesheetControllerTest extends TestCase
         $this->assertSame('draft', $fresh->status);
     }
 
+    public function test_owner_can_clear_manual_draft_client_without_retaining_client_snapshots_or_allocations(): void
+    {
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'site_id' => $this->site->id,
+            'shift_location_snapshot' => 'Stale client room',
+            'coverage_roles_snapshot' => ['support_worker'],
+        ]);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => null,
+                'activity_type' => 'training',
+                'site_id' => $this->site->id,
+                'notes' => 'Manual training with no client',
+            ]))
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertNull($fresh->client_id);
+        $this->assertSame('training', $fresh->activity_type);
+        $this->assertSame($this->site->id, $fresh->site_id);
+        $this->assertSame($this->site->id, $fresh->shift_site_id);
+        $this->assertNull($fresh->shift_service_context_id);
+        $this->assertSame($this->site->name, $fresh->shift_site_name_snapshot);
+        $this->assertSame($this->site->name, $fresh->shift_location_snapshot);
+        $this->assertSame('training', $fresh->service_context_name_snapshot);
+        $this->assertNull($fresh->client_name_snapshot);
+        $this->assertSame($this->staff->name, $fresh->staff_name_snapshot);
+        $this->assertSame('training', $fresh->shift_type_snapshot);
+        $this->assertSame([], $fresh->coverage_roles_snapshot);
+        $this->assertSame('draft', $fresh->status);
+        $this->assertDatabaseMissing('timesheet_client_allocations', ['id' => $allocation->id]);
+        $this->assertSame(0, $fresh->clientAllocations()->count());
+    }
+
     public function test_linked_shift_client_remains_authoritative_during_update(): void
     {
         $foreignSite = Site::factory()->create([
@@ -565,6 +608,96 @@ class TimesheetControllerTest extends TestCase
         $this->assertStringNotContainsString($foreignClient->first_name, $foreignResponse->getContent());
         $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
         $this->assertSame($sideEffectsBefore, $this->timesheetSideEffectCounts());
+    }
+
+    public function test_owner_can_clear_returned_manual_client_and_resubmit_without_stale_snapshots_or_allocation(): void
+    {
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'activity_type' => 'meeting',
+            'site_id' => $this->site->id,
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Remove the incorrect client attribution.',
+            'shift_location_snapshot' => 'Stale client room',
+            'coverage_roles_snapshot' => ['support_worker'],
+        ]);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
+        $billingCount = DB::table('billing_entries')->count();
+        $payrollExportCount = DB::table('payroll_exports')->count();
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => null,
+                'notes' => 'Corrected manual meeting entry',
+            ]))
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertNull($fresh->client_id);
+        $this->assertSame('meeting', $fresh->activity_type);
+        $this->assertSame($this->site->id, $fresh->site_id);
+        $this->assertSame($this->site->id, $fresh->shift_site_id);
+        $this->assertNull($fresh->shift_service_context_id);
+        $this->assertSame($this->site->name, $fresh->shift_site_name_snapshot);
+        $this->assertSame($this->site->name, $fresh->shift_location_snapshot);
+        $this->assertSame('meeting', $fresh->service_context_name_snapshot);
+        $this->assertNull($fresh->client_name_snapshot);
+        $this->assertSame($this->staff->name, $fresh->staff_name_snapshot);
+        $this->assertSame('meeting', $fresh->shift_type_snapshot);
+        $this->assertSame([], $fresh->coverage_roles_snapshot);
+        $this->assertSame('submitted', $fresh->status);
+        $this->assertSame($this->staff->id, $fresh->submitted_by);
+        $this->assertNull($fresh->returned_at);
+        $this->assertNull($fresh->returned_by);
+        $this->assertNull($fresh->returned_notes);
+        $this->assertDatabaseMissing('timesheet_client_allocations', ['id' => $allocation->id]);
+        $this->assertSame(0, $fresh->clientAllocations()->count());
+        $this->assertSame($billingCount, DB::table('billing_entries')->count());
+        $this->assertSame($payrollExportCount, DB::table('payroll_exports')->count());
+    }
+
+    public function test_manual_client_clear_and_allocation_delete_roll_back_when_resubmit_fails(): void
+    {
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'site_id' => $this->site->id,
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Remove the incorrect client attribution.',
+        ]);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
+        $before = $timesheet->fresh()->getRawOriginal();
+
+        $this->mock(TimesheetReconciliationService::class)
+            ->shouldReceive('assertWorkflowAllowed')
+            ->once()
+            ->andThrow(ValidationException::withMessages([
+                'timesheet' => 'Forced post-clear workflow failure.',
+            ]));
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => null,
+            ]))
+            ->assertSessionHasErrors('timesheet');
+
+        $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        $this->assertDatabaseHas('timesheet_client_allocations', [
+            'id' => $allocation->id,
+            'timesheet_id' => $timesheet->id,
+            'client_id' => $this->client->id,
+        ]);
     }
 
     public function test_global_finance_scope_still_requires_explicit_edit_and_ownership_authority(): void

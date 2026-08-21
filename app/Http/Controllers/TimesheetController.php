@@ -17,6 +17,7 @@ use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TimesheetController extends Controller
@@ -940,6 +941,11 @@ class TimesheetController extends Controller
             // Resolve existence and Site access together below so missing and
             // inaccessible direct IDs have the same concealed response.
             'client_id' => ['nullable', 'integer'],
+            'activity_type' => [
+                'nullable', 'string',
+                'in:training,meeting,admin,travel,handover,supervision,standby,other',
+            ],
+            'site_id' => ['nullable', 'integer'],
             'work_date' => ['required', 'date'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
@@ -970,10 +976,32 @@ class TimesheetController extends Controller
             );
         }
 
-        $snapshot = $this->draftSnapshot($data['client_id'], $linkedShift, $timesheet->staff ?? $auth, $data['notes'] ?? $timesheet->notes);
+        $clearingManualClient = ! $linkedShift && ($data['client_id'] ?? null) === null;
+        $manualActivityType = array_key_exists('activity_type', $data)
+            ? $data['activity_type']
+            : $timesheet->activity_type;
+        $manualSiteId = array_key_exists('site_id', $data)
+            ? ($data['site_id'] !== null ? (int) $data['site_id'] : null)
+            : ($timesheet->site_id !== null ? (int) $timesheet->site_id : null);
+
+        if ($clearingManualClient && $manualSiteId !== null) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                $manualSiteId,
+                $this->timesheetBypassPermissions(),
+                'You are not authorized to assign that site to this timesheet.',
+            );
+        }
+
+        $snapshot = $clearingManualClient
+            ? $this->manualSnapshot($timesheet->staff ?? $auth, $manualActivityType, $manualSiteId)
+            : $this->draftSnapshot($data['client_id'], $linkedShift, $timesheet->staff ?? $auth, $data['notes'] ?? $timesheet->notes);
+        $snapshotFallback = $clearingManualClient ? null : $timesheet;
 
         $timesheet->fill([
             'client_id' => $data['client_id'],
+            'activity_type' => $clearingManualClient ? $manualActivityType : $timesheet->activity_type,
+            'site_id' => $clearingManualClient ? $manualSiteId : $timesheet->site_id,
             'work_date' => $data['work_date'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
@@ -985,20 +1013,26 @@ class TimesheetController extends Controller
             'public_holiday' => (bool) ($data['public_holiday'] ?? false),
             'notes' => $data['notes'] ?? null,
             'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
-            'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
-            'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
-            'client_name_snapshot' => $snapshot['client_name'] ?? $timesheet->client_name_snapshot,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? $timesheet->staff_name_snapshot,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? $timesheet->shift_type_snapshot ?? 'standard',
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $timesheet->coverage_roles_snapshot ?? [],
+            'shift_site_id' => $snapshot['site_id'] ?? $snapshotFallback?->shift_site_id,
+            'shift_service_context_id' => $snapshot['service_context_id'] ?? $snapshotFallback?->shift_service_context_id,
+            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $snapshotFallback?->shift_site_name_snapshot,
+            'shift_location_snapshot' => $snapshot['location'] ?? $snapshotFallback?->shift_location_snapshot,
+            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $snapshotFallback?->service_context_name_snapshot,
+            'client_name_snapshot' => $snapshot['client_name'] ?? $snapshotFallback?->client_name_snapshot,
+            'staff_name_snapshot' => $snapshot['staff_name'] ?? $snapshotFallback?->staff_name_snapshot,
+            'shift_type_snapshot' => $snapshot['shift_type'] ?? $snapshotFallback?->shift_type_snapshot ?? 'standard',
+            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
 
-        $timesheet->save();
+        DB::transaction(function () use ($timesheet, $clearingManualClient): void {
+            $timesheet->save();
 
-        app(TimesheetReconciliationService::class)->reconcile($timesheet);
+            if ($clearingManualClient) {
+                $timesheet->clientAllocations()->delete();
+            }
+
+            app(TimesheetReconciliationService::class)->reconcile($timesheet);
+        });
 
         $timesheet->load(['shift.client']);
         $client = $timesheet->shift?->client;
@@ -1102,6 +1136,11 @@ class TimesheetController extends Controller
             // Resolve existence and Site access together below so missing and
             // inaccessible direct IDs have the same concealed response.
             'client_id' => ['nullable', 'integer'],
+            'activity_type' => [
+                'nullable', 'string',
+                'in:training,meeting,admin,travel,handover,supervision,standby,other',
+            ],
+            'site_id' => ['nullable', 'integer'],
             'work_date' => ['required', 'date'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
@@ -1132,15 +1171,37 @@ class TimesheetController extends Controller
             );
         }
 
-        $snapshot = $this->draftSnapshot(
-            $data['client_id'],
-            $linkedShift,
-            $timesheet->staff ?? $auth,
-            $data['notes'] ?? $timesheet->notes,
-        );
+        $clearingManualClient = ! $linkedShift && ($data['client_id'] ?? null) === null;
+        $manualActivityType = array_key_exists('activity_type', $data)
+            ? $data['activity_type']
+            : $timesheet->activity_type;
+        $manualSiteId = array_key_exists('site_id', $data)
+            ? ($data['site_id'] !== null ? (int) $data['site_id'] : null)
+            : ($timesheet->site_id !== null ? (int) $timesheet->site_id : null);
+
+        if ($clearingManualClient && $manualSiteId !== null) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                $manualSiteId,
+                $this->timesheetBypassPermissions(),
+                'You are not authorized to assign that site to this timesheet.',
+            );
+        }
+
+        $snapshot = $clearingManualClient
+            ? $this->manualSnapshot($timesheet->staff ?? $auth, $manualActivityType, $manualSiteId)
+            : $this->draftSnapshot(
+                $data['client_id'],
+                $linkedShift,
+                $timesheet->staff ?? $auth,
+                $data['notes'] ?? $timesheet->notes,
+            );
+        $snapshotFallback = $clearingManualClient ? null : $timesheet;
 
         $result = $this->timesheetApprovals()->resubmit($timesheet, $auth, [
             'client_id' => $data['client_id'],
+            'activity_type' => $clearingManualClient ? $manualActivityType : $timesheet->activity_type,
+            'site_id' => $clearingManualClient ? $manualSiteId : $timesheet->site_id,
             'work_date' => $data['work_date'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
@@ -1152,15 +1213,15 @@ class TimesheetController extends Controller
             'public_holiday' => (bool) ($data['public_holiday'] ?? false),
             'notes' => $data['notes'] ?? null,
             'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
-            'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
-            'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
-            'client_name_snapshot' => $snapshot['client_name'] ?? $timesheet->client_name_snapshot,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? $timesheet->staff_name_snapshot,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? $timesheet->shift_type_snapshot ?? 'standard',
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $timesheet->coverage_roles_snapshot ?? [],
+            'shift_site_id' => $snapshot['site_id'] ?? $snapshotFallback?->shift_site_id,
+            'shift_service_context_id' => $snapshot['service_context_id'] ?? $snapshotFallback?->shift_service_context_id,
+            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $snapshotFallback?->shift_site_name_snapshot,
+            'shift_location_snapshot' => $snapshot['location'] ?? $snapshotFallback?->shift_location_snapshot,
+            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $snapshotFallback?->service_context_name_snapshot,
+            'client_name_snapshot' => $snapshot['client_name'] ?? $snapshotFallback?->client_name_snapshot,
+            'staff_name_snapshot' => $snapshot['staff_name'] ?? $snapshotFallback?->staff_name_snapshot,
+            'shift_type_snapshot' => $snapshot['shift_type'] ?? $snapshotFallback?->shift_type_snapshot ?? 'standard',
+            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
         $submittedTimesheet = $result->timesheet;
 

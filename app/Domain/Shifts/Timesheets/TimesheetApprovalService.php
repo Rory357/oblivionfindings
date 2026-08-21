@@ -62,6 +62,14 @@ class TimesheetApprovalService
                 $locked->fill($updates);
                 $locked->save();
 
+                // A shiftless manual entry with no primary client cannot keep
+                // materialised client allocations. Keep this deletion inside
+                // the resubmit transaction so any later workflow failure also
+                // restores the original allocation and snapshot state.
+                if ($locked->shift_id === null && $locked->client_id === null) {
+                    $locked->clientAllocations()->delete();
+                }
+
                 $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
 
                 $locked->forceFill($this->submittedFields($actor));
