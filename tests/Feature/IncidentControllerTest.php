@@ -4095,6 +4095,24 @@ class IncidentControllerTest extends TestCase
         );
         $investigations = app(HsInvestigationService::class);
         if ($event->investigation_required && ! $event->hasCompletedInvestigation()) {
+            $independentAssuranceActor = function () use ($event): User {
+                $actor = User::factory()->create([
+                    'role' => 'health_safety_officer',
+                    'approved_at' => now(),
+                    'email_verified_at' => now(),
+                ]);
+                $actor->roles()->attach(Role::query()->where('name', 'health_safety_officer')->firstOrFail());
+                HrEmployeeProfile::factory()->create([
+                    'user_id' => $actor->id,
+                    'primary_site_id' => $event->site_id,
+                    'secondary_site_ids' => [],
+                    'position_role' => 'health_safety_officer',
+                    'created_by' => $this->admin->id,
+                    'updated_by' => $this->admin->id,
+                ]);
+
+                return $actor;
+            };
             $investigation = $event->investigations()
                 ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
                 ->oldest('id')
@@ -4117,14 +4135,19 @@ class IncidentControllerTest extends TestCase
                 ]);
             }
             if ($investigation->status === HsInvestigation::STATUS_FINDINGS_RECORDED) {
-                $investigation = $investigations->submitForReview($investigation);
+                $investigation = $investigations->submitForReview($investigation, $officer);
             }
             if ($investigation->status === HsInvestigation::STATUS_UNDER_REVIEW) {
-                $investigations->complete($investigation, [
-                    'reviewed_by_id' => $officer->id,
-                    'approved_by_id' => $officer->id,
-                ]);
+                $reviewer = $independentAssuranceActor();
+                $this->actingAs($reviewer);
+                $investigation = $investigations->review($investigation, $reviewer);
             }
+            if ($investigation->status === HsInvestigation::STATUS_REVIEWED) {
+                $approver = $independentAssuranceActor();
+                $this->actingAs($approver);
+                $investigations->complete($investigation, $approver);
+            }
+            $this->actingAs($officer);
         }
         foreach ($event->investigations()->where('status', HsInvestigation::STATUS_COMPLETED)->get() as $investigation) {
             foreach ($investigations->undispositionedRecommendationIndexes($investigation) as $index) {
