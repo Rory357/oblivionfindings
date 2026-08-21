@@ -52,11 +52,12 @@ class SafeguardingExternalReportController extends Controller
     /**
      * Update the specified external report.
      */
-    public function update(Request $request, SafeguardingConcern $concern, SafeguardingExternalReport $report): RedirectResponse
+    public function update(Request $request, SafeguardingConcern $concern, string $report): RedirectResponse
     {
-        $actualConcern = $report->concern()->firstOrFail();
-        abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('reportExternal', $actualConcern);
+        // Resolve through the supplied parent so a foreign child remains concealed.
+        $report = $concern->externalReports()->findOrFail($report);
+
+        $this->authorize('reportExternal', $concern);
 
         $validated = $request->validate([
             'authority_reference' => 'nullable|string',

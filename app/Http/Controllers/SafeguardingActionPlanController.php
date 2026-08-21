@@ -39,11 +39,12 @@ class SafeguardingActionPlanController extends Controller
     /**
      * Update the specified action plan.
      */
-    public function update(Request $request, SafeguardingConcern $concern, SafeguardingActionPlan $actionPlan): RedirectResponse
+    public function update(Request $request, SafeguardingConcern $concern, string $actionPlan): RedirectResponse
     {
-        $actualConcern = $actionPlan->concern()->firstOrFail();
-        abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('update', $actualConcern);
+        // Resolve through the supplied parent so a foreign child remains concealed.
+        $actionPlan = $concern->actionPlans()->findOrFail($actionPlan);
+
+        $this->authorize('update', $concern);
 
         $validated = $request->validate([
             'action_description' => 'nullable|string',
@@ -62,11 +63,12 @@ class SafeguardingActionPlanController extends Controller
     /**
      * Mark the specified action plan as completed.
      */
-    public function complete(Request $request, SafeguardingConcern $concern, SafeguardingActionPlan $actionPlan): RedirectResponse
+    public function complete(Request $request, SafeguardingConcern $concern, string $actionPlan): RedirectResponse
     {
-        $actualConcern = $actionPlan->concern()->firstOrFail();
-        abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('update', $actualConcern);
+        // Resolve through the supplied parent so a foreign child remains concealed.
+        $actionPlan = $concern->actionPlans()->findOrFail($actionPlan);
+
+        $this->authorize('update', $concern);
 
         $validated = $request->validate([
             'completion_notes' => 'nullable|string',
