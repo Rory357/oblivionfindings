@@ -375,6 +375,96 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         }
     }
 
+    public function test_legacy_emar_alert_dismiss_uses_exact_action_canonical_scope_and_idempotent_replay(): void
+    {
+        $context = $this->context();
+
+        foreach (['clients.update', 'medications.orders.manage'] as $substitutePermission) {
+            $substitute = $this->userWithPermissions([
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+                $substitutePermission,
+            ], $context['local_site']);
+            $this->actingAs($substitute)
+                ->post(route('emar.alerts.dismiss', $context['local_alert']))
+                ->assertForbidden();
+        }
+        $actionOnly = $this->userWithPermissions([
+            'medications.administer.correct',
+        ], $context['local_site']);
+        $this->actingAs($actionOnly)
+            ->post(route('emar.alerts.dismiss', $context['local_alert']))
+            ->assertForbidden();
+
+        $emptyScope = $this->userWithPermissions([
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'medications.administer.correct',
+        ]);
+        $this->actingAs($emptyScope)
+            ->post(route('emar.alerts.dismiss', $context['local_alert']))
+            ->assertNotFound();
+
+        $actor = $this->userWithPermissions([
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'medications.administer.correct',
+        ], $context['local_site']);
+        $foreignResponse = $this->actingAs($actor)
+            ->post(route('emar.alerts.dismiss', $context['foreign_alert']))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->post(route('emar.alerts.dismiss', $context['forged_alert']))
+            ->assertNotFound();
+        $missingResponse = $this->actingAs($actor)
+            ->post(route('emar.alerts.dismiss', ['alert' => 999999]))
+            ->assertNotFound();
+        $this->assertSame($foreignResponse->getContent(), $missingResponse->getContent());
+        $this->assertSame('active', $context['foreign_alert']->fresh()->status);
+        $this->assertSame('active', $context['forged_alert']->fresh()->status);
+
+        $this->actingAs($actor)
+            ->from('/emar')
+            ->post(route('emar.alerts.dismiss', $context['local_alert']))
+            ->assertRedirect('/emar');
+        $acknowledgedAt = $context['local_alert']->fresh()->acknowledged_at?->toISOString();
+        $this->assertSame('acknowledged', $context['local_alert']->fresh()->status);
+        $this->actingAs($actor)
+            ->from('/emar')
+            ->post(route('emar.alerts.dismiss', $context['local_alert']))
+            ->assertRedirect('/emar');
+        $this->assertSame('acknowledged', $context['local_alert']->fresh()->status);
+        $this->assertSame($acknowledgedAt, $context['local_alert']->fresh()->acknowledged_at?->toISOString());
+
+        foreach (MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS as $bypassPermission) {
+            $globalAlert = MedicationDashboardAlert::query()->create([
+                'client_id' => $context['foreign_client']->id,
+                'client_medication_id' => $context['foreign_medication']->id,
+                'alert_type' => 'overdue',
+                'severity' => 'critical',
+                'message' => 'Global dismiss '.$bypassPermission,
+                'status' => 'active',
+            ]);
+            $globalWithoutAction = $this->userWithPermissions([
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+                'medications.orders.manage',
+                $bypassPermission,
+            ]);
+            $this->actingAs($globalWithoutAction)
+                ->post(route('emar.alerts.dismiss', $globalAlert))
+                ->assertForbidden();
+            $this->assertSame('active', $globalAlert->fresh()->status);
+
+            $global = $this->userWithPermissions([
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+                'medications.administer.correct',
+                $bypassPermission,
+            ]);
+            $this->actingAs($global)
+                ->from('/emar')
+                ->post(route('emar.alerts.dismiss', $globalAlert))
+                ->assertRedirect('/emar');
+            $this->assertSame('acknowledged', $globalAlert->fresh()->status);
+        }
+    }
+
     /** @return array<string, mixed> */
     private function context(): array
     {
@@ -438,6 +528,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             'foreign_site' => $foreignSite,
             'local_client' => $localClient,
             'foreign_client' => $foreignClient,
+            'local_medication' => $localMedication,
+            'foreign_medication' => $foreignMedication,
             'local_alert' => $localAlert,
             'foreign_alert' => $foreignAlert,
             'forged_alert' => $forgedAlert,

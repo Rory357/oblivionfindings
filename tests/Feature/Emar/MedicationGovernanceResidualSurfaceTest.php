@@ -18,6 +18,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class MedicationGovernanceResidualSurfaceTest extends TestCase
@@ -90,10 +91,10 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $this->assertStringNotContainsString('Foreign Resident', $emarCsv);
         $this->assertStringNotContainsString('198.51.100.77', $emarCsv);
 
-        $this->actingAs($reader)
-            ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['local_administration']->id]))
-            ->assertOk()
-            ->assertJson(['backed' => true]);
+        $this->assertMinimalIntegrityResponse(
+            $this->actingAs($reader)
+                ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['local_administration']->id])),
+        );
         $eventCsv = $this->actingAs($reader)
             ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['local_administration']->id]))
             ->assertOk()
@@ -102,6 +103,14 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $this->assertStringNotContainsString('PRIVATE ADMINISTRATION HISTORY', $eventCsv);
         $this->assertStringNotContainsString('198.51.100.77', $eventCsv);
         $this->assertStringNotContainsString('Change history', $eventCsv);
+
+        $foreignIntegrity = $this->actingAs($reader)
+            ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['foreign_administration']->id]))
+            ->assertNotFound();
+        $missingIntegrity = $this->actingAs($reader)
+            ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_999999']))
+            ->assertNotFound();
+        $this->assertSame($foreignIntegrity->getContent(), $missingIntegrity->getContent());
 
         $errorsBefore = MedicationError::query()->count();
         foreach ([
@@ -169,9 +178,10 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $this->assertTrue($auditIds->contains($context['local_log']->id));
             $this->assertTrue($auditIds->contains($context['foreign_log']->id));
             $this->assertFalse($auditIds->contains($context['forged_log']->id));
-            $this->actingAs($global)
-                ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['foreign_administration']->id]))
-                ->assertOk();
+            $this->assertMinimalIntegrityResponse(
+                $this->actingAs($global)
+                    ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['foreign_administration']->id])),
+            );
             $foreignEventCsv = $this->actingAs($global)
                 ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['foreign_administration']->id]))
                 ->assertOk()
@@ -199,6 +209,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             'emar.audit.event.flag' => ['medications.view', 'medications.audit.view', 'medications.administer.record'],
             'api.medications.alerts.acknowledge' => ['medications.view', 'medications.administer.correct'],
             'api.medications.alerts.resolve' => ['medications.view', 'medications.administer.correct'],
+            'emar.alerts.dismiss' => ['medications.view', 'medications.administer.correct'],
         ] as $routeName => $permissions) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             foreach ($permissions as $permission) {
@@ -208,6 +219,8 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $this->assertStringNotContainsString('clients.update', $serialized, $routeName);
             $this->assertStringNotContainsString('reports.viewAny', $serialized, $routeName);
         }
+        $dismissMiddleware = Route::getRoutes()->getByName('emar.alerts.dismiss')?->gatherMiddleware() ?? [];
+        $this->assertStringNotContainsString('medications.orders.manage', implode('|', $dismissMiddleware));
 
         foreach ([
             'emar.reports',
@@ -448,6 +461,30 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $this->assertSame($activeAlerts, $response->inertiaProps('emarWidgets.activeAlerts'));
         $this->assertSame($overdueReviews, $response->inertiaProps('emarWidgets.overdueReviews'));
         $this->assertSame($lowStock, $response->inertiaProps('emarWidgets.lowStock'));
+    }
+
+    private function assertMinimalIntegrityResponse(TestResponse $response): void
+    {
+        $response->assertOk()->assertExactJson(['backed' => true]);
+        foreach ([
+            'ip_address',
+            'user_agent',
+            'device',
+            'edited',
+            'edit_count',
+            'fingerprint',
+            'history',
+            'attributes',
+            'notes',
+        ] as $sensitivePath) {
+            $response->assertJsonMissingPath($sensitivePath);
+        }
+        $payload = (string) $response->getContent();
+        $this->assertStringNotContainsString('198.51.100.77', $payload);
+        $this->assertStringNotContainsString('203.0.113.88', $payload);
+        $this->assertStringNotContainsString('Sensitive test browser history', $payload);
+        $this->assertStringNotContainsString('PRIVATE ADMINISTRATION HISTORY', $payload);
+        $this->assertStringNotContainsString('FOREIGN PRIVATE HISTORY', $payload);
     }
 
     /** @param array<int, string> $permissions */

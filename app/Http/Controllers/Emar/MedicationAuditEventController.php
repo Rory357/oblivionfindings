@@ -103,8 +103,12 @@ class MedicationAuditEventController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         $siteIds = $this->governanceScope->readerSiteIds($user, 'medications.audit.view');
+        $model = $this->resolveModelOrFail($id, $siteIds);
+        $integrity = $this->integrity->forModel($model);
 
-        return response()->json($this->integrity->forModel($this->resolveModelOrFail($id, $siteIds)));
+        return response()->json([
+            'backed' => (bool) ($integrity['backed'] ?? false),
+        ]);
     }
 
     public function export(Request $request, string $id): StreamedResponse

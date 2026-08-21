@@ -239,7 +239,7 @@ class AuditTrailTest extends TestCase
         );
     }
 
-    public function test_integrity_endpoint_returns_fingerprint_and_conceals_derived_omissions(): void
+    public function test_integrity_endpoint_confirms_backing_record_without_sensitive_metadata_and_conceals_derived_omissions(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedAudit();
         $med = ClientMedication::query()->create([
@@ -253,8 +253,7 @@ class AuditTrailTest extends TestCase
 
         $this->actingAs($user)->getJson('/emar/audit/event/admin_'.$admin->id.'/integrity')
             ->assertOk()
-            ->assertJson(['backed' => true])
-            ->assertJsonStructure(['backed', 'fingerprint', 'edited', 'recorded_at']);
+            ->assertExactJson(['backed' => true]);
 
         $this->actingAs($user)->getJson('/emar/audit/event/omission_999_202601010800/integrity')
             ->assertNotFound();

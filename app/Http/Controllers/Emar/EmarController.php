@@ -5937,9 +5937,27 @@ class EmarController extends Controller
         );
     }
 
-    public function dismissAlert(MedicationDashboardAlert $alert)
+    public function dismissAlert(Request $request, int $alert)
     {
-        app(MedicationAlertService::class)->acknowledgeAlert($alert, auth()->id());
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $actor,
+            'medications.administer.correct',
+        );
+        $canonicalAlert = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows(
+                MedicationDashboardAlert::query()->whereKey($alert),
+                $siteIds,
+            )
+            ->with('client:id,site_id')
+            ->firstOrFail();
+
+        app(MedicationAlertService::class)->acknowledgeAlert(
+            $canonicalAlert,
+            $actor->id,
+            $siteIds,
+        );
 
         return redirect()->back();
     }

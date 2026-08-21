@@ -215,12 +215,19 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
         Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
-        Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
 
         // PRN Effectiveness
         Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
 
     }); // end medications.orders.manage middleware group
+
+    Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])
+        ->whereNumber('alert')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.administer.correct',
+        ])
+        ->name('emar.alerts.dismiss');
 
     Route::middleware('permission:medications.controlled.record')->group(function () {
         Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');

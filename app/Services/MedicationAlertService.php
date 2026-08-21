@@ -823,8 +823,8 @@ class MedicationAlertService
     // Alert management — retained for MedicationDashboardAlert UI compat
     // -----------------------------------------------------------------------
 
-    /** @param array<int, int>|null $siteIds Null is reserved for internal callers. */
-    public function acknowledgeAlert(MedicationDashboardAlert $alert, int $userId, ?array $siteIds = null): bool
+    /** @param array<int, int> $siteIds */
+    public function acknowledgeAlert(MedicationDashboardAlert $alert, int $userId, array $siteIds): bool
     {
         $alert->loadMissing('client:id,site_id');
 
@@ -844,11 +844,11 @@ class MedicationAlertService
         }, 3);
     }
 
-    /** @param array<int, int>|null $siteIds Null is reserved for internal callers. */
+    /** @param array<int, int> $siteIds */
     public function resolveAlert(
         MedicationDashboardAlert $alert,
-        ?string $notes = null,
-        ?array $siteIds = null,
+        ?string $notes,
+        array $siteIds,
     ): bool
     {
         $alert->loadMissing('client:id,site_id');
@@ -879,14 +879,14 @@ class MedicationAlertService
     /**
      * Lock canonical Site, Client, medication, then alert for every transition.
      *
-     * @param array<int, int>|null $siteIds
+     * @param array<int, int> $siteIds
      */
-    private function lockCanonicalAlert(MedicationDashboardAlert $snapshot, ?array $siteIds): MedicationDashboardAlert
+    private function lockCanonicalAlert(MedicationDashboardAlert $snapshot, array $siteIds): MedicationDashboardAlert
     {
         $snapshotSiteId = (int) ($snapshot->client?->site_id ?? 0);
         $site = Site::query()
             ->whereKey($snapshotSiteId)
-            ->when($siteIds !== null, fn ($query) => $query->whereIn('id', $siteIds))
+            ->whereIn('id', $siteIds)
             ->lockForUpdate()
             ->firstOrFail();
         $client = Client::query()
