@@ -29,7 +29,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('medications.audit.export');
 
     // Medication reports
-    Route::middleware('permission:reports.viewAny')->group(function () {
+    Route::middleware([
+        'permission:medications.view',
+        'permission:medications.reports.export|reports.viewAny',
+    ])->group(function () {
         Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
             ->name('reports.medications');
         Route::get('/reports/medications/export-mar', [MedicationsReportController::class, 'exportMarCsv'])

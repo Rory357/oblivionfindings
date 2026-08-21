@@ -187,7 +187,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Medication stock updates (managers/finance)
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
-        ->middleware('permission:medications.stock.update|medications.controlled.record|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('clients.medical.medications.stock.update');
 
     // Medication administration (support workers + managers)
@@ -213,7 +213,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Controlled medication discrepancies
     Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ClientMedicalController::class, 'closeControlledDiscrepancy'])
-        ->middleware('permission:medications.controlled.record|clients.update')
+        ->middleware('permission:medications.controlled.record')
         ->name('clients.medical.controlled_discrepancies.close');
 
     // Client incidents

@@ -12,7 +12,7 @@ class MedicationStockLowNotification extends Notification
     public function __construct(
         public string $medication,
         public string $clientName,
-        public int $count,
+        public string $count,
         public string $unit,
         public int $reorderLevel,
     ) {}

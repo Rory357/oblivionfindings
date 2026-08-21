@@ -39,7 +39,7 @@ class MedicationPharmacyOrder extends Model
         'delivered_at' => 'datetime',
         'batch_expiry' => 'date',
         'quantity_ordered' => 'integer',
-        'quantity_received' => 'integer',
+        'quantity_received' => 'decimal:2',
     ];
 
     public function client()
@@ -60,6 +60,11 @@ class MedicationPharmacyOrder extends Model
     public function receivedByUser()
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function controlledDrugEntry()
+    {
+        return $this->hasOne(ClientControlledDrugEntry::class, 'pharmacy_order_id');
     }
 
     public function scopePending($query)

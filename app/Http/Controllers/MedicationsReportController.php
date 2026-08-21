@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -14,13 +15,13 @@ class MedicationsReportController extends Controller
 {
     use SanitizesCsvOutput;
 
-    public function index(Request $request)
+    public function index(Request $request, MedicationGovernanceScopeService $scope)
     {
-        // Access is permission-gated at the route level (reports.viewAny)
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
@@ -32,6 +33,7 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [$accessibleSiteIds, $readerSiteIds] = $this->readerSiteIds($request, $scope, $filters);
 
         $admins = ClientMedicationAdministration::query()
             ->with([
@@ -40,6 +42,7 @@ class MedicationsReportController extends Controller
                 'administeredBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
 
         if (! empty($filters['client_id'])) {
@@ -93,6 +96,7 @@ class MedicationsReportController extends Controller
                 'resolvedBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereBetween('reported_at', [$dateFrom, $dateTo]);
 
         if (! empty($filters['client_id'])) {
@@ -138,6 +142,7 @@ class MedicationsReportController extends Controller
             ->values();
 
         $clients = Client::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name'])
@@ -148,6 +153,10 @@ class MedicationsReportController extends Controller
             ->values();
 
         $serviceContexts = ServiceContext::query()
+            ->whereIn('id', Client::query()
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->whereNotNull('service_context_id')
+                ->select('service_context_id'))
             ->where('is_active', true)
             ->orderBy('type')
             ->orderBy('name')
@@ -164,6 +173,7 @@ class MedicationsReportController extends Controller
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $filters['client_id'] ?? null,
+                'site_id' => $filters['site_id'] ?? null,
                 'service_context_id' => $filters['service_context_id'] ?? null,
                 'status' => $filters['status'] ?? null,
                 'discrepancy_status' => $filters['discrepancy_status'] ?? null,
@@ -175,12 +185,13 @@ class MedicationsReportController extends Controller
         ]);
     }
 
-    public function exportMarCsv(Request $request)
+    public function exportMarCsv(Request $request, MedicationGovernanceScopeService $scope)
     {
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
         ]);
@@ -191,6 +202,7 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [, $readerSiteIds] = $this->readerSiteIds($request, $scope, $filters);
 
         $q = ClientMedicationAdministration::query()
             ->with([
@@ -199,6 +211,7 @@ class MedicationsReportController extends Controller
                 'administeredBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
 
         if (! empty($filters['client_id'])) {
@@ -252,12 +265,13 @@ class MedicationsReportController extends Controller
         ]);
     }
 
-    public function exportDiscrepanciesCsv(Request $request)
+    public function exportDiscrepanciesCsv(Request $request, MedicationGovernanceScopeService $scope)
     {
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
@@ -268,6 +282,7 @@ class MedicationsReportController extends Controller
         $dateTo = isset($filters['date_to']) && $filters['date_to']
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
+        [, $readerSiteIds] = $this->readerSiteIds($request, $scope, $filters);
 
         $q = ClientControlledDrugDiscrepancy::query()
             ->with([
@@ -278,6 +293,7 @@ class MedicationsReportController extends Controller
                 'resolvedBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereBetween('reported_at', [$dateFrom, $dateTo]);
 
         if (! empty($filters['client_id'])) {
@@ -338,5 +354,29 @@ class MedicationsReportController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{0: array<int, int>, 1: array<int, int>}
+     */
+    private function readerSiteIds(
+        Request $request,
+        MedicationGovernanceScopeService $scope,
+        array $filters,
+    ): array {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+
+        $siteId = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $accessibleSiteIds = $scope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
+            $siteId,
+            $clientId,
+        );
+
+        return [$accessibleSiteIds, $siteId !== null ? [$siteId] : $accessibleSiteIds];
     }
 }

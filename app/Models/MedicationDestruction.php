@@ -11,6 +11,13 @@ class MedicationDestruction extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
 
+    /**
+     * Voiding is an immutable administrative annotation only. It never removes
+     * the original stock or controlled-register effect; any correction must be
+     * recorded through the separately witnessed governed reconciliation flow.
+     */
+    public const VOID_STOCK_SEMANTICS = 'administrative_annotation_reconciliation_required';
+
     protected $fillable = [
         'client_id',
         'client_medication_id',
@@ -89,7 +96,9 @@ class MedicationDestruction extends Model
 
     /**
      * Records that have not been voided — the live disposal register. Voided
-     * records remain in the table (immutable, MoD Regs 1977) but are superseded.
+     * records remain in the table (immutable, MoD Regs 1977). This scope is for
+     * administrative register presentation only and must not calculate stock or
+     * controlled-register balances.
      */
     public function scopeVerified($query)
     {

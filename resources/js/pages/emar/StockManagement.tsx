@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
     AdjustStockDialog,
+    ControlledPharmacyDeliveryDialog,
     NewPharmacyOrderDialog,
     ReceiveStockDialog,
     StockCountDialog,
@@ -25,6 +26,7 @@ import {
     type StockMed,
     type StockRow,
 } from '@/pages/emar/_stock-dialogs';
+import { pharmacyOrderAdvanceAction } from '@/pages/emar/medication-stock-governance';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertOctagon,
@@ -68,16 +70,19 @@ type OrderRow = {
     medication_id: number | null;
     client_name: string;
     medication_name: string | null;
+    controlled: boolean;
     pharmacy_name: string | null;
     order_type: string | null;
     status: string;
     quantity_ordered: number | null;
-    quantity_received: number | null;
+    quantity_received: number | string | null;
     ordered_at: string | null;
     submitted_at: string | null;
     confirmed_at: string | null;
     dispensed_at: string | null;
     delivered_at: string | null;
+    batch_number: string | null;
+    batch_expiry: string | null;
 };
 
 type Props = {
@@ -99,6 +104,7 @@ type Props = {
 type Modal =
     | { type: 'order'; clientId?: number; medId?: number }
     | { type: 'receive'; medId?: number }
+    | { type: 'controlled-delivery'; order: OrderRow; item: StockRow }
     | { type: 'count'; medId?: number; controlledOnly?: boolean }
     | { type: 'adjust'; item: StockRow }
     | { type: 'detail'; item: StockRow }
@@ -268,6 +274,9 @@ export default function StockManagement({
     const openStockCtx = (e: ReactMouseEvent, s: StockRow) => {
         e.preventDefault();
         const order = openOrderFor(s.medication_id);
+        const orderRow = openOrders.find(
+            (candidate) => candidate.medication_id === s.medication_id,
+        );
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -301,11 +310,25 @@ export default function StockManagement({
                       {
                           icon: <Truck className="h-3.5 w-3.5" />,
                           label: 'Receive against order',
-                          onClick: () =>
+                          onClick: () => {
+                              if (
+                                  orderRow &&
+                                  pharmacyOrderAdvanceAction(orderRow) ===
+                                      'controlled-delivery'
+                              ) {
+                                  setModal({
+                                      type: 'controlled-delivery',
+                                      order: orderRow,
+                                      item: s,
+                                  });
+                                  return;
+                              }
+
                               setModal({
                                   type: 'receive',
                                   medId: s.medication_id,
-                              }),
+                              });
+                          },
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -502,9 +525,22 @@ export default function StockManagement({
         );
     }, [filtered]);
 
-    const advance = (id: number) =>
+    const advance = (order: OrderRow) => {
+        if (pharmacyOrderAdvanceAction(order) === 'controlled-delivery') {
+            const item = stockItems.find(
+                (stock) => stock.medication_id === order.medication_id,
+            );
+            if (item && order.medication_id !== null) {
+                setModal({ type: 'controlled-delivery', order, item });
+                return;
+            }
+
+            router.visit('/emar/controlled');
+            return;
+        }
+
         router.post(
-            `/emar/stock/pharmacy-orders/${id}/advance`,
+            `/emar/stock/pharmacy-orders/${order.id}/advance`,
             {},
             {
                 preserveScroll: true,
@@ -517,6 +553,7 @@ export default function StockManagement({
                 ],
             },
         );
+    };
     // Site + Client round-trip to the server (the board is server-filtered on
     // those two only); search/chip/tab stay client-side over the loaded rows.
     const reload = (over: {
@@ -1162,7 +1199,7 @@ export default function StockManagement({
                                 <OrderCard
                                     key={o.id}
                                     o={o}
-                                    onAdvance={() => advance(o.id)}
+                                    onAdvance={() => advance(o)}
                                 />
                             ))
                         )}
@@ -1187,6 +1224,21 @@ export default function StockManagement({
                     onClose={() => setModal(null)}
                 />
             )}
+            {modal?.type === 'controlled-delivery' &&
+                modal.order.medication_id !== null && (
+                    <ControlledPharmacyDeliveryDialog
+                        order={{
+                            ...modal.order,
+                            medication_id: modal.order.medication_id,
+                            medication_name:
+                                modal.order.medication_name ??
+                                'Controlled drug',
+                        }}
+                        stockItem={modal.item}
+                        witnesses={witnesses}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {modal?.type === 'count' && (
                 <StockCountDialog
                     medications={activeMedications}
@@ -1201,6 +1253,11 @@ export default function StockManagement({
                 <AdjustStockDialog
                     item={modal.item}
                     onClose={() => setModal(null)}
+                    onControlledCount={
+                        modal.item.controlled
+                            ? () => runCount(modal.item)
+                            : undefined
+                    }
                 />
             )}
             {modal?.type === 'detail' && (

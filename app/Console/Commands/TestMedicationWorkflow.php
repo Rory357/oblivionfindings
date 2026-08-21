@@ -173,11 +173,7 @@ class TestMedicationWorkflow extends Command
 
         $this->info("  ✓ {$stocks->count()} stock record(s) found");
         
-        $lowStock = $stocks->filter(function ($stock) {
-            return $stock->on_hand !== null && 
-                   $stock->reorder_level !== null && 
-                   $stock->on_hand <= $stock->reorder_level;
-        });
+        $lowStock = $stocks->filter(fn (ClientMedicationStock $stock) => $stock->isLowStock());
         
         if ($lowStock->isNotEmpty()) {
             $this->warn("    ⚠ {$lowStock->count()} medication(s) with low stock");

@@ -14,6 +14,7 @@ use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationReview;
 use App\Models\MedicationSyringeDriver;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -30,7 +31,8 @@ class MedicationReportingService
         ?Carbon $dateTo = null,
         ?int $serviceContextId = null,
         ?string $status = null,
-        ?string $careLevel = null
+        ?string $careLevel = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
@@ -43,6 +45,7 @@ class MedicationReportingService
             'serviceContext:id,name',
             'shift:id,starts_at,ends_at',
         ])
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -115,12 +118,14 @@ class MedicationReportingService
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
         ?Carbon $dateTo = null,
-        ?string $careLevel = null
+        ?string $careLevel = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group,deleted_at', 'client:id,first_name,last_name,care_level']);
@@ -183,22 +188,23 @@ class MedicationReportingService
         ];
     }
 
-    public function reportRegularUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportRegularUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
-        return $this->reportMedicationUsageByType('regular', $clientId, $dateFrom, $dateTo, $careLevel);
+        return $this->reportMedicationUsageByType('regular', $clientId, $dateFrom, $dateTo, $careLevel, $siteIds);
     }
 
-    public function reportShortCourseUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportShortCourseUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
-        return $this->reportMedicationUsageByType('short_course', $clientId, $dateFrom, $dateTo, $careLevel);
+        return $this->reportMedicationUsageByType('short_course', $clientId, $dateFrom, $dateTo, $careLevel, $siteIds);
     }
 
-    private function reportMedicationUsageByType(string $type, ?int $clientId, ?Carbon $dateFrom, ?Carbon $dateTo, ?string $careLevel): array
+    private function reportMedicationUsageByType(string $type, ?int $clientId, ?Carbon $dateFrom, ?Carbon $dateTo, ?string $careLevel, ?array $siteIds = null): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup,deleted_at', 'administeredBy:id,name'])
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
@@ -236,12 +242,13 @@ class MedicationReportingService
         ];
     }
 
-    public function reportObservationUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportObservationUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $observations = ClientMedicationAdministration::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at'])
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->where(function ($query) {
@@ -271,6 +278,7 @@ class MedicationReportingService
             ]);
 
         $inrs = ClientInrRecord::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
             ->whereBetween('tested_on', [$dateFrom->toDateString(), $dateTo->toDateString()])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -299,12 +307,13 @@ class MedicationReportingService
         ];
     }
 
-    public function reportSyringeDriverUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportSyringeDriverUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $drivers = MedicationSyringeDriver::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with(['client:id,first_name,last_name,care_level', 'commencedBy:id,name', 'completedBy:id,name'])
             ->whereBetween('commenced_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -335,12 +344,13 @@ class MedicationReportingService
         ];
     }
 
-    public function reportChartReviews(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    public function reportChartReviews(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null, ?array $siteIds = null): array
     {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $reviews = MedicationReview::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with('client:id,first_name,last_name,care_level,next_chart_review_date')
             ->where(function ($query) use ($dateFrom, $dateTo) {
                 $query->whereBetween('scheduled_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
@@ -398,12 +408,14 @@ class MedicationReportingService
     public function reportMissedDoses(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::where('status', 'missed')
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereBetween('scheduled_for', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['medication:id,name,dosage,controlled_drug,high_risk,deleted_at', 'client:id,first_name,last_name']);
 
@@ -453,12 +465,14 @@ class MedicationReportingService
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
         ?Carbon $dateTo = null,
-        int $lateThresholdMinutes = 30
+        int $lateThresholdMinutes = 30,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::where('status', 'given')
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereNotNull('scheduled_for')
             ->whereNotNull('administered_at')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
@@ -497,10 +511,12 @@ class MedicationReportingService
      */
     public function reportControlledDrugBalance(
         ?int $clientId = null,
-        ?int $medicationId = null
+        ?int $medicationId = null,
+        ?array $siteIds = null,
     ): array {
         $query = ClientMedication::where('controlled_drug', true)
             ->active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->with(['stock', 'client:id,first_name,last_name']);
 
         if ($clientId) {
@@ -542,10 +558,10 @@ class MedicationReportingService
         if (! $stock || $stock->on_hand === null) {
             return 'unknown';
         }
-        if ($stock->on_hand === 0) {
+        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
             return 'out_of_stock';
         }
-        if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
+        if ($stock->isLowStock()) {
             return 'low_stock';
         }
 
@@ -559,7 +575,8 @@ class MedicationReportingService
         ?int $clientId = null,
         ?string $status = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
@@ -570,6 +587,7 @@ class MedicationReportingService
             'reportedBy:id,name',
             'resolvedBy:id,name',
         ])
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereBetween('reported_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -616,7 +634,8 @@ class MedicationReportingService
         ?int $clientId = null,
         ?int $medicationId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
@@ -626,6 +645,7 @@ class MedicationReportingService
             'medication:id,name',
             'changedBy:id,name',
         ])
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereBetween('changed_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
         if ($clientId) {
@@ -664,12 +684,14 @@ class MedicationReportingService
     public function reportMedicationIncidents(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
 
         $query = ClientIncident::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->whereBetween('occurred_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['client:id,first_name,last_name']);
 
@@ -719,7 +741,8 @@ class MedicationReportingService
     public function generateAuditReport(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?array $siteIds = null,
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
@@ -731,23 +754,23 @@ class MedicationReportingService
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $clientId,
             ],
-            'mar_summary' => $this->getMarSummary($clientId, $dateFrom, $dateTo),
-            'prn_summary' => $this->getPrnSummary($clientId, $dateFrom, $dateTo),
-            'controlled_summary' => $this->getControlledSummary($clientId, $dateFrom, $dateTo),
-            'safety_alerts' => $this->getSafetyAlerts($clientId, $dateFrom, $dateTo),
-            'compliance_metrics' => $this->getComplianceMetrics($clientId, $dateFrom, $dateTo),
+            'mar_summary' => $this->getMarSummary($clientId, $dateFrom, $dateTo, $siteIds),
+            'prn_summary' => $this->getPrnSummary($clientId, $dateFrom, $dateTo, $siteIds),
+            'controlled_summary' => $this->getControlledSummary($clientId, $dateFrom, $dateTo, $siteIds),
+            'safety_alerts' => $this->getSafetyAlerts($clientId, $dateFrom, $dateTo, $siteIds),
+            'compliance_metrics' => $this->getComplianceMetrics($clientId, $dateFrom, $dateTo, $siteIds),
         ];
     }
 
     /**
      * Get MAR summary for audit
      */
-    private function getMarSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getMarSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
         $query = ClientMedicationAdministration::whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
-        ]);
+        ])->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -776,9 +799,10 @@ class MedicationReportingService
     /**
      * Get PRN summary for audit
      */
-    private function getPrnSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getPrnSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
         $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
 
@@ -799,12 +823,12 @@ class MedicationReportingService
     /**
      * Get controlled drug summary for audit
      */
-    private function getControlledSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getControlledSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
         $query = ClientControlledDrugEntry::whereBetween('recorded_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
-        ]);
+        ])->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -820,6 +844,7 @@ class MedicationReportingService
                 $dateFrom->startOfDay(),
                 $dateTo->endOfDay(),
             ])
+                ->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)))
                 ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                 ->count(),
         ];
@@ -828,12 +853,12 @@ class MedicationReportingService
     /**
      * Get safety alerts for audit
      */
-    private function getSafetyAlerts(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getSafetyAlerts(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
         $query = MedicationDashboardAlert::whereBetween('created_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
-        ]);
+        ])->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -856,12 +881,12 @@ class MedicationReportingService
     /**
      * Get compliance metrics
      */
-    private function getComplianceMetrics(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
+    private function getComplianceMetrics(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): array
     {
         $adminQuery = ClientMedicationAdministration::whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
-        ]);
+        ])->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)));
 
         if ($clientId) {
             $adminQuery->where('client_id', $clientId);
@@ -878,19 +903,19 @@ class MedicationReportingService
         return [
             'on_time_percentage' => $total > 0 ? round(($onTime / $total) * 100, 1) : 0,
             'witness_compliance_percentage' => $controlledTotal > 0 ? round(($withWitness / $controlledTotal) * 100, 1) : 100,
-            'documentation_completeness' => $this->calculateDocumentationCompleteness($clientId, $dateFrom, $dateTo),
+            'documentation_completeness' => $this->calculateDocumentationCompleteness($clientId, $dateFrom, $dateTo, $siteIds),
         ];
     }
 
     /**
      * Calculate documentation completeness
      */
-    private function calculateDocumentationCompleteness(?int $clientId, Carbon $dateFrom, Carbon $dateTo): float
+    private function calculateDocumentationCompleteness(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null): float
     {
         $query = ClientMedicationAdministration::whereBetween('administered_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
-        ]);
+        ])->when($siteIds !== null, fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds)));
 
         if ($clientId) {
             $query->where('client_id', $clientId);

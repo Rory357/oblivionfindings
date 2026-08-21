@@ -17,6 +17,7 @@ import { ClipboardCheck, Info, Package, PackagePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { genericStockMedications } from '../medication-stock-governance';
 import type { MedicationOption } from './cd-register-modal';
 import type { ClientOption } from './report-error-modal';
 
@@ -92,7 +93,7 @@ export function StockMovementModal({
         onClose();
     };
 
-    const clientMeds = medications.filter(
+    const clientMeds = genericStockMedications(medications).filter(
         (m) => String(m.client_id) === clientId,
     );
     const step1Ok = clientId && medId;
@@ -109,13 +110,13 @@ export function StockMovementModal({
             action === 'receive'
                 ? {
                       client_medication_id: Number(medId),
-                      quantity: Number(quantity),
+                      quantity,
                       batch_number: batch || null,
                       expiry_date: expiry || null,
                   }
                 : {
                       client_medication_id: Number(medId),
-                      new_quantity: Number(newQuantity),
+                      new_quantity: newQuantity,
                       reason,
                   };
         router.post(url, payload, {
@@ -249,7 +250,8 @@ export function StockMovementModal({
                             <Field label="Quantity received" required>
                                 <Input
                                     type="number"
-                                    inputMode="numeric"
+                                    inputMode="decimal"
+                                    step={0.01}
                                     value={quantity}
                                     onChange={(e) =>
                                         setQuantity(e.target.value)
@@ -279,7 +281,8 @@ export function StockMovementModal({
                             <Field label="New on-hand count" required>
                                 <Input
                                     type="number"
-                                    inputMode="numeric"
+                                    inputMode="decimal"
+                                    step={0.01}
                                     value={newQuantity}
                                     onChange={(e) =>
                                         setNewQuantity(e.target.value)

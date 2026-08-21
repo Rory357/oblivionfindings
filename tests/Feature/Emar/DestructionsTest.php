@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationStock;
 use App\Models\MedicationDestruction;
 use App\Models\Permission;
 use App\Models\Role;
@@ -28,19 +32,30 @@ class DestructionsTest extends TestCase
     private function setupRegister(): array
     {
         $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage']);
+        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'medications.controlled.view', 'medications.controlled.record']);
         $w1 = $this->makeRoleUser('coordinator');
         $w2 = $this->makeRoleUser('coordinator');
+        $this->grantPermissions($w1, ['medications.controlled.witness']);
+        $this->grantPermissions($w2, ['medications.controlled.witness']);
+        foreach ([$user, $w1, $w2] as $staffMember) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $staffMember->id,
+                'primary_site_id' => $site->id,
+                'is_active' => true,
+                'start_date' => now()->subYear()->toDateString(),
+                'end_date' => null,
+            ]);
+        }
 
-        $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
-        ClientMedication::query()->create([
+        $med = ClientMedication::query()->create([
             'client_id' => $client->id, 'name' => 'Oxycodone', 'dosage' => '5mg', 'frequency' => 'PRN',
             'controlled_drug' => true, 'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
         ]);
 
-        return compact('user', 'w1', 'w2', 'site', 'client');
+        return compact('user', 'w1', 'w2', 'site', 'client', 'med');
     }
 
     private function record(array $overrides = []): MedicationDestruction
@@ -77,6 +92,47 @@ class DestructionsTest extends TestCase
         $this->assertSame($user->id, $rec->voided_by);
     }
 
+    public function test_void_is_administrative_only_and_records_explicit_reconciliation_provenance(): void
+    {
+        ['user' => $user, 'w1' => $witness, 'client' => $client, 'med' => $medication] = $this->setupRegister();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 8.5,
+            'unit' => 'tablets',
+        ]);
+        $entry = ClientControlledDrugEntry::create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'entry_type' => 'destruction',
+            'quantity' => 0.5,
+            'unit' => 'tablets',
+            'on_hand_before' => 9,
+            'on_hand_after' => 8.5,
+            'recorded_by' => $user->id,
+            'witnessed_by' => $witness->id,
+            'recorded_at' => now(),
+        ]);
+        $record = $this->record([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'site_id' => $client->site_id,
+            'quantity' => 0.5,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('emar.destructions.void', $record), ['void_reason' => 'Duplicate administrative record'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Destruction record voided. Stock and register balances were not changed; record any correction through witnessed reconciliation.');
+
+        $this->assertSame(8.5, (float) $stock->refresh()->on_hand);
+        $this->assertDatabaseHas('client_controlled_drug_entries', ['id' => $entry->id]);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $audit = AuditLog::query()->where('action', 'medications.destruction.void')->latest('id')->firstOrFail();
+        $this->assertSame(MedicationDestruction::VOID_STOCK_SEMANTICS, $audit->meta['void_stock_semantics'] ?? null);
+        $this->assertFalse((bool) ($audit->meta['stock_effect_reversed'] ?? true));
+        $this->assertTrue((bool) ($audit->meta['requires_governed_stock_reconciliation'] ?? false));
+    }
+
     public function test_void_requires_a_reason(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupRegister();
@@ -92,12 +148,13 @@ class DestructionsTest extends TestCase
 
     public function test_cd_destruction_rejects_duplicate_witnesses(): void
     {
-        ['user' => $user, 'w1' => $w1, 'client' => $client] = $this->setupRegister();
+        ['user' => $user, 'w1' => $w1, 'client' => $client, 'med' => $med] = $this->setupRegister();
 
         $this->actingAs($user)
             ->from('/emar/destructions')
             ->post('/emar/destructions', [
                 'client_id' => $client->id,
+                'client_medication_id' => $med->id,
                 'medication_name' => 'Oxycodone',
                 'quantity' => 2,
                 'unit' => 'tablets',
@@ -105,7 +162,9 @@ class DestructionsTest extends TestCase
                 'disposal_method' => 'denaturing',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
+                'witness_1_credential' => 'password',
                 'witness_2_id' => $w1->id, // same person twice
+                'witness_2_credential' => 'password',
                 'authorised_by_name' => 'Pharmacist Pat',
             ])
             ->assertSessionHasErrors('witness_2_id');
@@ -115,12 +174,13 @@ class DestructionsTest extends TestCase
 
     public function test_cd_destruction_records_with_two_distinct_witnesses(): void
     {
-        ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client] = $this->setupRegister();
+        ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client, 'med' => $med] = $this->setupRegister();
 
         $this->actingAs($user)
             ->from('/emar/destructions')
             ->post('/emar/destructions', [
                 'client_id' => $client->id,
+                'client_medication_id' => $med->id,
                 'medication_name' => 'Oxycodone',
                 'quantity' => 2,
                 'unit' => 'tablets',
@@ -128,7 +188,9 @@ class DestructionsTest extends TestCase
                 'disposal_method' => 'denaturing',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
+                'witness_1_credential' => 'password',
                 'witness_2_id' => $w2->id,
+                'witness_2_credential' => 'password',
                 'authorised_by_name' => 'Pharmacist Pat',
             ])
             ->assertSessionHasNoErrors();
@@ -191,6 +253,8 @@ class DestructionsTest extends TestCase
                 ->where('destructions.0.reason_label', 'Expired')
                 ->where('destructions.0.disposal_method_label', 'Denaturing')
                 ->where('destructions.0.is_voided', true)
+                ->where('destructions.0.void_stock_semantics', MedicationDestruction::VOID_STOCK_SEMANTICS)
+                ->where('destructions.0.requires_governed_stock_reconciliation', true)
                 ->where('destructions.0.void_reason', 'Wrong quantity recorded')
                 ->where('destructions.0.voided_by_name', $user->name)
             );

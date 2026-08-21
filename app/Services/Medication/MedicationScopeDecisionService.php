@@ -57,20 +57,29 @@ class MedicationScopeDecisionService
             $submittedRound,
             $callback,
         ) {
+            abort_unless($performer->canDo('medications.administer.record'), 403);
             $this->notFoundUnless($actionAt->lessThanOrEqualTo(now()->addMinute()));
 
-            $medication = ClientMedication::query()
+            $medicationSnapshot = ClientMedication::query()
                 ->whereKey($submittedMedication->getKey())
                 ->whereNull('deleted_at')
-                ->lockForUpdate()
-                ->first();
-            $this->notFoundUnless($medication !== null);
+                ->first(['id', 'client_id']);
+            $this->notFoundUnless($medicationSnapshot !== null);
 
             $client = Client::query()
-                ->whereKey($medication->client_id)
+                ->whereKey($medicationSnapshot->client_id)
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($client !== null && (int) $client->id === (int) $submittedClient->getKey());
+
+            $medication = ClientMedication::query()
+                ->whereKey($medicationSnapshot->id)
+                ->where('client_id', $client->id)
+                ->whereNull('deleted_at')
+                ->whereNull('superseded_by')
+                ->lockForUpdate()
+                ->first();
+            $this->notFoundUnless($medication !== null);
 
             $round = null;
             if ($submittedRound !== null) {

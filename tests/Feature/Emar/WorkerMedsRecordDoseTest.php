@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -26,6 +27,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -369,8 +371,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->assertRedirect('/meds/today')
             ->assertSessionHasErrors('witnessed_by');
 
-        $witness = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($witness, ['medications.controlled.witness']);
+        $witness = $this->currentWitnessAt($this->site);
 
         $this->actingAs($this->worker)
             ->from('/meds/today')
@@ -380,7 +381,26 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
                 'witness_credential' => 'password',
-                'cd_balance' => 9,
+                'quantity_administered' => 0.015,
+                'cd_balance' => 9.999,
+            ])
+            ->assertRedirect('/meds/today')
+            ->assertSessionHasErrors(['quantity_administered', 'cd_balance']);
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame(10.0, (float) $medication->stock->refresh()->on_hand);
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                'client_medication_id' => $medication->id,
+                'scheduled_for' => $scheduledFor->toIso8601String(),
+                'status' => 'given',
+                'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
+                'quantity_administered' => 0.5,
+                'cd_balance' => 9.5,
             ])
             ->assertRedirect('/meds/today')
             ->assertSessionHas('success');
@@ -388,16 +408,204 @@ class WorkerMedsRecordDoseTest extends TestCase
         $administration = ClientMedicationAdministration::sole();
         $this->assertSame($witness->id, (int) $administration->witnessed_by);
         $this->assertStringContainsString(
-            'CD register balance after dose: 9',
+            'CD register balance after dose: 9.5',
             (string) $administration->notes,
         );
 
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_medication_id' => $medication->id,
             'entry_type' => 'administered',
-            'on_hand_after' => 9,
             'witnessed_by' => $witness->id,
         ]);
+        $entry = $medication->controlledDrugEntries()->sole();
+        $this->assertSame(0.5, (float) $entry->quantity);
+        $this->assertSame(10.0, (float) $entry->on_hand_before);
+        $this->assertSame(9.5, (float) $entry->on_hand_after);
+        $this->assertSame(9.5, (float) $medication->stock->refresh()->on_hand);
+    }
+
+    public function test_controlled_dose_rejects_missing_insufficient_and_stale_stock_without_mutation(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], [
+            'name' => 'Controlled stock provenance',
+            'controlled_drug' => true,
+        ]);
+        $scheduledFor = Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'));
+        $witness = $this->currentWitnessAt($this->site);
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'scheduled_for' => $scheduledFor->toIso8601String(),
+            'status' => 'given',
+            'witnessed_by' => $witness->id,
+            'witness_credential' => 'password',
+            'quantity_administered' => 0.5,
+            'cd_balance' => 9.5,
+        ];
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', $payload)
+            ->assertSessionHasErrors('quantity_administered');
+
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 0.25,
+            'unit' => 'tablets',
+        ]);
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', $payload)
+            ->assertSessionHasErrors('quantity_administered');
+
+        $stock->update(['on_hand' => 10]);
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                ...$payload,
+                'cd_balance' => 8,
+            ])
+            ->assertSessionHasErrors('cd_balance');
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+    }
+
+    public function test_controlled_dose_strict_audit_failure_rolls_back_administration_and_stock(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], [
+            'name' => 'Audited controlled administration',
+            'controlled_drug' => true,
+        ]);
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
+        $witness = $this->currentWitnessAt($this->site);
+        $injectFailure = true;
+        AuditLog::creating(function (AuditLog $audit) use (&$injectFailure): void {
+            if ($injectFailure && $audit->action === 'medications.controlled.entry.record') {
+                throw new RuntimeException('Injected controlled administration audit failure.');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)
+                ->post('/meds/today/record', [
+                    'client_medication_id' => $medication->id,
+                    'scheduled_for' => now()->toIso8601String(),
+                    'status' => 'given',
+                    'witnessed_by' => $witness->id,
+                    'witness_credential' => 'password',
+                    'quantity_administered' => 0.5,
+                    'cd_balance' => 9.5,
+                ]);
+            $this->fail('The injected controlled administration audit failure should escape.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected controlled administration audit failure.', $exception->getMessage());
+        } finally {
+            $injectFailure = false;
+            $this->withExceptionHandling();
+        }
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'medications.controlled.entry.record']);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+    }
+
+    public function test_controlled_dose_conceals_foreign_ended_and_stale_permission_witnesses_and_rejects_bad_credentials(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], [
+            'name' => 'Witness authority boundary',
+            'controlled_drug' => true,
+        ]);
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $foreignWitness = $this->currentWitnessAt($foreignSite);
+        $endedWitness = $this->currentWitnessAt($this->site, [
+            'end_date' => now()->subDay()->toDateString(),
+        ]);
+        $inactiveWitness = $this->currentWitnessAt($this->site, [
+            'is_active' => false,
+        ]);
+        $stalePermissionWitness = $this->currentWitnessAt($this->site);
+        $witnessPermission = Permission::query()
+            ->where('key', 'medications.controlled.witness')
+            ->sole();
+        $stalePermissionWitness->permissionOverrides()->sync([
+            $witnessPermission->id => ['allowed' => false],
+        ]);
+        $validWitness = $this->currentWitnessAt($this->site);
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'scheduled_for' => now()->toIso8601String(),
+            'status' => 'given',
+            'quantity_administered' => 0.5,
+            'cd_balance' => 9.5,
+            'witness_credential' => 'password',
+        ];
+
+        foreach ([$foreignWitness, $endedWitness, $inactiveWitness, $stalePermissionWitness] as $ineligibleWitness) {
+            $this->actingAs($this->worker)
+                ->post('/meds/today/record', [
+                    ...$payload,
+                    'witnessed_by' => $ineligibleWitness->id,
+                ])
+                ->assertNotFound();
+        }
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                ...$payload,
+                'witnessed_by' => $validWitness->id,
+                'witness_credential' => 'wrong-password',
+            ])
+            ->assertSessionHasErrors('witness_credential');
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+    }
+
+    public function test_generic_administration_strict_audit_failure_rolls_back_domain_and_audit_state(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], [
+            'name' => 'Strictly audited administration',
+        ]);
+        $auditCount = AuditLog::count();
+        $injectFailure = true;
+        AuditLog::creating(function (AuditLog $audit) use (&$injectFailure): void {
+            if ($injectFailure && $audit->action === 'medications.administration.record') {
+                throw new RuntimeException('Injected generic administration audit failure.');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)
+                ->post('/meds/today/record', [
+                    'client_medication_id' => $medication->id,
+                    'scheduled_for' => now()->toIso8601String(),
+                    'status' => 'given',
+                ]);
+            $this->fail('The injected generic administration audit failure should escape.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected generic administration audit failure.', $exception->getMessage());
+        } finally {
+            $injectFailure = false;
+            $this->withExceptionHandling();
+        }
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame($auditCount, AuditLog::count());
     }
 
     public function test_prn_effect_records_once_per_administration(): void
@@ -477,8 +685,7 @@ class WorkerMedsRecordDoseTest extends TestCase
     {
         $this->scheduledMedication(['08:00', '16:00']);
 
-        $witness = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($witness, ['medications.controlled.witness']);
+        $witness = $this->currentWitnessAt($this->site);
 
         $this->actingAs($this->worker)
             ->get('/meds/today')
@@ -538,6 +745,22 @@ class WorkerMedsRecordDoseTest extends TestCase
             'active' => true,
             'state' => 'active',
         ], $overrides));
+    }
+
+    private function currentWitnessAt(Site $site, array $profileOverrides = []): User
+    {
+        $witness = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($witness, ['medications.controlled.witness']);
+        HrEmployeeProfile::factory()->create(array_merge([
+            'user_id' => $witness->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ], $profileOverrides));
+
+        return $witness;
     }
 
     protected function makeRoleUser(string $roleName): User

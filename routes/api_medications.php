@@ -92,11 +92,17 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     // Reports
     Route::get('/reports', [MedicationsApiController::class, 'getReports'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.reports.export|reports.viewAny',
+        ])
         ->name('api.medications.reports');
 
     Route::get('/reports/export', [MedicationsApiController::class, 'exportReportCsv'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.reports.export|reports.viewAny',
+        ])
         ->name('api.medications.reports.export');
 
     // Shift summary
@@ -124,11 +130,11 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.scheduled_counts.index');
 
     Route::post('/clients/{client}/medications/{medication}/scheduled-counts', [MedicationsApiController::class, 'createScheduledStockCount'])
-        ->middleware('permission:medications.stock.update|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('api.medications.scheduled_counts.store');
 
     Route::post('/clients/{client}/scheduled-counts/{count}/complete', [MedicationsApiController::class, 'completeScheduledStockCount'])
-        ->middleware('permission:medications.stock.update|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('api.medications.scheduled_counts.complete');
 
     // Drug Interactions Admin

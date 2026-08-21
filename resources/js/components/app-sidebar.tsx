@@ -510,10 +510,13 @@ function buildIconNavItems({
     // first click still matches the frontline experience, with Dashboard kept
     // one level deeper for compliance / management work.
     const canAdminEmar =
-        can?.medications?.ordersManage ||
-        can?.medications?.auditView ||
-        can?.medications?.reportsExport ||
-        can?.reports?.viewAny;
+        can?.medications?.view &&
+        (can?.medications?.ordersManage ||
+            can?.medications?.auditView ||
+            can?.medications?.reportsExport ||
+            can?.medications?.controlledView ||
+            can?.medications?.stockUpdate ||
+            can?.reports?.viewAny);
     const canWorkerMeds =
         can?.medications?.administerRecord ||
         can?.medications?.view ||
@@ -1081,7 +1084,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.medications?.view)
         admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.controlledView)
         admin.push({
             title: 'Controlled Drugs',
             href: '/emar/controlled',
@@ -1104,7 +1107,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/medications',
             icon: Pill,
         });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.stockUpdate)
         mgmt.push({
             title: 'Stock Management',
             href: '/emar/stock',
@@ -1138,7 +1141,10 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/audit',
             icon: Shield,
         });
-    if (can?.reports?.viewAny)
+    if (
+        can?.medications?.view &&
+        (can?.reports?.viewAny || can?.medications?.reportsExport)
+    )
         compliance.push({
             title: 'Reports',
             href: '/emar/reports',
@@ -1150,7 +1156,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/competency',
             icon: ClipboardCheck,
         });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.controlledView)
         compliance.push({
             title: 'Destructions',
             href: '/emar/destructions',

@@ -21,6 +21,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -180,8 +181,8 @@ class WorkerMedsController extends Controller
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
-            'cd_balance' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
+            'cd_balance' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', 'max:100000'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
@@ -224,6 +225,7 @@ class WorkerMedsController extends Controller
                         'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
                         'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'cd_balance' => $data['cd_balance'] ?? null,
                         'scheduled_for' => $data['scheduled_for'],
                         'administered_at' => $data['administered_at']
                             ?? $data['captured_offline_at']
@@ -304,7 +306,7 @@ class WorkerMedsController extends Controller
             'client_medication_id' => ['required', 'integer'],
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
@@ -628,7 +630,7 @@ class WorkerMedsController extends Controller
 
                     $expired = $stock->expiry_date && $stock->expiry_date->lte($today);
                     $expiringSoon = ! $expired && $stock->expiry_date && $stock->expiry_date->lte($today->copy()->addDays(30));
-                    $low = $stock->reorder_level !== null && $stock->on_hand <= $stock->reorder_level;
+                    $low = $stock->isLowStock();
 
                     if ($expired) {
                         $type = 'expired';
@@ -636,7 +638,7 @@ class WorkerMedsController extends Controller
                         $detail = 'Expired '.$stock->expiry_date->format('j M Y');
                     } elseif ($low) {
                         $type = 'stock_low';
-                        $tone = $stock->on_hand <= 0 ? 'crit' : 'warn';
+                        $tone = MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) ? 'crit' : 'warn';
                         $detail = $stock->on_hand.' '.($stock->unit ?: 'units').' left · reorder at '.$stock->reorder_level;
                     } else {
                         $type = 'expiring_soon';

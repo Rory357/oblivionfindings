@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationDashboardAlert;
 use App\Services\Medication\MedicationSignalService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -119,13 +120,13 @@ class CheckMedicationStock extends Command
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'stock_low',
-                severity: $stock->on_hand <= 0 ? 'critical' : 'warning',
+                severity: MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) ? 'critical' : 'warning',
                 message: "{$medicationName} for {$clientName} is low ({$stock->on_hand} {$stock->unit} remaining, reorder level: {$stock->reorder_level}).{$suggestedQty}",
                 medicationId: $stock->client_medication_id,
             );
 
             // OUT OF STOCK → operational signal. Low stock → dashboard only.
-            if ($stock->on_hand <= 0 && $stock->medication?->client_id) {
+            if (MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) && $stock->medication?->client_id) {
                 $signalService->emit(
                     MedicationSignalService::TYPE_STOCK_OUT,
                     $stock->medication->client_id,

@@ -14,7 +14,9 @@ use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationRound;
 use App\Models\Site;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationReportingService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,7 +25,7 @@ class EmarReportController extends Controller
 {
     use SanitizesCsvOutput;
 
-    public function index(Request $request)
+    public function index(Request $request, MedicationGovernanceScopeService $scope)
     {
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
@@ -34,11 +36,18 @@ class EmarReportController extends Controller
             'report_type' => ['nullable', 'string'],
         ]);
 
-        // §3b: a site filter scopes the client-linked panels (administration,
-        // reasons, PRN, controlled, errors) and themes the hero. Stock / rounds /
-        // competency stay point-in-time / org-wide.
+        $actor = $request->user();
+        abort_unless($actor, 403);
         $siteId = $filters['site_id'] ?? null;
-        $bySite = fn ($query) => $query->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)));
+        $clientId = $filters['client_id'] ?? null;
+        $accessibleSiteIds = $scope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
+            $siteId ? (int) $siteId : null,
+            $clientId ? (int) $clientId : null,
+        );
+        $readerSiteIds = $siteId ? [(int) $siteId] : $accessibleSiteIds;
+        $bySite = fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds));
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
             ? Carbon::parse($filters['date_from'])->startOfDay()
@@ -47,7 +56,6 @@ class EmarReportController extends Controller
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
-        $clientId = $filters['client_id'] ?? null;
         $careLevel = $filters['care_level'] ?? null;
 
         // ─── Administration Summary ──────────────────────────
@@ -198,6 +206,7 @@ class EmarReportController extends Controller
 
         // ─── Controlled Drugs ────────────────────────────────
         $cdAdminCount = ClientMedicationAdministration::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
             ->where('client_medications.controlled_drug', true)
             ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
@@ -206,6 +215,7 @@ class EmarReportController extends Controller
             ->count();
 
         $destructionsCount = MedicationDestruction::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->where('is_controlled_drug', true)
             ->whereBetween('destroyed_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -213,6 +223,7 @@ class EmarReportController extends Controller
             ->count();
 
         $discrepancyQuery = ClientControlledDrugDiscrepancy::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
@@ -220,6 +231,7 @@ class EmarReportController extends Controller
         $discrepancyCount = (clone $discrepancyQuery)->count();
 
         $cdByMedication = ClientMedicationAdministration::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
             ->where('client_medications.controlled_drug', true)
             ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
@@ -239,21 +251,29 @@ class EmarReportController extends Controller
         // ─── Staff Compliance ────────────────────────────────
         $today = Carbon::today();
 
-        $currentCompetency = MedicationCompetencyAssessment::where('status', 'passed')
+        $competencyQuery = MedicationCompetencyAssessment::query()
+            ->whereHas('user.hrEmployeeProfile', fn ($profile) => $profile->where(function ($site) use ($readerSiteIds) {
+                $site->whereIn('primary_site_id', $readerSiteIds);
+                foreach ($readerSiteIds as $readerSiteId) {
+                    $site->orWhereJsonContains('secondary_site_ids', $readerSiteId);
+                }
+            }));
+
+        $currentCompetency = (clone $competencyQuery)->where('status', 'passed')
             ->where('expiry_date', '>', $today)
             ->where('expiry_date', '>', $today->copy()->addDays(30))
             ->count();
 
-        $expiringCompetency = MedicationCompetencyAssessment::where('status', 'passed')
+        $expiringCompetency = (clone $competencyQuery)->where('status', 'passed')
             ->where('expiry_date', '>', $today)
             ->where('expiry_date', '<=', $today->copy()->addDays(30))
             ->count();
 
-        $expiredCompetency = MedicationCompetencyAssessment::where('status', 'passed')
+        $expiredCompetency = (clone $competencyQuery)->where('status', 'passed')
             ->where('expiry_date', '<=', $today)
             ->count();
 
-        $staffCompetencyList = MedicationCompetencyAssessment::query()
+        $staffCompetencyList = (clone $competencyQuery)
             ->with('user:id,name')
             ->whereIn('status', ['passed', 'failed'])
             ->orderByDesc('assessment_date')
@@ -281,22 +301,26 @@ class EmarReportController extends Controller
             ->values();
 
         // ─── Stock Status ────────────────────────────────────
-        $totalStockItems = ClientMedicationStock::count();
+        $stockQuery = ClientMedicationStock::query()
+            ->whereHas('medication.client', fn ($client) => $client->whereIn('site_id', $readerSiteIds));
+        $totalStockItems = (clone $stockQuery)->count();
 
-        $lowStockCount = ClientMedicationStock::whereColumn('on_hand', '<=', 'reorder_level')->count();
+        $lowStockCount = (clone $stockQuery)->whereColumn('on_hand', '<=', 'reorder_level')->count();
 
-        $expiringStockCount = ClientMedicationStock::whereNotNull('expiry_date')
+        $expiringStockCount = (clone $stockQuery)->whereNotNull('expiry_date')
             ->where('expiry_date', '>', $today)
             ->where('expiry_date', '<=', $today->copy()->addDays(30))
             ->count();
 
-        $expiredStockCount = ClientMedicationStock::whereNotNull('expiry_date')
+        $expiredStockCount = (clone $stockQuery)->whereNotNull('expiry_date')
             ->where('expiry_date', '<=', $today)
             ->count();
 
-        $activeMediactions = ClientMedication::where('active', true)->count();
+        $activeMediactions = ClientMedication::where('active', true)
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->count();
 
-        $stockList = ClientMedicationStock::query()
+        $stockList = (clone $stockQuery)
             ->with(['medication:id,client_id,name', 'medication.client:id,first_name,last_name'])
             ->orderByRaw('CASE WHEN on_hand <= reorder_level THEN 0 ELSE 1 END')
             ->orderBy('expiry_date')
@@ -308,7 +332,7 @@ class EmarReportController extends Controller
                     $status = 'expired';
                 } elseif ($s->expiry_date && $s->expiry_date->lte($today->copy()->addDays(30))) {
                     $status = 'expiring';
-                } elseif ($s->on_hand <= $s->reorder_level) {
+                } elseif ($s->isLowStock()) {
                     $status = 'low';
                 }
 
@@ -318,7 +342,7 @@ class EmarReportController extends Controller
                 return [
                     'medication' => $s->medication?->name ?? 'Unknown',
                     'client' => $clientName,
-                    'on_hand' => (int) $s->on_hand,
+                    'on_hand' => MedicationStockQuantity::toFloat($s->on_hand ?? 0),
                     'reorder_level' => (int) $s->reorder_level,
                     'expiry_date' => $s->expiry_date?->toDateString(),
                     'status' => $status,
@@ -328,6 +352,7 @@ class EmarReportController extends Controller
 
         // ─── Round Completion ────────────────────────────────
         $roundQuery = MedicationRound::query()
+            ->whereIn('site_id', $readerSiteIds)
             ->whereBetween('round_date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
 
         $roundTotals = (clone $roundQuery)->selectRaw("
@@ -411,6 +436,7 @@ class EmarReportController extends Controller
 
         // ─── Client list for filter ──────────────────────────
         $clients = Client::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'care_level'])
@@ -422,6 +448,7 @@ class EmarReportController extends Controller
             ->values();
 
         $careLevels = Client::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->whereNotNull('care_level')
             ->distinct()
             ->orderBy('care_level')
@@ -433,6 +460,7 @@ class EmarReportController extends Controller
         $cdMedications = ClientMedication::query()
             ->active()
             ->controlled()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->with(['client:id,first_name,last_name', 'stock'])
             ->orderBy('name')
             ->get()
@@ -443,14 +471,17 @@ class EmarReportController extends Controller
                 'client_id' => $m->client_id,
                 'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
                 'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
+                    'on_hand' => $m->stock->on_hand !== null
+                        ? MedicationStockQuantity::toFloat($m->stock->on_hand)
+                        : null,
                     'unit' => $m->stock->unit,
                     'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
                 ] : null,
             ])
             ->values();
 
-        $activeSite = $siteId ? Site::find($siteId) : null;
+        $sites = $scope->sitePicker($accessibleSiteIds);
+        $activeSite = $siteId ? $sites->firstWhere('id', (int) $siteId) : null;
 
         return Inertia::render('emar/Reports', [
             'filters' => [
@@ -465,7 +496,7 @@ class EmarReportController extends Controller
             'careLevels' => $careLevels,
             'cdMedications' => $cdMedications,
             'reasonBreakdown' => $reasonBreakdown,
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
             'adminSummary' => $adminSummary,
@@ -508,12 +539,13 @@ class EmarReportController extends Controller
         ]);
     }
 
-    public function export(Request $request)
+    public function export(Request $request, MedicationGovernanceScopeService $scope)
     {
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'care_level' => ['nullable', 'string', 'max:60'],
             'report_type' => ['nullable', 'string', 'in:administration,prn,controlled,rounds,errors,regular,short_course,observations,chart_reviews,syringe_drivers'],
         ]);
@@ -530,27 +562,37 @@ class EmarReportController extends Controller
         }
 
         $clientId = $filters['client_id'] ?? null;
+        $siteId = $filters['site_id'] ?? null;
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $accessibleSiteIds = $scope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
+            $siteId ? (int) $siteId : null,
+            $clientId ? (int) $clientId : null,
+        );
+        $readerSiteIds = $siteId ? [(int) $siteId] : $accessibleSiteIds;
         $careLevel = $filters['care_level'] ?? null;
         $type = $filters['report_type'] ?? 'administration';
 
         $filename = "emar_{$type}_report_".now()->format('Ymd_His').'.csv';
 
-        return response()->streamDownload(function () use ($type, $dateFrom, $dateTo, $clientId, $careLevel) {
+        return response()->streamDownload(function () use ($type, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds) {
             $out = fopen('php://output', 'w');
             $reporting = app(MedicationReportingService::class);
 
             match ($type) {
-                'administration' => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel),
-                'prn' => $this->exportPrn($out, $dateFrom, $dateTo, $clientId, $careLevel),
-                'controlled' => $this->exportControlled($out, $dateFrom, $dateTo, $clientId, $careLevel),
-                'rounds' => $this->exportRounds($out, $dateFrom, $dateTo),
-                'errors' => $this->exportErrors($out, $dateFrom, $dateTo, $clientId, $careLevel),
-                'regular' => $this->exportServiceRecords($out, $reporting->reportRegularUsage($clientId, $dateFrom, $dateTo, $careLevel)),
-                'short_course' => $this->exportServiceRecords($out, $reporting->reportShortCourseUsage($clientId, $dateFrom, $dateTo, $careLevel)),
-                'observations' => $this->exportServiceRecords($out, $reporting->reportObservationUsage($clientId, $dateFrom, $dateTo, $careLevel)),
-                'chart_reviews' => $this->exportServiceRecords($out, $reporting->reportChartReviews($clientId, $dateFrom, $dateTo, $careLevel)),
-                'syringe_drivers' => $this->exportServiceRecords($out, $reporting->reportSyringeDriverUsage($clientId, $dateFrom, $dateTo, $careLevel)),
-                default => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel),
+                'administration' => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds),
+                'prn' => $this->exportPrn($out, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds),
+                'controlled' => $this->exportControlled($out, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds),
+                'rounds' => $this->exportRounds($out, $dateFrom, $dateTo, $readerSiteIds),
+                'errors' => $this->exportErrors($out, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds),
+                'regular' => $this->exportServiceRecords($out, $reporting->reportRegularUsage($clientId, $dateFrom, $dateTo, $careLevel, $readerSiteIds)),
+                'short_course' => $this->exportServiceRecords($out, $reporting->reportShortCourseUsage($clientId, $dateFrom, $dateTo, $careLevel, $readerSiteIds)),
+                'observations' => $this->exportServiceRecords($out, $reporting->reportObservationUsage($clientId, $dateFrom, $dateTo, $careLevel, $readerSiteIds)),
+                'chart_reviews' => $this->exportServiceRecords($out, $reporting->reportChartReviews($clientId, $dateFrom, $dateTo, $careLevel, $readerSiteIds)),
+                'syringe_drivers' => $this->exportServiceRecords($out, $reporting->reportSyringeDriverUsage($clientId, $dateFrom, $dateTo, $careLevel, $readerSiteIds)),
+                default => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel, $readerSiteIds),
             };
 
             fclose($out);
@@ -559,11 +601,12 @@ class EmarReportController extends Controller
         ]);
     }
 
-    private function exportAdministrations($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
+    private function exportAdministrations($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel, array $siteIds): void
     {
         $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Reason Code', 'Administered By', 'Witness', 'BSL', 'Pulse', 'Blood Pressure', 'Notes']);
 
         ClientMedicationAdministration::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -591,11 +634,12 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportPrn($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
+    private function exportPrn($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel, array $siteIds): void
     {
         $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Dose', 'Reason', 'Administered By']);
 
         ClientMedicationAdministration::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,is_prn,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
@@ -619,11 +663,12 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportControlled($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
+    private function exportControlled($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel, array $siteIds): void
     {
         $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Dose', 'Administered By', 'Witness']);
 
         ClientMedicationAdministration::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,controlled_drug,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
@@ -648,11 +693,12 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportRounds($out, Carbon $dateFrom, Carbon $dateTo): void
+    private function exportRounds($out, Carbon $dateFrom, Carbon $dateTo, array $siteIds): void
     {
         $this->putCsv($out, ['Date', 'Name', 'Status', 'Scheduled Time', 'Started At', 'Completed At', 'Total Meds', 'Administered', 'Refused', 'Missed']);
 
         MedicationRound::query()
+            ->whereIn('site_id', $siteIds)
             ->whereBetween('round_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
             ->orderBy('round_date')
             ->chunk(500, function ($rows) use ($out) {
@@ -673,11 +719,12 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
+    private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel, array $siteIds): void
     {
         $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Description']);
 
         MedicationError::query()
+            ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level'])
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))

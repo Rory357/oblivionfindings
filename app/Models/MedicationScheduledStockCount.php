@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +29,9 @@ class MedicationScheduledStockCount extends Model
     ];
 
     protected $casts = [
+        'expected_quantity' => 'decimal:2',
+        'actual_quantity' => 'decimal:2',
+        'discrepancy' => 'decimal:2',
         'scheduled_date' => 'date',
         'scheduled_time' => 'datetime',
         'completed_at' => 'datetime',
@@ -64,10 +68,13 @@ class MedicationScheduledStockCount extends Model
     /**
      * Mark as completed
      */
-    public function complete(int $actualQty, ?string $notes = null, ?int $completedBy = null, ?int $witnessedBy = null): void
+    public function complete(int|float|string $actualQty, ?string $notes = null, ?int $completedBy = null, ?int $witnessedBy = null): void
     {
-        $this->actual_quantity = $actualQty;
-        $this->discrepancy = $actualQty - ($this->expected_quantity ?? $actualQty);
+        $actualQuantity = MedicationStockQuantity::normalize($actualQty);
+        $expectedQuantity = $this->expected_quantity ?? $actualQuantity;
+
+        $this->actual_quantity = $actualQuantity;
+        $this->discrepancy = MedicationStockQuantity::subtract($actualQuantity, $expectedQuantity);
         $this->notes = $notes;
         $this->completed_by = $completedBy;
         $this->witnessed_by = $witnessedBy;

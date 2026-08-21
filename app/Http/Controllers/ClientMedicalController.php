@@ -6,17 +6,16 @@ use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Models\Client;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
-use App\Models\ServiceContext;
-use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationOrderLifecycleService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
@@ -24,6 +23,7 @@ use App\Services\MedicationIncidentIntegrationService;
 use App\Services\NotificationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -327,127 +327,66 @@ class ClientMedicalController extends Controller
         }
     }
 
-    public function updateMedicationStock(Request $request, Client $client, ClientMedication $medication)
+    public function updateMedicationStock(
+        Request $request,
+        Client $client,
+        ClientMedication $medication,
+        MedicationGovernanceScopeService $governanceScope,
+    )
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
-
         $user = $request->user();
-        abort_unless(
-            ($user?->canDo('clients.update') ?? false)
-            || ($user?->canDo('medications.stock.update') ?? false)
-            || ($user?->canDo('medications.controlled.record') ?? false),
-            403
-        );
+        abort_unless($user, 403);
 
         $data = $request->validate([
-            'on_hand' => ['nullable', 'integer', 'min:0'],
+            'on_hand' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'reorder_level' => ['nullable', 'integer', 'min:0'],
             'last_counted_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
-            'witnessed_by' => ['nullable', 'integer'],
             'reason' => ['nullable', 'string', 'max:255'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $stock = ClientMedicationStock::firstOrNew(['client_medication_id' => $medication->id]);
-        $beforeOnHand = $stock->exists ? $stock->on_hand : null;
-        $immediateAction = filled($data['immediate_action_taken'] ?? null)
-            ? trim((string) $data['immediate_action_taken'])
-            : null;
-        unset($data['immediate_action_taken']);
-        $stock->fill($data);
-        $stock->client_medication_id = $medication->id;
-        if (isset($data['last_counted_at']) && $data['last_counted_at']) {
-            $stock->last_counted_at = $data['last_counted_at'];
+        if (array_key_exists('on_hand', $data) && $data['on_hand'] !== null) {
+            $data['on_hand'] = MedicationStockQuantity::normalize($data['on_hand']);
         }
-
-        // Controlled drug stock counts/adjustments: require permissions, a witness and a reason.
-        if ($medication->controlled_drug) {
-            abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
-
-            // Step 13: optional governance - block further controlled stock edits when an open discrepancy exists
-            $hasOpen = ClientControlledDrugDiscrepancy::query()
-                ->where('client_id', $client->id)
-                ->where('client_medication_id', $medication->id)
-                ->whereIn('status', ['open', 'under_review'])
-                ->exists();
-            if ($hasOpen && ! ($user?->canDo('medications.controlled.override') ?? false) && ! ($user?->canDo('clients.update') ?? false)) {
-                return back()->withInput()->with('error', 'There is an open controlled-drug discrepancy. Further stock edits are blocked unless you have override permission.');
-            }
-            if (empty($data['witnessed_by'])) {
-                return back()->withInput()->with('error', 'A witness is required when updating controlled drug stock.');
-            }
-            if ((int) $data['witnessed_by'] === (int) $user->id) {
-                return back()->withInput()->with('error', 'The witness must be a different user.');
-            }
-            if (empty($data['reason'])) {
-                return back()->withInput()->with('error', 'Please provide a reason for the controlled drug stock update.');
-            }
-            if ($beforeOnHand !== null
-                && $stock->on_hand !== null
-                && (int) $stock->on_hand !== (int) $beforeOnHand
-                && $immediateAction === null
-            ) {
-                throw ValidationException::withMessages([
-                    'immediate_action_taken' => 'Record the immediate action actually taken for this controlled-drug discrepancy.',
-                ]);
-            }
-
-            $witness = User::query()->find($data['witnessed_by']);
-            if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
-                return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
-            }
-        }
-        $discrepancy = null;
 
         try {
-            DB::transaction(function () use ($stock, $medication, $client, $beforeOnHand, $data, $user, $immediateAction, &$discrepancy): void {
-                $stock->save();
-                if ($medication->controlled_drug) {
-                    ClientControlledDrugEntry::create([
-                        'client_id' => $client->id,
-                        'client_medication_id' => $medication->id,
-                        'shift_id' => null,
-                        'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
-                        'entry_type' => 'stock_count',
-                        'quantity' => null,
-                        'unit' => $stock->unit,
-                        'on_hand_before' => $beforeOnHand,
-                        'on_hand_after' => $stock->on_hand,
-                        'reason' => $data['reason'],
-                        'notes' => $data['notes'] ?? null,
-                        'recorded_at' => now(),
-                        'recorded_by' => $user->id,
-                        'witnessed_by' => (int) $data['witnessed_by'],
-                    ]);
-
-                    // If the counted stock differs from the last known on-hand, flag a discrepancy for review.
-                    if ($beforeOnHand !== null && $stock->on_hand !== null && (int) $stock->on_hand !== (int) $beforeOnHand) {
-                        $discrepancy = ClientControlledDrugDiscrepancy::create([
-                            'client_id' => $client->id,
-                            'client_medication_id' => $medication->id,
-                            'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
-                            'on_hand_before' => $beforeOnHand,
-                            'on_hand_after' => $stock->on_hand,
-                            'difference' => (int) $stock->on_hand - (int) $beforeOnHand,
-                            'reason' => $data['reason'] ?? null,
-                            'notes' => $data['notes'] ?? null,
-                            'immediate_action_taken' => $immediateAction,
-                            'reported_at' => now(),
-                            'reported_by' => $user->id,
-                            'witnessed_by' => (int) $data['witnessed_by'],
-                            'status' => 'open',
+            $stock = $governanceScope->forMedication(
+                $user,
+                (int) $medication->id,
+                MedicationGovernanceScopeService::STOCK_CAPABILITY,
+                function (Client $canonicalClient, ClientMedication $lockedMedication) use ($data, $user): ClientMedicationStock {
+                    if ((bool) $lockedMedication->controlled_drug) {
+                        throw ValidationException::withMessages([
+                            'on_hand' => 'Controlled drug stock counts must be recorded through the controlled-drug balance check with a second witness.',
                         ]);
                     }
-                }
 
-                if ($discrepancy) {
-                    app(MedicationIncidentIntegrationService::class)
-                        ->handleControlledDiscrepancy($discrepancy, $user->id);
-                }
-            }, 3);
+                    $stock = ClientMedicationStock::query()
+                        ->where('client_medication_id', $lockedMedication->id)
+                        ->lockForUpdate()
+                        ->first() ?? new ClientMedicationStock(['client_medication_id' => $lockedMedication->id]);
+                    $beforeOnHand = $stock->exists && $stock->on_hand !== null
+                        ? MedicationStockQuantity::normalize($stock->on_hand)
+                        : null;
+                    $stock->fill(collect($data)->except('reason')->all());
+                    $stock->save();
+
+                    AuditLogger::logOrFail('medications.stock.client_medical.update', $stock, array_filter([
+                        'actor_id' => $user->id,
+                        'client_id' => $canonicalClient->id,
+                        'client_medication_id' => $lockedMedication->id,
+                        'reason' => $data['reason'] ?? null,
+                        'on_hand_before' => $beforeOnHand,
+                        'on_hand_after' => $stock->on_hand !== null
+                            ? MedicationStockQuantity::normalize($stock->on_hand)
+                            : null,
+                    ], fn ($value) => $value !== null && $value !== ''));
+
+                    return $stock;
+                },
+                (int) $client->id,
+            );
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication stock', $stock, $client, [
                 'title' => 'Medication stock updated: '.($medication->name ?? 'Medication'),
@@ -455,6 +394,8 @@ class ClientMedicalController extends Controller
             ]);
 
             return back()->with('success', 'Medication stock updated successfully.');
+        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
@@ -480,7 +421,7 @@ class ClientMedicalController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
             'shift_id' => ['nullable', 'integer'],
@@ -548,22 +489,6 @@ class ClientMedicalController extends Controller
                             }
                         } catch (\Throwable $e) {
                             // ignore parse errors
-                        }
-                    }
-
-                    // Controlled drugs: require permission + witness when recording a "given" administration.
-                    if ($medication->controlled_drug && (($data['status'] ?? 'given') === 'given')) {
-                        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
-                        if (empty($data['witnessed_by'])) {
-                            return back()->withInput()->with('error', 'A witness is required when administering a controlled drug.');
-                        }
-                        if ((int) $data['witnessed_by'] === (int) $user->id) {
-                            return back()->withInput()->with('error', 'The witness must be a different user.');
-                        }
-
-                        $witness = User::query()->find($data['witnessed_by']);
-                        if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
-                            return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
                         }
                     }
 
@@ -748,26 +673,47 @@ class ClientMedicalController extends Controller
         abort_unless($discrepancy->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
+        abort_unless($user, 403);
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string'],
         ]);
 
-        if ($discrepancy->status === 'closed') {
+        [$discrepancy, $alreadyClosed] = app(MedicationGovernanceScopeService::class)->forDiscrepancy(
+            $user,
+            $discrepancy,
+            function (Client $canonicalClient, ?ClientMedication $medication, ClientControlledDrugDiscrepancy $lockedDiscrepancy) use ($client, $data, $user): array {
+                abort_unless((int) $canonicalClient->id === (int) $client->id, 404);
+                if ($lockedDiscrepancy->status === 'closed') {
+                    return [$lockedDiscrepancy, true];
+                }
+
+                $lockedDiscrepancy->update([
+                    'status' => 'closed',
+                    'resolved_at' => now(),
+                    'resolved_by' => $user->id,
+                    'resolution_notes' => $data['resolution_notes'] ?? null,
+                ]);
+
+                AuditLogger::logOrFail('medications.controlled.discrepancy.resolve', $lockedDiscrepancy, array_filter([
+                    'actor_id' => $user->id,
+                    'client_id' => $canonicalClient->id,
+                    'client_medication_id' => $medication?->id,
+                    'source' => 'client_medical',
+                ], fn ($value) => $value !== null && $value !== ''));
+
+                return [$lockedDiscrepancy, false];
+            },
+        );
+
+        if ($alreadyClosed) {
             return back()->with('success', 'Discrepancy already closed.');
         }
-
-        $discrepancy->status = 'closed';
-        $discrepancy->resolved_at = now();
-        $discrepancy->resolved_by = $user?->id;
-        $discrepancy->resolution_notes = $data['resolution_notes'] ?? null;
-        $discrepancy->save();
 
         app(MedicationIncidentIntegrationService::class)->resolveControlledDiscrepancy(
             $discrepancy,
             'Controlled drug discrepancy closed from client medical record.',
-            $user?->id
+            $user->id
         );
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'controlled drug discrepancy', $discrepancy, $client, [

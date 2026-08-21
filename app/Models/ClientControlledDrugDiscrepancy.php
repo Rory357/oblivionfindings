@@ -32,6 +32,9 @@ class ClientControlledDrugDiscrepancy extends Model
     ];
 
     protected $casts = [
+        'on_hand_before' => 'decimal:2',
+        'on_hand_after' => 'decimal:2',
+        'difference' => 'decimal:2',
         'reported_at' => 'datetime',
         'resolved_at' => 'datetime',
     ];

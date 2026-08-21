@@ -1455,6 +1455,65 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
+    public function test_controlled_stock_update_preserves_half_unit_discrepancy_provenance(): void
+    {
+        $this->mockNotificationService();
+        $med = $this->createControlledDrug();
+        $witness = $this->createWitness();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 9.5,
+            'unit' => 'tablets',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
+                'on_hand' => 9,
+                'witnessed_by' => $witness->id,
+                'reason' => 'Half tablet count variance',
+                'immediate_action_taken' => 'Secured the stock and escalated the half-tablet variance.',
+                'unit' => 'tablets',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $entry = $med->controlledDrugEntries()->sole();
+        $discrepancy = ClientControlledDrugDiscrepancy::query()
+            ->where('client_medication_id', $med->id)
+            ->sole();
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(9.5, (float) $entry->on_hand_before);
+        $this->assertSame(9.0, (float) $entry->on_hand_after);
+        $this->assertSame(-0.5, (float) $discrepancy->difference);
+    }
+
+    public function test_controlled_stock_update_rejects_excess_scale_without_mutation(): void
+    {
+        $med = $this->createControlledDrug();
+        $witness = $this->createWitness();
+        $stock = ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from("/clients/{$this->client->id}/medical")
+            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
+                'on_hand' => 9.999,
+                'witnessed_by' => $witness->id,
+                'reason' => 'Invalid precision probe',
+                'immediate_action_taken' => 'No action should be recorded.',
+            ])
+            ->assertSessionHasErrors('on_hand');
+
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertSame(0, $med->controlledDrugEntries()->count());
+        $this->assertSame(0, ClientControlledDrugDiscrepancy::query()
+            ->where('client_medication_id', $med->id)
+            ->count());
+    }
+
     public function test_controlled_stock_update_no_discrepancy_when_amounts_match(): void
     {
         $this->mockNotificationService();

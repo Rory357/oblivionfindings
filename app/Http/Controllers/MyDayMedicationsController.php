@@ -9,6 +9,7 @@ use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -47,7 +48,7 @@ class MyDayMedicationsController extends Controller
         $data = $request->validate([
             'scheduled_for' => ['required', 'date'],
             'dose_given' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],

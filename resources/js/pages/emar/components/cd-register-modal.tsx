@@ -43,13 +43,12 @@ const STEPS = [
     },
 ];
 
-const ENTRY_TYPES = [
+export const CD_REGISTER_ENTRY_TYPES = [
     { value: 'receipt', label: 'Receipt — stock received' },
     { value: 'administration', label: 'Administration — given to client' },
     { value: 'disposal', label: 'Disposal / destruction' },
     { value: 'transfer_in', label: 'Transfer in' },
     { value: 'transfer_out', label: 'Transfer out' },
-    { value: 'balance_check', label: 'Balance check / count' },
     { value: 'adjustment', label: 'Adjustment' },
 ];
 
@@ -66,6 +65,40 @@ function newUuid(): string {
         const v = c === 'x' ? r : (r % 4) + 8;
         return v.toString(16);
     });
+}
+
+export function buildCdRegisterRequest(input: {
+    clientId: string;
+    clientMedicationId: string;
+    medicationName: string;
+    entryType: string;
+    quantity: string;
+    unit: string;
+    onHandBefore: string;
+    onHandAfter: string;
+    witnessedBy: string;
+    witnessCredential: string;
+    batch: string;
+    expiry: string;
+    notes: string;
+    uuid: string;
+}) {
+    return {
+        client_id: Number(input.clientId),
+        client_medication_id: Number(input.clientMedicationId),
+        medication_name: input.medicationName,
+        entry_type: input.entryType,
+        quantity: input.quantity,
+        unit: input.unit || null,
+        on_hand_before: input.onHandBefore,
+        on_hand_after: input.onHandAfter,
+        witnessed_by: Number(input.witnessedBy),
+        witness_credential: input.witnessCredential,
+        batch_number: input.batch || null,
+        expiry_date: input.expiry || null,
+        notes: input.notes || null,
+        client_request_uuid: input.uuid,
+    };
 }
 
 export function CdRegisterModal({
@@ -91,13 +124,14 @@ export function CdRegisterModal({
     const [clientId, setClientId] = useState(
         initialClientId ? String(initialClientId) : '',
     );
-    const [medName, setMedName] = useState('');
+    const [clientMedicationId, setClientMedicationId] = useState('');
     const [entryType, setEntryType] = useState('');
     const [quantity, setQuantity] = useState('');
     const [unit, setUnit] = useState('');
     const [onHandBefore, setOnHandBefore] = useState('');
     const [onHandAfter, setOnHandAfter] = useState('');
     const [witnessedBy, setWitnessedBy] = useState('');
+    const [witnessCredential, setWitnessCredential] = useState('');
     const [batch, setBatch] = useState('');
     const [expiry, setExpiry] = useState('');
     const [notes, setNotes] = useState('');
@@ -114,13 +148,14 @@ export function CdRegisterModal({
     const reset = () => {
         setStep(0);
         setClientId(initialClientId ? String(initialClientId) : '');
-        setMedName('');
+        setClientMedicationId('');
         setEntryType('');
         setQuantity('');
         setUnit('');
         setOnHandBefore('');
         setOnHandAfter('');
         setWitnessedBy('');
+        setWitnessCredential('');
         setBatch('');
         setExpiry('');
         setNotes('');
@@ -135,27 +170,38 @@ export function CdRegisterModal({
         (m) => String(m.client_id) === clientId && m.controlled,
     );
 
-    const step1Ok = clientId && medName.trim() && entryType && quantity.trim();
-    const step2Ok = witnessedBy.length > 0;
+    const selectedMedication = clientControlledMeds.find(
+        (medication) => String(medication.id) === clientMedicationId,
+    );
+    const medName = selectedMedication?.name ?? '';
+    const step1Ok =
+        clientId && clientMedicationId && entryType && quantity.trim();
+    const step2Ok =
+        witnessedBy.length > 0 &&
+        witnessCredential.length > 0 &&
+        onHandBefore.length > 0 &&
+        onHandAfter.length > 0;
 
     const submit = () => {
         setSaving(true);
         router.post(
             '/emar/controlled/entries',
-            {
-                client_id: Number(clientId),
-                medication_name: medName,
-                entry_type: entryType,
-                quantity: Number(quantity),
-                unit: unit || null,
-                on_hand_before: onHandBefore ? Number(onHandBefore) : null,
-                on_hand_after: onHandAfter ? Number(onHandAfter) : null,
-                witnessed_by: Number(witnessedBy),
-                batch_number: batch || null,
-                expiry_date: expiry || null,
-                notes: notes || null,
-                client_request_uuid: uuid,
-            },
+            buildCdRegisterRequest({
+                clientId,
+                clientMedicationId,
+                medicationName: medName,
+                entryType,
+                quantity,
+                unit,
+                onHandBefore,
+                onHandAfter,
+                witnessedBy,
+                witnessCredential,
+                batch,
+                expiry,
+                notes,
+                uuid,
+            }),
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -229,7 +275,7 @@ export function CdRegisterModal({
                             value={clientId}
                             onChange={(v) => {
                                 setClientId(v);
-                                setMedName('');
+                                setClientMedicationId('');
                             }}
                             placeholder="Select client"
                             options={clients.map((c) => ({
@@ -243,25 +289,25 @@ export function CdRegisterModal({
                     <Field label="Controlled drug" required>
                         {clientControlledMeds.length > 0 ? (
                             <SelectInput
-                                value={medName}
+                                value={clientMedicationId}
                                 onChange={(v) => {
-                                    setMedName(v);
+                                    setClientMedicationId(v);
                                     const m = clientControlledMeds.find(
-                                        (x) => x.name === v,
+                                        (x) => String(x.id) === v,
                                     );
                                     if (m?.unit) setUnit(m.unit);
                                 }}
                                 placeholder="Select medication"
                                 options={clientControlledMeds.map((m) => ({
-                                    value: m.name,
+                                    value: String(m.id),
                                     label: m.name,
                                 }))}
                             />
                         ) : (
                             <Input
-                                value={medName}
-                                onChange={(e) => setMedName(e.target.value)}
-                                placeholder="Medication name"
+                                value=""
+                                disabled
+                                placeholder="No controlled medication available"
                             />
                         )}
                     </Field>
@@ -270,7 +316,7 @@ export function CdRegisterModal({
                             value={entryType}
                             onChange={setEntryType}
                             placeholder="Select entry type"
-                            options={ENTRY_TYPES}
+                            options={CD_REGISTER_ENTRY_TYPES}
                         />
                     </Field>
                     <Field label="Quantity" required>
@@ -297,7 +343,7 @@ export function CdRegisterModal({
                         title="Witness & balance"
                         blurb="Counter-signature and running balance."
                     />
-                    <Field label="Balance before">
+                    <Field label="Balance before" required>
                         <Input
                             type="number"
                             inputMode="decimal"
@@ -306,7 +352,7 @@ export function CdRegisterModal({
                             placeholder="On hand before"
                         />
                     </Field>
-                    <Field label="Balance after">
+                    <Field label="Balance after" required>
                         <Input
                             type="number"
                             inputMode="decimal"
@@ -333,6 +379,17 @@ export function CdRegisterModal({
                                 value: String(w.id),
                                 label: w.name,
                             }))}
+                        />
+                    </Field>
+                    <Field label="Witness password" required span>
+                        <Input
+                            type="password"
+                            value={witnessCredential}
+                            onChange={(e) =>
+                                setWitnessCredential(e.target.value)
+                            }
+                            autoComplete="current-password"
+                            placeholder="Witness enters their password"
                         />
                     </Field>
                     <Field label="Batch number">

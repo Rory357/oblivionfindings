@@ -14,6 +14,7 @@ use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
 use App\Services\UserSiteAccessService;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -215,7 +216,7 @@ class SendMedicationAlerts extends Command
                 $entry['user']->notify(new MedicationStockLowNotification(
                     medication: $medicationName,
                     clientName: $clientName,
-                    count: (int) $stock->on_hand,
+                    count: MedicationStockQuantity::display($stock->on_hand ?? 0),
                     unit: $stock->unit ?? 'units',
                     reorderLevel: (int) $stock->reorder_level,
                 ));

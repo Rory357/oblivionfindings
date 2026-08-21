@@ -14,11 +14,13 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class EnhancedMarService
 {
@@ -36,6 +38,7 @@ class EnhancedMarService
         MedicationScanVerificationService $scanVerificationService,
         MedicationRuleService $ruleService,
         protected MedicationAdministratorCompetencyPolicy $medicationCompetencyPolicy,
+        protected MedicationGovernanceScopeService $medicationGovernanceScope,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -563,6 +566,30 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        if (array_key_exists('quantity_administered', $data) && $data['quantity_administered'] !== null) {
+            try {
+                $data['quantity_administered'] = MedicationStockQuantity::normalize($data['quantity_administered']);
+            } catch (\InvalidArgumentException) {
+                return [
+                    'success' => false,
+                    'error' => 'Quantity administered must use no more than two decimal places.',
+                    'error_field' => 'quantity_administered',
+                ];
+            }
+        }
+
+        if (array_key_exists('cd_balance', $data) && $data['cd_balance'] !== null) {
+            try {
+                $data['cd_balance'] = MedicationStockQuantity::normalize($data['cd_balance']);
+            } catch (\InvalidArgumentException) {
+                return [
+                    'success' => false,
+                    'error' => 'Controlled drug balance must use no more than two decimal places.',
+                    'error_field' => 'cd_balance',
+                ];
+            }
+        }
+
         $overrideValidation = $this->validateSafetyOverrideRequest($data, $userId);
         if ($overrideValidation !== null) {
             return $overrideValidation;
@@ -610,11 +637,6 @@ class EnhancedMarService
             return $observationValidation;
         }
 
-        $witnessValidation = $this->validateWitness($medication, $adminRules, $data, $userId);
-        if (! ($witnessValidation['success'] ?? false)) {
-            return $witnessValidation;
-        }
-
         $covertValidation = $this->validateCovertAuthorisation($medication, $data);
         if ($covertValidation !== null) {
             return $covertValidation;
@@ -648,7 +670,19 @@ class EnhancedMarService
         }
 
         try {
-            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $witnessValidation, $clientRequestUuid) {
+            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $clientRequestUuid) {
+                $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+
+                // Medication governance lock order is parent-first everywhere:
+                // Client -> medication -> shift/round -> administration/count -> stock.
+                $medication = ClientMedication::query()
+                    ->whereKey($medication->id)
+                    ->where('client_id', $client->id)
+                    ->whereNull('deleted_at')
+                    ->whereNull('superseded_by')
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $shift = null;
                 if ($shiftId !== null) {
                     $shift = Shift::query()
@@ -667,23 +701,27 @@ class EnhancedMarService
                     }
                 }
 
-                // Re-fetch medication with lock to prevent race conditions
-                $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
-
-                if ((int) $medication->client_id !== (int) $client->id) {
-                    return [
-                        'success' => false,
-                        'error' => 'The requested medication action is not available.',
-                        'error_field' => 'client_medication_id',
-                    ];
-                }
-
                 if (! $medication->isAdministrable()) {
                     return [
                         'success' => false,
                         'error' => 'Medication order is awaiting verification before it can be administered.',
                         'error_field' => 'approval_status',
                     ];
+                }
+
+                // Witness authority is evaluated only after the canonical
+                // medication row is locked. The shared governance service then
+                // locks the witness and their current Site staff profile in this
+                // same transaction before any administration or stock write.
+                $witnessValidation = $this->validateWitness(
+                    $client,
+                    $medication,
+                    $this->ruleService->requirementsFor($medication),
+                    $data,
+                    $userId,
+                );
+                if (! ($witnessValidation['success'] ?? false)) {
+                    return $witnessValidation;
                 }
 
                 // Establish the worker/competency serialization boundary after
@@ -797,6 +835,41 @@ class EnhancedMarService
                     $medication->load(['stock' => function ($q) {
                         $q->lockForUpdate();
                     }]);
+
+                    if (($data['status'] ?? null) === 'given') {
+                        $quantity = MedicationStockQuantity::normalize($data['quantity_administered'] ?? 1);
+                        $quantity = MedicationStockQuantity::greaterThan($quantity, 0) ? $quantity : '1.00';
+                        $stock = $medication->stock;
+
+                        if (! $stock || $stock->on_hand === null) {
+                            return [
+                                'success' => false,
+                                'error' => 'No controlled drug stock position exists. Reconcile the stock count before administering this medication.',
+                                'error_field' => 'quantity_administered',
+                            ];
+                        }
+
+                        $before = MedicationStockQuantity::normalize($stock->on_hand);
+                        if (MedicationStockQuantity::greaterThan($quantity, $before)) {
+                            return [
+                                'success' => false,
+                                'error' => 'The controlled drug stock balance is too low for this administration. Reconcile the stock count before continuing.',
+                                'error_field' => 'quantity_administered',
+                            ];
+                        }
+
+                        $after = MedicationStockQuantity::subtract($before, $quantity);
+                        if (
+                            ($data['cd_balance'] ?? null) !== null
+                            && ! MedicationStockQuantity::equals($data['cd_balance'], $after)
+                        ) {
+                            return [
+                                'success' => false,
+                                'error' => 'The controlled drug balance changed. Review the current stock balance before recording this administration.',
+                                'error_field' => 'cd_balance',
+                            ];
+                        }
+                    }
                 }
 
                 // Create administration record
@@ -871,9 +944,18 @@ class EnhancedMarService
                         $admin,
                         $userId,
                         $admin->witnessed_by,
-                        (float) ($data['quantity_administered'] ?? 1)
+                        $data['quantity_administered'] ?? 1
                     );
                 }
+
+                AuditLogger::logOrFail('medications.administration.record', $admin, array_filter([
+                    'actor_id' => $userId,
+                    'client_id' => $client->id,
+                    'client_medication_id' => $medication->id,
+                    'client_request_uuid' => $clientRequestUuid,
+                    'status' => $admin->status,
+                    'witnessed_by' => $admin->witnessed_by,
+                ], fn ($value) => $value !== null && $value !== ''));
 
                 return [
                     'success' => true,
@@ -881,7 +963,7 @@ class EnhancedMarService
                     'safety_check' => $safetyCheck,
                     'prn_over_limit_attempt' => $prnOverLimitAttempt,
                 ];
-            });
+            }, 3);
         } catch (QueryException $exception) {
             if ($clientRequestUuid === null) {
                 throw $exception;
@@ -1213,7 +1295,13 @@ class EnhancedMarService
         ];
     }
 
-    private function validateWitness(ClientMedication $medication, array $adminRules, array $data, int $userId): array
+    private function validateWitness(
+        Client $client,
+        ClientMedication $medication,
+        array $adminRules,
+        array $data,
+        int $userId,
+    ): array
     {
         $requiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
 
@@ -1229,38 +1317,14 @@ class EnhancedMarService
             ];
         }
 
-        if ((int) $data['witnessed_by'] === (int) $userId) {
-            return [
-                'success' => false,
-                'error' => 'Witness must be a different user.',
-                'error_field' => 'witnessed_by',
-            ];
-        }
-
-        if (blank($data['witness_credential'] ?? null)) {
-            return [
-                'success' => false,
-                'error' => 'Witness password is required before this medication can be signed.',
-                'error_field' => 'witness_credential',
-            ];
-        }
-
-        $witness = User::query()->find($data['witnessed_by']);
-        if (! $witness || ! $witness->canDo('medications.controlled.witness')) {
-            return [
-                'success' => false,
-                'error' => 'Selected witness is not authorised to witness medication administrations.',
-                'error_field' => 'witnessed_by',
-            ];
-        }
-
-        if (! Hash::check((string) $data['witness_credential'], (string) $witness->password)) {
-            return [
-                'success' => false,
-                'error' => 'Witness password did not match.',
-                'error_field' => 'witness_credential',
-            ];
-        }
+        $recorder = User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+        $witness = $this->medicationGovernanceScope->confirmedControlledWitness(
+            $recorder,
+            $client,
+            (int) $data['witnessed_by'],
+            $data['witness_credential'] ?? null,
+            recorderId: $userId,
+        );
 
         return [
             'success' => true,
@@ -1313,21 +1377,26 @@ class EnhancedMarService
         ClientMedicationAdministration $admin,
         int $recordedBy,
         ?int $witnessedBy,
-        float $quantity = 1.0
+        int|float|string $quantity = 1
     ): void {
-        $quantity = $quantity > 0 ? $quantity : 1.0;
+        $quantity = MedicationStockQuantity::normalize($quantity);
+        $quantity = MedicationStockQuantity::greaterThan($quantity, 0) ? $quantity : '1.00';
         $stock = $medication->stock;
-        $before = $stock?->on_hand;
-
-        // Update stock if applicable
-        if ($stock && $before !== null) {
-            $stock->on_hand = max(0, $before - $quantity);
-            $stock->last_counted_at = now();
-            $stock->save();
+        if (! $stock || $stock->on_hand === null) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'No controlled drug stock position exists. Reconcile the stock count before administering this medication.',
+            ]);
         }
 
+        $before = MedicationStockQuantity::normalize($stock->on_hand);
+
+        $after = MedicationStockQuantity::subtract($before, $quantity);
+        $stock->on_hand = $after;
+        $stock->last_counted_at = now();
+        $stock->save();
+
         // Create controlled drug register entry
-        ClientControlledDrugEntry::create([
+        $entry = ClientControlledDrugEntry::create([
             'client_id' => $admin->client_id,
             'client_medication_id' => $medication->id,
             'shift_id' => $admin->shift_id,
@@ -1336,12 +1405,25 @@ class EnhancedMarService
             'quantity' => $quantity,
             'unit' => $stock?->unit,
             'on_hand_before' => $before,
-            'on_hand_after' => $stock?->on_hand,
+            'on_hand_after' => $after,
             'reason' => $admin->reason,
             'notes' => $admin->notes,
             'recorded_at' => $admin->administered_at,
             'recorded_by' => $recordedBy,
             'witnessed_by' => $witnessedBy,
+        ]);
+
+        AuditLogger::logOrFail('medications.controlled.entry.record', $entry, [
+            'actor_id' => $recordedBy,
+            'client_id' => $admin->client_id,
+            'client_medication_id' => $medication->id,
+            'stock_id' => $stock->id,
+            'entry_type' => 'administration',
+            'witnessed_by' => $witnessedBy,
+            'witness_method' => $admin->witness_method,
+            'witnessed_at' => $admin->witnessed_at?->toIso8601String(),
+            'on_hand_before' => $before,
+            'on_hand_after' => $after,
         ]);
     }
 

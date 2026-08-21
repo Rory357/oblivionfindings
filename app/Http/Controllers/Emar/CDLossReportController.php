@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\ControlledDrugLossReport;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,12 +14,28 @@ class CDLossReportController extends Controller
 {
     use HandlesMedicationSync;
 
-    public function index(Request $request)
+    public function index(Request $request, MedicationGovernanceScopeService $scope)
     {
-        $reports = ControlledDrugLossReport::with([
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteFilter = $request->integer('site_id') ?: null;
+        $clientFilter = $request->integer('client_id') ?: null;
+        $siteIds = $scope->readerSiteIds(
+            $actor,
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            $siteFilter,
+            $clientFilter,
+        );
+        $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $siteIds;
+
+        $reports = $scope->scopeCanonicalClientMedicationRows(
+            ControlledDrugLossReport::query(),
+            $readerSiteIds,
+        )->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
+            ->with([
             'client:id,first_name,last_name',
             'discoveredBy:id,name',
-        ])
+            ])
             ->latest()
             ->get();
 

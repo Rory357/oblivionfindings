@@ -242,7 +242,7 @@ export function RecordDoseWizard({
                     ? null
                     : Number(data.quantity_administered),
             cd_balance:
-                data.cd_balance === '' ? null : parseInt(data.cd_balance, 10),
+                data.cd_balance === '' ? null : Number(data.cd_balance),
             blood_glucose_level:
                 data.blood_glucose_level === ''
                     ? null

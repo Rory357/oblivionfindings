@@ -9,6 +9,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
 use App\Services\Medication\MedicationSignalService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 
 /**
@@ -390,7 +391,7 @@ class MedicationAlertService
             return null;
         }
 
-        if ($stock->on_hand === 0) {
+        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'stock_low',
@@ -417,7 +418,7 @@ class MedicationAlertService
             return $alert->toArray();
         }
 
-        if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
+        if ($stock->isLowStock()) {
             // Low stock is dashboard-only — NOT operational
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,

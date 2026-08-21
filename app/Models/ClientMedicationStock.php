@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +30,7 @@ class ClientMedicationStock extends Model
     ];
 
     protected $casts = [
+        'on_hand' => 'decimal:2',
         'last_counted_at' => 'datetime',
         'expiry_date' => 'date',
         'last_reorder_alert_at' => 'datetime',
@@ -96,7 +98,9 @@ class ClientMedicationStock extends Model
      */
     public function isLowStock(): bool
     {
-        return $this->reorder_level !== null && $this->on_hand <= $this->reorder_level;
+        return $this->reorder_level !== null
+            && $this->on_hand !== null
+            && MedicationStockQuantity::lessThanOrEqual($this->on_hand, $this->reorder_level);
     }
 
     /**

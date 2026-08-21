@@ -13,6 +13,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
+use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
 
 /**
@@ -74,7 +75,7 @@ class GuidedRoundController extends Controller
             'scheduled_for' => ['required', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
-            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
+            'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
