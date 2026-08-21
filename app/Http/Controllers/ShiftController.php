@@ -956,22 +956,16 @@ class ShiftController extends Controller
         if (! empty($data['user_id'])) {
             $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
             $this->assertStaffEligibleForShiftSite((int) $data['user_id'], (int) $data['site_id']);
-            try {
-                $assignee = User::findOrFail($data['user_id']);
-                $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
-                $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
+            $assignee = User::findOrFail($data['user_id']);
+            $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+            $decision = app(AssignmentEligibilityGateway::class)->decide($tempShift, $assignee);
+            $decision->assertMayAssign(
+                'user_id',
+                'This staff member cannot be assigned to this shift.',
+            );
 
-                if ($eligibility->hasBlocks()) {
-                    return back()->withErrors([
-                        'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to this shift.',
-                    ])->withInput();
-                }
-
-                if ($eligibility->hasWarnings()) {
-                    session()->flash('assignment_warnings', $eligibility->warnings);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Eligibility check failed during shift creation', ['error' => $e->getMessage()]);
+            if ($decision->result?->hasWarnings()) {
+                session()->flash('assignment_warnings', $decision->result->warnings);
             }
         }
 
@@ -1423,50 +1417,56 @@ class ShiftController extends Controller
             $overrideData = null;
             if ($resolvedUserId && ($userChanged || $timesChanged || $licenceRequirementsChanged)) {
                 $this->assertCanAssignShiftToUser($auth, (int) $resolvedUserId);
+                $assignee = User::findOrFail($resolvedUserId);
+                $evalShift = clone $shift;
+                $evalShift->fill(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
+                $decision = app(AssignmentEligibilityGateway::class)->decide($evalShift, $assignee);
+
                 try {
-                    $assignee = User::findOrFail($resolvedUserId);
-                    $evalShift = clone $shift;
-                    $evalShift->fill(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
-                    $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($evalShift, $assignee);
+                    $decision->assertMayAssign(
+                        'user_id',
+                        'This staff member cannot be assigned to this shift.',
+                    );
+                } catch (ValidationException $exception) {
+                    app(CoverageReservationService::class)->release($reservation);
 
-                    if ($eligibility->hasBlocks()) {
-                        return back()->withErrors([
-                            'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to this shift.',
-                        ])->withInput();
+                    throw $exception;
+                }
+
+                $eligibility = $decision->result;
+                if ($decision->isWarning()) {
+                    if (! $overrideAcknowledged) {
+                        app(CoverageReservationService::class)->release($reservation);
+
+                        return back()
+                            ->with('eligibility_result', $eligibility?->toArray() ?? [])
+                            ->with('assignment_warnings', $eligibility?->warnings ?? [])
+                            ->withInput();
                     }
 
-                    if ($eligibility->hasWarnings()) {
-                        if (! $overrideAcknowledged) {
-                            return back()
-                                ->with('eligibility_result', $eligibility->toArray())
-                                ->with('assignment_warnings', $eligibility->warnings)
-                                ->withInput();
+                    if (! empty($eligibility?->overrideable_warnings)) {
+                        abort_unless(
+                            $auth->canDo('shifts.overrideEligibility'),
+                            403,
+                            'You do not have permission to override eligibility warnings.',
+                        );
+
+                        if ($overrideReason === '') {
+                            app(CoverageReservationService::class)->release($reservation);
+
+                            return back()->withErrors([
+                                'override_reason' => 'A reason is required when overriding eligibility warnings.',
+                            ])->with('eligibility_result', $eligibility->toArray())->withInput();
                         }
 
-                        if (! empty($eligibility->overrideable_warnings)) {
-                            abort_unless(
-                                $auth->canDo('shifts.overrideEligibility'),
-                                403,
-                                'You do not have permission to override eligibility warnings.',
-                            );
-
-                            if ($overrideReason === '') {
-                                return back()->withErrors([
-                                    'override_reason' => 'A reason is required when overriding eligibility warnings.',
-                                ])->with('eligibility_result', $eligibility->toArray())->withInput();
-                            }
-
-                            $overrideData = [
-                                'user_id' => (int) $resolvedUserId,
-                                'overridden_by' => $auth->id,
-                                'override_reason' => $overrideReason,
-                                'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
-                                'acknowledged_warnings' => $eligibility->overrideable_warnings,
-                            ];
-                        }
+                        $overrideData = [
+                            'user_id' => (int) $resolvedUserId,
+                            'overridden_by' => $auth->id,
+                            'override_reason' => $overrideReason,
+                            'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
+                            'acknowledged_warnings' => $eligibility->overrideable_warnings,
+                        ];
                     }
-                } catch (\Throwable $e) {
-                    Log::warning('Eligibility check failed during shift update', ['error' => $e->getMessage()]);
                 }
             } elseif (! $resolvedUserId) {
                 // Open shift (no assignee) — only check client-level conflicts for overlaps.
