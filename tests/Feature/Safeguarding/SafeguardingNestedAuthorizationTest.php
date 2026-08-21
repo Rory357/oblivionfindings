@@ -29,11 +29,19 @@ class SafeguardingNestedAuthorizationTest extends TestCase
 
     private SafeguardingConcern $hiddenConcern;
 
+    private SafeguardingConcern $sameSiteConcern;
+
     /** @var array<string, Model> */
     private array $visibleChildren;
 
     /** @var array<string, Model> */
     private array $hiddenChildren;
+
+    /** @var array<string, Model> */
+    private array $sameSiteChildren;
+
+    /** @var array<string, Model> */
+    private array $sameSiteOwnChildren;
 
     protected function setUp(): void
     {
@@ -63,11 +71,64 @@ class SafeguardingNestedAuthorizationTest extends TestCase
             'is_sensitive' => false,
             'status' => 'investigating',
         ]);
+        $this->sameSiteConcern = SafeguardingConcern::factory()->create([
+            'site_id' => $visibleSite->id,
+            'is_sensitive' => false,
+            'status' => 'investigating',
+        ]);
+        $sameSiteForeignConcern = SafeguardingConcern::factory()->create([
+            'site_id' => $visibleSite->id,
+            'is_sensitive' => false,
+            'status' => 'investigating',
+        ]);
 
         $this->visibleChildren = $this->childrenFor($this->visibleSensitiveConcern);
         $this->hiddenChildren = $this->childrenFor($this->hiddenConcern);
+        $this->sameSiteOwnChildren = $this->childrenFor($this->sameSiteConcern);
+        $this->sameSiteChildren = $this->childrenFor($sameSiteForeignConcern);
 
         Notification::fake();
+    }
+
+    #[DataProvider('canonicalNestedWriteOperations')]
+    public function test_authorized_same_parent_mutations_resolve_the_canonical_child(string $operation): void
+    {
+        $this->assertTrue($this->canPerform($operation, $this->sameSiteConcern));
+
+        $this->dispatchWrite($operation, $this->sameSiteConcern, $this->sameSiteOwnChildren)
+            ->assertRedirect();
+
+        if ($operation === 'investigation_update') {
+            $this->assertSame(
+                'completed',
+                $this->sameSiteOwnChildren['investigation']->fresh()->status,
+            );
+        } elseif ($operation === 'external_report_update') {
+            $this->assertTrue(
+                $this->sameSiteOwnChildren['external_report']->fresh()->acknowledgement_received,
+            );
+        } else {
+            $this->assertSame(
+                'completed',
+                $this->sameSiteOwnChildren['action_plan']->fresh()->status,
+            );
+        }
+
+        $this->assertSame('in_progress', $this->sameSiteChildren['investigation']->fresh()->status);
+        $this->assertFalse($this->sameSiteChildren['external_report']->fresh()->acknowledgement_received);
+        $this->assertSame('pending', $this->sameSiteChildren['action_plan']->fresh()->status);
+    }
+
+    #[DataProvider('nestedWriteOperations')]
+    public function test_same_site_authorized_parent_cannot_substitute_another_concerns_child(string $operation): void
+    {
+        $this->assertTrue($this->canPerform($operation, $this->sameSiteConcern));
+        $before = $this->sideEffectSnapshot();
+
+        $response = $this->dispatchWrite($operation, $this->sameSiteConcern, $this->sameSiteChildren);
+
+        $response->assertNotFound();
+        $this->assertNoSideEffects($before);
     }
 
     #[DataProvider('nestedWriteOperations')]
@@ -137,6 +198,16 @@ class SafeguardingNestedAuthorizationTest extends TestCase
             'action plan update' => ['action_plan_update'],
             'action plan complete' => ['action_plan_complete'],
             'attachment destroy' => ['attachment_destroy'],
+        ];
+    }
+
+    public static function canonicalNestedWriteOperations(): array
+    {
+        return [
+            'investigation update' => ['investigation_update'],
+            'external report update' => ['external_report_update'],
+            'action plan update' => ['action_plan_update'],
+            'action plan complete' => ['action_plan_complete'],
         ];
     }
 
@@ -245,9 +316,19 @@ class SafeguardingNestedAuthorizationTest extends TestCase
         $this->assertSame($before, $this->sideEffectSnapshot());
         Notification::assertNothingSent();
 
-        foreach ([$this->visibleChildren, $this->hiddenChildren] as $children) {
+        foreach ([$this->visibleChildren, $this->hiddenChildren, $this->sameSiteChildren, $this->sameSiteOwnChildren] as $children) {
             Storage::disk('private')->assertExists($children['attachment']->path);
         }
+    }
+
+    private function canPerform(string $operation, SafeguardingConcern $concern): bool
+    {
+        return match ($operation) {
+            'investigation_update' => $this->actor->can('investigate', $concern),
+            'external_report_update' => $this->actor->can('reportExternal', $concern),
+            'action_plan_update', 'action_plan_complete', 'attachment_destroy' => $this->actor->can('update', $concern),
+            default => false,
+        };
     }
 
     /** @return array<int, array<string, mixed>> */

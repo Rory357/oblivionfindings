@@ -46,11 +46,12 @@ class SafeguardingInvestigationController extends Controller
     /**
      * Update the specified investigation.
      */
-    public function update(Request $request, SafeguardingConcern $concern, SafeguardingInvestigation $investigation): RedirectResponse
+    public function update(Request $request, SafeguardingConcern $concern, string $investigation): RedirectResponse
     {
-        $actualConcern = $investigation->concern()->firstOrFail();
-        abort_unless($actualConcern->is($concern), 404);
-        $this->authorize('investigate', $actualConcern);
+        // Resolve through the supplied parent so a foreign child remains concealed.
+        $investigation = $concern->investigations()->findOrFail($investigation);
+
+        $this->authorize('investigate', $concern);
 
         $validated = $request->validate([
             'status' => 'nullable|in:planned,in_progress,paused,completed,abandoned,pending,cancelled,on_hold',
