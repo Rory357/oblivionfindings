@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -253,6 +254,107 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
+    public function test_owner_cannot_reassign_manual_draft_to_foreign_or_missing_client_without_side_effects(): void
+    {
+        $foreignSite = Site::factory()->create([
+            'name' => 'Kauri House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'first_name' => 'ForeignUpdate',
+            'last_name' => 'Client',
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'notes' => 'Original manual draft',
+        ]);
+        $before = $timesheet->fresh()->getRawOriginal();
+        $sideEffectsBefore = $this->timesheetSideEffectCounts();
+        $missingClientId = (int) Client::query()->max('id') + 1000;
+
+        $foreignResponse = $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $foreignClient->id,
+                'notes' => 'Foreign reassignment must not persist',
+            ]))
+            ->assertForbidden();
+
+        $missingResponse = $this->put(
+            route('operations.timesheets.update', $timesheet),
+            $this->validUpdatePayload($timesheet, [
+                'client_id' => $missingClientId,
+                'notes' => 'Missing reassignment must not persist',
+            ]),
+        )->assertForbidden();
+
+        $this->assertSame($foreignResponse->getContent(), $missingResponse->getContent());
+        $this->assertStringNotContainsString($foreignClient->first_name, $foreignResponse->getContent());
+        $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        $this->assertSame($sideEffectsBefore, $this->timesheetSideEffectCounts());
+    }
+
+    public function test_owner_can_reassign_manual_draft_to_secondary_site_client(): void
+    {
+        $secondarySite = Site::factory()->create([
+            'name' => 'Rimu House',
+            'type' => 'house',
+        ]);
+        $secondaryClient = Client::factory()->create([
+            'first_name' => 'SecondarySite',
+            'last_name' => 'Client',
+            'site_id' => $secondarySite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $this->staff->hrEmployeeProfile()->update([
+            'secondary_site_ids' => [$secondarySite->id],
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $secondaryClient->id,
+                'notes' => 'Approved secondary Site reassignment',
+            ]))
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame($secondaryClient->id, $fresh->client_id);
+        $this->assertSame($secondarySite->id, $fresh->shift_site_id);
+        $this->assertSame(trim($secondaryClient->first_name.' '.$secondaryClient->last_name), $fresh->client_name_snapshot);
+        $this->assertSame('draft', $fresh->status);
+    }
+
+    public function test_linked_shift_client_remains_authoritative_during_update(): void
+    {
+        $foreignSite = Site::factory()->create([
+            'name' => 'Totara House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'first_name' => 'LinkedForeign',
+            'last_name' => 'Client',
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $foreignClient->id,
+                'notes' => 'Linked shift stays authoritative',
+            ]))
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame($this->client->id, $fresh->client_id);
+        $this->assertSame($this->site->id, $fresh->shift_site_id);
+        $this->assertSame(trim($this->client->first_name.' '.$this->client->last_name), $fresh->client_name_snapshot);
+    }
+
     public function test_update_rejects_break_minutes_above_shared_240_cap(): void
     {
         // F3 — the timesheet break cap was unified down to 240 (was 600) so it
@@ -418,6 +520,95 @@ class TimesheetControllerTest extends TestCase
         $this->assertSame(45, $fresh->break_minutes);
         $this->assertEqualsWithDelta(12.5, (float) $fresh->mileage_km, 0.001);
         $this->assertSame('Updated with mileage.', $fresh->notes);
+    }
+
+    public function test_owner_cannot_resubmit_manual_timesheet_with_foreign_or_missing_client_without_side_effects(): void
+    {
+        $foreignSite = Site::factory()->create([
+            'name' => 'Nikau House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'first_name' => 'ForeignResubmit',
+            'last_name' => 'Client',
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Please correct this entry.',
+            'notes' => 'Original returned entry',
+        ]);
+        $before = $timesheet->fresh()->getRawOriginal();
+        $sideEffectsBefore = $this->timesheetSideEffectCounts();
+        $missingClientId = (int) Client::query()->max('id') + 1000;
+
+        $foreignResponse = $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $foreignClient->id,
+                'notes' => 'Foreign resubmission must not persist',
+            ]))
+            ->assertForbidden();
+
+        $missingResponse = $this->post(
+            route('operations.timesheets.resubmit', $timesheet),
+            $this->validUpdatePayload($timesheet, [
+                'client_id' => $missingClientId,
+                'notes' => 'Missing resubmission must not persist',
+            ]),
+        )->assertForbidden();
+
+        $this->assertSame($foreignResponse->getContent(), $missingResponse->getContent());
+        $this->assertStringNotContainsString($foreignClient->first_name, $foreignResponse->getContent());
+        $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        $this->assertSame($sideEffectsBefore, $this->timesheetSideEffectCounts());
+    }
+
+    public function test_global_finance_scope_still_requires_explicit_edit_and_ownership_authority(): void
+    {
+        $globalSite = Site::factory()->create([
+            'name' => 'Pohutukawa House',
+            'type' => 'house',
+        ]);
+        $globalClient = Client::factory()->create([
+            'first_name' => 'GlobalFinance',
+            'last_name' => 'Client',
+            'site_id' => $globalSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff, [
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Finance correction requested.',
+        ]);
+
+        $this->assertTrue($this->finance->canDo('reports.viewAny'));
+        $this->assertFalse($this->finance->canDo('timesheets.update'));
+        $this->assertFalse($this->finance->canDo('timesheets.submit'));
+        $this->assertFalse($this->finance->canDo('timesheets.manageAny'));
+        $this->grantPermissions($this->finance, [
+            'timesheets.update',
+            'timesheets.submit',
+            'timesheets.manageAny',
+        ]);
+
+        $this->actingAs($this->finance)
+            ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $globalClient->id,
+                'notes' => 'Global finance correction',
+            ]))
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame($globalClient->id, $fresh->client_id);
+        $this->assertSame($globalSite->id, $fresh->shift_site_id);
+        $this->assertSame('submitted', $fresh->status);
+        $this->assertSame($this->finance->id, $fresh->submitted_by);
     }
 
     public function test_resubmit_endpoint_rejects_invalid_payload_without_changing_status(): void
@@ -863,6 +1054,64 @@ class TimesheetControllerTest extends TestCase
             'shift_type_snapshot' => 'standard',
             'coverage_roles_snapshot' => [],
         ], collect($overrides)->except(['shift', 'shift_overrides'])->all()));
+    }
+
+    protected function makeManualTimesheet(User $staff, array $overrides = []): Timesheet
+    {
+        return Timesheet::query()->create(array_merge([
+            'user_id' => $staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => null,
+            'activity_type' => 'travel',
+            'site_id' => null,
+            'shift_site_id' => $this->site->id,
+            'shift_service_context_id' => $this->serviceContext->id,
+            'work_date' => '2026-04-11',
+            'starts_at' => Carbon::parse('2026-04-11 09:00:00'),
+            'ends_at' => Carbon::parse('2026-04-11 17:00:00'),
+            'break_minutes' => 30,
+            'notes' => 'Manual draft notes',
+            'status' => 'draft',
+            'created_by' => $staff->id,
+            'shift_site_name_snapshot' => $this->site->name,
+            'service_context_name_snapshot' => $this->serviceContext->name,
+            'client_name_snapshot' => trim($this->client->first_name.' '.$this->client->last_name),
+            'staff_name_snapshot' => $staff->name,
+            'shift_type_snapshot' => 'standard',
+            'coverage_roles_snapshot' => [],
+        ], $overrides));
+    }
+
+    protected function validUpdatePayload(Timesheet $timesheet, array $overrides = []): array
+    {
+        return array_merge([
+            'client_id' => $timesheet->client_id,
+            'work_date' => $timesheet->work_date->format('Y-m-d'),
+            'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+            'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+            'break_minutes' => $timesheet->break_minutes,
+            'notes' => $timesheet->notes,
+        ], $overrides);
+    }
+
+    /**
+     * Counts the persisted side-effect surfaces that reassignment denial must
+     * leave untouched. The raw timesheet comparison separately covers every
+     * snapshot, status, reconciliation, payroll-link, and timestamp column.
+     *
+     * @return array<string, int>
+     */
+    protected function timesheetSideEffectCounts(): array
+    {
+        return collect([
+            'audit_logs',
+            'billing_entries',
+            'notifications',
+            'payroll_exports',
+            'timesheet_client_allocations',
+        ])->mapWithKeys(fn (string $table): array => [
+            $table => DB::table($table)->count(),
+        ])->all();
     }
 
     protected function makeSubmittedTimesheet(User $staff, array $overrides = []): Timesheet

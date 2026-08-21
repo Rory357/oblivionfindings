@@ -937,7 +937,9 @@ class TimesheetController extends Controller
         }
 
         $data = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            // Resolve existence and Site access together below so missing and
+            // inaccessible direct IDs have the same concealed response.
+            'client_id' => ['nullable', 'integer'],
             'work_date' => ['required', 'date'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
@@ -954,6 +956,18 @@ class TimesheetController extends Controller
         $linkedShift = $timesheet->shift_id ? Shift::find($timesheet->shift_id) : null;
         if ($linkedShift) {
             $data['client_id'] = $linkedShift->client_id;
+        }
+
+        // A linked shift remains authoritative. Manual reassignment must pass
+        // the same canonical client-Site boundary as timesheet creation before
+        // snapshot data is read or any timesheet side effect can occur.
+        if (($data['client_id'] ?? null) !== null) {
+            $this->siteAccess()->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                $this->timesheetBypassPermissions(),
+                'You are not authorized to assign that client to this timesheet.',
+            );
         }
 
         $snapshot = $this->draftSnapshot($data['client_id'], $linkedShift, $timesheet->staff ?? $auth, $data['notes'] ?? $timesheet->notes);
@@ -1085,7 +1099,9 @@ class TimesheetController extends Controller
         );
 
         $data = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            // Resolve existence and Site access together below so missing and
+            // inaccessible direct IDs have the same concealed response.
+            'client_id' => ['nullable', 'integer'],
             'work_date' => ['required', 'date'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
@@ -1102,6 +1118,18 @@ class TimesheetController extends Controller
         $linkedShift = $timesheet->shift_id ? Shift::find($timesheet->shift_id) : null;
         if ($linkedShift) {
             $data['client_id'] = $linkedShift->client_id;
+        }
+
+        // Keep the client resolution ahead of snapshotting and the atomic
+        // workflow command: denial must leave status, audit, payroll, billing,
+        // notification, and allocation state untouched.
+        if (($data['client_id'] ?? null) !== null) {
+            $this->siteAccess()->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                $this->timesheetBypassPermissions(),
+                'You are not authorized to assign that client to this timesheet.',
+            );
         }
 
         $snapshot = $this->draftSnapshot(
