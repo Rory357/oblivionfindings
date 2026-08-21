@@ -11,6 +11,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationOrderVersion;
+use App\Models\MedicationPrescriberOrder;
 use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -42,6 +43,13 @@ class MedicationOrderLifecycleTest extends TestCase
 
     private Shift $shift;
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -61,6 +69,7 @@ class MedicationOrderLifecycleTest extends TestCase
             'medications.view',
             'clients.viewAny',
             'clients.update',
+            'medications.orders.manage',
             'reports.viewAny',
         ]);
         $this->shift = $this->activeShift($this->manager, $this->client);
@@ -258,6 +267,181 @@ class MedicationOrderLifecycleTest extends TestCase
             ->where('auditable_id', $breakGlassMedication->id)
             ->firstOrFail();
         $this->assertSame($access->id, (int) data_get($audit->meta, 'break_glass_access_id'));
+    }
+
+    public function test_service_rejects_an_actor_without_order_management_capability_even_with_global_scope(): void
+    {
+        $scopeOnlyActor = $this->scopedUser([
+            'medications.view',
+            'clinical.accessAllSites',
+        ]);
+        $this->activeShift($scopeOnlyActor, $this->client);
+        $medication = $this->medication(['name' => 'Action capability boundary']);
+
+        try {
+            app(MedicationOrderLifecycleService::class)->discontinue(
+                $scopeOnlyActor,
+                $medication,
+                'Scope must not become action authority',
+                $this->client->id,
+            );
+            $this->fail('A scope-only actor discontinued a medication order.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $this->assertOrderStillActive($medication);
+        $this->assertDatabaseMissing('medication_order_versions', [
+            'client_medication_id' => $medication->id,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'medication_order.discontinued',
+            'auditable_id' => $medication->id,
+        ]);
+    }
+
+    public function test_confirmed_prescriber_cease_uses_exact_lifecycle_evidence_and_rolls_back_replay_and_audit_failure(): void
+    {
+        Carbon::setTestNow('2026-08-21 10:15:30');
+        $medication = $this->medication(['name' => 'Confirmed prescriber cease']);
+        $payload = $this->prescriberCeasePayload($medication, 'Dr Confirmed', 'Course complete');
+
+        $this->actingAs($this->manager)
+            ->post('/emar/prescriptions', $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $order = MedicationPrescriberOrder::query()
+            ->where('client_medication_id', $medication->id)
+            ->firstOrFail();
+        $this->assertFalse($order->requires_countersign);
+        $this->assertSame('confirmed', $order->status);
+        $reason = 'Prescriber cease order — Dr Confirmed: Course complete';
+        $ceasedAt = $this->assertExactLifecycleEvidence($medication, $this->manager, $reason);
+
+        Carbon::setTestNow(now()->addMinute());
+        $this->actingAs($this->manager)
+            ->post('/emar/prescriptions', $payload)
+            ->assertSessionHasErrors('medication');
+
+        $this->assertSame(1, MedicationPrescriberOrder::query()->where('client_medication_id', $medication->id)->count());
+        $this->assertSame(1, MedicationOrderVersion::query()->where('client_medication_id', $medication->id)->count());
+        $this->assertSame(1, AuditLog::query()
+            ->where('action', 'medication_order.discontinued')
+            ->where('auditable_id', $medication->id)
+            ->count());
+        $this->assertTrue($medication->fresh()->ceased_at->equalTo($ceasedAt));
+
+        $rollbackMedication = $this->medication(['name' => 'Confirmed cease rollback']);
+        AuditLog::creating(static function (AuditLog $audit) use ($rollbackMedication): void {
+            if ($audit->action === 'medication_order.discontinued'
+                && (int) $audit->auditable_id === (int) $rollbackMedication->id) {
+                throw new RuntimeException('Injected prescriber cease audit failure');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->manager)->post(
+                '/emar/prescriptions',
+                $this->prescriberCeasePayload($rollbackMedication, 'Dr Rollback', 'Audit must persist'),
+            );
+            $this->fail('Prescriber cease audit failure did not escape the transaction.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected prescriber cease audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
+        }
+
+        $this->assertOrderStillActive($rollbackMedication);
+        $this->assertDatabaseMissing('medication_prescriber_orders', [
+            'client_medication_id' => $rollbackMedication->id,
+        ]);
+        $this->assertDatabaseMissing('medication_order_versions', [
+            'client_medication_id' => $rollbackMedication->id,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'medication_order.discontinued',
+            'auditable_id' => $rollbackMedication->id,
+        ]);
+    }
+
+    public function test_countersigned_prescriber_cease_uses_exact_lifecycle_evidence_and_rolls_back_replay_and_audit_failure(): void
+    {
+        Carbon::setTestNow('2026-08-21 11:20:40');
+        $medication = $this->medication(['name' => 'Countersigned prescriber cease']);
+        $order = $this->pendingCountersignedCeaseOrder($medication, 'Dr Verbal', 'Countersigned stop');
+
+        $this->actingAs($this->manager)
+            ->post("/emar/prescriptions/{$order->id}/countersign", [
+                'countersign_method' => 'electronic',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('electronic', $order->countersign_method);
+        $this->assertNotNull($order->countersigned_at);
+        $reason = 'Prescriber cease order — Dr Verbal: Countersigned stop';
+        $ceasedAt = $this->assertExactLifecycleEvidence($medication, $this->manager, $reason);
+        $this->assertTrue($order->countersigned_at->equalTo($ceasedAt));
+
+        Carbon::setTestNow(now()->addMinute());
+        $this->actingAs($this->manager)
+            ->post("/emar/prescriptions/{$order->id}/countersign", [
+                'countersign_method' => 'replay',
+            ])
+            ->assertSessionHasErrors('medication');
+
+        $order->refresh();
+        $this->assertSame('electronic', $order->countersign_method);
+        $this->assertTrue($order->countersigned_at->equalTo($ceasedAt));
+        $this->assertSame(1, MedicationOrderVersion::query()->where('client_medication_id', $medication->id)->count());
+        $this->assertSame(1, AuditLog::query()
+            ->where('action', 'medication_order.discontinued')
+            ->where('auditable_id', $medication->id)
+            ->count());
+
+        $rollbackMedication = $this->medication(['name' => 'Countersign rollback']);
+        $rollbackOrder = $this->pendingCountersignedCeaseOrder(
+            $rollbackMedication,
+            'Dr Countersign Rollback',
+            'Audit must persist',
+        );
+        AuditLog::creating(static function (AuditLog $audit) use ($rollbackMedication): void {
+            if ($audit->action === 'medication_order.discontinued'
+                && (int) $audit->auditable_id === (int) $rollbackMedication->id) {
+                throw new RuntimeException('Injected countersign audit failure');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->manager)->post(
+                "/emar/prescriptions/{$rollbackOrder->id}/countersign",
+                ['countersign_method' => 'electronic'],
+            );
+            $this->fail('Countersign audit failure did not escape the transaction.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected countersign audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
+        }
+
+        $rollbackOrder->refresh();
+        $this->assertSame('pending', $rollbackOrder->status);
+        $this->assertNull($rollbackOrder->countersigned_at);
+        $this->assertNull($rollbackOrder->countersigned_by);
+        $this->assertNull($rollbackOrder->countersign_method);
+        $this->assertOrderStillActive($rollbackMedication);
+        $this->assertDatabaseMissing('medication_order_versions', [
+            'client_medication_id' => $rollbackMedication->id,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'medication_order.discontinued',
+            'auditable_id' => $rollbackMedication->id,
+        ]);
     }
 
     public function test_discontinuation_retains_administration_stock_controlled_drug_and_version_context(): void
@@ -568,6 +752,71 @@ class MedicationOrderLifecycleTest extends TestCase
             'approval_status' => 'verified',
             'version' => 1,
         ], $overrides));
+    }
+
+    /** @return array<string, mixed> */
+    private function prescriberCeasePayload(
+        ClientMedication $medication,
+        string $prescriber,
+        string $clinicalNotes,
+    ): array {
+        return [
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'order_type' => 'cease',
+            'prescriber_name' => $prescriber,
+            'medication_name' => $medication->name,
+            'dose' => $medication->dosage,
+            'route' => $medication->route ?? 'Oral',
+            'frequency' => $medication->frequency,
+            'clinical_notes' => $clinicalNotes,
+            'order_date' => today()->toDateString(),
+        ];
+    }
+
+    private function pendingCountersignedCeaseOrder(
+        ClientMedication $medication,
+        string $prescriber,
+        string $clinicalNotes,
+    ): MedicationPrescriberOrder {
+        return MedicationPrescriberOrder::query()->create([
+            ...$this->prescriberCeasePayload($medication, $prescriber, $clinicalNotes),
+            'status' => 'pending',
+            'requires_countersign' => true,
+            'received_by' => $this->manager->id,
+        ]);
+    }
+
+    private function assertExactLifecycleEvidence(
+        ClientMedication $medication,
+        User $actor,
+        string $reason,
+    ): Carbon {
+        $medication->refresh();
+        $version = MedicationOrderVersion::query()
+            ->where('client_medication_id', $medication->id)
+            ->sole();
+        $audit = AuditLog::query()
+            ->where('action', 'medication_order.discontinued')
+            ->where('auditable_id', $medication->id)
+            ->sole();
+
+        $this->assertSame('ceased', $medication->state);
+        $this->assertFalse($medication->active);
+        $this->assertNull($medication->deleted_at);
+        $this->assertSame($actor->id, (int) $medication->ceased_by);
+        $this->assertSame($reason, $medication->ceased_reason);
+        $this->assertNotNull($medication->ceased_at);
+        $this->assertSame('ceased', $version->state);
+        $this->assertSame($reason, $version->ceased_reason);
+        $this->assertSame($actor->id, (int) $version->changed_by);
+        $this->assertTrue($version->ceased_at->equalTo($medication->ceased_at));
+        $this->assertTrue($version->changed_at->equalTo($medication->ceased_at));
+        $this->assertTrue($audit->created_at->equalTo($medication->ceased_at));
+        $this->assertSame($reason, data_get($audit->meta, 'reason'));
+        $this->assertSame($version->id, (int) data_get($audit->meta, 'medication_order_version_id'));
+
+        return $medication->ceased_at->copy();
     }
 
     /** @param  array<int, string>  $permissions */

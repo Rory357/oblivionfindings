@@ -158,21 +158,22 @@ class ClientMedicalController extends Controller
             'prescriber_name' => ['nullable', 'string', 'max:255'],
             'pharmacy' => ['nullable', 'string', 'max:255'],
             'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date'],
-            'ceased_at' => ['nullable', 'date'],
-            'ceased_reason' => ['nullable', 'string', 'max:255'],
-            'state' => ['nullable', 'in:active,paused,ceased'],
-            'paused_at' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'ceased_at' => ['prohibited'],
+            'ceased_reason' => ['prohibited'],
+            'state' => ['nullable', 'in:active'],
+            'paused_at' => ['prohibited'],
             'instructions' => ['nullable', 'string'],
-            'active' => ['sometimes', 'boolean'],
+            'active' => ['sometimes', 'accepted'],
         ]);
 
-        // Normalize state/active
-        if (! empty($data['state'])) {
-            $data['active'] = $data['state'] === 'active';
-        } else {
-            $data['state'] = ($data['active'] ?? true) ? 'active' : 'ceased';
-        }
+        // Ordinary profile creation always creates a current active order.
+        // Historical/ceased evidence can only be written by its governed lifecycle.
+        $data['state'] = 'active';
+        $data['active'] = true;
+        $data['ceased_at'] = null;
+        $data['ceased_reason'] = null;
+        $data['paused_at'] = null;
 
         try {
             return app(MedicationScopeDecisionService::class)->forClient(

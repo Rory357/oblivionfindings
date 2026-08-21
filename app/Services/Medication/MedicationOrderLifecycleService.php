@@ -6,6 +6,7 @@ use App\Models\ClientMedication;
 use App\Models\MedicationOrderVersion;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -27,8 +28,12 @@ class MedicationOrderLifecycleService
         ClientMedication $submittedMedication,
         string $reason,
         ?int $submittedClientId = null,
+        ?Carbon $ceasedAt = null,
     ): ClientMedication {
+        abort_unless($performer->canDo('medications.orders.manage'), 403);
+
         $reason = trim($reason);
+        $ceasedAt ??= now();
 
         if ($reason === '' || mb_strlen($reason) > 255) {
             throw ValidationException::withMessages([
@@ -39,8 +44,8 @@ class MedicationOrderLifecycleService
         return $this->scope->forMedication(
             $performer,
             $submittedMedication,
-            now(),
-            function (MedicationScopeDecision $decision) use ($reason): ClientMedication {
+            $ceasedAt,
+            function (MedicationScopeDecision $decision) use ($reason, $ceasedAt): ClientMedication {
                 $medication = $decision->medication;
 
                 if ($medication->state === 'ceased' || $medication->ceased_at !== null) {
@@ -49,7 +54,6 @@ class MedicationOrderLifecycleService
                     ]);
                 }
 
-                $ceasedAt = now();
                 $nextVersion = max(
                     (int) ($medication->version ?? 1),
                     (int) MedicationOrderVersion::query()

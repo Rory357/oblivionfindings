@@ -692,22 +692,30 @@ class MedicationControllerTest extends TestCase
             ->assertSessionHasErrors(['state']);
     }
 
-    public function test_store_medication_normalizes_state_and_active(): void
+    public function test_store_medication_rejects_crafted_inactive_or_ceased_orders_without_persistence(): void
     {
-        $this->mockNotificationService();
+        $attempts = [
+            ['name' => 'Crafted ceased state', 'state' => 'ceased', 'error' => 'state'],
+            ['name' => 'Crafted paused state', 'state' => 'paused', 'error' => 'state'],
+            ['name' => 'Crafted inactive flag', 'active' => false, 'error' => 'active'],
+            ['name' => 'Crafted expired order', 'end_date' => today()->subDay()->toDateString(), 'error' => 'end_date'],
+            ['name' => 'Crafted cessation time', 'ceased_at' => '2026-08-21 10:30:00', 'error' => 'ceased_at'],
+            ['name' => 'Crafted cessation reason', 'ceased_reason' => 'Historical import bypass', 'error' => 'ceased_reason'],
+        ];
 
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Ceased Med',
-                'state' => 'ceased',
-            ])
-            ->assertRedirect();
+        foreach ($attempts as $attempt) {
+            $error = $attempt['error'];
+            unset($attempt['error']);
 
-        $this->assertDatabaseHas('client_medications', [
-            'name' => 'Ceased Med',
-            'state' => 'ceased',
-            'active' => false,
-        ]);
+            $this->actingAs($this->admin)
+                ->post("/clients/{$this->client->id}/medical/medications", $attempt)
+                ->assertSessionHasErrors($error);
+
+            $this->assertDatabaseMissing('client_medications', [
+                'client_id' => $this->client->id,
+                'name' => $attempt['name'],
+            ]);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════

@@ -3007,8 +3007,10 @@ class EmarController extends Controller
                 $payload = $validated;
                 $payload['client_id'] = $scope->client->id;
                 $payload['received_by'] = $user->id;
-                $payload['status'] = 'pending';
                 $payload['requires_countersign'] = in_array($payload['order_type'], ['verbal', 'telephone']);
+                $payload['status'] = $payload['order_type'] === 'cease' && ! $payload['requires_countersign']
+                    ? 'confirmed'
+                    : 'pending';
 
                 // Blank values are converted to null; omit this NOT NULL field
                 // so the schema's canonical default applies.
@@ -3018,7 +3020,7 @@ class EmarController extends Controller
 
                 $order = MedicationPrescriberOrder::create($payload);
                 if (! $order->requires_countersign) {
-                    $this->applyCeaseOrder($order, $medication);
+                    $this->applyCeaseOrder($order, $user, $medication);
                 }
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
@@ -3038,7 +3040,9 @@ class EmarController extends Controller
      */
     private function applyCeaseOrder(
         MedicationPrescriberOrder $order,
+        User $performer,
         ?ClientMedication $medication = null,
+        ?Carbon $ceasedAt = null,
     ): void {
         if ($order->order_type !== 'cease' || ! $order->client_medication_id) {
             return;
@@ -3050,25 +3054,16 @@ class EmarController extends Controller
             ->whereNull('deleted_at')
             ->lockForUpdate()
             ->first();
-        if (! $medication || $medication->state === 'ceased') {
-            return;
-        }
+        abort_unless($medication, 404, 'The requested medication action is not available.');
 
-        abort_unless(
-            (int) $medication->client_id === (int) $order->client_id,
-            404,
-            'The requested medication action is not available.',
-        );
-
-        $medication->update([
-            'state' => 'ceased',
-            'active' => false,
-            'end_date' => now()->toDateString(),
-            'ceased_reason' => 'Prescriber cease order — '.$order->prescriber_name
+        $this->medicationOrderLifecycle->discontinue(
+            $performer,
+            $medication,
+            'Prescriber cease order — '.$order->prescriber_name
                 .(filled($order->clinical_notes) ? ': '.$order->clinical_notes : ''),
-            'ceased_at' => now(),
-            'ceased_by' => $order->received_by,
-        ]);
+            (int) $order->client_id,
+            $ceasedAt ?? now(),
+        );
     }
 
     public function updatePrescription(Request $request, MedicationPrescriberOrder $order)
@@ -3139,8 +3134,9 @@ class EmarController extends Controller
             $order,
             now(),
             function (MedicationScopeDecision $scope) use ($validated, $user) {
+                $countersignedAt = now();
                 $scope->prescription->update([
-                    'countersigned_at' => now(),
+                    'countersigned_at' => $countersignedAt,
                     'countersigned_by' => $user->id,
                     'countersign_method' => $validated['countersign_method'] ?? null,
                     'status' => $scope->prescription->status === 'pending'
@@ -3148,7 +3144,12 @@ class EmarController extends Controller
                         : $scope->prescription->status,
                 ]);
 
-                $this->applyCeaseOrder($scope->prescription, $scope->medication);
+                $this->applyCeaseOrder(
+                    $scope->prescription,
+                    $user,
+                    $scope->medication,
+                    $countersignedAt,
+                );
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'countersigned_prescriber_order',
