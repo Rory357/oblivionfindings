@@ -4185,6 +4185,11 @@ class EmarController extends Controller
                     'witness_2_id' => 'required|integer|min:1',
                     'authorised_by_name' => 'required|string|max:255',
                 ]);
+                $lockedWitnessUsers = $this->governanceScope->lockControlledWitnessUsers([
+                    (int) $actor->id,
+                    (int) $payload['witness_1_id'],
+                    (int) $payload['witness_2_id'],
+                ]);
                 $witness1 = $this->governanceScope->confirmedControlledWitness(
                     $actor,
                     $client,
@@ -4193,6 +4198,7 @@ class EmarController extends Controller
                     'witness_1_id',
                     'witness_1_credential',
                     (int) $actor->id,
+                    $lockedWitnessUsers,
                 );
                 $witness2 = $this->governanceScope->confirmedControlledWitness(
                     $actor,
@@ -4202,6 +4208,7 @@ class EmarController extends Controller
                     'witness_2_id',
                     'witness_2_credential',
                     (int) $actor->id,
+                    $lockedWitnessUsers,
                 );
             }
 

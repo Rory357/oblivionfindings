@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(function () {
     // Dashboard
     Route::get('/dashboard/widgets', [MedicationsApiController::class, 'getDashboardWidgets'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.dashboard.widgets');
 
     // MAR
@@ -75,15 +75,15 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     // Alerts
     Route::get('/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.alerts.index');
 
     Route::get('/clients/{client}/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.alerts.client');
 
     Route::post('/alerts/{alertId}/acknowledge', [MedicationsApiController::class, 'acknowledgeAlert'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.alerts.acknowledge');
 
     Route::post('/alerts/{alertId}/resolve', [MedicationsApiController::class, 'resolveAlert'])

@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -40,8 +41,10 @@ class MedicationAlertService
 {
     public function __construct(
         protected ?MedicationSignalService $signalService = null,
+        protected ?MedicationGovernanceScopeService $governanceScope = null,
     ) {
         $this->signalService ??= app(MedicationSignalService::class);
+        $this->governanceScope ??= app(MedicationGovernanceScopeService::class);
     }
 
     /**
@@ -549,23 +552,31 @@ class MedicationAlertService
     // Dashboard widgets — unchanged, read from MedicationDashboardAlert / domain models
     // -----------------------------------------------------------------------
 
-    public function getGlobalDashboardWidgets(?int $clientId = null): array
+    /**
+     * @param array<int, int>|null $siteIds Null is reserved for internal
+     *        unscoped callers; an explicit empty array must return zero rows.
+     */
+    public function getGlobalDashboardWidgets(?int $clientId = null, ?array $siteIds = null): array
     {
         return [
-            'overdue_meds' => $this->getOverdueMedsWidget($clientId),
-            'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId),
-            'controlled_discrepancies' => $this->getControlledDiscrepanciesWidget($clientId),
-            'expiring_medications' => $this->getExpiringMedicationsWidget($clientId),
-            'high_risk_medications' => $this->getHighRiskMedicationsWidget($clientId),
-            'todays_summary' => $this->getTodaysSummaryWidget($clientId),
+            'overdue_meds' => $this->getOverdueMedsWidget($clientId, $siteIds),
+            'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId, $siteIds),
+            'controlled_discrepancies' => $this->getControlledDiscrepanciesWidget($clientId, $siteIds),
+            'expiring_medications' => $this->getExpiringMedicationsWidget($clientId, $siteIds),
+            'high_risk_medications' => $this->getHighRiskMedicationsWidget($clientId, $siteIds),
+            'todays_summary' => $this->getTodaysSummaryWidget($clientId, $siteIds),
         ];
     }
 
-    private function getOverdueMedsWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getOverdueMedsWidget(?int $clientId = null, ?array $siteIds = null): array
     {
         $query = MedicationDashboardAlert::where('alert_type', 'overdue')
-            ->where('status', 'active')
-            ->with('client:id,first_name,last_name');
+            ->where('status', 'active');
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds);
+        }
+        $query->with('client:id,first_name,last_name');
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -587,11 +598,15 @@ class MedicationAlertService
         ];
     }
 
-    private function getPrnNearLimitsWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getPrnNearLimitsWidget(?int $clientId = null, ?array $siteIds = null): array
     {
         $query = MedicationDashboardAlert::whereIn('alert_type', ['prn_near_limit', 'prn_over_limit'])
-            ->where('status', 'active')
-            ->with(['client:id,first_name,last_name', 'medication:id,name']);
+            ->where('status', 'active');
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds);
+        }
+        $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -615,10 +630,14 @@ class MedicationAlertService
         ];
     }
 
-    private function getControlledDiscrepanciesWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getControlledDiscrepanciesWidget(?int $clientId = null, ?array $siteIds = null): array
     {
-        $query = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])
-            ->with(['client:id,first_name,last_name', 'medication:id,name']);
+        $query = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review']);
+        if ($siteIds !== null) {
+            $query = $this->governanceScope->scopeCanonicalClientMedicationRows($query, $siteIds, false);
+        }
+        $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -642,9 +661,14 @@ class MedicationAlertService
         ];
     }
 
-    private function getExpiringMedicationsWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getExpiringMedicationsWidget(?int $clientId = null, ?array $siteIds = null): array
     {
         $query = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
             ->whereNotNull('end_date')
             ->where('end_date', '<=', now()->addDays(14))
             ->where('end_date', '>=', now())
@@ -671,9 +695,14 @@ class MedicationAlertService
         ];
     }
 
-    private function getHighRiskMedicationsWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getHighRiskMedicationsWidget(?int $clientId = null, ?array $siteIds = null): array
     {
         $query = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
             ->where('high_risk', true)
             ->with('client:id,first_name,last_name');
 
@@ -698,12 +727,17 @@ class MedicationAlertService
         ];
     }
 
-    private function getTodaysSummaryWidget(?int $clientId = null): array
+    /** @param array<int, int>|null $siteIds */
+    private function getTodaysSummaryWidget(?int $clientId = null, ?array $siteIds = null): array
     {
         $today = now()->startOfDay();
         $tomorrow = $today->copy()->addDay();
 
         $scheduledQuery = ClientMedication::active()
+            ->when($siteIds !== null, fn ($query) => $query->whereHas(
+                'client',
+                fn ($client) => $client->whereIn('site_id', $siteIds),
+            ))
             ->where('is_prn', false)
             ->where(function ($q) use ($today) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $today);
@@ -728,6 +762,10 @@ class MedicationAlertService
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $completedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($completedQuery, $siteIds, false);
+        }
 
         if ($clientId) {
             $completedQuery->where('client_id', $clientId);
@@ -740,12 +778,20 @@ class MedicationAlertService
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $refusedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($refusedQuery, $siteIds, false);
+        }
 
         $missedQuery = ClientMedicationAdministration::where('status', 'missed')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
+        if ($siteIds !== null) {
+            $missedQuery = $this->governanceScope
+                ->scopeCanonicalClientMedicationRows($missedQuery, $siteIds, false);
+        }
 
         if ($clientId) {
             $refusedQuery->where('client_id', $clientId);

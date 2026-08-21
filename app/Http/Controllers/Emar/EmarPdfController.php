@@ -8,7 +8,7 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationRound;
-use App\Services\UserSiteAccessService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -16,13 +16,17 @@ use Illuminate\Http\Request;
 
 class EmarPdfController extends Controller
 {
+    public function __construct(
+        private MedicationGovernanceScopeService $governanceScope,
+    ) {}
+
     /**
      * Generate a PDF MAR chart for a client over a date range.
      */
     public function marChart(Request $request)
     {
         $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => 'required|integer|min:1',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
@@ -30,14 +34,22 @@ class EmarPdfController extends Controller
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
-        $client = Client::findOrFail($request->input('client_id'));
-        $this->authorize('viewMedications', $client);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $clientId = (int) $request->input('client_id');
+        $this->governanceScope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
+            requestedClientId: $clientId,
+        );
+        $client = Client::query()->findOrFail($clientId);
 
         $scheduledMedications = ClientMedication::where('client_id', $client->id)
             ->where('active', true)
             ->where('is_prn', false)
-            ->with(['administrations' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('scheduled_for', [
+            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+                $query->where('client_id', $client->id)
+                    ->whereBetween('scheduled_for', [
                     Carbon::parse($dateFrom)->startOfDay(),
                     Carbon::parse($dateTo)->endOfDay(),
                 ]);
@@ -48,8 +60,9 @@ class EmarPdfController extends Controller
         $prnMedications = ClientMedication::where('client_id', $client->id)
             ->where('active', true)
             ->where('is_prn', true)
-            ->with(['administrations' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('administered_at', [
+            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+                $query->where('client_id', $client->id)
+                    ->whereBetween('administered_at', [
                     Carbon::parse($dateFrom)->startOfDay(),
                     Carbon::parse($dateTo)->endOfDay(),
                 ]);
@@ -82,7 +95,7 @@ class EmarPdfController extends Controller
     public function controlledDrugRegister(Request $request)
     {
         $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => 'required|integer|min:1',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
@@ -90,10 +103,26 @@ class EmarPdfController extends Controller
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
-        $client = Client::findOrFail($request->input('client_id'));
-        $this->authorize('viewMedications', $client);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $clientId = (int) $request->input('client_id');
+        $this->governanceScope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
+            requestedClientId: $clientId,
+        );
+        $this->governanceScope->readerSiteIds(
+            $actor,
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            requestedClientId: $clientId,
+        );
+        $client = Client::query()->findOrFail($clientId);
 
-        $entries = ClientControlledDrugEntry::where('client_id', $client->id)
+        $entries = $this->governanceScope->scopeCanonicalClientMedicationRows(
+            ClientControlledDrugEntry::query()->where('client_id', $client->id),
+            [(int) $client->site_id],
+            false,
+        )
             ->whereBetween('recorded_at', [
                 Carbon::parse($dateFrom)->startOfDay(),
                 Carbon::parse($dateTo)->endOfDay(),
@@ -125,17 +154,23 @@ class EmarPdfController extends Controller
 
         $date = $request->input('date', Carbon::today()->toDateString());
 
-        // Scope to the sites this user may see (empty = unrestricted org-wide
-        // reporter or no site profile), so a site-restricted exporter cannot
-        // pull every site's round sheet by date.
-        $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
-            $request->user(),
-            ['reports.viewAny'],
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $actor,
+            ['medications.reports.export', 'reports.viewAny'],
         );
 
         $rounds = MedicationRound::where('round_date', $date)
-            ->when($siteIds !== [], fn ($q) => $q->whereIn('site_id', $siteIds))
-            ->with(['assignedTo', 'administrations.medication', 'administrations.client'])
+            ->whereIn('site_id', $siteIds)
+            ->with([
+                'assignedTo',
+                'administrations' => function ($query) use ($siteIds): void {
+                    $this->governanceScope
+                        ->scopeCanonicalClientMedicationRows($query, $siteIds, false)
+                        ->with(['medication', 'client']);
+                },
+            ])
             ->orderBy('scheduled_time')
             ->get();
 

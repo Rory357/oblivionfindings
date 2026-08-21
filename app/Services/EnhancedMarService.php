@@ -1317,13 +1317,25 @@ class EnhancedMarService
             ];
         }
 
-        $recorder = User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+        $lockedWitnessUsers = $this->medicationGovernanceScope->lockControlledWitnessUsers([
+            $userId,
+            (int) $data['witnessed_by'],
+        ]);
+        $recorder = $lockedWitnessUsers->get($userId);
+        if (! $recorder) {
+            return [
+                'success' => false,
+                'error' => 'The medication recorder could not be confirmed.',
+                'error_field' => 'witnessed_by',
+            ];
+        }
         $witness = $this->medicationGovernanceScope->confirmedControlledWitness(
             $recorder,
             $client,
             (int) $data['witnessed_by'],
             $data['witness_credential'] ?? null,
             recorderId: $userId,
+            lockedUsers: $lockedWitnessUsers,
         );
 
         return [

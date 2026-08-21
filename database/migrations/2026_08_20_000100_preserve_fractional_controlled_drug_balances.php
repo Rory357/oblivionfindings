@@ -33,7 +33,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $this->assertBalancesAreWholeNumbers();
+        $this->assertBalancesFitSignedIntegers();
 
         Schema::table('medication_scheduled_stock_counts', function (Blueprint $table): void {
             $table->integer('expected_quantity')->nullable()->change();
@@ -57,7 +57,7 @@ return new class extends Migration
         });
     }
 
-    private function assertBalancesAreWholeNumbers(): void
+    private function assertBalancesFitSignedIntegers(): void
     {
         foreach ([
             'client_medication_stocks' => ['on_hand'],
@@ -67,14 +67,18 @@ return new class extends Migration
         ] as $table => $columns) {
             foreach ($columns as $column) {
                 $wrappedColumn = DB::connection()->getQueryGrammar()->wrap($column);
-                $hasFractionalValue = DB::table($table)
+                $hasUnsafeValue = DB::table($table)
                     ->whereNotNull($column)
-                    ->whereRaw("{$wrappedColumn} <> ROUND({$wrappedColumn}, 0)")
+                    ->where(function ($query) use ($wrappedColumn): void {
+                        $query->whereRaw("{$wrappedColumn} <> ROUND({$wrappedColumn}, 0)")
+                            ->orWhereRaw("{$wrappedColumn} < -2147483648")
+                            ->orWhereRaw("{$wrappedColumn} > 2147483647");
+                    })
                     ->exists();
 
-                if ($hasFractionalValue) {
+                if ($hasUnsafeValue) {
                     throw new \RuntimeException(
-                        "Cannot restore {$table}.{$column} to integer storage while fractional medication-stock provenance exists.",
+                        "Cannot restore {$table}.{$column} to signed integer storage while fractional or out-of-range medication-stock provenance exists.",
                     );
                 }
             }

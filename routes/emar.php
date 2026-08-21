@@ -284,7 +284,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Audit trail
     Route::get('/audit', [AuditLogController::class, 'index'])
-        ->middleware('permission:medications.audit.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+        ])
         ->name('emar.audit');
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
         ->middleware('permission:medications.reports.export')
@@ -407,9 +410,14 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.errors.link_incident');
 
     // ─── PDF Exports ─────────────────────────────────────────
-    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
+    Route::middleware([
+        'permission:medications.view',
+        'permission:medications.reports.export|reports.viewAny',
+    ])->group(function () {
         Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
-        Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])->name('emar.pdf.cd_register');
+        Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])
+            ->middleware('permission:medications.controlled.view')
+            ->name('emar.pdf.cd_register');
         Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
     });
 });

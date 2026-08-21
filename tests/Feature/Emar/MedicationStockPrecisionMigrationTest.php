@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
@@ -34,7 +35,7 @@ class MedicationStockPrecisionMigrationTest extends TestCase
             $migration->down();
             $this->fail('The migration must not narrow fractional medication-stock provenance.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('fractional medication-stock provenance exists', $exception->getMessage());
+            $this->assertStringContainsString('fractional or out-of-range medication-stock provenance exists', $exception->getMessage());
         }
 
         $this->assertSame('decimal', Schema::getColumnType('client_medication_stocks', 'on_hand'));
@@ -42,6 +43,107 @@ class MedicationStockPrecisionMigrationTest extends TestCase
         $this->assertSame('decimal', Schema::getColumnType('client_controlled_drug_discrepancies', 'difference'));
         $this->assertSame('decimal', Schema::getColumnType('medication_scheduled_stock_counts', 'actual_quantity'));
         $this->assertSame(9.5, (float) $stock->refresh()->on_hand);
+    }
+
+    public function test_down_migration_rejects_signed_integer_overflow_before_any_ddl(): void
+    {
+        $client = Client::factory()->create();
+        $positiveMedication = ClientMedication::factory()->create(['client_id' => $client->id]);
+        $positive = ClientMedicationStock::query()->create([
+            'client_medication_id' => $positiveMedication->id,
+            'on_hand' => '3000000000.00',
+            'unit' => 'tablets',
+        ]);
+        $migration = require database_path(
+            'migrations/2026_08_20_000100_preserve_fractional_controlled_drug_balances.php',
+        );
+
+        try {
+            $migration->down();
+            $this->fail('The migration must reject values outside signed MySQL INT before narrowing any column.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('fractional or out-of-range medication-stock provenance exists', $exception->getMessage());
+        }
+
+        foreach ([
+            ['client_medication_stocks', 'on_hand'],
+            ['client_controlled_drug_entries', 'on_hand_before'],
+            ['client_controlled_drug_discrepancies', 'difference'],
+            ['medication_scheduled_stock_counts', 'actual_quantity'],
+        ] as [$table, $column]) {
+            $this->assertSame('decimal', Schema::getColumnType($table, $column));
+        }
+        $this->assertSame('3000000000.00', (string) $positive->refresh()->on_hand);
+    }
+
+    public function test_down_migration_rejects_negative_signed_integer_overflow_when_representable(): void
+    {
+        $client = Client::factory()->create();
+        $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
+        $reporter = User::factory()->create();
+        $discrepancy = ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'service_context_id' => $client->service_context_id,
+            'on_hand_before' => '0.00',
+            'on_hand_after' => '0.00',
+            'difference' => '-3000000000.00',
+            'reason' => 'Rollback boundary regression',
+            'reported_by' => $reporter->id,
+            'status' => 'open',
+            'reported_at' => now(),
+        ]);
+        $migration = require database_path(
+            'migrations/2026_08_20_000100_preserve_fractional_controlled_drug_balances.php',
+        );
+
+        try {
+            $migration->down();
+            $this->fail('The migration must reject negative values outside signed MySQL INT before narrowing any column.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('fractional or out-of-range medication-stock provenance exists', $exception->getMessage());
+        }
+
+        $this->assertSame('decimal', Schema::getColumnType('client_medication_stocks', 'on_hand'));
+        $this->assertSame('decimal', Schema::getColumnType('client_controlled_drug_discrepancies', 'difference'));
+        $this->assertSame('-3000000000.00', (string) $discrepancy->refresh()->difference);
+    }
+
+    public function test_whole_in_range_values_survive_down_and_re_up(): void
+    {
+        $client = Client::factory()->create();
+        $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
+        $stock = ClientMedicationStock::query()->create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => '2147483647.00',
+            'unit' => 'tablets',
+        ]);
+        $reporter = User::factory()->create();
+        $discrepancy = ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'service_context_id' => $client->service_context_id,
+            'on_hand_before' => '0.00',
+            'on_hand_after' => '0.00',
+            'difference' => '-2147483648.00',
+            'reason' => 'Exact signed integer lower bound',
+            'reported_by' => $reporter->id,
+            'status' => 'open',
+            'reported_at' => now(),
+        ]);
+        $migration = require database_path(
+            'migrations/2026_08_20_000100_preserve_fractional_controlled_drug_balances.php',
+        );
+
+        $migration->down();
+        $this->assertSame('integer', Schema::getColumnType('client_medication_stocks', 'on_hand'));
+        $this->assertSame(2147483647, (int) $stock->refresh()->on_hand);
+        $this->assertSame(-2147483648, (int) $discrepancy->refresh()->difference);
+
+        $migration->up();
+        $this->assertSame('decimal', Schema::getColumnType('client_medication_stocks', 'on_hand'));
+        $this->assertSame('2147483647.00', (string) $stock->refresh()->on_hand);
+        $this->assertSame('-2147483648.00', (string) $discrepancy->refresh()->difference);
     }
 
     public function test_controlled_delivery_migration_down_refuses_to_remove_linked_provenance(): void

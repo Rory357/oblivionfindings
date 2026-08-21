@@ -16,17 +16,35 @@ use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Services\Emar\MarOmissionService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
+    public function __construct(
+        private MedicationGovernanceScopeService $governanceScope,
+    ) {}
+
     public function index(Request $request, MarOmissionService $omissions)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('medications.audit.view'), 403);
+        abort_unless($user, 403);
 
-        $clientId = $request->query('client_id');
+        $clientId = $request->integer('client_id') ?: null;
+        $siteFilter = $request->integer('site_id') ?: null;
+        $accessibleSiteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.audit.view',
+            $siteFilter,
+            $clientId,
+        );
+        $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
+        $allowedClientIds = Client::query()
+            ->whereIn('site_id', $readerSiteIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         $eventTypes = $request->query('event_types', []);
@@ -39,6 +57,7 @@ class AuditLogController extends Controller
         // 1. ClientMedication — started / ceased
         if (empty($eventTypes) || array_intersect(['medication_started', 'medication_ceased'], $eventTypes)) {
             $medQuery = ClientMedication::query()
+                ->whereIn('client_id', $allowedClientIds)
                 ->with(['client:id,first_name,last_name', 'createdByUser:id,name', 'ceasedByUser:id,name'])
                 ->select('id', 'client_id', 'created_by', 'name', 'dosage', 'created_at', 'ceased_at', 'ceased_reason', 'ceased_by');
 
@@ -94,7 +113,11 @@ class AuditLogController extends Controller
         // 2. ClientMedicationAdministration — dose_administered / dose_refused / dose_missed
         $adminTypes = ['dose_administered', 'dose_refused', 'dose_missed'];
         if (empty($eventTypes) || array_intersect($adminTypes, $eventTypes)) {
-            $adminQuery = ClientMedicationAdministration::query()
+            $adminQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                ClientMedicationAdministration::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+                false,
+            )
                 ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
                 ->select('id', 'client_id', 'client_medication_id', 'administered_by', 'witnessed_by', 'scheduled_for', 'administered_at', 'status', 'reason', 'reason_code', 'dose_given', 'notes');
 
@@ -157,7 +180,10 @@ class AuditLogController extends Controller
 
         // 3. MedicationPrescriberOrder — prescriber_order
         if (empty($eventTypes) || in_array('prescriber_order', $eventTypes)) {
-            $orderQuery = MedicationPrescriberOrder::query()
+            $orderQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                MedicationPrescriberOrder::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+            )
                 ->with(['client:id,first_name,last_name'])
                 ->select('id', 'client_id', 'medication_name', 'dose', 'prescriber_name', 'order_type', 'status', 'created_at');
 
@@ -195,6 +221,7 @@ class AuditLogController extends Controller
         // 4. MedicationReview — review_completed
         if (empty($eventTypes) || in_array('review_completed', $eventTypes)) {
             $reviewQuery = MedicationReview::query()
+                ->whereIn('client_id', $allowedClientIds)
                 ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
                 ->whereNotNull('completed_date')
                 ->select('id', 'client_id', 'review_type', 'completed_date', 'reviewer_name', 'reviewer_user_id', 'clinical_summary');
@@ -231,7 +258,10 @@ class AuditLogController extends Controller
 
         // 5. MedicationDestruction — destruction
         if (empty($eventTypes) || in_array('destruction', $eventTypes)) {
-            $destructionQuery = MedicationDestruction::query()
+            $destructionQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                MedicationDestruction::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+            )
                 ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name'])
                 ->select('id', 'client_id', 'medication_name', 'quantity', 'unit', 'reason', 'disposal_method', 'destroyed_by', 'destroyed_at');
 
@@ -270,7 +300,11 @@ class AuditLogController extends Controller
 
         // 6. MedicationOrderVersion — medication_changed
         if (empty($eventTypes) || in_array('medication_changed', $eventTypes)) {
-            $versionQuery = MedicationOrderVersion::query()
+            $versionQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                MedicationOrderVersion::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+                false,
+            )
                 ->with(['client:id,first_name,last_name', 'changedBy:id,name'])
                 ->where('version_number', '>', 1)
                 ->select('id', 'client_id', 'client_medication_id', 'version_number', 'name', 'dosage', 'frequency', 'route', 'instructions', 'is_prn', 'dose_times', 'change_reason', 'changed_by', 'created_at');
@@ -293,8 +327,13 @@ class AuditLogController extends Controller
             $medIds = $versions->pluck('client_medication_id')->filter()->unique()->values();
             $byMedVersion = $medIds->isEmpty()
                 ? collect()
-                : MedicationOrderVersion::query()
-                    ->whereIn('client_medication_id', $medIds)
+                : $this->governanceScope->scopeCanonicalClientMedicationRows(
+                    MedicationOrderVersion::query()
+                        ->whereIn('client_medication_id', $medIds)
+                        ->whereIn('client_id', $allowedClientIds),
+                    $readerSiteIds,
+                    false,
+                )
                     ->get(['id', 'client_medication_id', 'version_number', 'name', 'dosage', 'frequency', 'route', 'instructions', 'is_prn', 'dose_times'])
                     ->groupBy('client_medication_id')
                     ->map(fn ($group) => $group->keyBy('version_number'));
@@ -327,7 +366,11 @@ class AuditLogController extends Controller
 
         // 7. ClientControlledDrugEntry — controlled-drug movements (with witness)
         if (empty($eventTypes) || array_intersect(['cd_given', 'cd_received', 'cd_wasted', 'cd_balance_check', 'cd_adjustment'], $eventTypes)) {
-            $cdQuery = ClientControlledDrugEntry::query()
+            $cdQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                ClientControlledDrugEntry::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+                false,
+            )
                 ->with(['client:id,first_name,last_name', 'medication:id,name', 'recordedBy:id,name', 'witnessedBy:id,name']);
 
             if ($clientId) {
@@ -406,7 +449,10 @@ class AuditLogController extends Controller
 
         // 8. MedicationError — medication_error
         if (empty($eventTypes) || in_array('medication_error', $eventTypes)) {
-            $errorQuery = MedicationError::query()
+            $errorQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                MedicationError::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+            )
                 ->with(['client:id,first_name,last_name', 'reportedBy:id,name']);
 
             if ($clientId) {
@@ -443,7 +489,11 @@ class AuditLogController extends Controller
         // 9. MedicationPharmacyOrder — stock received (real delivery receipts only;
         //    non-CD ad-hoc stock has no movement log, so nothing is invented here).
         if (empty($eventTypes) || in_array('stock_received', $eventTypes)) {
-            $stockQuery = MedicationPharmacyOrder::query()
+            $stockQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
+                MedicationPharmacyOrder::query()->whereIn('client_id', $allowedClientIds),
+                $readerSiteIds,
+                false,
+            )
                 ->with(['client:id,first_name,last_name', 'medication:id,name', 'receivedByUser:id,name'])
                 ->whereNotNull('delivered_at');
 
@@ -482,20 +532,23 @@ class AuditLogController extends Controller
         // 10. Omissions — scheduled doses never recorded (real "blank MAR slot"
         //     detection over a bounded recent window; reuses MarScheduleService).
         if (empty($eventTypes) || in_array('omission', $eventTypes)) {
-            foreach ($omissions->omissionsForRange(
-                $dateFrom ? Carbon::parse($dateFrom) : null,
-                $dateTo ? Carbon::parse($dateTo) : null,
-                $clientId ? (int) $clientId : null,
-            ) as $omission) {
-                $events->push($omission);
+            $omissionClientIds = $clientId !== null ? [$clientId] : $allowedClientIds;
+            foreach ($omissionClientIds as $omissionClientId) {
+                foreach ($omissions->omissionsForRange(
+                    $dateFrom ? Carbon::parse($dateFrom) : null,
+                    $dateTo ? Carbon::parse($dateTo) : null,
+                    $omissionClientId,
+                ) as $omission) {
+                    $events->push($omission);
+                }
             }
         }
 
         // ── Enrich every event with category / source / site / flags so the
         //    redesigned page can facet, surface compliance gaps and render the
         //    read-only detail drawer. (See docs/emar-redesign/audit-plan.md.)
-        $clientSite = Client::query()->pluck('site_id', 'id');
-        $siteNames = Site::query()->pluck('name', 'id');
+        $clientSite = Client::query()->whereIn('id', $allowedClientIds)->pluck('site_id', 'id');
+        $siteNames = Site::query()->whereIn('id', $readerSiteIds)->pluck('name', 'id');
         $categoryOf = [
             'dose_administered' => 'doses', 'dose_refused' => 'doses', 'dose_missed' => 'doses', 'omission' => 'doses',
             'cd_given' => 'controlled', 'cd_received' => 'controlled', 'cd_wasted' => 'controlled',
@@ -551,7 +604,6 @@ class AuditLogController extends Controller
         if ($staffFilter) {
             $events = $events->filter(fn ($e) => $e['performed_by'] === $staffFilter)->values();
         }
-        $siteFilter = $request->integer('site_id') ?: null;
         if ($siteFilter) {
             $events = $events->filter(fn ($e) => (int) ($e['site_id'] ?? 0) === $siteFilter)->values();
         }
@@ -580,7 +632,7 @@ class AuditLogController extends Controller
         $events = $sorted->take(800)->values();
 
         $clients = Client::query()
-            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->whereIn('site_id', $readerSiteIds)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
@@ -588,14 +640,20 @@ class AuditLogController extends Controller
         $staff = $sorted->pluck('performed_by')->filter()->unique()->sort()->values()
             ->map(fn ($name, $i) => ['id' => $i, 'name' => $name]);
 
-        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
+        $activeSite = $siteFilter
+            ? Site::query()->whereKey($siteFilter)->whereIn('id', $readerSiteIds)->first()
+            : null;
 
         return inertia('emar/AuditLog', [
             'events' => $events,
             'stats' => $stats,
             'clients' => $clients,
             'staff' => $staff,
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => Site::query()
+                ->whereIn('id', $readerSiteIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
             'user_first_name' => $user ? (explode(' ', trim((string) $user->name))[0] ?: null) : null,

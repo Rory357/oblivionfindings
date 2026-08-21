@@ -485,6 +485,40 @@ final class MedicationGovernanceScopeService
         }, 3);
     }
 
+    /**
+     * Lock every recorder/witness User row in one canonical order before any
+     * HR profile lock. Callers with multiple witnesses must pass the complete
+     * set once so opposite request ordering cannot invert row-lock order.
+     *
+     * @param array<int, int> $userIds
+     * @return Collection<int, User>
+     */
+    public function lockControlledWitnessUsers(array $userIds): Collection
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Controlled medication witnesses must be locked in the governing transaction.');
+        }
+
+        $ids = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        $this->notFoundUnless($ids->isNotEmpty());
+
+        $users = User::query()
+            ->whereIn('id', $ids->all())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy(fn (User $user) => (int) $user->id);
+        $this->notFoundUnless($users->count() === $ids->count());
+
+        return $users;
+    }
+
+    /** @param Collection<int, User>|null $lockedUsers */
     public function confirmedControlledWitness(
         User $actor,
         Client $client,
@@ -493,6 +527,7 @@ final class MedicationGovernanceScopeService
         string $witnessErrorKey = 'witnessed_by',
         string $credentialErrorKey = 'witness_credential',
         ?int $recorderId = null,
+        ?Collection $lockedUsers = null,
     ): User {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Controlled medication witnesses must be confirmed in the governing transaction.');
@@ -504,7 +539,20 @@ final class MedicationGovernanceScopeService
             ]);
         }
 
-        $witness = User::query()->whereKey($witnessId)->lockForUpdate()->first();
+        $lockedUsers ??= $this->lockControlledWitnessUsers([
+            (int) $actor->id,
+            $recorderId ?? (int) $actor->id,
+            $witnessId,
+        ]);
+        $requiredUserIds = collect([
+            (int) $actor->id,
+            $recorderId ?? (int) $actor->id,
+            $witnessId,
+        ])->unique();
+        $this->notFoundUnless(
+            $requiredUserIds->every(fn (int $id) => $lockedUsers->has($id)),
+        );
+        $witness = $lockedUsers->get($witnessId);
         $this->notFoundUnless($witness !== null);
 
         $eligibleAtSite = $this->currentStaff->currentUsersQuery()

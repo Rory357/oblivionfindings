@@ -981,29 +981,24 @@ class MedicationsApiController extends Controller
     public function getDashboardAlerts(Request $request, ?Client $client = null)
     {
         $user = $request->user();
+        abort_unless($user, 403);
+        $clientId = $client ? (int) $client->id : null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            requestedClientId: $clientId,
+        );
 
-        if ($client) {
-            $this->authorize('viewMedications', $client);
-            $alerts = MedicationDashboardAlert::forClient($client->id)
-                ->active()
-                ->with(['medication:id,name', 'client:id,first_name,last_name'])
-                ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-                ->orderByDesc('created_at')
-                ->get();
-        } else {
-            // Global alerts - check permissions
-            abort_unless(
-                $user->canDo('medications.view') || $user->canDo('clients.viewAny'),
-                403
-            );
-
-            $alerts = MedicationDashboardAlert::active()
-                ->with(['medication:id,name', 'client:id,first_name,last_name'])
-                ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-                ->orderByDesc('created_at')
-                ->limit(50)
-                ->get();
-        }
+        $alertsQuery = MedicationDashboardAlert::query()
+            ->active()
+            ->when($clientId, fn ($query) => $query->where('client_id', $clientId));
+        $alerts = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows($alertsQuery, $siteIds)
+            ->with(['medication:id,name', 'client:id,first_name,last_name'])
+            ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
 
         return response()->json([
             'alerts' => $alerts->map(fn ($a) => [
@@ -1033,14 +1028,20 @@ class MedicationsApiController extends Controller
     public function acknowledgeAlert(Request $request, int $alertId)
     {
         $user = $request->user();
+        abort_unless($user, 403);
 
-        $alert = MedicationDashboardAlert::findOrFail($alertId);
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+        );
+        $alert = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows(
+                MedicationDashboardAlert::query()->whereKey($alertId),
+                $siteIds,
+            )
+            ->firstOrFail();
 
-        // Verify user can access this client's medication data
-        $client = Client::findOrFail($alert->client_id);
-        $this->authorize('viewMedications', $client);
-
-        $success = $this->alertService->acknowledgeAlert($alertId, $user->id);
+        $success = $this->alertService->acknowledgeAlert((int) $alert->id, $user->id);
 
         return response()->json([
             'success' => $success,
@@ -1083,22 +1084,15 @@ class MedicationsApiController extends Controller
     {
         $user = $request->user();
 
-        abort_unless(
-            $user->canDo('medications.view') || $user->canDo('clients.viewAny'),
-            403
+        abort_unless($user, 403);
+        $clientId = $request->integer('client_id') ?: null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            requestedClientId: $clientId,
         );
 
-        $clientId = $request->input('client_id');
-
-        // If not global view, restrict to assigned clients
-        if (! $user->canDo('clients.viewAny') && $clientId) {
-            $assignedIds = $user->assignedClients()->pluck('clients.id')->toArray();
-            if (! in_array((int) $clientId, $assignedIds)) {
-                abort(403);
-            }
-        }
-
-        $widgets = $this->alertService->getGlobalDashboardWidgets($clientId);
+        $widgets = $this->alertService->getGlobalDashboardWidgets($clientId, $siteIds);
 
         return response()->json($widgets);
     }
