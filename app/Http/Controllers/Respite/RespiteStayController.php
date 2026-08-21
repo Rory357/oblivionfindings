@@ -340,14 +340,14 @@ class RespiteStayController extends Controller
 
             if ($behaviourSupportPlanId !== null) {
                 $behaviourSupportPlanId = $this->stayScope
-                    ->currentPlan($stay, $behaviourSupportPlanId, 'behaviour_support_plan_id', true)
+                    ->currentPlan($stay, $behaviourSupportPlanId, null, true)
                     ->id;
             } elseif ($withinSupportPlan) {
                 $behaviourSupportPlanId = $this->stayScope->currentPlanId($stay, true);
             }
 
-            if (! empty($validated['related_incident_id'])) {
-                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], 'related_incident_id', true);
+            if (array_key_exists('related_incident_id', $validated) && $validated['related_incident_id'] !== null) {
+                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], null, true);
             }
 
             return RestraintEvent::create([

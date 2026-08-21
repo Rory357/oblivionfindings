@@ -19,7 +19,10 @@ use Illuminate\Validation\ValidationException;
 
 class RespiteStayScope
 {
-    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
+    private const CLIENT_SITE_BYPASS_PERMISSIONS = [
+        'clinical.accessAllSites',
+        'sites.viewAll',
+    ];
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
@@ -27,34 +30,12 @@ class RespiteStayScope
 
     public function applyAccessibleStayScope(Builder $query, Request $request): Builder
     {
-        $user = $request->user();
-        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
-
-        if (! $user || $siteIds === []) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query
-            ->whereHas('client', function (Builder $clients) use ($siteIds, $user): void {
-                $clients->whereIn('site_id', $siteIds);
-
-                if (! $user->canDo('clients.viewAny')) {
-                    if (! $user->canDo('clients.viewAssigned')) {
-                        $clients->whereRaw('1 = 0');
-
-                        return;
-                    }
-
-                    $clients->whereHas('supportWorkers', fn (Builder $workers) => $workers->whereKey($user->id));
-                }
-            })
-            ->whereHas('booking', function (Builder $bookings) use ($siteIds): void {
-                $bookings
-                    ->whereColumn('respite_bookings.client_id', 'respite_stays.client_id')
-                    ->where(function (Builder $locations) use ($siteIds): void {
-                        $locations->whereNull('location_id')->orWhereIn('location_id', $siteIds);
-                    });
-            });
+        return $this->applyStayScope(
+            $query,
+            $request->user(),
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            true,
+        );
     }
 
     /**
@@ -89,9 +70,55 @@ class RespiteStayScope
             });
     }
 
-    public function resolveAuthorizedStay(Request $request, int $stayId, bool $lock = false): RespiteStay
-    {
-        $stayQuery = RespiteStay::query();
+    public function resolveAuthorizedStay(
+        Request $request,
+        int $stayId,
+        bool $lock = false,
+    ): RespiteStay {
+        return $this->resolveAuthorizedStayWithScope(
+            $request,
+            $stayId,
+            $lock,
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            true,
+        );
+    }
+
+    public function resolveAuthorizedHealthSafetyStay(
+        Request $request,
+        int $stayId,
+        bool $lock = false,
+    ): RespiteStay {
+        return $this->resolveAuthorizedStayWithScope(
+            $request,
+            $stayId,
+            $lock,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+            false,
+        );
+    }
+
+    /**
+     * Resolve the authoritative stay graph before a read or mutation.
+     *
+     * @param  array<int, string>  $siteBypassPermissions
+     */
+    private function resolveAuthorizedStayWithScope(
+        Request $request,
+        int $stayId,
+        bool $lock,
+        array $siteBypassPermissions,
+        bool $requireClientPermission,
+    ): RespiteStay {
+        $user = $request->user();
+        abort_unless($user, 404);
+
+        $stayQuery = $this->applyStayScope(
+            RespiteStay::query(),
+            $user,
+            $siteBypassPermissions,
+            $requireClientPermission,
+        );
         if ($lock) {
             $stayQuery->lockForUpdate();
         }
@@ -115,36 +142,17 @@ class RespiteStayScope
             404,
         );
 
-        $user = $request->user();
-        abort_unless($user, 403);
-        Gate::forUser($user)->authorize('view', $client);
-
         $siteId = $booking->location_id ?: $client->site_id;
-        $this->siteAccess->assertCanAccessSiteId(
-            $user,
-            $siteId ? (int) $siteId : null,
-            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        $allowedSiteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions);
+        abort_unless(
+            $siteId
+                && $client->site_id
+                && in_array((int) $siteId, $allowedSiteIds, true)
+                && in_array((int) $client->site_id, $allowedSiteIds, true),
+            404,
         );
-
-        $stay->setRelation('booking', $booking);
-        $stay->setRelation('client', $client);
-
-        return $stay;
-    }
-
-    public function lockCanonicalStay(int $stayId): RespiteStay
-    {
-        $stay = RespiteStay::query()->lockForUpdate()->find($stayId);
-        if (! $stay) {
-            abort(404);
-        }
-
-        $booking = RespiteBooking::query()->lockForUpdate()->find($stay->booking_id);
-        $client = Client::query()->lockForUpdate()->find($stay->client_id);
-        if (! $booking
-            || ! $client
-            || (int) $booking->client_id !== (int) $stay->client_id) {
-            abort(404);
+        if ($requireClientPermission) {
+            abort_unless(Gate::forUser($user)->allows('view', $client), 404);
         }
 
         $stay->setRelation('booking', $booking);
@@ -163,17 +171,23 @@ class RespiteStayScope
         return (int) $siteId;
     }
 
-    public function assertSubmittedClient(RespiteStay $stay, mixed $clientId): void
-    {
+    public function assertSubmittedClient(
+        RespiteStay $stay,
+        mixed $clientId,
+        ?string $field = 'client_id',
+    ): void {
         if ((int) $clientId !== (int) $stay->client_id) {
-            $this->fail('client_id', 'The resident must match the selected respite stay.');
+            $this->fail($field, 'The resident must match the selected respite stay.');
         }
     }
 
-    public function assertSubmittedSite(RespiteStay $stay, mixed $siteId): void
-    {
+    public function assertSubmittedSite(
+        RespiteStay $stay,
+        mixed $siteId,
+        ?string $field = 'site_id',
+    ): void {
         if ((int) $siteId !== $this->siteId($stay)) {
-            $this->fail('site_id', 'The site must match the selected respite stay.');
+            $this->fail($field, 'The site must match the selected respite stay.');
         }
     }
 
@@ -414,24 +428,38 @@ class RespiteStayScope
         }
 
         foreach (['incident_id', 'linked_incident_id', 'related_incident_id'] as $key) {
-            if (! empty($metadata[$key])) {
-                $this->incident($stay, (int) $metadata[$key], $field, $lock);
+            if (array_key_exists($key, $metadata) && $metadata[$key] !== null) {
+                $metadata[$key] = $this->incident(
+                    $stay,
+                    (int) $metadata[$key],
+                    $field,
+                    $lock,
+                )->id;
             }
         }
         foreach (['daily_note_id', 'note_id'] as $key) {
-            if (! empty($metadata[$key])) {
-                $this->dailyNote($stay, (int) $metadata[$key], $field, $lock);
+            if (array_key_exists($key, $metadata) && $metadata[$key] !== null) {
+                $metadata[$key] = $this->dailyNote(
+                    $stay,
+                    (int) $metadata[$key],
+                    $field,
+                    $lock,
+                )->id;
             }
         }
-        if (! empty($metadata['restraint_event_id'])) {
-            $this->restraint($stay, (int) $metadata['restraint_event_id'], $field, $lock);
+        if (array_key_exists('restraint_event_id', $metadata) && $metadata['restraint_event_id'] !== null) {
+            $metadata['restraint_event_id'] = $this->restraint(
+                $stay,
+                (int) $metadata['restraint_event_id'],
+                $field,
+                $lock,
+            )->id;
         }
-        if (! empty($metadata['behaviour_support_plan_id'])) {
-            if ($requireCurrentPlans) {
-                $this->currentPlan($stay, (int) $metadata['behaviour_support_plan_id'], $field, $lock);
-            } else {
-                $this->boundPlan($stay, (int) $metadata['behaviour_support_plan_id'], $field, $lock);
-            }
+        if (array_key_exists('behaviour_support_plan_id', $metadata) && $metadata['behaviour_support_plan_id'] !== null) {
+            $plan = $requireCurrentPlans
+                ? $this->currentPlan($stay, (int) $metadata['behaviour_support_plan_id'], $field, $lock)
+                : $this->boundPlan($stay, (int) $metadata['behaviour_support_plan_id'], $field, $lock);
+            $metadata['behaviour_support_plan_id'] = $plan->id;
         }
 
         return $metadata;
@@ -480,6 +508,44 @@ class RespiteStayScope
             })
             ->where(function (Builder $plans): void {
                 $plans->whereNull('review_date')->orWhereDate('review_date', '>=', today());
+            });
+    }
+
+    /**
+     * @param  array<int, string>  $siteBypassPermissions
+     */
+    private function applyStayScope(
+        Builder $query,
+        ?User $user,
+        array $siteBypassPermissions,
+        bool $requireClientPermission,
+    ): Builder {
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, $siteBypassPermissions);
+        if (! $user || $siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->whereHas('client', function (Builder $clients) use ($siteIds, $user, $requireClientPermission): void {
+                $clients->whereIn('site_id', $siteIds);
+
+                if (! $requireClientPermission || $user->canDo('clients.viewAny')) {
+                    return;
+                }
+                if (! $user->canDo('clients.viewAssigned')) {
+                    $clients->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $clients->whereHas('supportWorkers', fn (Builder $workers) => $workers->whereKey($user->id));
+            })
+            ->whereHas('booking', function (Builder $bookings) use ($siteIds): void {
+                $bookings
+                    ->whereColumn('respite_bookings.client_id', 'respite_stays.client_id')
+                    ->where(function (Builder $locations) use ($siteIds): void {
+                        $locations->whereNull('location_id')->orWhereIn('location_id', $siteIds);
+                    });
             });
     }
 }

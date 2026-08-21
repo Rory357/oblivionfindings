@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RespiteStay extends Model
@@ -34,7 +35,6 @@ class RespiteStay extends Model
         'bed_hold_reason',
         'bed_hold_until',
         'cultural_support_notes',
-        'evidence_pack_id',
         'created_by',
         'updated_by',
     ];
@@ -63,9 +63,9 @@ class RespiteStay extends Model
         return $this->belongsTo(Client::class);
     }
 
-    public function evidencePack(): BelongsTo
+    public function evidencePack(): HasOne
     {
-        return $this->belongsTo(RespiteEvidencePack::class, 'evidence_pack_id');
+        return $this->hasOne(RespiteEvidencePack::class, 'stay_id');
     }
 
     public function handovers(): HasMany
