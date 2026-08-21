@@ -19,9 +19,24 @@ class AlertsEventsController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.events.view'), 403);
-        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
-        $eventScope = fn () => DeviceEvent::query()
-            ->whereIn('device_id', clone $visibleDeviceIds);
+        $eventScope = fn () => $this->access->applyTemporalEventCustodyScope(
+            DeviceEvent::query(),
+            $user,
+        );
+
+        $forcedDeviceId = null;
+        if ($request->filled('device_id')) {
+            $forcedDeviceId = filter_var(
+                $request->input('device_id'),
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]],
+            );
+            abort_if($forcedDeviceId === false, 404);
+            abort_unless(
+                $eventScope()->where('device_id', $forcedDeviceId)->exists(),
+                404,
+            );
+        }
 
         // ── Stats ─────────────────────────────────────────────────
 
@@ -54,8 +69,8 @@ class AlertsEventsController extends Controller
         }
 
         // Specific device filter.
-        if ($request->filled('device_id')) {
-            $query->where('device_id', (int) $request->input('device_id'));
+        if ($forcedDeviceId !== null) {
+            $query->where('device_id', $forcedDeviceId);
         }
 
         // Source filter.

@@ -580,6 +580,12 @@ class SecurityDevicesAccessService
             return $query->whereRaw('1 = 0');
         }
 
+        $query->whereExists(fn ($device) => $device
+            ->selectRaw('1')
+            ->from('devices as canonical_event_device')
+            ->whereColumn('canonical_event_device.id', $deviceColumn)
+            ->whereNull('canonical_event_device.deleted_at'));
+
         return $query->where(function (Builder $custody) use (
             $siteIds,
             $targetTypes,
@@ -587,9 +593,7 @@ class SecurityDevicesAccessService
             $occurredAtColumn,
             $user,
         ): void {
-            $effectiveAssignment = function ($assignment, bool $authorised) use (
-                $siteIds,
-                $targetTypes,
+            $effectiveAssignment = function ($assignment) use (
                 $deviceColumn,
                 $occurredAtColumn,
             ): void {
@@ -601,15 +605,40 @@ class SecurityDevicesAccessService
                         $window->whereNull('custody_history.released_at')
                             ->orWhereColumn('custody_history.released_at', '>', $occurredAtColumn);
                     });
-                if ($authorised) {
-                    $assignment->whereIn('custody_history.custody_site_id', $siteIds)
-                        ->whereIn('custody_history.assignable_type', $targetTypes);
-                }
             };
 
-            $custody->whereExists(fn ($assignment) => $effectiveAssignment($assignment, true));
+            $custody->where(function (Builder $assigned) use (
+                $effectiveAssignment,
+                $siteIds,
+                $targetTypes,
+            ): void {
+                $assigned->whereExists(function ($assignment) use (
+                    $effectiveAssignment,
+                    $siteIds,
+                    $targetTypes,
+                ): void {
+                    $effectiveAssignment($assignment);
+                    $assignment->whereIn('custody_history.custody_site_id', $siteIds)
+                        ->whereIn('custody_history.assignable_type', $targetTypes);
+                })->whereNotExists(function ($assignment) use (
+                    $effectiveAssignment,
+                    $siteIds,
+                    $targetTypes,
+                ): void {
+                    $effectiveAssignment($assignment);
+                    $assignment->where(function ($unauthorised) use ($siteIds, $targetTypes): void {
+                        $unauthorised->whereNull('custody_history.custody_site_id')
+                            ->orWhereNotIn('custody_history.custody_site_id', $siteIds)
+                            ->orWhereNotIn('custody_history.assignable_type', $targetTypes);
+                    });
+                });
+            });
+
+            // A custody-free observation is unknown/quarantined history. It is
+            // deliberately available only to the explicit all-Sites plus
+            // unassigned-stock authority represented by canViewQuarantined().
             if ($this->canViewQuarantined($user)) {
-                $custody->orWhereNotExists(fn ($assignment) => $effectiveAssignment($assignment, false));
+                $custody->orWhereNotExists(fn ($assignment) => $effectiveAssignment($assignment));
             }
         });
     }

@@ -2,9 +2,14 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -366,6 +371,289 @@ class AlertsEventsControllerTest extends TestCase
         });
     }
 
+    public function test_rows_stats_vocabularies_search_and_forced_device_follow_occurred_at_custody_after_transfer(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $viewerA = $this->siteViewer($siteA, ['securityDevices.events.view']);
+        $viewerB = $this->siteViewer($siteB, ['securityDevices.events.view']);
+        $device = Device::factory()->create(['name' => 'Transferred sensor']);
+        $transferAt = now()->subHours(2)->startOfSecond();
+
+        $this->siteAssignment($device, $siteA, now()->subHours(6), $transferAt);
+        $this->siteAssignment($device, $siteB, $transferAt);
+
+        $eventA = DeviceEvent::query()->create([
+            'device_id' => $device->id,
+            'event_type' => 'site_a_only_event',
+            'severity' => 'critical',
+            'source' => 'site-a-private-source',
+            'occurred_at' => $transferAt->copy()->subHour(),
+        ]);
+        $eventB = DeviceEvent::query()->create([
+            'device_id' => $device->id,
+            'event_type' => 'site_b_only_event',
+            'severity' => 'warning',
+            'source' => 'site-b-private-source',
+            'occurred_at' => $transferAt->copy()->addHour(),
+        ]);
+
+        $responseA = $this->actingAs($viewerA)
+            ->get('/security-devices/alerts-events?search=site_a_only');
+        $responseA->assertOk()->assertInertia(function ($page) use ($eventA): void {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(1, $props['stats']['total24h']);
+            $this->assertSame(1, $props['stats']['critical24h']);
+            $this->assertSame(0, $props['stats']['warning24h']);
+            $this->assertSame(1, $props['stats']['unprocessed']);
+            $this->assertSame(1, $props['events']['meta']['total']);
+            $this->assertSame([$eventA->id], collect($props['events']['data'])->pluck('id')->all());
+            $this->assertSame(['site_a_only_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['site-a-private-source'], $props['filterOptions']['sources']);
+        });
+        $responseA->assertDontSee('site_b_only_event')->assertDontSee('site-b-private-source');
+
+        $this->actingAs($viewerA)
+            ->get("/security-devices/alerts-events?device_id={$device->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('events.meta.total', 1)
+                ->where('events.data.0.id', $eventA->id));
+
+        $responseB = $this->actingAs($viewerB)
+            ->get("/security-devices/alerts-events?device_id={$device->id}");
+        $responseB->assertOk()->assertInertia(function ($page) use ($eventB): void {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(1, $props['stats']['total24h']);
+            $this->assertSame(0, $props['stats']['critical24h']);
+            $this->assertSame(1, $props['stats']['warning24h']);
+            $this->assertSame(1, $props['stats']['unprocessed']);
+            $this->assertSame([$eventB->id], collect($props['events']['data'])->pluck('id')->all());
+            $this->assertSame(['site_b_only_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['site-b-private-source'], $props['filterOptions']['sources']);
+        });
+        $responseB->assertDontSee('site_a_only_event')->assertDontSee('site-a-private-source');
+    }
+
+    public function test_temporal_custody_is_applied_before_pagination_totals(): void
+    {
+        $visibleSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
+        $viewer = $this->siteViewer($visibleSite, ['securityDevices.events.view']);
+        $visibleDevice = Device::factory()->create();
+        $foreignDevice = Device::factory()->create();
+        $occurredAt = now()->subHour()->startOfSecond();
+
+        $this->siteAssignment($visibleDevice, $visibleSite, now()->subDay());
+        $this->siteAssignment($foreignDevice, $foreignSite, now()->subDay());
+
+        for ($index = 1; $index <= 51; $index++) {
+            DeviceEvent::query()->create([
+                'device_id' => $visibleDevice->id,
+                'event_type' => 'visible-page-event',
+                'severity' => 'info',
+                'source' => 'visible-page-source',
+                'occurred_at' => $occurredAt->copy()->addSeconds($index),
+            ]);
+        }
+        DeviceEvent::query()->create([
+            'device_id' => $foreignDevice->id,
+            'event_type' => 'foreign-page-event',
+            'severity' => 'critical',
+            'source' => 'foreign-page-source',
+            'occurred_at' => $occurredAt,
+        ]);
+
+        $response = $this->actingAs($viewer)->get('/security-devices/alerts-events?page=2');
+
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->where('stats.total24h', 51)
+            ->where('stats.critical24h', 0)
+            ->where('stats.unprocessed', 51)
+            ->where('events.meta.current_page', 2)
+            ->where('events.meta.last_page', 2)
+            ->where('events.meta.total', 51)
+            ->has('events.data', 1)
+            ->where('events.data.0.event_type', 'visible-page-event'));
+        $response->assertDontSee('foreign-page-event')->assertDontSee('foreign-page-source');
+    }
+
+    public function test_no_site_fails_closed_and_global_scope_never_replaces_the_events_action(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $deviceA = Device::factory()->create();
+        $deviceB = Device::factory()->create();
+        $this->siteAssignment($deviceA, $siteA, now()->subDay());
+        $this->siteAssignment($deviceB, $siteB, now()->subDay());
+        DeviceEvent::query()->create([
+            'device_id' => $deviceA->id,
+            'event_type' => 'global-site-a-event',
+            'severity' => 'info',
+            'source' => 'global-site-a-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+        DeviceEvent::query()->create([
+            'device_id' => $deviceB->id,
+            'event_type' => 'global-site-b-event',
+            'severity' => 'warning',
+            'source' => 'global-site-b-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+
+        $actionOnly = $this->permissionViewer(['securityDevices.events.view']);
+        $this->actingAs($actionOnly)
+            ->get('/security-devices/alerts-events')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total24h', 0)
+                ->where('stats.warning24h', 0)
+                ->where('events.meta.total', 0)
+                ->has('filterOptions.eventTypes', 0)
+                ->has('filterOptions.sources', 0));
+
+        $globalOnly = $this->permissionViewer(['securityDevices.devices.viewAllSites']);
+        $this->actingAs($globalOnly)
+            ->get('/security-devices/alerts-events')
+            ->assertForbidden();
+
+        $globalWithAction = $this->permissionViewer([
+            'securityDevices.devices.viewAllSites',
+            'securityDevices.events.view',
+        ]);
+        $this->actingAs($globalWithAction)
+            ->get('/security-devices/alerts-events')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total24h', 2)
+                ->where('stats.warning24h', 1)
+                ->where('stats.unprocessed', 2)
+                ->where('events.meta.total', 2));
+    }
+
+    public function test_foreign_missing_malformed_and_mixed_custody_forced_device_ids_are_concealed(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $viewerA = $this->siteViewer($siteA, ['securityDevices.events.view']);
+        $viewerB = $this->siteViewer($siteB, ['securityDevices.events.view']);
+        $foreignDevice = Device::factory()->create();
+        $mixedDevice = Device::factory()->create();
+        $deletedDevice = Device::factory()->create();
+        $assignedAt = now()->subDay();
+
+        $this->siteAssignment($foreignDevice, $siteB, $assignedAt);
+        $this->siteAssignment($mixedDevice, $siteA, $assignedAt);
+        $this->siteAssignment($mixedDevice, $siteB, $assignedAt);
+        $this->siteAssignment($deletedDevice, $siteA, $assignedAt);
+        DeviceEvent::query()->create([
+            'device_id' => $foreignDevice->id,
+            'event_type' => 'foreign-direct-secret',
+            'severity' => 'critical',
+            'source' => 'foreign-direct-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+        DeviceEvent::query()->create([
+            'device_id' => $mixedDevice->id,
+            'event_type' => 'mixed-custody-secret',
+            'severity' => 'critical',
+            'source' => 'mixed-custody-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+        DeviceEvent::query()->create([
+            'device_id' => $deletedDevice->id,
+            'event_type' => 'deleted-device-secret',
+            'severity' => 'critical',
+            'source' => 'deleted-device-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+        $deletedDevice->delete();
+
+        foreach ([$foreignDevice->id, $mixedDevice->id, $deletedDevice->id, 999999999] as $concealedId) {
+            $this->actingAs($viewerA)
+                ->get("/security-devices/alerts-events?device_id={$concealedId}")
+                ->assertNotFound();
+        }
+        $this->actingAs($viewerA)
+            ->get('/security-devices/alerts-events?device_id=not-an-id')
+            ->assertNotFound();
+        $this->actingAs($viewerB)
+            ->get("/security-devices/alerts-events?device_id={$mixedDevice->id}")
+            ->assertNotFound();
+
+        $response = $this->actingAs($viewerA)->get('/security-devices/alerts-events');
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->where('stats.total24h', 0)
+            ->where('stats.critical24h', 0)
+            ->where('events.meta.total', 0)
+            ->has('filterOptions.eventTypes', 0)
+            ->has('filterOptions.sources', 0));
+        $response->assertDontSee('foreign-direct-secret')
+            ->assertDontSee('foreign-direct-source')
+            ->assertDontSee('mixed-custody-secret')
+            ->assertDontSee('mixed-custody-source')
+            ->assertDontSee('deleted-device-secret')
+            ->assertDontSee('deleted-device-source');
+    }
+
+    public function test_quarantine_history_requires_explicit_unknown_stock_authority_without_erasing_owned_history(): void
+    {
+        $site = Site::factory()->create();
+        $siteViewer = $this->siteViewer($site, ['securityDevices.events.view']);
+        $historicalDevice = Device::factory()->create(['status' => DeviceStatus::Quarantined]);
+        $unknownDevice = Device::factory()->create(['status' => DeviceStatus::Quarantined]);
+        $releasedAt = now()->subHours(2)->startOfSecond();
+        $this->siteAssignment($historicalDevice, $site, now()->subDay(), $releasedAt);
+        $ownedEvent = DeviceEvent::query()->create([
+            'device_id' => $historicalDevice->id,
+            'event_type' => 'owned-before-quarantine',
+            'severity' => 'warning',
+            'source' => 'owned-quarantine-source',
+            'occurred_at' => $releasedAt->copy()->subHour(),
+        ]);
+        DeviceEvent::query()->create([
+            'device_id' => $unknownDevice->id,
+            'event_type' => 'unknown-quarantine-event',
+            'severity' => 'critical',
+            'source' => 'unknown-quarantine-source',
+            'occurred_at' => now()->subHour(),
+        ]);
+
+        $siteResponse = $this->actingAs($siteViewer)->get('/security-devices/alerts-events');
+        $siteResponse->assertOk()->assertInertia(fn ($page) => $page
+            ->where('stats.total24h', 1)
+            ->where('stats.critical24h', 0)
+            ->where('events.meta.total', 1)
+            ->where('events.data.0.id', $ownedEvent->id));
+        $siteResponse->assertDontSee('unknown-quarantine-event')->assertDontSee('unknown-quarantine-source');
+
+        $globalWithoutUnknownStock = $this->permissionViewer([
+            'securityDevices.devices.viewAllSites',
+            'securityDevices.events.view',
+        ]);
+        $this->actingAs($globalWithoutUnknownStock)
+            ->get('/security-devices/alerts-events')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total24h', 1)
+                ->where('events.meta.total', 1));
+
+        $globalWithUnknownStock = $this->permissionViewer([
+            'securityDevices.devices.viewAllSites',
+            'securityDevices.devices.viewUnassigned',
+            'securityDevices.events.view',
+        ]);
+        $this->actingAs($globalWithUnknownStock)
+            ->get('/security-devices/alerts-events')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total24h', 2)
+                ->where('stats.critical24h', 1)
+                ->where('events.meta.total', 2));
+    }
+
     // ── Events ordered newest first ───────────────────────────────
 
     public function test_events_ordered_newest_first(): void
@@ -388,5 +676,50 @@ class AlertsEventsControllerTest extends TestCase
             $this->assertEquals($newer->id, $data[0]['id']);
             $this->assertEquals($older->id, $data[1]['id']);
         });
+    }
+
+    /** @param list<string> $permissions */
+    private function siteViewer(Site $site, array $permissions): User
+    {
+        $viewer = $this->permissionViewer($permissions);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+
+        return $viewer;
+    }
+
+    /** @param list<string> $permissions */
+    private function permissionViewer(array $permissions): User
+    {
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $permissionModels = Permission::query()->whereIn('key', $permissions)->get();
+        $this->assertCount(count($permissions), $permissionModels, 'A required permission was not seeded.');
+        $viewer->permissionOverrides()->syncWithoutDetaching(
+            $permissionModels->mapWithKeys(fn (Permission $permission): array => [
+                $permission->id => ['allowed' => true],
+            ]),
+        );
+
+        return $viewer;
+    }
+
+    private function siteAssignment(
+        Device $device,
+        Site $site,
+        \DateTimeInterface $assignedAt,
+        ?\DateTimeInterface $releasedAt = null,
+    ): DeviceAssignment {
+        return DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'custody_site_id' => $site->id,
+            'assigned_at' => $assignedAt,
+            'released_at' => $releasedAt,
+        ]);
     }
 }
