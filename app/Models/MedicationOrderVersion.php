@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicationOrderVersion extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'client_medication_id',
@@ -52,7 +52,7 @@ class MedicationOrderVersion extends Model
         'dose_times' => 'array',
         'start_date' => 'date',
         'end_date' => 'date',
-        'ceased_at' => 'date',
+        'ceased_at' => 'datetime',
         'paused_at' => 'datetime',
         'changed_at' => 'datetime',
         'is_prn' => 'boolean',
@@ -80,6 +80,17 @@ class MedicationOrderVersion extends Model
         return $this->belongsTo(User::class, 'changed_by');
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function (): never {
+            throw new \LogicException('Medication order version evidence is immutable.');
+        });
+
+        static::deleting(function (): never {
+            throw new \LogicException('Medication order version evidence is immutable.');
+        });
+    }
+
     /**
      * Get formatted dose display
      */
@@ -88,6 +99,7 @@ class MedicationOrderVersion extends Model
         if ($this->dose_amount && $this->dose_unit) {
             return "{$this->dose_amount} {$this->dose_unit}";
         }
+
         return $this->dosage ?? '—';
     }
 

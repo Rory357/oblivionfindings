@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { DiscontinueDialog } from '@/pages/emar/_dialogs';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -66,6 +67,10 @@ export default function ClientMedical({
     const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
+    const [medicationToDiscontinue, setMedicationToDiscontinue] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
 
     // When navigating from the client profile "Manage" buttons, we pass a section.
     // This keeps the medical workflow focused instead of showing every create form at once.
@@ -767,21 +772,23 @@ export default function ClientMedical({
                                             >
                                                 View in eMAR
                                             </Button>
-                                            {can_edit && (
-                                                <Button
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                        medForm.delete(
-                                                            `/clients/${client.id}/medical/medications/${m.id}`,
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        )
-                                                    }
-                                                >
-                                                    Remove
-                                                </Button>
-                                            )}
+                                            {can_edit &&
+                                                m.state !== 'ceased' &&
+                                                !m.ceased_at && (
+                                                    <Button
+                                                        variant="destructive"
+                                                        onClick={() =>
+                                                            setMedicationToDiscontinue(
+                                                                {
+                                                                    id: m.id,
+                                                                    name: m.name,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Discontinue
+                                                    </Button>
+                                                )}
                                         </div>
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
@@ -1960,6 +1967,14 @@ export default function ClientMedical({
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {medicationToDiscontinue && (
+                <DiscontinueDialog
+                    medication={medicationToDiscontinue}
+                    action={`/clients/${client.id}/medical/medications/${medicationToDiscontinue.id}/discontinue`}
+                    onClose={() => setMedicationToDiscontinue(null)}
+                />
             )}
 
             <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>

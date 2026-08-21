@@ -98,7 +98,7 @@ class ClientMedication extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'review_date' => 'date',
-        'ceased_at' => 'date',
+        'ceased_at' => 'datetime',
         'paused_at' => 'datetime',
         'verified_at' => 'datetime',
         'superseded_at' => 'datetime',
@@ -383,6 +383,13 @@ class ClientMedication extends Model
             && $this->isVerifiedForAdministration();
     }
 
+    protected static function booted(): void
+    {
+        static::deleting(function (): never {
+            throw new \LogicException('Medication orders are retained; discontinue the order instead.');
+        });
+    }
+
     /**
      * Check if medication has expired
      */
@@ -588,33 +595,6 @@ class ClientMedication extends Model
         ]);
 
         return $history;
-    }
-
-    /**
-     * Cease this medication
-     */
-    public function cease(string $reason, ?int $ceasedBy = null): void
-    {
-        $this->state = 'ceased';
-        $this->ceased_at = now();
-        $this->ceased_reason = $reason;
-        $this->active = false;
-        $this->save();
-
-        // Create version record for audit
-        MedicationOrderVersion::create([
-            'client_medication_id' => $this->id,
-            'client_id' => $this->client_id,
-            'version_number' => ($this->version ?? 1) + 1,
-            'name' => $this->name,
-            'dosage' => $this->dosage,
-            'state' => 'ceased',
-            'ceased_at' => $this->ceased_at,
-            'ceased_reason' => $reason,
-            'change_reason' => 'Medication ceased: '.$reason,
-            'changed_by' => $ceasedBy,
-            'changed_at' => now(),
-        ]);
     }
 
     /**

@@ -42,6 +42,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
@@ -73,6 +74,7 @@ class EmarController extends Controller
         protected MedicationScanVerificationService $scanVerificationService,
         protected MedsBoardPayloadService $boardPayload,
         protected MedicationScopeDecisionService $medicationScope,
+        protected MedicationOrderLifecycleService $medicationOrderLifecycle,
     ) {}
 
     // ─── Helpers ──────────────────────────────────────────
@@ -4955,36 +4957,20 @@ class EmarController extends Controller
     {
         // A documented reason for ceasing an order is required — an undocumented
         // cessation is a governance gap in NZ medication practice.
-        $request->validate([
-            'reason' => 'required|string|max:500',
+        $validated = $request->validate([
+            'reason' => ['bail', 'required', 'string', 'max:255'],
         ]);
 
         $user = $request->user();
         abort_unless($user, 403);
 
-        return $this->medicationScope->forMedication(
+        $this->medicationOrderLifecycle->discontinue(
             $user,
             $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $user) {
-                $scope->medication->update([
-                    'state' => 'ceased',
-                    'active' => false,
-                    'end_date' => now()->toDateString(),
-                    'ceased_reason' => $request->reason,
-                    'ceased_at' => now(),
-                    'ceased_by' => $user->id,
-                ]);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'ceased_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back();
-            },
-            true,
+            $validated['reason'],
         );
+
+        return redirect()->back()->with('success', 'Medication discontinued successfully.');
     }
 
     // ─── Controlled Drug Entry CRUD ──────────────────────

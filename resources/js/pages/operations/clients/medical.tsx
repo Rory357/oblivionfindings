@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { DiscontinueDialog } from '@/pages/emar/_dialogs';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -96,6 +97,10 @@ export default function ClientMedical({
     const [showAdminForm, setShowAdminForm] = useState(false);
     const [showStockForm, setShowStockForm] = useState(false);
     const [editingProfile, setEditingProfile] = useState(false);
+    const [medicationToDiscontinue, setMedicationToDiscontinue] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
 
     // When navigating from the client profile "Manage" buttons, we pass a section.
     // This keeps the medical workflow focused instead of showing every create form at once.
@@ -1679,23 +1684,25 @@ export default function ClientMedical({
                                                         </span>
                                                     )}
                                                 </div>
-                                                {can_edit && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
-                                                        onClick={() =>
-                                                            medForm.delete(
-                                                                `/operations/clients/${client.id}/medical/medications/${m.id}`,
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            )
-                                                        }
-                                                    >
-                                                        Remove
-                                                    </Button>
-                                                )}
+                                                {can_edit &&
+                                                    m.state !== 'ceased' &&
+                                                    !m.ceased_at && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                            onClick={() =>
+                                                                setMedicationToDiscontinue(
+                                                                    {
+                                                                        id: m.id,
+                                                                        name: m.name,
+                                                                    },
+                                                                )
+                                                            }
+                                                        >
+                                                            Discontinue
+                                                        </Button>
+                                                    )}
                                             </div>
                                             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                                 {m.dosage && (
@@ -3342,6 +3349,14 @@ export default function ClientMedical({
                     </div>
                 )}
             </PageLayout>
+
+            {medicationToDiscontinue && (
+                <DiscontinueDialog
+                    medication={medicationToDiscontinue}
+                    action={`/operations/clients/${client.id}/medical/medications/${medicationToDiscontinue.id}/discontinue`}
+                    onClose={() => setMedicationToDiscontinue(null)}
+                />
+            )}
 
             <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>
                 <DialogContent>

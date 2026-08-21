@@ -82,7 +82,11 @@ class ClientMedicationAdministration extends Model
 
     public function medication()
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        // Administrations are immutable historical evidence. Resolve the
+        // narrow legacy case where their parent order was soft-deleted before
+        // medication deletion was retired, without widening any live-order
+        // query to include deleted medications.
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function shift()

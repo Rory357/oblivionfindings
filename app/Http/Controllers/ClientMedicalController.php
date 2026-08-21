@@ -16,6 +16,7 @@ use App\Models\ServiceContext;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
@@ -260,18 +261,24 @@ class ClientMedicalController extends Controller
             'pharmacy' => ['nullable', 'string', 'max:255'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
-            'ceased_at' => ['nullable', 'date'],
-            'ceased_reason' => ['nullable', 'string', 'max:255'],
-            'state' => ['nullable', 'in:active,paused,ceased'],
+            'ceased_at' => ['prohibited'],
+            'ceased_reason' => ['prohibited'],
+            'state' => ['nullable', 'in:active,paused'],
             'paused_at' => ['nullable', 'date'],
             'instructions' => ['nullable', 'string'],
             'active' => ['sometimes', 'boolean'],
         ]);
 
+        if (($data['active'] ?? null) === false && ($data['state'] ?? null) !== 'paused') {
+            throw ValidationException::withMessages([
+                'state' => 'Use Discontinue and record a reason to cease this medication.',
+            ]);
+        }
+
         if (! empty($data['state'])) {
             $data['active'] = $data['state'] === 'active';
         } else {
-            $data['state'] = ($data['active'] ?? true) ? 'active' : 'ceased';
+            $data['state'] = 'active';
         }
 
         try {
@@ -770,51 +777,50 @@ class ClientMedicalController extends Controller
         return back()->with('success', 'Discrepancy closed.');
     }
 
-    public function destroyMedication(Request $request, Client $client, ClientMedication $medication)
+    public function discontinueMedication(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
         $user = $request->user();
-        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.orders.manage') ?? false), 403);
+        abort_unless(
+            ($user?->canDo('medications.view') ?? false)
+            && (($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.orders.manage') ?? false)),
+            403,
+        );
+
+        $data = $request->validate([
+            'reason' => ['bail', 'required', 'string', 'max:255'],
+        ]);
+
         try {
-            return app(MedicationScopeDecisionService::class)->forMedication(
+            $discontinued = app(MedicationOrderLifecycleService::class)->discontinue(
                 $user,
                 $medication,
-                now(),
-                function (MedicationScopeDecision $scope) use ($request, $client) {
-                    abort_unless(
-                        (int) $scope->client->id === (int) $client->id,
-                        404,
-                        'The requested medication action is not available.',
-                    );
-
-                    $scope->medication->delete();
-                    app(NotificationService::class)->notifyCrud(
-                        $request->user(),
-                        'deleted',
-                        'medication',
-                        $scope->medication,
-                        $scope->client,
-                        [
-                            'title' => 'Medication removed: '.($scope->medication->name ?? 'Medication'),
-                            'url' => url("/clients/{$scope->client->id}/medical"),
-                        ],
-                    );
-                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
-                        $scope,
-                        'deleted_medication_order',
-                        'Medication '.$scope->medication->id,
-                    );
-
-                    return back()->with('success', 'Medication removed successfully.');
-                },
-                submittedClientId: (int) $client->id,
+                $data['reason'],
+                (int) $client->id,
             );
+
+            try {
+                app(NotificationService::class)->notifyCrud(
+                    $user,
+                    'updated',
+                    'medication',
+                    $discontinued,
+                    $client,
+                    [
+                        'title' => 'Medication discontinued: '.($discontinued->name ?? 'Medication'),
+                        'url' => url("/clients/{$client->id}/medical"),
+                    ],
+                );
+            } catch (\Throwable $notificationFailure) {
+                report($notificationFailure);
+            }
+
+            return back()->with('success', 'Medication discontinued successfully.');
         } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
             throw $e;
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->with('error', 'Failed to remove medication. No changes were saved.');
+            return back()->with('error', 'Failed to discontinue medication. No changes were saved.');
         }
     }
 

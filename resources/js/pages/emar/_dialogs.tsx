@@ -1141,13 +1141,15 @@ export function MedicationDetailDialog({
 export function DiscontinueDialog({
     medication,
     onClose,
+    action,
 }: {
-    medication: MedRow;
+    medication: Pick<MedRow, 'id' | 'name'>;
     onClose: () => void;
+    action?: string;
 }) {
     const form = useForm({ reason: '' });
     const submit = () => {
-        form.post(`/emar/medications/${medication.id}/discontinue`, {
+        form.post(action ?? `/emar/medications/${medication.id}/discontinue`, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Medication discontinued');

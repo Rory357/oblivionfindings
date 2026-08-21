@@ -314,9 +314,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.medical.medications.store');
         Route::put('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'updateMedication'])
             ->name('operations.clients.medical.medications.update');
-        Route::delete('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'destroyMedication'])
-            ->name('operations.clients.medical.medications.destroy');
-
         // Medical conditions
         Route::post('/clients/{client}/medical/conditions', [ClientMedicalController::class, 'storeCondition'])
             ->name('operations.clients.medical.conditions.store');
@@ -566,6 +563,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.clients.excursions.destroy');
 
     // Medication stock updates
+    Route::post('/clients/{client}/medical/medications/{medication}/discontinue', [ClientMedicalController::class, 'discontinueMedication'])
+        ->middleware('permission:clients.update|medications.orders.manage')
+        ->name('operations.clients.medical.medications.discontinue');
+
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
         ->middleware('permission:medications.stock.update|medications.controlled.record|clients.update')
         ->name('operations.clients.medical.medications.stock.update');

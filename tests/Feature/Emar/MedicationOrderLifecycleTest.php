@@ -1,0 +1,760 @@
+<?php
+
+namespace Tests\Feature\Emar;
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
+use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationOrderVersion;
+use App\Models\Permission;
+use App\Models\ServiceContext;
+use App\Models\Shift;
+use App\Models\Site;
+use App\Models\User;
+use App\Services\Medication\MedicationOrderLifecycleService;
+use App\Services\NotificationService;
+use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use LogicException;
+use RuntimeException;
+use Symfony\Component\Process\Process;
+use Tests\TestCase;
+
+class MedicationOrderLifecycleTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Site $site;
+
+    private ServiceContext $serviceContext;
+
+    private Client $client;
+
+    private User $manager;
+
+    private Shift $shift;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create();
+        $this->serviceContext = ServiceContext::factory()->create([
+            'name' => 'Medication lifecycle test context',
+            'type' => 'residential',
+            'is_active' => true,
+        ]);
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+        ]);
+        $this->manager = $this->scopedUser([
+            'medications.view',
+            'clients.viewAny',
+            'clients.update',
+            'reports.viewAny',
+        ]);
+        $this->shift = $this->activeShift($this->manager, $this->client);
+
+        $notification = \Mockery::mock(NotificationService::class);
+        $notification->shouldReceive('notifyCrud')->zeroOrMoreTimes()->andReturnNull();
+        $this->app->instance(NotificationService::class, $notification);
+    }
+
+    public function test_emar_and_both_profile_paths_use_the_same_reasoned_retained_lifecycle(): void
+    {
+        $emarManager = $this->scopedUser([
+            'medications.view',
+            'medications.orders.manage',
+        ]);
+        $this->activeShift($emarManager, $this->client);
+        $actions = [
+            [fn (ClientMedication $medication): string => "/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", $this->manager],
+            [fn (ClientMedication $medication): string => "/operations/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", $this->manager],
+            [fn (ClientMedication $medication): string => "/emar/medications/{$medication->id}/discontinue", $emarManager],
+        ];
+
+        foreach ($actions as $index => [$action, $actor]) {
+            $medication = $this->medication(['name' => 'Retained order '.($index + 1)]);
+
+            $this->actingAs($actor)
+                ->post($action($medication), [
+                    'reason' => 'Prescriber confirmed cessation '.($index + 1),
+                ])
+                ->assertRedirect()
+                ->assertSessionHas('success');
+
+            $medication->refresh();
+            $this->assertSame('ceased', $medication->state);
+            $this->assertFalse($medication->active);
+            $this->assertNull($medication->deleted_at);
+            $this->assertSame($actor->id, (int) $medication->ceased_by);
+            $this->assertNotNull($medication->ceased_at);
+            $this->assertDatabaseHas('medication_order_versions', [
+                'client_medication_id' => $medication->id,
+                'version_number' => 2,
+                'state' => 'ceased',
+                'changed_by' => $actor->id,
+            ]);
+            $this->assertDatabaseHas('audit_logs', [
+                'action' => 'medication_order.discontinued',
+                'auditable_id' => $medication->id,
+                'user_id' => $actor->id,
+            ]);
+        }
+    }
+
+    public function test_reason_and_explicit_permission_matrix_fail_closed(): void
+    {
+        $medication = $this->medication();
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => '   ',
+            ])
+            ->assertSessionHasErrors('reason');
+
+        $viewer = $this->scopedUser(['medications.view', 'clients.viewAny']);
+        $this->activeShift($viewer, $this->client);
+        $this->actingAs($viewer)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'Viewer must not cease orders',
+            ])
+            ->assertForbidden();
+
+        $clientEditor = $this->scopedUser(['clients.viewAny', 'clients.update']);
+        $this->activeShift($clientEditor, $this->client);
+        $this->actingAs($clientEditor)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'Client editor without medication view must not cease orders',
+            ])
+            ->assertForbidden();
+
+        $ordersManager = $this->scopedUser([
+            'medications.view',
+            'clients.viewAny',
+            'medications.orders.manage',
+        ]);
+        $this->activeShift($ordersManager, $this->client);
+        $this->actingAs($ordersManager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'Order manager confirmed cessation',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame($ordersManager->id, (int) $medication->fresh()->ceased_by);
+    }
+
+    public function test_wrong_client_site_and_assignment_are_denied_without_mutation(): void
+    {
+        $otherClient = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+        ]);
+        $otherMedication = $this->medication(['client_id' => $otherClient->id]);
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$otherMedication->id}/discontinue", [
+                'reason' => 'Forged resident identifier',
+            ])
+            ->assertNotFound();
+
+        $otherSite = Site::factory()->create();
+        $siteClient = Client::factory()->create([
+            'site_id' => $otherSite->id,
+            'service_context_id' => $this->serviceContext->id,
+        ]);
+        $siteMedication = $this->medication(['client_id' => $siteClient->id]);
+        $this->actingAs($this->manager)
+            ->post("/clients/{$siteClient->id}/medical/medications/{$siteMedication->id}/discontinue", [
+                'reason' => 'Wrong Site attempt',
+            ])
+            ->assertNotFound();
+
+        $unassigned = $this->scopedUser([
+            'medications.view',
+            'clients.viewAny',
+            'medications.orders.manage',
+        ]);
+        $this->actingAs($unassigned)
+            ->post("/clients/{$this->client->id}/medical/medications/{$otherMedication->id}/discontinue", [
+                'reason' => 'Wrong order and no assignment',
+            ])
+            ->assertNotFound();
+        $this->actingAs($unassigned)
+            ->post("/clients/{$this->client->id}/medical/medications/{$this->medication()->id}/discontinue", [
+                'reason' => 'No current assignment',
+            ])
+            ->assertForbidden();
+
+        foreach ([$otherMedication, $siteMedication] as $medication) {
+            $this->assertDatabaseHas('client_medications', [
+                'id' => $medication->id,
+                'state' => 'active',
+                'deleted_at' => null,
+            ]);
+        }
+    }
+
+    public function test_explicit_global_site_scope_and_canonical_break_glass_are_positive_paths(): void
+    {
+        $otherSite = Site::factory()->create();
+        $otherClient = Client::factory()->create([
+            'site_id' => $otherSite->id,
+            'service_context_id' => $this->serviceContext->id,
+        ]);
+        $globalUser = $this->scopedUser([
+            'medications.view',
+            'medications.orders.manage',
+            'clinical.accessAllSites',
+        ]);
+        $this->activeShift($globalUser, $otherClient);
+        $globalMedication = $this->medication(['client_id' => $otherClient->id]);
+
+        $this->actingAs($globalUser)
+            ->post("/operations/clients/{$otherClient->id}/medical/medications/{$globalMedication->id}/discontinue", [
+                'reason' => 'Central clinical lead confirmed cessation',
+            ])
+            ->assertRedirect();
+
+        $breakGlassUser = $this->scopedUser([
+            'medications.view',
+            'medications.orders.manage',
+            'medications.breakglass',
+        ]);
+        $breakGlassMedication = $this->medication();
+        $access = ClientBreakGlassAccess::query()->create([
+            'client_id' => $this->client->id,
+            'user_id' => $breakGlassUser->id,
+            'reason' => 'Urgent medication order review',
+            'reason_category' => 'Staff absence / cover',
+            'authorization_mode' => 'self',
+            'acknowledged_min_necessary' => true,
+            'acknowledged_incident_report' => true,
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        $this->actingAs($breakGlassUser)
+            ->post("/clients/{$this->client->id}/medical/medications/{$breakGlassMedication->id}/discontinue", [
+                'reason' => 'Emergency prescriber instruction',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('break_glass_access_events', [
+            'break_glass_access_id' => $access->id,
+            'action' => 'ceased_medication_order',
+        ]);
+        $audit = AuditLog::query()
+            ->where('action', 'medication_order.discontinued')
+            ->where('auditable_id', $breakGlassMedication->id)
+            ->firstOrFail();
+        $this->assertSame($access->id, (int) data_get($audit->meta, 'break_glass_access_id'));
+    }
+
+    public function test_discontinuation_retains_administration_stock_controlled_drug_and_version_context(): void
+    {
+        $medication = $this->medication(['controlled_drug' => true]);
+        $administration = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $this->shift->id,
+            'service_context_id' => $this->serviceContext->id,
+            'administered_by' => $this->manager->id,
+            'scheduled_for' => now(),
+            'administered_at' => now(),
+            'status' => 'given',
+            'dose_given' => '1 tablet',
+        ]);
+        $stock = ClientMedicationStock::query()->create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 18,
+            'unit' => 'tablets',
+        ]);
+        $controlled = ClientControlledDrugEntry::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $this->shift->id,
+            'service_context_id' => $this->serviceContext->id,
+            'entry_type' => 'administered',
+            'quantity' => 1,
+            'unit' => 'tablet',
+            'on_hand_before' => 19,
+            'on_hand_after' => 18,
+            'recorded_at' => now(),
+            'recorded_by' => $this->manager->id,
+        ]);
+
+        app(MedicationOrderLifecycleService::class)->discontinue(
+            $this->manager,
+            $medication,
+            'Course completed',
+            $this->client->id,
+        );
+
+        $this->assertDatabaseHas('client_medication_administrations', ['id' => $administration->id]);
+        $this->assertDatabaseHas('client_medication_stocks', ['id' => $stock->id, 'on_hand' => 18]);
+        $this->assertDatabaseHas('client_controlled_drug_entries', ['id' => $controlled->id]);
+        $this->assertSame($medication->id, $administration->fresh()->medication?->id);
+        $this->assertSame($medication->id, $stock->fresh()->medication?->id);
+        $this->assertSame($medication->id, $controlled->fresh()->medication?->id);
+        $this->assertCount(1, $medication->fresh()->versions);
+    }
+
+    public function test_legacy_soft_deleted_parent_remains_resolvable_in_history_and_export_without_a_fabricated_reason(): void
+    {
+        $medication = $this->medication(['name' => 'Legacy retained administration order']);
+        $administration = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $this->shift->id,
+            'service_context_id' => $this->serviceContext->id,
+            'administered_by' => $this->manager->id,
+            'scheduled_for' => now(),
+            'administered_at' => now(),
+            'status' => 'given',
+            'dose_given' => '1 tablet',
+        ]);
+        DB::table('client_medications')->where('id', $medication->id)->update([
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $historicalOrder = $administration->fresh()->medication;
+        $this->assertNotNull($historicalOrder);
+        $this->assertTrue($historicalOrder->trashed());
+        $this->assertNull($historicalOrder->ceased_reason);
+        $this->assertFalse(ClientMedication::query()->whereKey($medication->id)->exists());
+
+        $csv = $this->actingAs($this->manager)
+            ->get('/emar/reports/export?report_type=administration&client_id='.$this->client->id)
+            ->assertOk()
+            ->streamedContent();
+        $this->assertStringContainsString('Legacy retained administration order', $csv);
+    }
+
+    public function test_replay_and_direct_model_delete_are_fail_closed(): void
+    {
+        $medication = $this->medication();
+        app(MedicationOrderLifecycleService::class)->discontinue(
+            $this->manager,
+            $medication,
+            'First and only cessation',
+            $this->client->id,
+        );
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'Replay attempt',
+            ])
+            ->assertSessionHasErrors('medication');
+        $this->assertDatabaseCount('medication_order_versions', 1);
+
+        try {
+            $medication->fresh()->delete();
+            $this->fail('Medication deletion did not fail closed.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('discontinue', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('client_medications', [
+            'id' => $medication->id,
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_version_and_strict_audit_failures_each_roll_the_order_back(): void
+    {
+        $versionFailure = $this->medication(['name' => 'Version rollback order']);
+        MedicationOrderVersion::creating(static function (MedicationOrderVersion $version) use ($versionFailure): void {
+            if ((int) $version->client_medication_id === (int) $versionFailure->id) {
+                throw new RuntimeException('Injected version evidence failure');
+            }
+        });
+
+        try {
+            app(MedicationOrderLifecycleService::class)->discontinue(
+                $this->manager,
+                $versionFailure,
+                'Must roll back on version failure',
+                $this->client->id,
+            );
+            $this->fail('Version failure did not escape the transaction.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected version evidence failure', $exception->getMessage());
+        }
+
+        $this->assertOrderStillActive($versionFailure);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'medication_order.discontinued',
+            'auditable_id' => $versionFailure->id,
+        ]);
+
+        $auditFailure = $this->medication(['name' => 'Audit rollback order']);
+        AuditLog::creating(static function (): never {
+            throw new RuntimeException('Injected strict audit failure');
+        });
+
+        try {
+            app(MedicationOrderLifecycleService::class)->discontinue(
+                $this->manager,
+                $auditFailure,
+                'Must roll back on audit failure',
+                $this->client->id,
+            );
+            $this->fail('Audit failure did not escape the transaction.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected strict audit failure', $exception->getMessage());
+        }
+
+        $this->assertOrderStillActive($auditFailure);
+        $this->assertDatabaseMissing('medication_order_versions', [
+            'client_medication_id' => $auditFailure->id,
+        ]);
+    }
+
+    public function test_version_evidence_cannot_be_updated_or_deleted(): void
+    {
+        $medication = $this->medication();
+        app(MedicationOrderLifecycleService::class)->discontinue(
+            $this->manager,
+            $medication,
+            'Immutable evidence test',
+            $this->client->id,
+        );
+        $version = MedicationOrderVersion::query()->where('client_medication_id', $medication->id)->firstOrFail();
+
+        foreach (['update', 'delete'] as $operation) {
+            try {
+                if ($operation === 'update') {
+                    $version->update(['change_reason' => 'Tampered']);
+                } else {
+                    $version->delete();
+                }
+                $this->fail("Medication version {$operation} did not fail closed.");
+            } catch (LogicException $exception) {
+                $this->assertStringContainsString('immutable', $exception->getMessage());
+            }
+        }
+
+        $this->assertDatabaseHas('medication_order_versions', [
+            'id' => $version->id,
+            'change_reason' => 'Medication discontinued: Immutable evidence test',
+        ]);
+    }
+
+    public function test_two_process_discontinue_race_creates_exactly_one_cessation(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+        $medication = $this->medication(['name' => 'Concurrent discontinue order']);
+        $database = $connection->getDatabaseName();
+        $token = Str::uuid()->toString();
+        $readyPaths = [
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."med-order-stop-a-{$token}",
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."med-order-stop-b-{$token}",
+        ];
+        $processes = [];
+        $connection->commit();
+
+        try {
+            $connection->beginTransaction();
+            ClientMedication::query()->whereKey($medication->id)->lockForUpdate()->firstOrFail();
+            foreach ($readyPaths as $index => $readyPath) {
+                $processes[] = $this->startRaceWorker(
+                    'discontinue',
+                    $readyPath,
+                    $database,
+                    $medication,
+                    'Concurrent reason '.($index + 1),
+                );
+            }
+            $this->waitForWorkers($readyPaths);
+            usleep(250_000);
+            $this->assertTrue($processes[0]->isRunning() && $processes[1]->isRunning());
+            $connection->commit();
+
+            $results = array_map(function (Process $process): array {
+                $process->wait();
+                $this->assertTrue($process->isSuccessful(), trim($process->getErrorOutput()));
+
+                return json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            }, $processes);
+
+            $this->assertCount(1, array_filter($results, fn (array $result): bool => $result['success']));
+            $this->assertCount(1, array_filter($results, fn (array $result): bool => ! $result['success']));
+            $this->assertSame('ceased', $medication->fresh()->state);
+            $this->assertSame(1, MedicationOrderVersion::query()->where('client_medication_id', $medication->id)->count());
+            $this->assertSame(1, AuditLog::query()->where('action', 'medication_order.discontinued')->where('auditable_id', $medication->id)->count());
+        } finally {
+            $this->finishCommittedRace($connection, $processes, $readyPaths);
+        }
+    }
+
+    public function test_administration_waiting_behind_discontinue_lock_fails_after_revalidation(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+        $actionAt = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
+        $medication = $this->medication([
+            'name' => 'Administration race order',
+            'dose_times' => [$actionAt->format('H:i')],
+            'start_date' => $actionAt->copy()->subMonth()->toDateString(),
+        ]);
+        $database = $connection->getDatabaseName();
+        $readyPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'med-order-admin-'.Str::uuid();
+        $process = null;
+        $connection->commit();
+
+        try {
+            $connection->beginTransaction();
+            ClientMedication::query()->whereKey($medication->id)->lockForUpdate()->firstOrFail();
+            $process = $this->startRaceWorker(
+                'administer',
+                $readyPath,
+                $database,
+                $medication,
+                $actionAt->toIso8601String(),
+            );
+            $this->waitForWorkers([$readyPath]);
+            usleep(250_000);
+            $this->assertTrue($process->isRunning());
+
+            app(MedicationOrderLifecycleService::class)->discontinue(
+                $this->manager,
+                $medication,
+                'Stopped while administration was waiting',
+                $this->client->id,
+            );
+            $connection->commit();
+
+            $process->wait();
+            $this->assertTrue($process->isSuccessful(), trim($process->getErrorOutput()));
+            $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertFalse($result['success']);
+            // The post-lock reload sees active=false. Canonical schedule-cell
+            // resolution therefore conceals the now-unavailable order before
+            // the later active-state validator can return 422.
+            $this->assertSame(404, $result['status']);
+            $this->assertDatabaseMissing('client_medication_administrations', [
+                'client_medication_id' => $medication->id,
+            ]);
+            $this->assertSame('ceased', $medication->fresh()->state);
+        } finally {
+            $this->finishCommittedRace($connection, array_filter([$process]), [$readyPath]);
+        }
+    }
+
+    private function medication(array $overrides = []): ClientMedication
+    {
+        return ClientMedication::query()->create(array_merge([
+            'client_id' => $this->client->id,
+            'created_by' => $this->manager->id,
+            'name' => 'Lifecycle medication order',
+            'dosage' => '1 tablet',
+            'frequency' => 'Once daily',
+            'dose_times' => [now()->format('H:i')],
+            'start_date' => today()->subMonth(),
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ], $overrides));
+    }
+
+    /** @param  array<int, string>  $permissions */
+    private function scopedUser(array $permissions): User
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $ids = Permission::query()->whereIn('key', $permissions)->pluck('id');
+        $user->permissionOverrides()->sync(
+            $ids->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all(),
+        );
+        $user->unsetRelation('permissionOverrides');
+        $user->unsetRelation('roles');
+
+        return $user;
+    }
+
+    private function activeShift(User $user, Client $client): Shift
+    {
+        return Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'created_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    private function assertOrderStillActive(ClientMedication $medication): void
+    {
+        $fresh = $medication->fresh();
+        $this->assertSame('active', $fresh->state);
+        $this->assertTrue($fresh->active);
+        $this->assertNull($fresh->ceased_at);
+        $this->assertNull($fresh->ceased_by);
+        $this->assertNull($fresh->deleted_at);
+    }
+
+    private function startRaceWorker(
+        string $mode,
+        string $readyPath,
+        string $database,
+        ClientMedication $medication,
+        string $argument,
+    ): Process {
+        $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$performer = App\Models\User::query()->findOrFail((int) $argv[3]);
+$client = App\Models\Client::query()->findOrFail((int) $argv[4]);
+$medication = App\Models\ClientMedication::query()->findOrFail((int) $argv[5]);
+file_put_contents($argv[6], 'ready');
+try {
+    if ($argv[2] === 'discontinue') {
+        $app->make(App\Services\Medication\MedicationOrderLifecycleService::class)->discontinue(
+            $performer,
+            $medication,
+            $argv[7],
+            $client->id,
+        );
+    } else {
+        $actionAt = Carbon\Carbon::parse($argv[7]);
+        $app->make(App\Services\Medication\MedicationScopeDecisionService::class)->forAdministration(
+            $performer,
+            $client,
+            $medication,
+            $actionAt,
+            $actionAt,
+            null,
+            null,
+            function (App\Services\Medication\MedicationScopeDecision $scope) use ($actionAt): void {
+                App\Models\ClientMedicationAdministration::query()->create([
+                    'client_id' => $scope->client->id,
+                    'client_medication_id' => $scope->medication->id,
+                    'shift_id' => $scope->shiftId(),
+                    'service_context_id' => $scope->client->service_context_id,
+                    'administered_by' => $scope->performer->id,
+                    'scheduled_for' => $actionAt,
+                    'administered_at' => $actionAt,
+                    'status' => 'given',
+                    'dose_given' => '1 tablet',
+                ]);
+            },
+        );
+    }
+    echo json_encode(['success' => true, 'status' => 200], JSON_THROW_ON_ERROR);
+} catch (Illuminate\Validation\ValidationException $exception) {
+    echo json_encode(['success' => false, 'status' => 422, 'errors' => $exception->errors()], JSON_THROW_ON_ERROR);
+} catch (Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+    echo json_encode(['success' => false, 'status' => $exception->getStatusCode()], JSON_THROW_ON_ERROR);
+}
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $worker,
+            base_path(),
+            $mode,
+            (string) $this->manager->id,
+            (string) $this->client->id,
+            (string) $medication->id,
+            $readyPath,
+            $argument,
+        ], base_path(), [
+            'APP_ENV' => 'testing',
+            'DB_CONNECTION' => 'mysql',
+            'DB_DATABASE' => $database,
+            'CACHE_STORE' => 'array',
+            'QUEUE_CONNECTION' => 'sync',
+            'SESSION_DRIVER' => 'array',
+        ]);
+        $process->setTimeout(30);
+        $process->start();
+
+        return $process;
+    }
+
+    /** @param  array<int, string>  $paths */
+    private function waitForWorkers(array $paths): void
+    {
+        $deadline = microtime(true) + 15;
+        while (array_filter($paths, fn (string $path): bool => ! is_file($path)) !== []) {
+            if (microtime(true) >= $deadline) {
+                throw new RuntimeException('Timed out waiting for the medication lifecycle race workers.');
+            }
+            usleep(10_000);
+        }
+    }
+
+    /**
+     * @param  array<int, Process>  $processes
+     * @param  array<int, string>  $readyPaths
+     */
+    private function finishCommittedRace($connection, array $processes, array $readyPaths): void
+    {
+        while ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
+        foreach ($processes as $process) {
+            if ($process->isRunning()) {
+                $process->stop(1);
+            }
+        }
+        foreach ($readyPaths as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        DB::table('break_glass_access_events')->whereIn(
+            'break_glass_access_id',
+            DB::table('client_break_glass_accesses')->where('client_id', $this->client->id)->select('id'),
+        )->delete();
+        DB::table('client_break_glass_accesses')->where('client_id', $this->client->id)->delete();
+        DB::table('audit_logs')->where('client_id', $this->client->id)->delete();
+        DB::table('client_controlled_drug_entries')->where('client_id', $this->client->id)->delete();
+        DB::table('client_medication_stocks')->whereIn(
+            'client_medication_id',
+            DB::table('client_medications')->where('client_id', $this->client->id)->select('id'),
+        )->delete();
+        DB::table('client_medication_administrations')->where('client_id', $this->client->id)->delete();
+        DB::table('medication_order_versions')->where('client_id', $this->client->id)->delete();
+        DB::table('shifts')->where('client_id', $this->client->id)->delete();
+        DB::table('client_user')->where('client_id', $this->client->id)->delete();
+        DB::table('client_medications')->where('client_id', $this->client->id)->delete();
+        DB::table('clients')->where('id', $this->client->id)->delete();
+        DB::table('permission_user')->where('user_id', $this->manager->id)->delete();
+        DB::table('hr_employee_profiles')->where('user_id', $this->manager->id)->delete();
+        DB::table('users')->where('id', $this->manager->id)->delete();
+        DB::table('sites')->where('id', $this->site->id)->delete();
+        DB::table('service_contexts')->where('id', $this->serviceContext->id)->delete();
+
+        $connection->beginTransaction();
+    }
+}

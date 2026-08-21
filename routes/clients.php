@@ -128,9 +128,6 @@ Route::middleware(['auth'])->group(function () {
             ->name('clients.medical.medications.store');
         Route::put('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'updateMedication'])
             ->name('clients.medical.medications.update');
-        Route::delete('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'destroyMedication'])
-            ->name('clients.medical.medications.destroy');
-
         // Medical conditions
         Route::post('/clients/{client}/medical/conditions', [ClientMedicalController::class, 'storeCondition'])
             ->name('clients.medical.conditions.store');
@@ -167,6 +164,10 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/clients/{client}/assessments/{assessment}', [ClientAssessmentController::class, 'destroy'])
             ->name('clients.assessments.destroy');
     });
+
+    Route::post('/clients/{client}/medical/medications/{medication}/discontinue', [ClientMedicalController::class, 'discontinueMedication'])
+        ->middleware('permission:clients.update|medications.orders.manage')
+        ->name('clients.medical.medications.discontinue');
 
     // Client assignments
     Route::middleware('permission:clients.assignments.update')->group(function () {

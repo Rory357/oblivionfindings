@@ -813,30 +813,51 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  10. MEDICATION CRUD - Delete
+    //  10. MEDICATION ORDER LIFECYCLE - legacy delete is retired
     // ══════════════════════════════════════════════════════════════
 
-    public function test_destroy_medication_requires_authentication(): void
+    public function test_legacy_destroy_medication_paths_fail_closed(): void
     {
         $med = $this->createMedication();
+
+        $this->actingAs($this->admin);
+
+        $operationsPath = "/operations/clients/{$this->client->id}/medical/medications/{$med->id}";
+
         $this->delete("/clients/{$this->client->id}/medical/medications/{$med->id}")
-            ->assertRedirect('/login');
+            ->assertRedirect($operationsPath);
+
+        $this->delete($operationsPath)->assertStatus(405);
+
+        $this->assertDatabaseHas('client_medications', [
+            'id' => $med->id,
+            'deleted_at' => null,
+        ]);
     }
 
-    public function test_destroy_medication_removes_record(): void
+    public function test_discontinue_medication_retires_order_without_deleting_it(): void
     {
         $this->mockNotificationService();
         $med = $this->createMedication();
 
         $this->actingAs($this->admin)
-            ->delete("/clients/{$this->client->id}/medical/medications/{$med->id}")
+            ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
+                'reason' => 'Prescriber stopped treatment',
+            ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertSoftDeleted('client_medications', ['id' => $med->id]);
+        $this->assertDatabaseHas('client_medications', [
+            'id' => $med->id,
+            'state' => 'ceased',
+            'active' => false,
+            'ceased_reason' => 'Prescriber stopped treatment',
+            'ceased_by' => $this->admin->id,
+            'deleted_at' => null,
+        ]);
     }
 
-    public function test_destroy_medication_returns_404_for_mismatched_client(): void
+    public function test_discontinue_medication_returns_404_for_mismatched_client(): void
     {
         $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $med = ClientMedication::create([
@@ -847,16 +868,20 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/clients/{$this->client->id}/medical/medications/{$med->id}")
+            ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
+                'reason' => 'Wrong resident attempt',
+            ])
             ->assertNotFound();
     }
 
-    public function test_destroy_medication_forbidden_for_support_worker(): void
+    public function test_discontinue_medication_forbidden_for_support_worker(): void
     {
         $med = $this->createMedication();
 
         $this->actingAs($this->supportWorker)
-            ->delete("/clients/{$this->client->id}/medical/medications/{$med->id}")
+            ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
+                'reason' => 'Not authorized',
+            ])
             ->assertForbidden();
     }
 
@@ -2574,11 +2599,8 @@ class MedicationControllerTest extends TestCase
         $med = $this->createMedication();
 
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => $med->name,
-                'state' => 'ceased',
-                'ceased_at' => now()->format('Y-m-d'),
-                'ceased_reason' => 'No longer required',
+            ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
+                'reason' => 'No longer required',
             ])
             ->assertRedirect();
 
@@ -2883,13 +2905,10 @@ class MedicationControllerTest extends TestCase
             ])
             ->assertRedirect();
 
-        // 5. Cease medication
+        // 5. Discontinue medication through the governed lifecycle action.
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => 'Lifecycle Med',
-                'state' => 'ceased',
-                'ceased_at' => now()->format('Y-m-d'),
-                'ceased_reason' => 'No longer needed',
+            ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/discontinue", [
+                'reason' => 'No longer needed',
             ])
             ->assertRedirect();
 
@@ -2897,12 +2916,19 @@ class MedicationControllerTest extends TestCase
         $this->assertEquals('ceased', $med->state);
         $this->assertFalse($med->active);
 
-        // 6. Delete medication
+        // 6. Legacy delete remains fail-closed and the ceased order remains.
+        $operationsPath = "/operations/clients/{$this->client->id}/medical/medications/{$med->id}";
+
         $this->actingAs($this->admin)
             ->delete("/clients/{$this->client->id}/medical/medications/{$med->id}")
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertRedirect($operationsPath);
 
-        $this->assertSoftDeleted('client_medications', ['id' => $med->id]);
+        $this->delete($operationsPath)->assertStatus(405);
+
+        $this->assertDatabaseHas('client_medications', [
+            'id' => $med->id,
+            'state' => 'ceased',
+            'deleted_at' => null,
+        ]);
     }
 }

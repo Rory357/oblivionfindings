@@ -11,6 +11,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationRound;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\UserSiteAccessService;
@@ -196,6 +197,9 @@ class MedicationScopeDecisionService
                 $client !== null
                 && ($submittedClientId === null || (int) $client->id === $submittedClientId)
             );
+            $siteId = $this->clientSiteId($client);
+            $site = Site::query()->whereKey($siteId)->lockForUpdate()->first();
+            $this->notFoundUnless($site !== null && (int) $site->id === $siteId);
             [$shift, $breakGlass] = $this->resolveClientAuthority($performer, $client, $actionAt, null);
             if ($requireAdministrable) {
                 $this->assertMedicationIsActiveFor($medication, $actionAt);
