@@ -20,6 +20,7 @@ class RespiteDailyNoteController extends Controller
 {
     public function __construct(
         private readonly RespiteStayScope $stayScope,
+        private readonly IncidentJourneyService $incidentJourneys,
     ) {}
 
     public function index(Request $request): Response
@@ -101,10 +102,10 @@ class RespiteDailyNoteController extends Controller
 
         $note = DB::transaction(function () use ($request, $validated): RespiteDailyNote {
             $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $validated['stay_id'], true);
-            $this->stayScope->assertSubmittedClient($stay, $validated['client_id']);
+            $this->stayScope->assertSubmittedClient($stay, $validated['client_id'], null);
 
-            if (! empty($validated['linked_incident_id'])) {
-                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], 'linked_incident_id', true);
+            if (array_key_exists('linked_incident_id', $validated) && $validated['linked_incident_id'] !== null) {
+                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], null, true);
             }
 
             $attributes = $validated;
@@ -196,8 +197,8 @@ class RespiteDailyNoteController extends Controller
                 'concerns', 'incident_occurred', 'sensitive_flag',
             ]);
 
-            if (! empty($validated['linked_incident_id'])) {
-                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], 'linked_incident_id', true);
+            if (array_key_exists('linked_incident_id', $validated) && $validated['linked_incident_id'] !== null) {
+                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], null, true);
             }
 
             $attributes = $validated;
@@ -374,8 +375,7 @@ class RespiteDailyNoteController extends Controller
             ],
         ]);
 
-        $journey = app(IncidentJourneyService::class)
-            ->ensureForSubmittedIncident($incident, $actor);
+        $journey = $this->incidentJourneys->ensureForSubmittedIncident($incident, $actor);
 
         $note->forceFill([
             'linked_incident_id' => $journey->incident->id,

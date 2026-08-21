@@ -186,6 +186,13 @@ class RespiteEvidencePackController extends Controller
             'description' => 'nullable|string|max:1000',
             'file_path' => 'nullable|string|max:500',
             'metadata' => 'nullable|array',
+            'metadata.incident_id' => 'nullable|integer',
+            'metadata.linked_incident_id' => 'nullable|integer',
+            'metadata.related_incident_id' => 'nullable|integer',
+            'metadata.daily_note_id' => 'nullable|integer',
+            'metadata.note_id' => 'nullable|integer',
+            'metadata.restraint_event_id' => 'nullable|integer',
+            'metadata.behaviour_support_plan_id' => 'nullable|integer',
         ]);
 
         $added = DB::transaction(function () use ($request, $evidencePack, $validated): bool {
@@ -208,7 +215,7 @@ class RespiteEvidencePackController extends Controller
                 'metadata' => $this->stayScope->normalizeEvidenceMetadata(
                     $stay,
                     $validated['metadata'] ?? null,
-                    'metadata',
+                    null,
                     true,
                 ),
                 'added_at' => now()->toIso8601String(),

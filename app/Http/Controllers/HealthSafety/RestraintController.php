@@ -476,16 +476,19 @@ class RestraintController extends Controller
         ]);
 
         $event = DB::transaction(function () use ($request, $validated): RestraintEvent {
-            $stay = ! empty($validated['stay_id'])
-                ? $this->stayScope->lockCanonicalStay((int) $validated['stay_id'])
+            $stay = array_key_exists('stay_id', $validated) && $validated['stay_id'] !== null
+                ? $this->stayScope->resolveAuthorizedHealthSafetyStay(
+                    $request,
+                    (int) $validated['stay_id'],
+                    true,
+                )
                 : null;
             if ($stay) {
-                $client = $this->resolveAccessibleClient($request, (int) $stay->client_id);
+                $client = $stay->client;
                 $siteId = $this->stayScope->siteId($stay);
-                $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
-                $this->stayScope->assertSubmittedClient($stay, $validated['client_id']);
+                $this->stayScope->assertSubmittedClient($stay, $validated['client_id'], null);
                 if (array_key_exists('site_id', $validated)) {
-                    $this->stayScope->assertSubmittedSite($stay, $validated['site_id']);
+                    $this->stayScope->assertSubmittedSite($stay, $validated['site_id'], null);
                 }
             } else {
                 $client = $this->resolveAccessibleClient($request, (int) $validated['client_id']);
@@ -494,12 +497,13 @@ class RestraintController extends Controller
                 $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
             }
 
-            $planId = ! empty($validated['behaviour_support_plan_id'])
+            $planId = array_key_exists('behaviour_support_plan_id', $validated)
+                && $validated['behaviour_support_plan_id'] !== null
                 ? (int) $validated['behaviour_support_plan_id']
                 : null;
 
             if ($stay && $planId !== null) {
-                $planId = $this->stayScope->currentPlan($stay, $planId, 'behaviour_support_plan_id', true)->id;
+                $planId = $this->stayScope->currentPlan($stay, $planId, null, true)->id;
             } elseif ($stay && ($validated['within_support_plan'] ?? true)) {
                 $planId = $this->stayScope->currentPlanId($stay, true);
             } elseif ($planId !== null || ($validated['within_support_plan'] ?? true)) {
@@ -524,8 +528,11 @@ class RestraintController extends Controller
                 $planId = $plan?->id;
             }
 
-            if ($stay && ! empty($validated['related_incident_id'])) {
-                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], 'related_incident_id', true);
+            if ($stay
+                && array_key_exists('related_incident_id', $validated)
+                && $validated['related_incident_id'] !== null
+            ) {
+                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], null, true);
             } else {
                 $this->assertIncidentAtEventContext(
                     $request,

@@ -17,6 +17,7 @@ use App\Models\RestraintEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -86,7 +87,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 'incident_occurred' => true,
                 'concerns' => 'This must not create a mismatched incident.',
             ]))
-            ->assertSessionHasErrors('client_id');
+            ->assertNotFound();
 
         $this->assertSame($resident->id, $stay->client_id);
         $this->assertDatabaseCount('respite_daily_notes', 0);
@@ -112,7 +113,13 @@ class RespiteScopeIntegrityTest extends TestCase
                 'linked_incident_id' => $foreignIncident->id,
                 'incident_occurred' => true,
             ]))
-            ->assertSessionHasErrors('linked_incident_id');
+            ->assertNotFound();
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.daily-notes.store'), $this->dailyNotePayload($stay, $resident, [
+                'linked_incident_id' => 999999999,
+                'incident_occurred' => true,
+            ]))
+            ->assertNotFound();
 
         $this->assertDatabaseCount('respite_daily_notes', 0);
         $this->assertSame(1, ClientIncident::query()->count());
@@ -145,6 +152,61 @@ class RespiteScopeIntegrityTest extends TestCase
         Event::assertDispatchedTimes(RespiteEvent::class, 1);
     }
 
+    public function test_daily_note_store_rolls_back_when_derived_incident_journey_fails(): void
+    {
+        Event::fake([RespiteEvent::class]);
+        Notification::fake();
+        [$stay, $resident] = $this->stayAt($this->site, true);
+        $this->failIncidentJourneyAfterRealEffects();
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.daily-notes.store'), $this->dailyNotePayload($stay, $resident, [
+                'incident_occurred' => true,
+                'concerns' => 'This write must roll back in full.',
+            ]))
+            ->assertStatus(500);
+
+        $this->assertDatabaseCount('respite_daily_notes', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('respite_audit_logs', 0);
+        Event::assertNotDispatched(RespiteEvent::class);
+        Notification::assertNothingSent();
+    }
+
+    public function test_daily_note_update_rolls_back_when_derived_incident_journey_fails(): void
+    {
+        Event::fake([RespiteEvent::class]);
+        Notification::fake();
+        [$stay, $resident] = $this->stayAt($this->site, true);
+        $note = RespiteDailyNote::factory()->create([
+            'stay_id' => $stay->id,
+            'client_id' => $resident->id,
+            'incident_occurred' => false,
+            'concerns' => null,
+        ]);
+        $this->failIncidentJourneyAfterRealEffects();
+
+        $this->actingAs($this->coordinator)
+            ->put(route('respite.daily-notes.update', $note), [
+                'incident_occurred' => true,
+                'concerns' => 'This update must roll back in full.',
+            ])
+            ->assertStatus(500);
+
+        $note->refresh();
+        $this->assertFalse($note->incident_occurred);
+        $this->assertNull($note->concerns);
+        $this->assertNull($note->linked_incident_id);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('respite_audit_logs', 0);
+        Event::assertNotDispatched(RespiteEvent::class);
+        Notification::assertNothingSent();
+    }
+
     public function test_restraint_rejects_foreign_or_expired_plan_and_mismatched_incident_before_creation(): void
     {
         Event::fake([RespiteEvent::class]);
@@ -160,7 +222,7 @@ class RespiteScopeIntegrityTest extends TestCase
             ->post(route('respite.stays.restraints.store', $stay), $this->restraintPayload([
                 'behaviour_support_plan_id' => $foreignPlan->id,
             ]))
-            ->assertSessionHasErrors('behaviour_support_plan_id');
+            ->assertNotFound();
 
         $expiredPlan = BehaviourSupportPlan::factory()->create([
             'client_id' => $resident->id,
@@ -171,7 +233,7 @@ class RespiteScopeIntegrityTest extends TestCase
             ->post(route('respite.stays.restraints.store', $stay), $this->restraintPayload([
                 'behaviour_support_plan_id' => $expiredPlan->id,
             ]))
-            ->assertSessionHasErrors('behaviour_support_plan_id');
+            ->assertNotFound();
 
         $currentPlan = $this->currentPlan($resident);
         [$otherStay] = $this->stayAt($this->site, true, $resident);
@@ -185,7 +247,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 'behaviour_support_plan_id' => $currentPlan->id,
                 'related_incident_id' => $otherIncident->id,
             ]))
-            ->assertSessionHasErrors('related_incident_id');
+            ->assertNotFound();
 
         $this->assertDatabaseCount('restraint_events', 0);
         Event::assertNotDispatched(RespiteEvent::class);
@@ -205,7 +267,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 'site_id' => $this->site->id,
                 'stay_id' => $stay->id,
             ]))
-            ->assertSessionHasErrors('client_id');
+            ->assertNotFound();
 
         $this->actingAs($this->coordinator)
             ->post(route('health-safety.restraints.events.store'), $this->restraintPayload([
@@ -214,7 +276,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 'stay_id' => $stay->id,
                 'behaviour_support_plan_id' => $foreignPlan->id,
             ]))
-            ->assertSessionHasErrors('behaviour_support_plan_id');
+            ->assertNotFound();
 
         $this->actingAs($this->coordinator)
             ->post(route('health-safety.restraints.events.store'), $this->restraintPayload([
@@ -271,19 +333,19 @@ class RespiteScopeIntegrityTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->get(route('respite.stays.show', $foreignStay))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->get(route('respite.stays.show', $foreignLocationStay))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->get(route('respite.daily-notes.show', $foreignNote))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->get(route('respite.evidence-packs.show', $foreignPack))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->get(route('respite.evidence-packs.export', $foreignPack))
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->get(route('respite.evidence-packs.show', $mismatchedPack))
             ->assertNotFound();
@@ -292,13 +354,13 @@ class RespiteScopeIntegrityTest extends TestCase
                 'stay_id' => $foreignStay->id,
                 'summary' => 'Must not be created',
             ])
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->post(
                 route('respite.daily-notes.store'),
                 $this->dailyNotePayload($foreignLocationStay, $accessibleResident),
             )
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->coordinator)
             ->post(route('respite.stays.incidents.store', $foreignStay), [
                 'type' => 'privacy',
@@ -310,7 +372,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 'notification_authority' => 'privacy_commissioner',
                 'incident_type' => 'privacy_breach',
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertDatabaseCount('client_incidents', 0);
         $this->assertDatabaseCount('hs_events', 0);
@@ -323,6 +385,32 @@ class RespiteScopeIntegrityTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_client_view_permission_does_not_bypass_stay_site_scope_without_explicit_global_access(): void
+    {
+        [$accessibleStay, $resident] = $this->stayAt($this->site, true);
+        [$foreignLocationStay] = $this->stayAt($this->foreignSite, true, $resident);
+        $role = $this->coordinator->roles()->firstOrFail();
+        $role->permissions()->syncWithoutDetaching(
+            Permission::query()->where('key', 'clients.viewAny')->pluck('id'),
+        );
+
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.stays.show', $accessibleStay))
+            ->assertOk();
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.stays.show', $foreignLocationStay))
+            ->assertNotFound();
+
+        $role->permissions()->syncWithoutDetaching(
+            Permission::query()->where('key', 'sites.viewAll')->pluck('id'),
+        );
+        $globalCoordinator = $this->coordinator->fresh();
+
+        $this->actingAs($globalCoordinator)
+            ->get(route('respite.stays.show', $foreignLocationStay))
+            ->assertOk();
+    }
+
     public function test_evidence_item_rejects_foreign_record_metadata_without_mutation_or_audit(): void
     {
         [$stay, , $booking] = $this->stayAt($this->site, true);
@@ -331,6 +419,51 @@ class RespiteScopeIntegrityTest extends TestCase
             'client_id' => $foreignResident->id,
             'site_id' => $this->foreignSite->id,
             'respite_stay_id' => $foreignStay->id,
+        ]);
+        $foreignPlan = $this->currentPlan($foreignResident);
+        $foreignNote = RespiteDailyNote::factory()->create([
+            'stay_id' => $foreignStay->id,
+            'client_id' => $foreignResident->id,
+        ]);
+        $foreignRestraint = RestraintEvent::factory()->create([
+            'stay_id' => $foreignStay->id,
+            'client_id' => $foreignResident->id,
+            'site_id' => $this->foreignSite->id,
+            'within_support_plan' => false,
+        ]);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'items' => [],
+        ]);
+
+        foreach ([
+            ['incident_id' => $foreignIncident->id],
+            ['daily_note_id' => $foreignNote->id],
+            ['restraint_event_id' => $foreignRestraint->id],
+            ['behaviour_support_plan_id' => $foreignPlan->id],
+        ] as $metadata) {
+            $this->actingAs($this->coordinator)
+                ->post(route('respite.evidence-packs.add-item', $pack), [
+                    'type' => 'note',
+                    'title' => 'Forged respite evidence relation',
+                    'metadata' => $metadata,
+                ])
+                ->assertNotFound();
+        }
+
+        $this->assertSame([], $pack->fresh()->items);
+        $this->assertDatabaseCount('respite_audit_logs', 0);
+    }
+
+    public function test_evidence_item_validates_and_canonicalizes_supplied_relation_ids_before_write(): void
+    {
+        [$stay, $resident, $booking] = $this->stayAt($this->site, true);
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $resident->id,
+            'site_id' => $this->site->id,
+            'respite_stay_id' => $stay->id,
         ]);
         $pack = RespiteEvidencePack::query()->create([
             'stay_id' => $stay->id,
@@ -342,13 +475,26 @@ class RespiteScopeIntegrityTest extends TestCase
         $this->actingAs($this->coordinator)
             ->post(route('respite.evidence-packs.add-item', $pack), [
                 'type' => 'note',
-                'title' => 'Forged incident evidence',
-                'metadata' => ['incident_id' => $foreignIncident->id],
+                'title' => 'Canonical incident relation',
+                'metadata' => ['incident_id' => (string) $incident->id],
             ])
-            ->assertSessionHasErrors('metadata');
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame([], $pack->fresh()->items);
-        $this->assertDatabaseCount('respite_audit_logs', 0);
+        $storedItems = $pack->fresh()->items;
+        $this->assertSame($incident->id, $storedItems[0]['metadata']['incident_id']);
+        $auditCount = RespiteAuditLog::query()->count();
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.add-item', $pack), [
+                'type' => 'note',
+                'title' => 'Malformed relation must not persist',
+                'metadata' => ['incident_id' => ['not-an-id']],
+            ])
+            ->assertSessionHasErrors('metadata.incident_id');
+
+        $this->assertSame($storedItems, $pack->fresh()->items);
+        $this->assertSame($auditCount, RespiteAuditLog::query()->count());
     }
 
     public function test_seal_revalidates_tampered_plan_binding_and_rolls_back_all_seal_side_effects(): void
@@ -514,6 +660,20 @@ class RespiteScopeIntegrityTest extends TestCase
             'developed_at' => today()->subMonth(),
             'review_date' => today()->addMonth(),
         ]);
+    }
+
+    private function failIncidentJourneyAfterRealEffects(): void
+    {
+        $realJourney = app(IncidentJourneyService::class);
+        $this->mock(IncidentJourneyService::class, function ($mock) use ($realJourney): void {
+            $mock->shouldReceive('ensureForSubmittedIncident')
+                ->once()
+                ->andReturnUsing(function (ClientIncident $incident, ?User $actor) use ($realJourney): never {
+                    $realJourney->ensureForSubmittedIncident($incident, $actor);
+
+                    throw new \RuntimeException('Forced failure after derived incident effects.');
+                });
+        });
     }
 
     /** @param array<string,mixed> $overrides
