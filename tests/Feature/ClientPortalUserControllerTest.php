@@ -52,6 +52,7 @@ class ClientPortalUserControllerTest extends TestCase
         $response->assertRedirect();
 
         $user = User::where('email', 'nok.person@example.com')->firstOrFail();
+        $this->assertFalse($user->hasVerifiedEmail());
         $this->assertTrue($user->hasRole('next_of_kin'));
         $this->assertTrue($this->client->portalUsers()->whereKey($user->id)->exists());
         $this->assertEquals('sister', $this->client->portalUsers()->whereKey($user->id)->first()->pivot->relation);

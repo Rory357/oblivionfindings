@@ -37,6 +37,26 @@ test('approved unverified users can authenticate and are challenged at verified 
         ->assertRedirect(route('verification.notice'));
 });
 
+test('suspended account cannot authenticate regardless of email verification state', function (bool $verified) {
+    $user = User::factory()->withoutTwoFactor()->create([
+        'approved_at' => null,
+        'approved_by' => User::factory(),
+        'email_verified_at' => $verified ? now() : null,
+    ]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasErrors([
+        'email' => 'Your account is awaiting approval.',
+    ]);
+
+    $this->assertGuest();
+})->with([
+    'verified mailbox' => true,
+    'unverified mailbox' => false,
+]);
+
 test('unverified portal users retain the explicit auth only portal flow', function () {
     $user = User::factory()->unverified()->create([
         'role' => 'next_of_kin',

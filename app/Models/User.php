@@ -14,6 +14,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -115,6 +116,22 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isApproved(): bool
     {
         return ! is_null($this->approved_at);
+    }
+
+    /**
+     * Dispatch the framework verification notification only when this account
+     * has a usable mailbox. Legacy/system rows without one remain unverified,
+     * while the HTTP resend response stays indistinguishable from a send.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $email = trim((string) $this->getEmailForVerification());
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return;
+        }
+
+        $this->notify(new VerifyEmail);
     }
 
     /**

@@ -49,3 +49,21 @@ test('verification notification resend is throttled', function () {
 
     Notification::assertSentToTimes($user, VerifyEmail::class, 6);
 });
+
+test('missing or malformed legacy mailbox fails without notification or account disclosure', function (string $email) {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create(['email' => $email]);
+
+    $response = $this->actingAs($user)
+        ->post(route('verification.send'));
+
+    $response
+        ->assertRedirect(route('home'))
+        ->assertSessionHas('status', 'verification-link-sent');
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+    Notification::assertNothingSent();
+})->with([
+    'missing mailbox' => '',
+    'malformed mailbox' => 'not-an-email',
+]);

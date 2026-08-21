@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserLoginLog;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -237,7 +238,7 @@ class UsersController extends Controller
             'next_of_kin.is_emergency_contact' => ['boolean'],
         ]);
 
-        DB::transaction(function () use ($data, $user): void {
+        $newUser = DB::transaction(function () use ($data, $user): User {
             $portalRoleName = $data['user_type'] === 'client' ? 'client' : 'next_of_kin';
             $portalRole = Role::query()->where('name', $portalRoleName)->firstOrFail();
             $newUser = User::create([
@@ -276,7 +277,10 @@ class UsersController extends Controller
                 'role_ids' => [$portalRole->id],
             ]);
 
+            return $newUser;
         });
+
+        event(new Registered($newUser));
 
         return redirect()->route('system.users.index')
             ->with('success', 'User created successfully.');
@@ -360,11 +364,16 @@ class UsersController extends Controller
             'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
-        DB::transaction(function () use ($data, $employeeProfile, $target, $user): void {
-            $target->update([
+        $emailChanged = DB::transaction(function () use ($data, $employeeProfile, $target, $user): bool {
+            $target->fill([
                 'name' => $data['name'] ?? $target->name,
                 'email' => $data['email'] ?? $target->email,
             ]);
+            $emailChanged = $target->isDirty('email');
+            if ($emailChanged) {
+                $target->email_verified_at = null;
+            }
+            $target->save();
 
             if ($employeeProfile && array_key_exists('email', $data)) {
                 $employeeProfile->forceFill([
@@ -378,7 +387,13 @@ class UsersController extends Controller
                 $primaryRole = $target->roles()->orderByDesc('level')->first();
                 $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
             }
+
+            return $emailChanged;
         });
+
+        if ($emailChanged) {
+            $target->sendEmailVerificationNotification();
+        }
 
         AuditLogger::log('user.updated', $target, [
             'changed_by' => $user->id,

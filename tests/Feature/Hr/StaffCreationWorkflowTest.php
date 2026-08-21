@@ -133,6 +133,7 @@ test('a deterministic administrator creates exactly one Clinical Lead identity w
         ->and($account->roles()->pluck('name')->all())->toBe(['clinical_lead'])
         ->and($account->approved_at)->not->toBeNull()
         ->and($account->approved_by)->toBe($admin->id)
+        ->and($account->hasVerifiedEmail())->toBeFalse()
         ->and($profile->position_role)->toBe('clinical_lead')
         ->and($profile->primary_site_id)->toBe($primary->id)
         ->and($profile->secondary_site_ids)->toBe([$additional->id])

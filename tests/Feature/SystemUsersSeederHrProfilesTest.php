@@ -17,6 +17,7 @@ test('system users seeder creates hr employee profiles for all seeded staff reco
     foreach ($staffRecords as $staff) {
         $user = $staff->user;
         expect($user)->not()->toBeNull();
+        expect($user->hasVerifiedEmail())->toBeTrue();
 
         $profile = $user->hrEmployeeProfile;
         expect($profile)->not()->toBeNull();

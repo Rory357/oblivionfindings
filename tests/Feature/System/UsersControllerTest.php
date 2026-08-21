@@ -8,8 +8,10 @@ use App\Models\Site;
 use App\Models\Staff;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -104,8 +106,33 @@ class UsersControllerTest extends TestCase
         $this->assertDatabaseMissing('staff', ['employee_id' => 'EMP-9001']);
     }
 
+    public function test_admin_created_portal_account_starts_unverified_and_receives_native_verification(): void
+    {
+        Notification::fake();
+
+        $this->actingAs($this->admin)
+            ->post('/system/users', [
+                'name' => 'Portal Resident',
+                'email' => 'portal.resident@example.test',
+                'password' => 'temporary-pass',
+                'user_type' => 'client',
+                'client' => [
+                    'nhi_number' => 'ZZZ9001',
+                    'first_name' => 'Portal',
+                    'last_name' => 'Resident',
+                ],
+            ])
+            ->assertRedirect(route('system.users.index', absolute: false));
+
+        $created = User::query()->where('email', 'portal.resident@example.test')->sole();
+
+        $this->assertNull($created->email_verified_at);
+        Notification::assertSentToTimes($created, VerifyEmail::class, 1);
+    }
+
     public function test_update_user_writes_audit_log(): void
     {
+        Notification::fake();
         $target = $this->userWithRole('support_worker');
 
         $this->actingAs($this->admin)
@@ -117,6 +144,8 @@ class UsersControllerTest extends TestCase
 
         $target->refresh();
         $this->assertSame('Updated Name', $target->name);
+        $this->assertNull($target->email_verified_at);
+        Notification::assertSentToTimes($target, VerifyEmail::class, 1);
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->admin->id,
             'auditable_type' => $target->getMorphClass(),
@@ -220,6 +249,7 @@ class UsersControllerTest extends TestCase
 
     public function test_update_keeps_canonical_work_email_atomic_with_login_email(): void
     {
+        Notification::fake();
         $target = $this->userWithRole('support_worker');
         $profile = HrEmployeeProfile::factory()->create([
             'user_id' => $target->id,
@@ -237,8 +267,24 @@ class UsersControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('canonical.worker@example.test', $target->refresh()->email);
+        $this->assertNull($target->email_verified_at);
         $this->assertSame('canonical.worker@example.test', $profile->refresh()->work_email);
         $this->assertSame($this->admin->id, $profile->updated_by);
+        Notification::assertSentToTimes($target, VerifyEmail::class, 1);
+    }
+
+    public function test_admin_update_without_email_change_preserves_verification_and_sends_nothing(): void
+    {
+        Notification::fake();
+        $target = $this->userWithRole('support_worker');
+        $verifiedAt = $target->email_verified_at;
+
+        $this->actingAs($this->admin)
+            ->put("/system/users/{$target->id}", ['name' => 'Name Only Change'])
+            ->assertRedirect();
+
+        $this->assertTrue($target->refresh()->email_verified_at->equalTo($verifiedAt));
+        Notification::assertNothingSent();
     }
 
     public function test_session_termination_writes_audit_logs(): void

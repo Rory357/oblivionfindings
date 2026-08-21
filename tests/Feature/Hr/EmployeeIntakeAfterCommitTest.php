@@ -135,7 +135,8 @@ test('intake produces every side effect exactly once only after the outer transa
     expect(HrOnboardingChecklist::query()->where('employee_profile_id', $profile->id)->count())->toBe(1)
         ->and(HrWebhookDelivery::query()->where('event_type', 'employee.created')->count())->toBe(1)
         ->and(HrAutomationRun::query()->where('event_type', 'employee.created')->count())->toBe(1)
-        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe(1);
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe(1)
+        ->and($profile->user->fresh()->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentToTimes($profile->user, ResetPassword::class, 1);
     Queue::assertPushed(DeliverHrWebhookJob::class, 1);
 });
