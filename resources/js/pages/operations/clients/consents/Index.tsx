@@ -51,6 +51,14 @@ const STATUS_STYLES: Record<string, { bg: string; icon: typeof CheckCircle2 }> =
             bg: 'bg-status-warning-bg text-status-warning',
             icon: Clock,
         },
+        governance_review_required: {
+            bg: 'bg-status-warning-bg text-status-warning',
+            icon: AlertTriangle,
+        },
+        informational_acknowledgement: {
+            bg: 'bg-status-info-bg text-status-info',
+            icon: FileCheck,
+        },
     };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -322,9 +330,15 @@ export default function ConsentsIndex({
                             </div>
                             <div className="space-y-2">
                                 {items.map((c: any) => {
-                                    const displayStatus = c.is_expired
-                                        ? 'expired'
-                                        : c.status;
+                                    const displayStatus =
+                                        c.decision_state ===
+                                            'governance_review_required' ||
+                                        c.decision_state ===
+                                            'informational_acknowledgement'
+                                            ? c.decision_state
+                                            : c.is_expired
+                                              ? 'expired'
+                                              : c.status;
                                     const style =
                                         STATUS_STYLES[displayStatus] ??
                                         STATUS_STYLES.given;
@@ -357,9 +371,10 @@ export default function ConsentsIndex({
                                                                 <Badge
                                                                     className={`border-0 text-[10px] capitalize ${style.bg}`}
                                                                 >
-                                                                    {
-                                                                        displayStatus
-                                                                    }
+                                                                    {displayStatus.replace(
+                                                                        /_/g,
+                                                                        ' ',
+                                                                    )}
                                                                 </Badge>
                                                                 {c.capacity_assessed && (
                                                                     <Badge className="border-0 bg-primary/10 text-[10px] text-primary">

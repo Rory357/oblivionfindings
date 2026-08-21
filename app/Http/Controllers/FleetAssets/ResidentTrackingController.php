@@ -527,9 +527,9 @@ class ResidentTrackingController extends Controller
                         (int) $client->id,
                     );
                 },
-                validateLockedConsent: function (?ClientConsent $lockedConsent): void {
+                validateLockedConsent: function (?ClientConsent $lockedConsent) use ($client): void {
                     if (! $lockedConsent
-                        || ! ConsentValidationService::isValidResidentLocationConsent($lockedConsent)) {
+                        || ! ConsentValidationService::isValidResidentLocationConsent($lockedConsent, $client)) {
                         throw new \InvalidArgumentException(
                             'Resident tracking requires an active Personal Tracker (Wandering Risk) consent.',
                         );
@@ -995,15 +995,24 @@ class ResidentTrackingController extends Controller
 
     private function resolveTrackingConsentId(Client $client, ?int $requestedConsentId): int
     {
-        $candidate = $requestedConsentId
-            ? ClientConsent::query()->find($requestedConsentId)
+        $consent = $requestedConsentId
+            ? ClientConsent::query()
+                ->with([
+                    'consentType',
+                    'consentTypeVersion',
+                    'sourceConsentRequest',
+                    'authorityScope.nextOfKin',
+                    'authorityScope.capacityEvidenceConsent',
+                ])
+                ->whereKey($requestedConsentId)
+                ->where('client_id', $client->id)
+                ->first()
             : ConsentValidationService::latestValidResidentLocationConsentForClient($client);
 
-        $consent = $candidate
-            ? $this->validTrackingConsentQuery($client)
-                ->whereKey($candidate->id)
-                ->first()
-            : null;
+        if ($consent
+            && ! ConsentValidationService::isValidResidentLocationConsent($consent, $client)) {
+            $consent = null;
+        }
 
         if (! $consent) {
             throw ValidationException::withMessages([
@@ -1014,27 +1023,6 @@ class ResidentTrackingController extends Controller
         }
 
         return (int) $consent->id;
-    }
-
-    private function validTrackingConsentQuery(Client $client): Builder
-    {
-        return $this->trackingConsentQuery()->where('client_id', $client->id);
-    }
-
-    private function trackingConsentQuery(): Builder
-    {
-        return ClientConsent::query()
-            ->where('status', 'given')
-            ->whereNull('withdrawn_at')
-            ->whereNull('superseded_by_consent_id')
-            ->where('given_at', '<=', now())
-            ->where(function (Builder $expiry): void {
-                $expiry->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->whereHas('consentType', fn (Builder $type): Builder => $type
-                ->where('active', true)
-                ->where('name', 'Personal Tracker (Wandering Risk)'));
     }
 
     private function latestLocateCommandStatus(Device $device): ?string

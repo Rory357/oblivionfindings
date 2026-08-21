@@ -15,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class LocateNowRoutesTest extends TestCase
@@ -172,16 +173,9 @@ class LocateNowRoutesTest extends TestCase
             ],
         );
 
-        return ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'consent_type_version_id' => $version->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, [
             'status' => 'given',
             'given_at' => now(),
-            'given_by_user_id' => $this->admin->id,
-            'given_method' => 'electronic',
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
         ]);
     }
 }

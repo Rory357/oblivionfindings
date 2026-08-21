@@ -256,6 +256,7 @@ class FamilyDashboardController extends Controller
         // Pending consent requests addressed to this portal user
         $pendingConsentRequests = ConsentRequest::query()
             ->forClient($client->id)
+            ->where('site_id', $client->site_id)
             ->forRecipient($user->id)
             ->active()
             ->with(['consentType:id,name,category', 'requestedBy:id,name'])

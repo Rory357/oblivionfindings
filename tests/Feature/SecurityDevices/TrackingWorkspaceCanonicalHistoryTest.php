@@ -10,7 +10,6 @@ use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
 use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Integration\IntegrationEvent;
@@ -24,6 +23,7 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class TrackingWorkspaceCanonicalHistoryTest extends TestCase
@@ -57,16 +57,10 @@ class TrackingWorkspaceCanonicalHistoryTest extends TestCase
             'purpose' => 'Client personal safety tracking',
             'active' => true,
         ]);
-        $consent = ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, $viewer, [
             'status' => 'given',
             'given_at' => now()->subHour(),
-            'given_by_user_id' => $viewer->id,
-            'given_method' => 'written',
             'expires_at' => now()->addMonth(),
-            'created_by' => $viewer->id,
-            'updated_by' => $viewer->id,
         ]);
         $personal = Device::factory()->tracking()->create([
             'name' => 'Synthetic personal tracker',

@@ -21,6 +21,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class TrackingWorkspaceTest extends TestCase
@@ -665,16 +666,10 @@ class TrackingWorkspaceTest extends TestCase
             'active' => true,
         ]);
 
-        return ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, [
             'status' => 'given',
             'given_at' => now()->subHour(),
             'expires_at' => now()->addMonth(),
-            'given_by_user_id' => $this->admin->id,
-            'given_method' => 'written',
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
             ...$attributes,
         ]);
     }

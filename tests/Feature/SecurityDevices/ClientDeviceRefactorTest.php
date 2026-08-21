@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class ClientDeviceRefactorTest extends TestCase
@@ -68,18 +69,16 @@ class ClientDeviceRefactorTest extends TestCase
             'name' => 'Personal Tracker (Wandering Risk)',
             'active' => true,
         ]);
-        $this->trackingConsent = ClientConsent::query()->create([
-            'client_id' => $this->clientA->id,
-            'consent_type_id' => $trackingConsentType->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'expires_at' => now()->addMonth(),
-            'given_by_user_id' => $this->admin->id,
-            'given_by_relationship' => 'staff',
-            'given_method' => 'written',
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
-        ]);
+        $this->trackingConsent = AuthoritativeConsentFixture::manualSelf(
+            $this->clientA,
+            $trackingConsentType,
+            $this->admin,
+            [
+                'status' => 'given',
+                'given_at' => now(),
+                'expires_at' => now()->addMonth(),
+            ],
+        );
     }
 
     // ── Client profile: active tracker appears ────────────────────

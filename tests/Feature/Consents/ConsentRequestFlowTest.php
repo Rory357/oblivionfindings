@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -18,12 +19,12 @@ use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
- * End-to-end coverage of the consent-request → family-portal approve flow.
+ * End-to-end coverage of the consent-request → family-portal response flow.
  *
  * Covers:
  *   - Staff creates request (permission gate, notifications)
  *   - Recipient must be a linked portal user
- *   - Portal user approves → ClientConsent row written + linked
+ *   - Informational next-of-kin acknowledgement is audited without a ClientConsent
  *   - Portal user declines → no consent, staff notified
  *   - Non-recipient cannot respond (403)
  *   - Expired request cannot be responded to
@@ -42,6 +43,8 @@ class ConsentRequestFlowTest extends TestCase
     private Client $client;
 
     private ConsentType $consentType;
+
+    private ConsentTypeVersion $consentTypeVersion;
 
     protected function setUp(): void
     {
@@ -85,6 +88,15 @@ class ConsentRequestFlowTest extends TestCase
         $this->client->portalUsers()->attach($this->familyMember->id, ['relation' => 'next_of_kin']);
 
         $this->consentType = ConsentType::factory()->create();
+        $this->consentTypeVersion = ConsentTypeVersion::query()->create([
+            'consent_type_id' => $this->consentType->id,
+            'version' => $this->consentType->version,
+            'description' => $this->consentType->description,
+            'purpose' => $this->consentType->purpose,
+            'legal_basis' => $this->consentType->legal_basis,
+            'effective_from' => now()->subDay(),
+            'created_by' => $this->staff->id,
+        ]);
     }
 
     public function test_staff_creates_consent_request_and_recipient_is_notified(): void
@@ -119,7 +131,7 @@ class ConsentRequestFlowTest extends TestCase
         $this->assertDatabaseCount('consent_requests', 0);
     }
 
-    public function test_portal_user_approves_and_client_consent_row_is_written(): void
+    public function test_next_of_kin_approval_is_auditable_information_only_and_writes_no_consent(): void
     {
         Notification::fake();
 
@@ -135,18 +147,12 @@ class ConsentRequestFlowTest extends TestCase
 
         $request->refresh();
         $this->assertSame(ConsentRequest::STATUS_APPROVED, $request->status);
-        $this->assertNotNull($request->resulting_consent_id);
+        $this->assertSame(ConsentRequest::DECISION_INFORMATIONAL, $request->decision_kind);
+        $this->assertNull($request->resulting_consent_id);
         $this->assertNotNull($request->responded_at);
-
-        // A ClientConsent was created and linked.
-        $consent = ClientConsent::find($request->resulting_consent_id);
-        $this->assertNotNull($consent);
-        $this->assertSame($this->client->id, $consent->client_id);
-        $this->assertSame('given', $consent->status);
-        $this->assertSame('portal_signature', $consent->evidence_type);
-        $this->assertSame('electronic', $consent->given_method);
-        $this->assertSame($this->familyMember->id, $consent->given_by_user_id);
-        $this->assertSame('next_of_kin', $consent->given_by_relationship);
+        $this->assertSame($this->client->id, $request->decision_evidence['client_id']);
+        $this->assertSame('informational_only', $request->decision_evidence['authority_basis']);
+        $this->assertDatabaseCount('client_consents', 0);
 
         Notification::assertSentTo($this->staff, ConsentRequestRespondedNotification::class);
     }
@@ -298,7 +304,9 @@ class ConsentRequestFlowTest extends TestCase
     {
         return ConsentRequest::factory()->create(array_merge([
             'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
             'consent_type_id' => $this->consentType->id,
+            'consent_type_version_id' => $this->consentTypeVersion->id,
             'requested_by_user_id' => $this->staff->id,
             'recipient_user_id' => $this->familyMember->id,
             'recipient_relationship' => ConsentRequest::RELATION_NEXT_OF_KIN,

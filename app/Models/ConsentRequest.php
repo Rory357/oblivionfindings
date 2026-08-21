@@ -29,6 +29,14 @@ class ConsentRequest extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    public const DECISION_AUTHORITATIVE = 'authoritative_consent';
+
+    public const DECISION_INFORMATIONAL = 'informational_acknowledgement';
+
+    public const DECISION_DECLINED = 'declined';
+
+    public const DECISION_CONTRACT_VERSION = 1;
+
     public const RELATION_SELF = 'client';
 
     public const RELATION_NEXT_OF_KIN = 'next_of_kin';
@@ -87,7 +95,9 @@ class ConsentRequest extends Model
 
     protected $fillable = [
         'client_id',
+        'site_id',
         'consent_type_id',
+        'consent_type_version_id',
         'requested_by_user_id',
         'recipient_user_id',
         'recipient_relationship',
@@ -111,6 +121,8 @@ class ConsentRequest extends Model
         'decision_evidence_revoked_by_user_id',
         'decision_evidence_revoked_at',
         'decision_evidence_revocation_reason',
+        'authority_scope_id',
+        'capacity_evidence_consent_id',
         'triggering_subject_type',
         'triggering_subject_id',
         'purpose',
@@ -127,6 +139,9 @@ class ConsentRequest extends Model
         'response_notes',
         'response_ip_address',
         'response_user_agent',
+        'decision_kind',
+        'decision_contract_version',
+        'decision_evidence',
         'resulting_consent_id',
         'cancelled_by_user_id',
         'cancellation_reason',
@@ -146,6 +161,8 @@ class ConsentRequest extends Model
         'decision_evidence_revoked_at' => 'datetime',
         'retention_period_days' => 'integer',
         'audit_trail' => 'array',
+        'decision_contract_version' => 'integer',
+        'decision_evidence' => 'array',
     ];
 
     // ── Relationships ─────────────────────────────────────────────
@@ -155,9 +172,19 @@ class ConsentRequest extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
     public function consentType(): BelongsTo
     {
         return $this->belongsTo(ConsentType::class);
+    }
+
+    public function consentTypeVersion(): BelongsTo
+    {
+        return $this->belongsTo(ConsentTypeVersion::class);
     }
 
     public function requestedBy(): BelongsTo
@@ -193,6 +220,16 @@ class ConsentRequest extends Model
     public function decisionEvidenceRevoker(): BelongsTo
     {
         return $this->belongsTo(User::class, 'decision_evidence_revoked_by_user_id');
+    }
+
+    public function authorityScope(): BelongsTo
+    {
+        return $this->belongsTo(ConsentAuthorityScope::class);
+    }
+
+    public function capacityEvidenceConsent(): BelongsTo
+    {
+        return $this->belongsTo(ClientConsent::class, 'capacity_evidence_consent_id');
     }
 
     public function triggeringSubject(): MorphTo
@@ -260,8 +297,21 @@ class ConsentRequest extends Model
     public function authorityToConsent(): string
     {
         return $this->authority_next_of_kin_id !== null
+            && $this->authority_scope_id !== null
             && in_array($this->recipient_relationship, self::AUTHORISED_SUBSTITUTE_RELATIONS, true)
             ? 'substitute'
             : ($this->recipient_relationship === self::RELATION_SELF ? 'self' : 'informational_only');
+    }
+
+    public static function recipientRoleMatchesRelationship(User $recipient, ?string $relationship): bool
+    {
+        if ($relationship === self::RELATION_SELF) {
+            return $recipient->hasRole('client');
+        }
+
+        return in_array($relationship, [
+            self::RELATION_NEXT_OF_KIN,
+            ...self::AUTHORISED_SUBSTITUTE_RELATIONS,
+        ], true) && $recipient->hasRole('next_of_kin');
     }
 }

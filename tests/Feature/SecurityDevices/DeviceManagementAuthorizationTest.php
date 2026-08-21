@@ -8,7 +8,6 @@ use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorization
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Permission;
 use App\Models\Role;
@@ -16,6 +15,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function managementBoundaryActor(Site $site, string $role = 'support_worker'): User
 {
@@ -190,16 +190,10 @@ it('requires active purpose consent audience and source access for personal trac
         'purpose' => 'Client personal safety tracking',
         'active' => true,
     ]);
-    $consent = ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $consentType->id,
+    $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, $actor, [
         'status' => 'given',
         'given_at' => now(),
-        'given_by_user_id' => $actor->id,
-        'given_method' => 'electronic',
         'expires_at' => now()->addMonth(),
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
     ]);
     $tracker = Device::factory()->tracking()->create([
         'provider' => 'contract-test',

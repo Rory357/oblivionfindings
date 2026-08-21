@@ -30,6 +30,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class FleetDashboardResidentSiteIsolationTest extends TestCase
@@ -952,13 +953,9 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ],
         );
 
-        return ClientConsent::query()->create(array_merge([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'consent_type_version_id' => $version->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, array_merge([
             'status' => 'given',
             'given_at' => now(),
-            'given_method' => 'electronic',
         ], $overrides));
     }
 

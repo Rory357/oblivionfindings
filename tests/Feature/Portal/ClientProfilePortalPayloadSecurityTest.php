@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ConsentType;
@@ -12,6 +11,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientProfilePortalPayloadRole(
     User $user,
@@ -105,17 +105,10 @@ function grantClientProfilePortalFamilyDisclosure(
         'name' => 'Information Sharing with Whānau / Family',
         'category' => 'communication',
     ]);
-    ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $consentType->id,
+    AuthoritativeConsentFixture::manualSelf($client, $consentType, $actor, [
         'status' => 'given',
         'given_at' => now()->subMinute(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $actor->id,
-        'given_by_relationship' => 'next_of_kin',
-        'given_method' => 'portal',
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
     ]);
     FamilyPortalSetting::query()->create([
         'client_id' => $client->id,

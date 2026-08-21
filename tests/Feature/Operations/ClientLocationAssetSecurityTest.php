@@ -23,6 +23,7 @@ use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientLocationAssetPermissions(User $user, array $permissionKeys): void
 {
@@ -137,17 +138,10 @@ function grantClientLocationAssetTrackingConsent(Client $client, User $actor): C
         ],
     );
 
-    return ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $consentType->id,
+    return AuthoritativeConsentFixture::manualSelf($client, $consentType, $actor, [
         'status' => 'given',
         'given_at' => now()->subMinute(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $actor->id,
-        'given_by_relationship' => 'staff',
-        'given_method' => 'written',
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
     ]);
 }
 

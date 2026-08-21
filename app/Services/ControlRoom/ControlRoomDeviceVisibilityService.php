@@ -2,7 +2,6 @@
 
 namespace App\Services\ControlRoom;
 
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
@@ -25,6 +24,7 @@ class ControlRoomDeviceVisibilityService
 {
     public function __construct(
         private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
     ) {}
 
     /** @return list<int> */
@@ -306,7 +306,19 @@ class ControlRoomDeviceVisibilityService
         User $user,
         array $authorisedClientIds,
     ): void {
-        $query->where(function (Builder $privacy) use ($user, $authorisedClientIds): void {
+        $authorisedDeviceIds = Client::query()
+            ->whereKey($authorisedClientIds)
+            ->get(['id', 'site_id'])
+            ->flatMap(fn (Client $client) => $this->trackingPrivacy
+                ->authorisedClientAssignments($client)
+                ->pluck('device_id'))
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $query->where(function (Builder $privacy) use ($user, $authorisedClientIds, $authorisedDeviceIds): void {
             $privacy->where(function (Builder $ordinary): void {
                 $ordinary->where('control_room_devices.type', '!=', Device::TYPE_PERSONAL_TRACKER)
                     ->where(function (Builder $notCanonicalPersonal): void {
@@ -321,14 +333,20 @@ class ControlRoomDeviceVisibilityService
                     });
             });
 
-            if (! $user->canDo('assets.telemetry.view') || $authorisedClientIds === []) {
+            if (! $user->canDo('assets.telemetry.view')
+                || $authorisedClientIds === []
+                || $authorisedDeviceIds === []) {
                 return;
             }
 
-            $privacy->orWhere(function (Builder $personal) use ($authorisedClientIds): void {
+            $privacy->orWhere(function (Builder $personal) use (
+                $authorisedClientIds,
+                $authorisedDeviceIds,
+            ): void {
                 $personal->whereNotNull('control_room_devices.client_id')
                     ->whereNotNull('control_room_devices.canonical_device_id')
                     ->whereIn('control_room_devices.client_id', $authorisedClientIds)
+                    ->whereIn('control_room_devices.canonical_device_id', $authorisedDeviceIds)
                     ->where(function (Builder $classification): void {
                         $classification->where('control_room_devices.type', Device::TYPE_PERSONAL_TRACKER)
                             ->orWhereExists(fn ($canonical) => $canonical
@@ -337,43 +355,6 @@ class ControlRoomDeviceVisibilityService
                                 ->whereColumn('devices.id', 'control_room_devices.canonical_device_id')
                                 ->where('devices.domain', 'tracking')
                                 ->whereNull('devices.deleted_at'));
-                    })
-                    ->whereExists(function ($authority): void {
-                        $authority->selectRaw('1')
-                            ->from('device_assignments')
-                            ->join('devices as custody_devices', 'custody_devices.id', '=', 'device_assignments.device_id')
-                            ->join('clients', 'clients.id', '=', 'device_assignments.assignable_id')
-                            ->join('client_consents', 'client_consents.id', '=', 'device_assignments.consent_id')
-                            ->join('consent_types', 'consent_types.id', '=', 'client_consents.consent_type_id')
-                            ->whereColumn('device_assignments.device_id', 'control_room_devices.canonical_device_id')
-                            ->whereColumn('device_assignments.assignable_id', 'control_room_devices.client_id')
-                            ->whereColumn('device_assignments.custody_site_id', 'clients.site_id')
-                            ->where('device_assignments.assignable_type', DeviceAssignment::TARGET_CLIENT)
-                            ->where('device_assignments.assigned_at', '<=', now())
-                            ->whereNull('device_assignments.released_at')
-                            ->whereNull('device_assignments.collection_stopped_at')
-                            ->where('device_assignments.authority_basis', 'assignment_linked_client_consent')
-                            ->whereNotNull('device_assignments.tracking_purpose')
-                            ->whereJsonContains('device_assignments.access_audience', 'authorised_client_care')
-                            ->where('device_assignments.collection_started_at', '<=', now())
-                            ->where('device_assignments.retention_days', '>', 0)
-                            ->where('custody_devices.domain', 'tracking')
-                            ->whereNotIn('custody_devices.status', ['decommissioned', 'quarantined', 'lost'])
-                            ->whereNull('custody_devices.deleted_at')
-                            ->where('clients.status', 'active')
-                            ->whereNull('clients.deleted_at')
-                            ->where('client_consents.status', 'given')
-                            ->whereNull('client_consents.withdrawn_at')
-                            ->whereNull('client_consents.superseded_by_consent_id')
-                            ->whereNull('client_consents.deleted_at')
-                            ->where('client_consents.given_at', '<=', now())
-                            ->where(function ($expiry): void {
-                                $expiry->whereNull('client_consents.expires_at')
-                                    ->orWhere('client_consents.expires_at', '>', now());
-                            })
-                            ->where('consent_types.name', 'Personal Tracker (Wandering Risk)')
-                            ->where('consent_types.active', true)
-                            ->whereNull('consent_types.deleted_at');
                     });
             });
         });

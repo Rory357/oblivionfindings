@@ -8,6 +8,7 @@ use App\Models\ClientConsent;
 use App\Models\FamilyPortalSetting;
 use App\Models\NextOfKin;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use App\Services\ShiftTimelineService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -126,7 +127,6 @@ final class PortalClientSectionAccess
     public function hasActiveFamilyInformationConsent(Client $client): bool
     {
         return ClientConsent::query()
-            ->active()
             ->where('client_id', $client->id)
             ->whereHas('consentType', function ($query) {
                 $query->where('name', 'Information Sharing with Whānau / Family')
@@ -139,7 +139,20 @@ final class PortalClientSectionAccess
                             });
                     });
             })
-            ->exists();
+            ->with([
+                'consentType',
+                'consentTypeVersion',
+                'sourceConsentRequest',
+                'authorityScope.nextOfKin',
+                'authorityScope.capacityEvidenceConsent',
+            ])
+            ->get()
+            ->contains(fn (ClientConsent $consent): bool => ConsentValidationService::isConsumable(
+                $consent,
+                $client,
+                $consent->consent_type_id,
+                $consent->consentTypeVersion?->purpose,
+            ));
     }
 
     public function activeLocationTrackingConsent(Client $client): ?ClientConsent

@@ -75,7 +75,7 @@ class ConsentRequestPortalController extends Controller
             'acknowledge_authority' => ['required', 'accepted'],
         ]);
 
-        $this->service->approve(
+        $consent = $this->service->approve(
             $consentRequest,
             $request->user(),
             $request,
@@ -84,7 +84,12 @@ class ConsentRequestPortalController extends Controller
 
         return redirect()
             ->route('portal.clients.dashboard', $client->id)
-            ->with('success', 'Consent recorded. Thank you.');
+            ->with(
+                'success',
+                $consent
+                    ? 'Consent recorded. Thank you.'
+                    : 'Acknowledgement recorded for the care team. Thank you.',
+            );
     }
 
     public function decline(Request $request, Client $client, ConsentRequest $consentRequest)
@@ -118,6 +123,7 @@ class ConsentRequestPortalController extends Controller
             && $client->portalUsers()->whereKey($user->id)->exists(),
             404,
         );
+        abort_unless((int) $consentRequest->site_id === (int) $client->site_id, 404);
         Gate::forUser($user)->authorize('respond', $consentRequest);
     }
 }

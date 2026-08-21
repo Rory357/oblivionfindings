@@ -217,7 +217,7 @@ class DeviceAssignment extends Model
             : null;
         $validConsent = $consent
             && (int) $consent->client_id === (int) $this->assignable_id
-            && ConsentValidationService::isValidTrackingConsent($consent);
+            && ConsentValidationService::isValidTrackingConsent($consent, $this->assignable_id);
         $assignedAt = $this->assigned_at ?? now();
 
         $this->tracking_purpose ??= $isClient

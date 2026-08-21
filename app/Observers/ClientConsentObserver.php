@@ -9,7 +9,9 @@ class ClientConsentObserver
 {
     public function saved(ClientConsent $consent): void
     {
-        if (! $this->wasWithdrawn($consent)) {
+        if ($consent->decision_state !== ClientConsent::DECISION_AUTHORITATIVE
+            || ! $consent->gate_satisfying
+            || ! $this->wasWithdrawn($consent)) {
             return;
         }
 

@@ -8,7 +8,9 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Services\Operations\OpsNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -26,14 +28,19 @@ class ClientConsentController extends Controller
         Gate::authorize('viewAny', ClientConsent::class);
 
         $consents = ClientConsent::where('client_id', $client->id)
+            ->where('site_id', $client->site_id)
             ->with(['consentType', 'givenBy:id,name', 'creator:id,name'])
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->each(fn (ClientConsent $consent) => $consent->setAttribute(
+                'is_consumable',
+                $consent->isValid(),
+            ));
 
         $stats = [
             'total' => $consents->count(),
             'active' => $consents->filter(fn ($c) => $c->isValid())->count(),
-            'expiring_soon' => $consents->filter(fn ($c) => $c->isExpiringSoon())->count(),
+            'expiring_soon' => $consents->filter(fn ($c) => $c->isValid() && $c->isExpiringSoon())->count(),
             'expired' => $consents->filter(fn ($c) => $c->isExpired())->count(),
             'withdrawn' => $consents->where('status', 'withdrawn')->count(),
         ];
@@ -111,18 +118,85 @@ class ClientConsentController extends Controller
             ]);
         }
 
+        $consentType = ConsentType::query()->whereKey($data['consent_type_id'])->where('active', true)->firstOrFail();
+        $consentTypeVersion = ConsentTypeVersion::query()->firstOrCreate(
+            [
+                'consent_type_id' => $consentType->id,
+                'version' => $consentType->version,
+            ],
+            [
+                'description' => $consentType->description,
+                'purpose' => $consentType->purpose,
+                'legal_basis' => $consentType->legal_basis,
+                'changes_summary' => ['source' => 'canonical_consent_type_version'],
+                'effective_from' => $consentType->created_at ?? now(),
+                'created_by' => $auth->id,
+            ],
+        );
+        $isAuthoritativeSelfDecision = $data['status'] === 'given'
+            && in_array($data['given_by_relationship'] ?? null, ['self', 'client'], true)
+            && $consentTypeVersion
+            && hash_equals(
+                str($consentTypeVersion->purpose)->squish()->lower()->toString(),
+                str($consentType->purpose)->squish()->lower()->toString(),
+            );
+
+        if ($data['status'] === 'given' && ! $isAuthoritativeSelfDecision) {
+            throw ValidationException::withMessages([
+                'status' => 'Authoritative consent must be recorded by the identified Client. Use the representative consent-request workflow for substitute decisions.',
+            ]);
+        }
+
+        $decisionAt = Carbon::parse($data['given_at'])->startOfSecond();
+        $decisionExpiresAt = isset($data['expires_at'])
+            ? Carbon::parse($data['expires_at'])->startOfSecond()
+            : null;
+
         $consent = ClientConsent::create([
             'client_id' => $client->id,
+            'site_id' => $client->site_id,
             'consent_type_id' => $data['consent_type_id'],
+            'consent_type_version_id' => $consentTypeVersion?->id,
+            'decision_state' => $isAuthoritativeSelfDecision
+                ? ClientConsent::DECISION_AUTHORITATIVE
+                : ClientConsent::DECISION_GOVERNANCE_REVIEW,
+            'decision_basis' => $isAuthoritativeSelfDecision ? ClientConsent::BASIS_SELF : null,
+            'decision_client_id' => $isAuthoritativeSelfDecision ? $client->id : null,
+            'decision_actor_user_id' => $isAuthoritativeSelfDecision ? $client->user_id : null,
+            'decision_purpose' => $isAuthoritativeSelfDecision ? $consentTypeVersion?->purpose : null,
+            'decision_contract_version' => $isAuthoritativeSelfDecision ? 1 : null,
+            'decision_evidence' => $isAuthoritativeSelfDecision ? [
+                'source' => 'operations_manual',
+                'identity_source' => 'canonical_client_record',
+                'client_id' => $client->id,
+                'site_id' => $client->site_id,
+                'consent_type_id' => $consentType->id,
+                'consent_type_version_id' => $consentTypeVersion->id,
+                'consent_type_purpose' => $consentTypeVersion->purpose,
+                'decision_client_id' => $client->id,
+                'decision_actor_user_id' => $client->user_id,
+                'decision_actor_kind' => 'identified_client_self',
+                'authority_basis' => ClientConsent::BASIS_SELF,
+                'recorder_user_id' => $auth->id,
+                'assertion_method' => $data['given_method'],
+                'evidence_type' => $data['evidence_type'] ?? null,
+                'decision_at' => $decisionAt->toISOString(),
+                'decision_expires_at' => $decisionExpiresAt?->toISOString(),
+                'recorded_at' => now()->toISOString(),
+            ] : null,
+            'gate_satisfying' => $isAuthoritativeSelfDecision,
+            'governance_review_reason' => $isAuthoritativeSelfDecision
+                ? null
+                : 'non_authoritative_manual_record',
             'status' => $data['status'],
             'given_method' => $data['given_method'],
-            'given_at' => $data['given_at'],
+            'given_at' => $decisionAt,
             'given_by_user_id' => $auth->id,
             'given_by_relationship' => $data['given_by_relationship'] ?? null,
             'given_notes' => $data['given_notes'] ?? null,
             'conditions' => $data['conditions'] ?? null,
             'special_conditions' => $data['special_conditions'] ?? null,
-            'expires_at' => $data['expires_at'] ?? null,
+            'expires_at' => $decisionExpiresAt,
             'evidence_type' => $data['evidence_type'] ?? null,
             'capacity_assessed' => false,
             'capacity_outcome' => null,

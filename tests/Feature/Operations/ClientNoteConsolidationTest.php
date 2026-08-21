@@ -4,7 +4,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ClientNote;
 use App\Models\ConsentType;
 use App\Models\FamilyPortalSetting;
@@ -20,6 +19,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientNoteConsolidationPermissions(User $user, array $permissionKeys): void
 {
@@ -625,17 +625,10 @@ it('builds family emotion summaries only from portal-visible nonprivate nondraft
         'name' => 'Information Sharing with Whānau / Family',
         'category' => 'communication',
     ]);
-    ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $familyConsentType->id,
+    AuthoritativeConsentFixture::manualSelf($client, $familyConsentType, $portalUser, [
         'status' => 'given',
         'given_at' => now(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $portalUser->id,
-        'given_by_relationship' => 'parent',
-        'given_method' => 'portal',
-        'created_by' => $portalUser->id,
-        'updated_by' => $portalUser->id,
     ]);
     FamilyPortalSetting::query()->create([
         'client_id' => $client->id,

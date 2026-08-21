@@ -18,6 +18,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\ItAttachment;
@@ -75,6 +76,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         'client' => Client::class,
         'client_consent' => ClientConsent::class,
         'consent_type' => ConsentType::class,
+        'consent_type_version' => ConsentTypeVersion::class,
         'control_room_alert' => ControlRoomAlert::class,
         'device' => Device::class,
         'device_asset_link' => DeviceAssetLink::class,
@@ -624,17 +626,55 @@ final class ItSecurityDesktopReleaseFixtureManager
             'renewal_required' => false,
             'active' => true,
         ]));
+        $trackingConsentTypeVersion = $this->own('consent_type_version', ConsentTypeVersion::query()->create([
+            'consent_type_id' => $trackingConsentType->id,
+            'version' => $trackingConsentType->version,
+            'description' => $trackingConsentType->description,
+            'purpose' => $trackingConsentType->purpose,
+            'legal_basis' => $trackingConsentType->legal_basis,
+            'changes_summary' => ['source' => 'owned_non_production_release_fixture'],
+            'effective_from' => now(),
+            'created_by' => $manager->id,
+        ]));
+        $trackingConsentAt = now()->startOfSecond();
+        $trackingConsentExpiresAt = $trackingConsentAt->copy()->addYear();
         $consents = [
             'RELEASE V10 Client Alpha' => $this->own('client_consent', ClientConsent::query()->create([
                 'client_id' => $clients['RELEASE V10 Client Alpha']->id,
+                'site_id' => $clients['RELEASE V10 Client Alpha']->site_id,
                 'consent_type_id' => $trackingConsentType->id,
+                'consent_type_version_id' => $trackingConsentTypeVersion->id,
+                'decision_state' => ClientConsent::DECISION_AUTHORITATIVE,
+                'decision_basis' => ClientConsent::BASIS_SELF,
+                'decision_client_id' => $clients['RELEASE V10 Client Alpha']->id,
+                'decision_actor_user_id' => $clients['RELEASE V10 Client Alpha']->user_id,
+                'decision_purpose' => $trackingConsentTypeVersion->purpose,
+                'decision_contract_version' => 1,
+                'decision_evidence' => [
+                    'source' => 'operations_manual',
+                    'identity_source' => 'canonical_client_record',
+                    'client_id' => $clients['RELEASE V10 Client Alpha']->id,
+                    'site_id' => $clients['RELEASE V10 Client Alpha']->site_id,
+                    'consent_type_id' => $trackingConsentType->id,
+                    'consent_type_version_id' => $trackingConsentTypeVersion->id,
+                    'consent_type_purpose' => $trackingConsentTypeVersion->purpose,
+                    'decision_actor_kind' => 'identified_client_self',
+                    'decision_client_id' => $clients['RELEASE V10 Client Alpha']->id,
+                    'decision_actor_user_id' => $clients['RELEASE V10 Client Alpha']->user_id,
+                    'authority_basis' => ClientConsent::BASIS_SELF,
+                    'recorder_user_id' => $manager->id,
+                    'decision_at' => $trackingConsentAt->toISOString(),
+                    'decision_expires_at' => $trackingConsentExpiresAt->toISOString(),
+                    'fixture_evidence_class' => self::EVIDENCE_CLASS,
+                ],
+                'gate_satisfying' => true,
                 'status' => 'given',
-                'given_at' => now(),
+                'given_at' => $trackingConsentAt,
                 'given_by_user_id' => $manager->id,
                 'given_by_relationship' => 'self',
-                'given_method' => 'approved_non_production_fixture',
+                'given_method' => 'written',
                 'given_notes' => 'Owned desktop release acceptance baseline.',
-                'expires_at' => now()->addYear(),
+                'expires_at' => $trackingConsentExpiresAt,
                 'created_by' => $manager->id,
                 'updated_by' => $manager->id,
             ])),

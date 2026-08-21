@@ -26,6 +26,7 @@ use App\Models\ItSecurityDesktopReleaseFixturePack;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use Closure;
 use Illuminate\Support\Arr;
@@ -788,9 +789,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             && $assignment->assignable_type === 'client'
             && $consent instanceof ClientConsent
             && $type instanceof ConsentType
-            && $consent->status === 'given'
-            && $consent->withdrawn_at === null
-            && ($consent->expires_at === null || $consent->expires_at->isFuture())
+            && ConsentValidationService::isValidTrackingConsent($consent, $client)
             && $type->name === 'RELEASE V10 Client Location Tracking'
             && $type->purpose === 'Client personal safety tracking'
             && $assignment->tracking_purpose === 'Client personal safety tracking'

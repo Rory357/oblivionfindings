@@ -83,8 +83,8 @@ class DeviceAssignmentController extends Controller
      * Reject client-tracker assignments that lack a valid ClientConsent.
      *
      * Applies when: assignable is a client AND the device is a tracking device
-     * (domain='tracking'). A valid consent is one that belongs to this client,
-     * status='given', and either has no expiry or hasn't expired yet.
+     * (domain='tracking'). Consumability is decided by the canonical consent
+     * authority contract, including person, Site, type, purpose and authority.
      *
      * Enforced at controller level (not in the model) to avoid breaking unit
      * tests that build fixtures via DeviceAssignment::create() directly.
@@ -116,7 +116,7 @@ class DeviceAssignmentController extends Controller
             ->where('client_id', $assignableId)
             ->first();
 
-        if (! $consent || ! ConsentValidationService::isValidTrackingConsent($consent)) {
+        if (! $consent || ! ConsentValidationService::isValidTrackingConsent($consent, $assignableId)) {
             throw new \InvalidArgumentException(
                 'The chosen consent is not an active location-tracking consent for this client '
                 .'(missing, withdrawn, superseded, expired, or recorded for another purpose).'
