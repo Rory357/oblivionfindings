@@ -2380,11 +2380,11 @@ class MedicationControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_auditor_can_view_reports(): void
+    public function test_auditor_with_general_report_permission_cannot_view_medication_reports(): void
     {
         $this->actingAs($this->auditor)
             ->get('/reports/medications')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_coordinator_can_manage_medications(): void

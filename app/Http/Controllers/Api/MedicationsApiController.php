@@ -1030,18 +1030,9 @@ class MedicationsApiController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $siteIds = $this->governanceScope->readerSiteIds(
-            $user,
-            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
-        );
-        $alert = $this->governanceScope
-            ->scopeCanonicalClientMedicationRows(
-                MedicationDashboardAlert::query()->whereKey($alertId),
-                $siteIds,
-            )
-            ->firstOrFail();
+        [$alert, $siteIds] = $this->authorizedDashboardAlert($user, $alertId);
 
-        $success = $this->alertService->acknowledgeAlert((int) $alert->id, $user->id);
+        $success = $this->alertService->acknowledgeAlert($alert, $user->id, $siteIds);
 
         return response()->json([
             'success' => $success,
@@ -1054,27 +1045,37 @@ class MedicationsApiController extends Controller
     public function resolveAlert(Request $request, int $alertId)
     {
         $user = $request->user();
-
-        abort_unless(
-            $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
-            403
-        );
-
-        $alert = MedicationDashboardAlert::findOrFail($alertId);
-
-        // Verify user can access this client's medication data
-        $client = Client::findOrFail($alert->client_id);
-        $this->authorize('viewMedications', $client);
+        abort_unless($user, 403);
+        [$alert, $siteIds] = $this->authorizedDashboardAlert($user, $alertId);
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $success = $this->alertService->resolveAlert($alertId, $data['resolution_notes'] ?? null);
+        $success = $this->alertService->resolveAlert($alert, $data['resolution_notes'] ?? null, $siteIds);
 
         return response()->json([
             'success' => $success,
         ]);
+    }
+
+    /** @return array{MedicationDashboardAlert, array<int, int>} */
+    private function authorizedDashboardAlert(User $user, int $alertId): array
+    {
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.administer.correct',
+        );
+
+        $alert = $this->governanceScope
+            ->scopeCanonicalClientMedicationRows(
+                MedicationDashboardAlert::query()->whereKey($alertId),
+                $siteIds,
+            )
+            ->with('client:id,site_id')
+            ->firstOrFail();
+
+        return [$alert, $siteIds];
     }
 
     /**
@@ -1104,17 +1105,14 @@ class MedicationsApiController extends Controller
     {
         $user = $request->user();
 
-        abort_unless(
-            $user->canDo('medications.reports.export') || $user->canDo('reports.viewAny'),
-            403
-        );
+        abort_unless($user?->canDo('medications.reports.export'), 403);
 
         $reportType = $request->input('type', 'mar');
         $clientId = $request->integer('client_id') ?: null;
         $siteId = $request->integer('site_id') ?: null;
         $accessibleSiteIds = $this->governanceScope->readerSiteIds(
             $user,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             $siteId,
             $clientId,
         );
@@ -1145,17 +1143,14 @@ class MedicationsApiController extends Controller
     {
         $user = $request->user();
 
-        abort_unless(
-            $user->canDo('medications.reports.export') || $user->canDo('reports.viewAny'),
-            403
-        );
+        abort_unless($user?->canDo('medications.reports.export'), 403);
 
         $reportType = $request->input('type', 'mar');
         $clientId = $request->integer('client_id') ?: null;
         $siteId = $request->integer('site_id') ?: null;
         $accessibleSiteIds = $this->governanceScope->readerSiteIds(
             $user,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             $siteId,
             $clientId,
         );

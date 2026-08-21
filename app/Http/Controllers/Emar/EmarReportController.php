@@ -42,7 +42,7 @@ class EmarReportController extends Controller
         $clientId = $filters['client_id'] ?? null;
         $accessibleSiteIds = $scope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             $siteId ? (int) $siteId : null,
             $clientId ? (int) $clientId : null,
         );
@@ -567,7 +567,7 @@ class EmarReportController extends Controller
         abort_unless($actor, 403);
         $accessibleSiteIds = $scope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             $siteId ? (int) $siteId : null,
             $clientId ? (int) $clientId : null,
         );

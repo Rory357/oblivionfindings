@@ -290,17 +290,32 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ])
         ->name('emar.audit');
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
-        ->middleware('permission:medications.reports.export')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+            'permission:medications.reports.export',
+        ])
         ->name('emar.audit.export');
     // Per-event drawer actions (synthetic id → backing record; see controller).
     Route::get('/audit/event/{id}/integrity', [MedicationAuditEventController::class, 'integrity'])
-        ->middleware('permission:medications.audit.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+        ])
         ->name('emar.audit.event.integrity');
     Route::get('/audit/event/{id}/export', [MedicationAuditEventController::class, 'export'])
-        ->middleware('permission:medications.reports.export')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+            'permission:medications.reports.export',
+        ])
         ->name('emar.audit.event.export');
     Route::post('/audit/event/{id}/flag', [MedicationAuditEventController::class, 'flag'])
-        ->middleware('permission:medications.administer.record|clients.update')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.audit.view',
+            'permission:medications.administer.record',
+        ])
         ->name('emar.audit.event.flag');
 
     // Emergency access
@@ -343,7 +358,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // Reports
     Route::middleware([
         'permission:medications.view',
-        'permission:medications.reports.export|reports.viewAny',
+        'permission:medications.reports.export',
     ])->group(function () {
         Route::get('/reports', [EmarReportController::class, 'index'])
             ->name('emar.reports');
@@ -412,7 +427,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware([
         'permission:medications.view',
-        'permission:medications.reports.export|reports.viewAny',
+        'permission:medications.reports.export',
     ])->group(function () {
         Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
         Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])

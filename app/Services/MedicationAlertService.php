@@ -8,10 +8,13 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
+use App\Models\Site;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Medication alert generation and dashboard widget service.
@@ -820,28 +823,103 @@ class MedicationAlertService
     // Alert management — retained for MedicationDashboardAlert UI compat
     // -----------------------------------------------------------------------
 
-    public function acknowledgeAlert(int $alertId, int $userId): bool
+    /** @param array<int, int>|null $siteIds Null is reserved for internal callers. */
+    public function acknowledgeAlert(MedicationDashboardAlert $alert, int $userId, ?array $siteIds = null): bool
     {
-        $alert = MedicationDashboardAlert::find($alertId);
+        $alert->loadMissing('client:id,site_id');
 
-        if (!$alert || $alert->status !== 'active') {
-            return false;
-        }
+        return DB::transaction(function () use ($alert, $userId, $siteIds): bool {
+            $lockedAlert = $this->lockCanonicalAlert($alert, $siteIds);
 
-        $alert->acknowledge($userId);
-        return true;
+            if ($lockedAlert->status === 'acknowledged') {
+                return true;
+            }
+            if ($lockedAlert->status !== 'active') {
+                return false;
+            }
+
+            $lockedAlert->acknowledge($userId);
+
+            return true;
+        }, 3);
     }
 
-    public function resolveAlert(int $alertId, ?string $notes = null): bool
+    /** @param array<int, int>|null $siteIds Null is reserved for internal callers. */
+    public function resolveAlert(
+        MedicationDashboardAlert $alert,
+        ?string $notes = null,
+        ?array $siteIds = null,
+    ): bool
     {
-        $alert = MedicationDashboardAlert::find($alertId);
+        $alert->loadMissing('client:id,site_id');
 
-        if (!$alert) {
-            return false;
+        return DB::transaction(function () use ($alert, $notes, $siteIds): bool {
+            $lockedAlert = $this->lockCanonicalAlert($alert, $siteIds);
+            $normalizedNotes = filled($notes) ? trim((string) $notes) : null;
+
+            if ($lockedAlert->status === 'resolved') {
+                if (($lockedAlert->resolution_notes ?: null) !== $normalizedNotes) {
+                    throw ValidationException::withMessages([
+                        'resolution_notes' => 'This alert was already resolved with different resolution notes.',
+                    ]);
+                }
+
+                return true;
+            }
+            if (! in_array($lockedAlert->status, ['active', 'acknowledged'], true)) {
+                return false;
+            }
+
+            $lockedAlert->resolve($normalizedNotes);
+
+            return true;
+        }, 3);
+    }
+
+    /**
+     * Lock canonical Site, Client, medication, then alert for every transition.
+     *
+     * @param array<int, int>|null $siteIds
+     */
+    private function lockCanonicalAlert(MedicationDashboardAlert $snapshot, ?array $siteIds): MedicationDashboardAlert
+    {
+        $snapshotSiteId = (int) ($snapshot->client?->site_id ?? 0);
+        $site = Site::query()
+            ->whereKey($snapshotSiteId)
+            ->when($siteIds !== null, fn ($query) => $query->whereIn('id', $siteIds))
+            ->lockForUpdate()
+            ->firstOrFail();
+        $client = Client::query()
+            ->whereKey($snapshot->client_id)
+            ->where('site_id', $site->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if ($snapshot->client_medication_id !== null) {
+            ClientMedication::query()
+                ->whereKey($snapshot->client_medication_id)
+                ->where('client_id', $client->id)
+                ->lockForUpdate()
+                ->firstOrFail();
         }
 
-        $alert->resolve($notes);
-        return true;
+        $lockedAlert = MedicationDashboardAlert::query()
+            ->whereKey($snapshot->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $snapshotMedicationId = $snapshot->client_medication_id !== null
+            ? (int) $snapshot->client_medication_id
+            : null;
+        $lockedMedicationId = $lockedAlert->client_medication_id !== null
+            ? (int) $lockedAlert->client_medication_id
+            : null;
+        abort_unless(
+            (int) $lockedAlert->client_id === (int) $client->id
+            && $lockedMedicationId === $snapshotMedicationId,
+            404,
+        );
+
+        return $lockedAlert;
     }
 
     public function clearStaleAlerts(): int

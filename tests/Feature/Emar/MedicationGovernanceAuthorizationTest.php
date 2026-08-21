@@ -82,7 +82,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->assertNotNull($route, $routeName);
             $middleware = $route->gatherMiddleware();
             $this->assertContains('permission:medications.view', $middleware, $routeName);
-            $this->assertContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
+            $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            $this->assertStringNotContainsString('reports.viewAny', implode('|', $middleware), $routeName);
         }
 
         $sharedPermissions = file_get_contents(app_path('Http/Middleware/HandleInertiaRequests.php'));
@@ -256,7 +257,6 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             MedicationGovernanceScopeService::STOCK_CAPABILITY,
             'medications.audit.view',
             'medications.reports.export',
-            'reports.viewAny',
             'handovers.viewAny',
         ], $context['local_site']);
 

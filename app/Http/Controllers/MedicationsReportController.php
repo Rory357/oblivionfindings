@@ -372,7 +372,7 @@ class MedicationsReportController extends Controller
         $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
         $accessibleSiteIds = $scope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             $siteId,
             $clientId,
         );

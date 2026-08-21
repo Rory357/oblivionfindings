@@ -83,25 +83,31 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.alerts.client');
 
     Route::post('/alerts/{alertId}/acknowledge', [MedicationsApiController::class, 'acknowledgeAlert'])
-        ->middleware('permission:medications.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.administer.correct',
+        ])
         ->name('api.medications.alerts.acknowledge');
 
     Route::post('/alerts/{alertId}/resolve', [MedicationsApiController::class, 'resolveAlert'])
-        ->middleware('permission:medications.administer.correct|clients.update')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.administer.correct',
+        ])
         ->name('api.medications.alerts.resolve');
 
     // Reports
     Route::get('/reports', [MedicationsApiController::class, 'getReports'])
         ->middleware([
             'permission:medications.view',
-            'permission:medications.reports.export|reports.viewAny',
+            'permission:medications.reports.export',
         ])
         ->name('api.medications.reports');
 
     Route::get('/reports/export', [MedicationsApiController::class, 'exportReportCsv'])
         ->middleware([
             'permission:medications.view',
-            'permission:medications.reports.export|reports.viewAny',
+            'permission:medications.reports.export',
         ])
         ->name('api.medications.reports.export');
 

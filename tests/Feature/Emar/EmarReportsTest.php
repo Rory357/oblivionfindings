@@ -30,7 +30,7 @@ class EmarReportsTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'reports.viewAny']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.export']);
 
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
@@ -75,7 +75,7 @@ class EmarReportsTest extends TestCase
         $siteA = Site::factory()->create(['name' => 'Report Site A', 'is_active' => true]);
         $siteB = Site::factory()->create(['name' => 'Report Site B', 'is_active' => true]);
         $user = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($user, ['medications.view', 'medications.reports.export', 'reports.viewAny']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.export']);
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $siteA->id,
@@ -163,7 +163,7 @@ class EmarReportsTest extends TestCase
         $siteA = Site::factory()->create(['is_active' => true]);
         $siteB = Site::factory()->create(['is_active' => true]);
         $user = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($user, ['medications.view', 'reports.viewAny', 'sites.viewAll']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.export', 'sites.viewAll']);
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $siteA->id,
@@ -189,7 +189,7 @@ class EmarReportsTest extends TestCase
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('support_worker');
         $view = Permission::query()->where('key', 'medications.view')->firstOrFail();
-        $this->grantPermissions($user, ['reports.viewAny']);
+        $this->grantPermissions($user, ['medications.reports.export']);
         $user->permissionOverrides()->syncWithoutDetaching([$view->id => ['allowed' => false]]);
 
         $this->actingAs($user)->get('/emar/reports')->assertForbidden();

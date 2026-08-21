@@ -39,7 +39,7 @@ class EmarPdfController extends Controller
         $clientId = (int) $request->input('client_id');
         $this->governanceScope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             requestedClientId: $clientId,
         );
         $client = Client::query()->findOrFail($clientId);
@@ -108,7 +108,7 @@ class EmarPdfController extends Controller
         $clientId = (int) $request->input('client_id');
         $this->governanceScope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
             requestedClientId: $clientId,
         );
         $this->governanceScope->readerSiteIds(
@@ -158,7 +158,7 @@ class EmarPdfController extends Controller
         abort_unless($actor, 403);
         $siteIds = $this->governanceScope->readerSiteIds(
             $actor,
-            ['medications.reports.export', 'reports.viewAny'],
+            'medications.reports.export',
         );
 
         $rounds = MedicationRound::where('round_date', $date)

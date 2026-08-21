@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\AuditLog;
+use App\Models\Client;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -11,29 +14,55 @@ class MedicationAuditController extends Controller
 {
     use SanitizesCsvOutput;
 
-    private function baseQuery()
+    private const AUDITABLE_TYPES = [
+        \App\Models\ClientMedication::class,
+        \App\Models\ClientMedicationAdministration::class,
+        \App\Models\ClientControlledDrugEntry::class,
+        \App\Models\ClientControlledDrugDiscrepancy::class,
+        \App\Models\ClientBreakGlassAccess::class,
+    ];
+
+    public function __construct(
+        private readonly MedicationGovernanceScopeService $governanceScope,
+    ) {}
+
+    /** @param array<int, int> $clientIds */
+    private function baseQuery(array $clientIds): Builder
     {
         return AuditLog::query()
-            ->with(['user:id,name,email', 'client:id,first_name,last_name'])
-            ->whereIn('auditable_type', [
-                \App\Models\ClientMedication::class,
-                \App\Models\ClientMedicationAdministration::class,
-                \App\Models\ClientControlledDrugEntry::class,
-                \App\Models\ClientControlledDrugDiscrepancy::class,
-                \App\Models\ClientBreakGlassAccess::class,
-            ])
+            ->with(['user:id,name', 'client:id,first_name,last_name'])
+            ->whereIn('client_id', $clientIds)
+            ->whereIn('auditable_type', self::AUDITABLE_TYPES)
+            ->whereHasMorph(
+                'auditable',
+                self::AUDITABLE_TYPES,
+                fn (Builder $auditable) => $auditable->whereColumn(
+                    $auditable->getModel()->qualifyColumn('client_id'),
+                    'audit_logs.client_id',
+                ),
+            )
             ->orderByDesc('id');
     }
 
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('medications.audit.view'), 403);
+        abort_unless($user, 403);
+        $clientId = $request->integer('client_id') ?: null;
+        $siteId = $request->integer('site_id') ?: null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.audit.view',
+            $siteId,
+            $clientId,
+        );
+        $readerSiteIds = $siteId !== null ? [$siteId] : $siteIds;
+        $clientIds = $this->clientIds($readerSiteIds);
 
-        $q = $this->baseQuery();
+        $q = $this->baseQuery($clientIds);
 
-        if ($request->filled('client_id')) {
-            $q->where('client_id', (int) $request->query('client_id'));
+        if ($clientId !== null) {
+            $q->where('client_id', $clientId);
         }
         if ($request->filled('user_id')) {
             $q->where('user_id', (int) $request->query('user_id'));
@@ -59,27 +88,45 @@ class MedicationAuditController extends Controller
                 'id' => $l->user->id,
                 'name' => $l->user->name,
             ] : null,
-            'meta' => $l->meta,
+            'meta' => $this->safeMeta($l->meta),
         ])->values();
 
         return inertia('medications/audit', [
             'filters' => [
                 'client_id' => $request->query('client_id'),
+                'site_id' => $request->query('site_id'),
                 'user_id' => $request->query('user_id'),
                 'from' => $request->query('from'),
                 'to' => $request->query('to'),
             ],
             'logs' => $logs,
+            'clients' => $this->governanceScope->clientPicker($readerSiteIds),
+            'sites' => $this->governanceScope->sitePicker($siteIds),
         ]);
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('medications.reports.export'), 403);
+        abort_unless($user, 403);
+        $clientId = $request->integer('client_id') ?: null;
+        $siteId = $request->integer('site_id') ?: null;
+        $siteIds = $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.audit.view',
+            $siteId,
+            $clientId,
+        );
+        $this->governanceScope->readerSiteIds(
+            $user,
+            'medications.reports.export',
+            $siteId,
+            $clientId,
+        );
+        $readerSiteIds = $siteId !== null ? [$siteId] : $siteIds;
 
-        $q = $this->baseQuery();
-        if ($request->filled('client_id')) $q->where('client_id', (int) $request->query('client_id'));
+        $q = $this->baseQuery($this->clientIds($readerSiteIds));
+        if ($clientId !== null) $q->where('client_id', $clientId);
         if ($request->filled('user_id')) $q->where('user_id', (int) $request->query('user_id'));
         if ($request->filled('from')) $q->whereDate('created_at', '>=', $request->query('from'));
         if ($request->filled('to')) $q->whereDate('created_at', '<=', $request->query('to'));
@@ -88,7 +135,7 @@ class MedicationAuditController extends Controller
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
-            $this->putCsv($out, ['Time', 'Action', 'Type', 'ID', 'Client', 'User', 'Meta']);
+            $this->putCsv($out, ['Time', 'Action', 'Type', 'ID', 'Client', 'User', 'Changed fields']);
             $q->limit(5000)->get()->each(function ($l) use ($out) {
                 $this->putCsv($out, [
                     optional($l->created_at)->toDateTimeString(),
@@ -97,10 +144,36 @@ class MedicationAuditController extends Controller
                     $l->auditable_id,
                     $l->client ? trim($l->client->first_name . ' ' . $l->client->last_name) : '',
                     $l->user?->name ?? '',
-                    json_encode($l->meta ?? []),
+                    implode(', ', $this->safeMeta($l->meta)['fields']),
                 ]);
             });
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * @param  array<int, int>  $siteIds
+     * @return array<int, int>
+     */
+    private function clientIds(array $siteIds): array
+    {
+        return Client::query()
+            ->whereIn('site_id', $siteIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** @return array{fields: array<int, string>} */
+    private function safeMeta(mixed $meta): array
+    {
+        $fields = is_array($meta) ? ($meta['fields'] ?? []) : [];
+
+        return [
+            'fields' => collect(is_array($fields) ? $fields : [])
+                ->filter(fn ($field) => is_string($field) && $field !== '')
+                ->values()
+                ->all(),
+        ];
     }
 }

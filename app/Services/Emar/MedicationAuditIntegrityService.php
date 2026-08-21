@@ -23,24 +23,14 @@ class MedicationAuditIntegrityService
     /**
      * @return array<string, mixed>
      */
-    public function forModel(?Model $model): array
+    public function forModel(Model $model): array
     {
-        if (! $model) {
-            return [
-                'backed' => false,
-                'note' => 'Derived from the live medication schedule — there is no single stored record to fingerprint.',
-                'recorded_at' => null,
-                'device' => null,
-                'ip_address' => null,
-                'edited' => null,
-                'edit_count' => 0,
-                'fingerprint' => null,
-            ];
-        }
+        $clientId = (int) $model->getAttribute('client_id');
 
         $logs = AuditLog::query()
             ->where('auditable_type', $model->getMorphClass())
             ->where('auditable_id', $model->getKey())
+            ->where('client_id', $clientId)
             ->orderBy('id')
             ->get(['id', 'action', 'ip_address', 'user_agent', 'created_at']);
 

@@ -33,9 +33,9 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
     {
         foreach ([
             'emar.audit' => 'permission:medications.audit.view',
-            'emar.pdf.mar' => 'permission:medications.reports.export|reports.viewAny',
-            'emar.pdf.round_sheet' => 'permission:medications.reports.export|reports.viewAny',
-            'emar.pdf.cd_register' => 'permission:medications.reports.export|reports.viewAny',
+            'emar.pdf.mar' => 'permission:medications.reports.export',
+            'emar.pdf.round_sheet' => 'permission:medications.reports.export',
+            'emar.pdf.cd_register' => 'permission:medications.reports.export',
         ] as $routeName => $actionMiddleware) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             $this->assertContains('permission:medications.view', $middleware, $routeName);
@@ -50,11 +50,16 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             'api.medications.dashboard.widgets',
             'api.medications.alerts.index',
             'api.medications.alerts.client',
-            'api.medications.alerts.acknowledge',
         ] as $routeName) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             $this->assertContains('permission:medications.view', $middleware, $routeName);
             $this->assertStringNotContainsString('clients.viewAny', implode('|', $middleware), $routeName);
+        }
+        foreach (['api.medications.alerts.acknowledge', 'api.medications.alerts.resolve'] as $routeName) {
+            $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
+            $this->assertContains('permission:medications.view', $middleware, $routeName);
+            $this->assertContains('permission:medications.administer.correct', $middleware, $routeName);
+            $this->assertStringNotContainsString('clients.update', implode('|', $middleware), $routeName);
         }
     }
 
@@ -64,12 +69,12 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $localReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
-            'reports.viewAny',
+            'medications.reports.export',
         ], $context['local_site']);
         $noSiteReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
-            'reports.viewAny',
+            'medications.reports.export',
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         ]);
 
@@ -156,7 +161,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $reader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
-            'reports.viewAny',
+            'medications.reports.export',
+            'medications.administer.correct',
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         ], $context['local_site']);
 
@@ -197,14 +203,52 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             ->postJson(route('api.medications.alerts.acknowledge', $context['local_alert']))
             ->assertOk()
             ->assertJson(['success' => true]);
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.acknowledge', $context['local_alert']))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', $context['foreign_alert']), ['resolution_notes' => 'Foreign'])
+            ->assertNotFound();
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', $context['forged_alert']), ['resolution_notes' => 'Forged'])
+            ->assertNotFound();
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', ['alertId' => 999999]), ['resolution_notes' => 'Missing'])
+            ->assertNotFound();
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', $context['local_alert']), ['resolution_notes' => 'Reviewed locally'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', $context['local_alert']), ['resolution_notes' => 'Reviewed locally'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.resolve', $context['local_alert']), ['resolution_notes' => 'Conflicting replay'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('resolution_notes');
+        $this->actingAs($reader)
+            ->postJson(route('api.medications.alerts.acknowledge', $context['local_alert']))
+            ->assertOk()
+            ->assertJson(['success' => false]);
+        $this->assertSame('active', $context['foreign_alert']->refresh()->status);
+        $this->assertSame('active', $context['forged_alert']->refresh()->status);
 
         $clientsOnly = $this->userWithPermissions(['clients.viewAny'], $context['local_site']);
         $this->actingAs($clientsOnly)->getJson(route('api.medications.alerts.index'))->assertForbidden();
         $this->actingAs($clientsOnly)->getJson(route('api.medications.dashboard.widgets'))->assertForbidden();
+        $clientsUpdateOnly = $this->userWithPermissions(['clients.update'], $context['local_site']);
+        $this->actingAs($clientsUpdateOnly)
+            ->postJson(route('api.medications.alerts.acknowledge', $context['foreign_alert']))
+            ->assertForbidden();
+        $this->actingAs($clientsUpdateOnly)
+            ->postJson(route('api.medications.alerts.resolve', $context['foreign_alert']), ['resolution_notes' => 'No authority'])
+            ->assertForbidden();
 
         $actionOnly = $this->userWithPermissions([
             'medications.audit.view',
-            'reports.viewAny',
+            'medications.reports.export',
         ], $context['local_site']);
         $this->actingAs($actionOnly)->get(route('emar.audit'))->assertForbidden();
         $this->actingAs($actionOnly)
@@ -218,19 +262,42 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $this->actingAs($moduleOnly)
             ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id]))
             ->assertForbidden();
+        $this->actingAs($moduleOnly)
+            ->postJson(route('api.medications.alerts.acknowledge', $context['foreign_alert']))
+            ->assertForbidden();
+
+        $alertActionOnly = $this->userWithPermissions([
+            'medications.administer.correct',
+        ], $context['local_site']);
+        $this->actingAs($alertActionOnly)
+            ->postJson(route('api.medications.alerts.acknowledge', $context['foreign_alert']))
+            ->assertForbidden();
 
         $exportWithoutControlled = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
-            'reports.viewAny',
+            'medications.reports.export',
         ], $context['local_site']);
         $this->actingAs($exportWithoutControlled)
             ->get(route('emar.pdf.cd_register', ['client_id' => $context['local_client']->id]))
             ->assertForbidden();
 
+        $generalReportsOnly = $this->userWithPermissions([
+            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'reports.viewAny',
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+        ], $context['local_site']);
+        foreach (['emar.pdf.mar', 'emar.pdf.round_sheet', 'emar.pdf.cd_register'] as $routeName) {
+            $parameters = $routeName === 'emar.pdf.round_sheet'
+                ? []
+                : ['client_id' => $context['local_client']->id];
+            $this->actingAs($generalReportsOnly)->get(route($routeName, $parameters))->assertForbidden();
+        }
+
         foreach (MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS as $bypassPermission) {
             $globalWithoutActions = $this->userWithPermissions([
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
                 MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+                'reports.viewAny',
                 $bypassPermission,
             ]);
             $this->actingAs($globalWithoutActions)->get(route('emar.audit'))->assertForbidden();
@@ -253,7 +320,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             $global = $this->userWithPermissions([
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
                 'medications.audit.view',
-                'reports.viewAny',
+                'medications.reports.export',
+                'medications.administer.correct',
                 MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
                 $bypassPermission,
             ]);
@@ -281,6 +349,10 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
                 [$context['local_alert']->id, $context['foreign_alert']->id],
                 collect($widgets->json('overdue_meds.items'))->pluck('id')->all(),
             );
+            $this->actingAs($global)
+                ->postJson(route('api.medications.alerts.acknowledge', $context['foreign_alert']))
+                ->assertOk()
+                ->assertJson(['success' => true]);
 
             $this->actingAs($global)->get(route('emar.pdf.round_sheet'))->assertOk();
             $this->assertEqualsCanonicalizing(

@@ -15,6 +15,7 @@ use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -460,19 +461,38 @@ class DashboardController extends Controller
         // eMAR widget
         $emarWidgets = null;
         if ($user->canDo('medications.view')) {
-            $todayAdmins = \App\Models\ClientMedicationAdministration::whereDate('scheduled_for', $today)
-                ->orWhereDate('administered_at', $today)
+            $medicationScope = app(MedicationGovernanceScopeService::class);
+            $siteIds = $medicationScope->readerSiteIds(
+                $user,
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            );
+            $todayAdminQuery = \App\Models\ClientMedicationAdministration::query()
+                ->where(function ($query) use ($today): void {
+                    $query->whereDate('scheduled_for', $today)
+                        ->orWhereDate('administered_at', $today);
+                });
+            $todayAdmins = $medicationScope
+                ->scopeCanonicalClientMedicationRows($todayAdminQuery, $siteIds, false)
                 ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status='given' THEN 1 ELSE 0 END) as given")
                 ->first();
+            $alertQuery = $medicationScope->scopeCanonicalClientMedicationRows(
+                \App\Models\MedicationDashboardAlert::query()->where('status', 'active'),
+                $siteIds,
+            );
             $emarTotal = (int) ($todayAdmins->total ?? 0);
             $emarGiven = (int) ($todayAdmins->given ?? 0);
             $emarWidgets = [
                 'adminRate' => $emarTotal > 0 ? round(($emarGiven / $emarTotal) * 100, 1) : 0,
                 'pending' => $emarTotal - $emarGiven,
-                'activeAlerts' => \App\Models\MedicationDashboardAlert::where('status', 'active')->count(),
+                'activeAlerts' => $alertQuery->count(),
                 'overdueReviews' => \App\Models\MedicationReview::where('status', 'scheduled')
-                    ->where('scheduled_date', '<', $today->toDateString())->count(),
-                'lowStock' => \App\Models\ClientMedicationStock::whereHas('medication', fn ($q) => $q->where('state', 'active')->where('active', true))
+                    ->whereHas('client', fn ($query) => $query->whereIn('site_id', $siteIds))
+                    ->where('scheduled_date', '<', $today->toDateString())
+                    ->count(),
+                'lowStock' => \App\Models\ClientMedicationStock::whereHas('medication', fn ($query) => $query
+                    ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
+                    ->where('state', 'active')
+                    ->where('active', true))
                     ->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level')->count(),
             ];
         }

@@ -96,7 +96,9 @@ class EmarController extends Controller
             'manage_stock' => (bool) $user && $user->canDo('medications.stock.update'),
             'view_controlled' => (bool) $user && $user->canDo('medications.controlled.view'),
             'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
-            'export_reports' => (bool) $user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')),
+            'export_reports' => (bool) $user
+                && $user->canDo('medications.view')
+                && $user->canDo('medications.reports.export'),
         ];
     }
 
@@ -2712,7 +2714,8 @@ class EmarController extends Controller
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'board_user' => $this->boardPayload->boardUser($user),
             'can_manage' => (bool) $user?->canDo('medications.orders.manage'),
-            'can_export' => (bool) ($user?->canDo('medications.reports.export') || $user?->canDo('reports.viewAny')),
+            'can_export' => (bool) $user?->canDo('medications.view')
+                && (bool) $user?->canDo('medications.reports.export'),
         ]);
     }
 
@@ -5936,7 +5939,7 @@ class EmarController extends Controller
 
     public function dismissAlert(MedicationDashboardAlert $alert)
     {
-        app(MedicationAlertService::class)->acknowledgeAlert($alert->id, auth()->id());
+        app(MedicationAlertService::class)->acknowledgeAlert($alert, auth()->id());
 
         return redirect()->back();
     }
