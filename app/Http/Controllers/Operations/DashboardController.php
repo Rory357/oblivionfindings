@@ -3,45 +3,41 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\ClientIncident;
-use App\Models\Shift;
 use App\Models\Site;
-use App\Models\Timesheet;
+use App\Models\User;
+use App\Services\Operations\OperationsDashboardScopeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly OperationsDashboardScopeService $scope,
+    ) {}
+
     public function __invoke(Request $request)
     {
-        $auth = $request->user();
-        $orgId = $auth->organization_id ?? null;
+        $auth = $this->scope->authorize($request->user());
 
         // ── Client stats ────────────────────────────────────────────
-        $totalClients = Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        $totalClients = $this->scope->clients($auth)
             ->count();
 
-        $activeClients = Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        $activeClients = $this->scope->clients($auth)
             ->where('status', 'active')
             ->count();
 
-        $newClientsThisMonth = Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        $newClientsThisMonth = $this->scope->clients($auth)
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
 
-        $onboardingClients = Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        $onboardingClients = $this->scope->clients($auth)
             ->where('status', 'onboarding')
             ->count();
 
-        $clientStatusBreakdown = Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        $clientStatusBreakdown = $this->scope->clients($auth)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -53,7 +49,7 @@ class DashboardController extends Controller
         $weekStart = Carbon::now()->startOfWeek(Carbon::MONDAY);
         $weekEnd = Carbon::now()->endOfWeek(Carbon::SUNDAY);
 
-        $shiftsToday = Shift::query()
+        $shiftsToday = $this->scope->shifts($auth)
             ->whereDate('starts_at', $today)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
@@ -62,7 +58,7 @@ class DashboardController extends Controller
 
         $shiftsTodayTotal = array_sum($shiftsToday);
 
-        $shiftStatusBreakdown = Shift::query()
+        $shiftStatusBreakdown = $this->scope->shifts($auth)
             ->where('starts_at', '>=', $weekStart)
             ->where('starts_at', '<=', $weekEnd)
             ->selectRaw('status, COUNT(*) as count')
@@ -71,13 +67,13 @@ class DashboardController extends Controller
             ->toArray();
         $shiftsThisWeekTotal = array_sum($shiftStatusBreakdown);
 
-        $unassignedShifts = Shift::query()
+        $unassignedShifts = $this->scope->shifts($auth)
             ->whereNull('user_id')
             ->where('starts_at', '>', now())
             ->where('status', 'scheduled')
             ->count();
 
-        $urgentUnassigned = Shift::query()
+        $urgentUnassigned = $this->scope->shifts($auth)
             ->whereNull('user_id')
             ->where('starts_at', '>', now())
             ->where('starts_at', '<', now()->addHours(24))
@@ -85,14 +81,14 @@ class DashboardController extends Controller
             ->count();
 
         // Staff currently on shift (in-progress shifts).
-        $staffOnShift = Shift::query()
+        $staffOnShift = $this->scope->shifts($auth)
             ->where('status', 'in_progress')
             ->whereNotNull('user_id')
             ->distinct('user_id')
             ->count('user_id');
 
         // ── Hours this week ─────────────────────────────────────────
-        $hoursThisWeek = Timesheet::query()
+        $hoursThisWeek = $this->scope->timesheets($auth)
             ->where('status', 'approved')
             ->whereBetween('work_date', [$weekStart, $weekEnd])
             ->get()
@@ -100,23 +96,23 @@ class DashboardController extends Controller
 
         $lastWeekStart = (clone $weekStart)->subWeek();
         $lastWeekEnd = (clone $weekEnd)->subWeek();
-        $hoursLastWeek = Timesheet::query()
+        $hoursLastWeek = $this->scope->timesheets($auth)
             ->where('status', 'approved')
             ->whereBetween('work_date', [$lastWeekStart, $lastWeekEnd])
             ->get()
             ->sum(fn ($ts) => $this->timesheetHours($ts));
 
         // ── Timesheet stats ─────────────────────────────────────────
-        $timesheetsPending = Timesheet::query()
+        $timesheetsPending = $this->scope->timesheets($auth)
             ->where('status', 'submitted')
             ->count();
 
-        $timesheetsOverdue = Timesheet::query()
+        $timesheetsOverdue = $this->scope->timesheets($auth)
             ->where('status', 'submitted')
             ->where('submitted_at', '<', now()->subDays(3))
             ->count();
 
-        $timesheetStatusBreakdown = Timesheet::query()
+        $timesheetStatusBreakdown = $this->scope->timesheets($auth)
             ->where('work_date', '>=', now()->subDays(30))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
@@ -128,7 +124,7 @@ class DashboardController extends Controller
         for ($i = 7; $i >= 0; $i--) {
             $ws = Carbon::now()->startOfWeek(Carbon::MONDAY)->subWeeks($i);
             $we = (clone $ws)->endOfWeek(Carbon::SUNDAY);
-            $hours = Timesheet::query()
+            $hours = $this->scope->timesheets($auth)
                 ->where('status', 'approved')
                 ->whereBetween('work_date', [$ws, $we])
                 ->get()
@@ -140,8 +136,7 @@ class DashboardController extends Controller
         $clientsTrend12wk = [];
         for ($i = 11; $i >= 0; $i--) {
             $weekDate = Carbon::now()->subWeeks($i)->endOfWeek(Carbon::SUNDAY);
-            $count = Client::query()
-                ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            $count = $this->scope->clients($auth)
                 ->where('status', 'active')
                 ->where('created_at', '<=', $weekDate)
                 ->count();
@@ -149,7 +144,7 @@ class DashboardController extends Controller
         }
 
         // ── Recent activity (broader event types) ───────────────────
-        $recentShifts = Shift::query()
+        $recentShifts = $this->scope->shifts($auth)
             ->with(['client:id,first_name,last_name', 'staff:id,name'])
             ->latest('updated_at')
             ->limit(6)
@@ -165,7 +160,7 @@ class DashboardController extends Controller
                 'updated_at' => $s->updated_at?->toISOString(),
             ]);
 
-        $recentTimesheets = Timesheet::query()
+        $recentTimesheets = $this->scope->timesheets($auth)
             ->with(['client:id,first_name,last_name', 'staff:id,name'])
             ->whereIn('status', ['submitted', 'approved', 'rejected'])
             ->latest('updated_at')
@@ -181,7 +176,7 @@ class DashboardController extends Controller
                 'updated_at' => $ts->updated_at?->toISOString(),
             ]);
 
-        $recentIncidents = ClientIncident::query()
+        $recentIncidents = $this->scope->incidents($auth)
             ->with(['client:id,first_name,last_name'])
             ->whereIn('status', ['submitted', 'reviewed'])
             ->latest('updated_at')
@@ -208,14 +203,14 @@ class DashboardController extends Controller
         $shiftsPerDay = [];
         for ($i = 0; $i < 7; $i++) {
             $day = Carbon::today()->addDays($i);
-            $scheduled = Shift::query()
+            $scheduled = $this->scope->shifts($auth)
                 ->whereDate('starts_at', $day)
                 ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
                 ->count();
             $delivered = $i === 0
-                ? Shift::query()->whereDate('starts_at', $day)->whereIn('status', ['in_progress', 'completed'])->count()
+                ? $this->scope->shifts($auth)->whereDate('starts_at', $day)->whereIn('status', ['in_progress', 'completed'])->count()
                 : null;
-            $staffCount = Shift::query()
+            $staffCount = $this->scope->shifts($auth)
                 ->whereDate('starts_at', $day)
                 ->whereNotNull('user_id')
                 ->distinct('user_id')
@@ -228,7 +223,7 @@ class DashboardController extends Controller
                 'count' => $scheduled,
                 'scheduled' => $scheduled,
                 'delivered' => $delivered,
-                'target' => max(1, (int) round($scheduled * 0.97)),
+                'target' => $scheduled > 0 ? max(1, (int) round($scheduled * 0.97)) : 0,
                 'staff' => $staffCount,
                 'is_today' => $i === 0,
                 'is_forecast' => $i >= 4,
@@ -236,9 +231,7 @@ class DashboardController extends Controller
         }
 
         // ── Sites for hero / timeline / top_sites ────────────────────
-        $sites = Site::query()
-            ->where('is_active', true)
-            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+        $sites = $this->scope->sites($auth)
             ->orderBy('name')
             ->limit(20)
             ->get();
@@ -246,15 +239,13 @@ class DashboardController extends Controller
         $regionsCount = $sites->pluck('resolved_region')->filter()->unique()->count();
 
         // Top sites by approved hours this week
-        $topSites = Site::query()
-            ->where('is_active', true)
-            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+        $topSites = $this->scope->sites($auth)
             ->withCount([
                 'clients as client_count',
             ])
             ->get()
-            ->map(function (Site $site) use ($weekStart, $weekEnd) {
-                $hours = Timesheet::query()
+            ->map(function (Site $site) use ($auth, $weekStart, $weekEnd) {
+                $hours = $this->scope->timesheets($auth)
                     ->where('status', 'approved')
                     ->whereBetween('work_date', [$weekStart, $weekEnd])
                     ->whereHas('client', fn ($q) => $q->where('site_id', $site->id))
@@ -282,69 +273,68 @@ class DashboardController extends Controller
         unset($ts);
 
         // ── Today's shift timeline ──────────────────────────────────
-        $todayShifts = Shift::query()
+        $todayShifts = $this->scope->shifts($auth)
             ->with(['client:id,first_name,last_name,site_id', 'staff:id,name'])
             ->whereDate('starts_at', $today)
             ->get();
 
-        $timeline = $this->buildTimeline($todayShifts, $sites, $now);
+        $timeline = $this->buildTimeline($todayShifts, $sites, $now, $auth);
 
         // ── Hero summary ────────────────────────────────────────────
-        $unassignedToday = Shift::query()
+        $unassignedToday = $this->scope->shifts($auth)
             ->whereDate('starts_at', $today)
             ->whereNull('user_id')
             ->count();
         $coveragePct = $shiftsTodayTotal > 0
             ? (int) round(max(0, ($shiftsTodayTotal - $unassignedToday)) / $shiftsTodayTotal * 100)
-            : 100;
+            : 0;
 
         // ── Compliance & clock-in (computed from available data, stub fallback) ─
-        $totalStaffActive = \App\Models\User::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
-            ->count();
-        $totalStaffActive = max($totalStaffActive, 1);
+        $totalStaffActive = $this->scope->staff($auth)->count();
 
         // No clock-in tracking table available — derive from shift status.
         $todayInProgress = (int) ($shiftsToday['in_progress'] ?? 0);
         $todayCompleted = (int) ($shiftsToday['completed'] ?? 0);
-        $todayActiveShifts = max(1, $todayInProgress + $todayCompleted);
-        $latePct = 6;
+        $todayActiveShifts = $todayInProgress + $todayCompleted;
+        $latePct = $todayActiveShifts > 0 ? 6 : 0;
         $noShowPct = 0;
-        $onTimePct = 100 - $latePct - $noShowPct;
+        $onTimePct = $todayActiveShifts > 0 ? 100 - $latePct - $noShowPct : 0;
         $clockIn = [
             'adherence_pct' => $onTimePct,
             'on_time' => (int) round($todayActiveShifts * ($onTimePct / 100)),
             'late' => (int) round($todayActiveShifts * ($latePct / 100)),
             'no_show' => (int) round($todayActiveShifts * ($noShowPct / 100)),
-            'avg_late_sec' => 72,
-            'delta_pp' => 3,
+            'avg_late_sec' => $todayActiveShifts > 0 ? 72 : 0,
+            'delta_pp' => $todayActiveShifts > 0 ? 3 : 0,
         ];
 
         // Compliance: pull from SiteComplianceCheck where available, else stub.
-        $complianceTotal = max(1, $totalStaffActive);
+        $complianceTotal = $totalStaffActive;
         $complianceExpiring = (int) round($complianceTotal * 0.10);
         $complianceExpired = (int) round($complianceTotal * 0.04);
         $complianceCurrent = $complianceTotal - $complianceExpiring - $complianceExpired;
-        $compliancePct = (int) round(($complianceCurrent / $complianceTotal) * 100);
+        $compliancePct = $complianceTotal > 0
+            ? (int) round(($complianceCurrent / $complianceTotal) * 100)
+            : 0;
         $compliance = [
             'pct' => $compliancePct,
             'current' => $complianceCurrent,
             'expiring_30d' => $complianceExpiring,
             'expired' => $complianceExpired,
             'target_pct' => 95,
-            'current_pct' => (int) round($complianceCurrent / $complianceTotal * 100),
-            'expiring_pct' => (int) round($complianceExpiring / $complianceTotal * 100),
-            'expired_pct' => (int) round($complianceExpired / $complianceTotal * 100),
+            'current_pct' => $complianceTotal > 0 ? (int) round($complianceCurrent / $complianceTotal * 100) : 0,
+            'expiring_pct' => $complianceTotal > 0 ? (int) round($complianceExpiring / $complianceTotal * 100) : 0,
+            'expired_pct' => $complianceTotal > 0 ? (int) round($complianceExpired / $complianceTotal * 100) : 0,
         ];
 
         // ── Open incidents (last 48h) for needs-attention card ──────
-        $openIncidentsCount = ClientIncident::query()
+        $openIncidentsCount = $this->scope->incidents($auth)
             ->whereIn('status', ['submitted', 'reviewed'])
             ->where('updated_at', '>=', now()->subHours(48))
             ->count();
 
         // Roster conflicts (rough: any staff member with > 1 overlapping shift this week)
-        $conflictsCount = $this->estimateConflicts($weekStart, $weekEnd);
+        $conflictsCount = $this->estimateConflicts($weekStart, $weekEnd, $auth);
 
         // ── Attention payload (real counts + representative details) ─
         $attention = $this->buildAttention(
@@ -355,6 +345,7 @@ class DashboardController extends Controller
             conflicts: $conflictsCount,
             incidents: $openIncidentsCount,
             hoursThisWeek: $hoursThisWeek,
+            actor: $auth,
         );
 
         // ── Hours week sparkline (use weekly trend, pad to 12) ──────
@@ -410,7 +401,7 @@ class DashboardController extends Controller
                 'unassigned_open_24h' => $urgentUnassigned,
                 'on_leave' => 0,
                 'sites_count' => $sitesCount,
-                'regions_count' => max(1, $regionsCount),
+                'regions_count' => $regionsCount,
                 'rostered_today' => $staffOnShift + (int) ($shiftsToday['scheduled'] ?? 0),
             ],
             'attention' => $attention,
@@ -460,10 +451,10 @@ class DashboardController extends Controller
         return (float) max(0, $hours - ($ts->break_minutes ?? 0) / 60);
     }
 
-    private function estimateConflicts(Carbon $weekStart, Carbon $weekEnd): int
+    private function estimateConflicts(Carbon $weekStart, Carbon $weekEnd, User $actor): int
     {
         // Rough: count distinct staff who have 2+ shifts on the same day this week.
-        $duplicates = Shift::query()
+        $duplicates = $this->scope->shifts($actor)
             ->whereBetween('starts_at', [$weekStart, $weekEnd])
             ->whereNotNull('user_id')
             ->selectRaw('user_id, DATE(starts_at) as d, COUNT(*) as c')
@@ -478,7 +469,7 @@ class DashboardController extends Controller
      * @param  \Illuminate\Support\Collection<int,\App\Models\Shift>  $todayShifts
      * @param  \Illuminate\Support\Collection<int,\App\Models\Site>   $sites
      */
-    private function buildTimeline($todayShifts, $sites, Carbon $now): array
+    private function buildTimeline($todayShifts, $sites, Carbon $now, User $actor): array
     {
         $dayStart = Carbon::today()->startOfDay();
         $nowPct = max(0.0, min(1.0, ($now->getTimestamp() - $dayStart->getTimestamp()) / 86400));
@@ -507,13 +498,14 @@ class DashboardController extends Controller
         };
 
         // Group by site
-        $bySite = $sites->take(6)->map(function (Site $site) use ($todayShifts, $bar) {
+        $bySite = $sites->take(6)->map(function (Site $site) use ($actor, $todayShifts, $bar) {
             $siteShifts = $todayShifts->filter(fn ($s) => $s->client?->site_id === $site->id);
             $bars = $siteShifts->map(fn ($s) => $bar($s))->filter()->values()->all();
+            $clientCount = $this->scope->clients($actor)->where('site_id', $site->id)->count();
             return [
                 'key' => 'site-' . $site->id,
                 'label' => $site->name,
-                'sublabel' => trim(($site->resolved_region ?? '') . ' · ' . $site->clients()->count() . ' clients', ' ·'),
+                'sublabel' => trim(($site->resolved_region ?? '') . ' · ' . $clientCount . ' clients', ' ·'),
                 'icon' => 'building-2',
                 'bars' => $bars,
                 'href' => '/sites/' . $site->id,
@@ -621,10 +613,11 @@ class DashboardController extends Controller
         int $conflicts,
         int $incidents,
         float $hoursThisWeek,
+        User $actor,
     ): array {
         // Real counts wired to representative sub-rows. Sub-rows come from
         // actual queries when data exists, otherwise show a friendly state.
-        $unassignedRows = Shift::query()
+        $unassignedRows = $this->scope->shifts($actor)
             ->whereNull('user_id')
             ->where('starts_at', '>', now())
             ->where('starts_at', '<', now()->addHours(48))
@@ -646,7 +639,7 @@ class DashboardController extends Controller
                 ];
             })->values()->all();
 
-        $pendingRows = Timesheet::query()
+        $pendingRows = $this->scope->timesheets($actor)
             ->where('status', 'submitted')
             ->with(['staff:id,name', 'client.site'])
             ->orderBy('submitted_at')
@@ -663,7 +656,7 @@ class DashboardController extends Controller
                 ];
             })->values()->all();
 
-        $incidentRows = ClientIncident::query()
+        $incidentRows = $this->scope->incidents($actor)
             ->with(['client.site'])
             ->whereIn('status', ['submitted', 'reviewed'])
             ->where('updated_at', '>=', now()->subDays(2))

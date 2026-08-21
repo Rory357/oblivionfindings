@@ -13,6 +13,7 @@ class OperationsPermissionsSeeder extends Seeder
         $permissions = [
             // Operations Dashboard
             ['key' => 'operations.dashboard.view', 'description' => 'View Operations Dashboard'],
+            ['key' => 'operations.dashboard.viewAllSites', 'description' => 'View Operations Dashboard Across All Sites'],
 
             // Care Plans
             ['key' => 'care_plans.viewAny', 'description' => 'View Care Plans'],

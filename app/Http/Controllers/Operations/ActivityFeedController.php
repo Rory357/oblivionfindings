@@ -3,19 +3,19 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\Shift;
-use App\Models\Timesheet;
+use App\Services\Operations\OperationsDashboardScopeService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class ActivityFeedController extends Controller
 {
+    public function __construct(
+        private readonly OperationsDashboardScopeService $scope,
+    ) {}
+
     public function index(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('clients.viewAny') || $auth->canDo('shifts.viewAny')), 403);
+        $auth = $this->scope->authorize($request->user());
 
         $filter = $request->get('filter', 'all');
         $perPage = 25;
@@ -24,7 +24,7 @@ class ActivityFeedController extends Controller
 
         // Recent shifts (completed, started, cancelled)
         if ($filter === 'all' || $filter === 'shifts') {
-            $shifts = Shift::query()
+            $shifts = $this->scope->shifts($auth)
                 ->with(['client:id,first_name,last_name', 'staff:id,name'])
                 ->whereIn('status', ['completed', 'in_progress', 'cancelled'])
                 ->where('updated_at', '>=', now()->subDays(7))
@@ -51,7 +51,7 @@ class ActivityFeedController extends Controller
 
         // Recent timesheet submissions/approvals
         if ($filter === 'all' || $filter === 'timesheets') {
-            $timesheets = Timesheet::query()
+            $timesheets = $this->scope->timesheets($auth)
                 ->with(['client:id,first_name,last_name', 'staff:id,name'])
                 ->whereIn('status', ['submitted', 'approved', 'rejected'])
                 ->where('updated_at', '>=', now()->subDays(7))
@@ -73,7 +73,7 @@ class ActivityFeedController extends Controller
 
         // New clients
         if ($filter === 'all' || $filter === 'clients') {
-            $newClients = Client::query()
+            $newClients = $this->scope->clients($auth)
                 ->where('created_at', '>=', now()->subDays(7))
                 ->latest('created_at')
                 ->limit(20)
