@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import type React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HeroClusterTile, HeroComplianceBadges } from './hs-hero-kit';
+
+const mockPage = vi.hoisted(() => ({
+    certification_status: 'unknown',
+    first_aid_coverage_status: 'unknown',
+}));
 
 vi.mock('@inertiajs/react', () => ({
     Link: ({
@@ -17,25 +22,60 @@ vi.mock('@inertiajs/react', () => ({
             {children}
         </a>
     ),
+    usePage: () => ({
+        props: {
+            nzsAssurance: mockPage,
+        },
+    }),
 }));
 
 describe('HeroComplianceBadges — canonical NZ labels', () => {
-    it('renders the five canonical labels in the healthy state', () => {
+    beforeEach(() => {
+        mockPage.certification_status = 'unknown';
+        mockPage.first_aid_coverage_status = 'unknown';
+    });
+
+    it('renders unknown assurance without resolver-backed evidence', () => {
         render(<HeroComplianceBadges worksafeAwaiting={0} sdsExpiring={0} />);
 
         expect(
             screen.getByText('WorkSafe notifiable · 0 awaiting'),
         ).toBeInTheDocument();
-        // The :2021 suffix is part of the canonical wording — analytics was missing it.
         expect(
-            screen.getByText('Ngā Paerewa NZS 8134:2021 · Certified'),
+            screen.getByText('Ngā Paerewa NZS 8134:2021 · Evidence unknown'),
         ).toBeInTheDocument();
         // Lower-case "substances".
         expect(
             screen.getByText('Hazardous substances · SDS current'),
         ).toBeInTheDocument();
         expect(screen.getByText('Fire · Drills current')).toBeInTheDocument();
-        expect(screen.getByText('First aid · Cover OK')).toBeInTheDocument();
+        expect(screen.getByText('First aid · Cover unknown')).toBeInTheDocument();
+    });
+
+    it('retains green claims only for explicit resolver-backed positive states', () => {
+        mockPage.certification_status = 'certified';
+        mockPage.first_aid_coverage_status = 'certified';
+        render(<HeroComplianceBadges />);
+
+        expect(
+            screen.getByText('Ngā Paerewa NZS 8134:2021 · Certified'),
+        ).toHaveClass('bg-primary-foreground/10');
+        expect(screen.getByText('First aid · Cover OK')).toHaveClass(
+            'bg-primary-foreground/10',
+        );
+    });
+
+    it('renders action-required assurance without success chrome', () => {
+        mockPage.certification_status = 'action_required';
+        mockPage.first_aid_coverage_status = 'action_required';
+        render(<HeroComplianceBadges />);
+
+        expect(
+            screen.getByText('Ngā Paerewa NZS 8134:2021 · Action required'),
+        ).toHaveClass('bg-status-warning/25');
+        expect(screen.getByText('First aid · Cover gaps')).toHaveClass(
+            'bg-status-warning/25',
+        );
     });
 
     it('escalates WorkSafe + SDS to warning chrome when counts are non-zero', () => {

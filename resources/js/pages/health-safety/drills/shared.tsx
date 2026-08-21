@@ -166,7 +166,6 @@ export type DrillHero = {
         drills_overdue: number;
         sites_overdue: number;
         fenz_reviews_due: number;
-        nga_paerewa_certified: boolean;
     };
 };
 

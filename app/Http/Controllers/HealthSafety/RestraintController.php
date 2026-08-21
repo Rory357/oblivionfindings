@@ -240,7 +240,6 @@ class RestraintController extends Controller
             'badges' => [
                 'unreviewed' => $events()->whereNull('reviewed_at')->count(),
                 'plans_overdue' => $plans()->where('status', 'active')->whereNotNull('review_date')->where('review_date', '<', now())->count(),
-                'nga_paerewa_certified' => true,
                 'reduction_trend_pct' => $reduction,
             ],
         ];

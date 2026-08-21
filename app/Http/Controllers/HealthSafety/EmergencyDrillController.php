@@ -137,7 +137,6 @@ class EmergencyDrillController extends Controller
                 'drills_overdue' => $overdue,
                 'sites_overdue' => $complianceSummary['overdue'],
                 'fenz_reviews_due' => $fenzReviewsDue,
-                'nga_paerewa_certified' => $complianceSummary['overdue'] === 0 && $fenzReviewsDue === 0,
             ],
         ];
 

@@ -30,7 +30,9 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    ngaPaerewaBadge,
     type HeroComplianceBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
@@ -50,7 +52,6 @@ import { type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
-    BadgeCheck,
     Ban,
     Bell,
     CircleSlash,
@@ -128,7 +129,6 @@ type Props = {
     badges: {
         worksafe_awaiting: number;
         sds_to_action: number;
-        nga_paerewa_certified: boolean;
     };
     sites: { id: number; name: string }[];
     can: { create: boolean; manage: boolean };
@@ -243,6 +243,7 @@ export default function SubstancesIndex({
     initialAction,
     detail,
 }: Props) {
+    const assurance = useNzsAssurance();
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [wizardOpen, setWizardOpen] = useState(openWizard);
     const [editSubstance, setEditSubstance] = useState<SubstanceDetail | null>(
@@ -391,11 +392,7 @@ export default function SubstancesIndex({
                     ? `WorkSafe notifiable · ${badges.worksafe_awaiting} awaiting`
                     : 'WorkSafe · none pending',
         },
-        {
-            icon: BadgeCheck,
-            tone: 'success',
-            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
-        },
+        ngaPaerewaBadge(assurance.certification_status),
         {
             icon: FlaskConical,
             tone: badges.sds_to_action > 0 ? 'critical' : 'success',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
@@ -9,7 +10,9 @@ use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\MarScheduleService;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
@@ -142,6 +145,13 @@ class HandleInertiaRequests extends Middleware
 
             'itNavigation' => $user && str_starts_with((string) $request->route()?->getName(), 'it.')
                 ? fn () => ItModuleNavigation::forUser($user)
+                : null,
+
+            // Resolver-backed Site assurance for the existing H&S, clinical and
+            // compliance heroes. Certification and first-aider cover remain separate
+            // signals; inaccessible explicit Site ids always collapse to unknown.
+            'nzsAssurance' => $user && $this->isNzsAssuranceSurface($request)
+                ? fn () => $this->nzsAssuranceForRequest($request, $user)
                 : null,
 
             'auth' => [
@@ -322,6 +332,56 @@ class HandleInertiaRequests extends Middleware
                     : ['unread_count' => 0, 'items' => []],
             ] : null),
         ];
+    }
+
+    private function isNzsAssuranceSurface(Request $request): bool
+    {
+        $name = (string) $request->route()?->getName();
+        $path = trim($request->path(), '/');
+
+        return $path === 'health-safety'
+            || str_starts_with($path, 'health-safety/')
+            || $path === 'health-clinical'
+            || str_starts_with($path, 'health-clinical/')
+            || $path === 'compliance'
+            || in_array($name, [
+                'compliance.hazards',
+                'sites.hazards.index',
+                'sites.compliance.dashboard',
+            ], true);
+    }
+
+    /** @return array{certification_status:string,first_aid_coverage_status:string} */
+    private function nzsAssuranceForRequest(Request $request, User $user): array
+    {
+        $path = trim($request->path(), '/');
+        $name = (string) $request->route()?->getName();
+        if ($path === 'health-clinical' || str_starts_with($path, 'health-clinical/')) {
+            $siteIds = app(ClinicalSiteAccessService::class)->allowedSiteIds($user);
+        } elseif ($name === 'sites.compliance.dashboard') {
+            $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds($user, ['sites.viewAll']);
+        } elseif ($path === 'compliance') {
+            $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
+                $user,
+                ['healthSafety.viewAllSites', 'reports.viewAny'],
+            );
+        } else {
+            $siteIds = app(UserSiteAccessService::class)->accessibleHealthSafetySiteIds($user);
+        }
+
+        $routeSite = $request->route('site');
+        $explicitSiteId = $routeSite instanceof Site
+            ? (int) $routeSite->id
+            : (is_numeric($routeSite) ? (int) $routeSite : null);
+        if ($explicitSiteId === null && $request->filled('site_id')) {
+            $explicitSiteId = $request->integer('site_id');
+        }
+
+        if ($explicitSiteId !== null) {
+            $siteIds = in_array($explicitSiteId, $siteIds, true) ? [$explicitSiteId] : [];
+        }
+
+        return app(NzsAssuranceResolver::class)->resolveSites($siteIds);
     }
 
     /**

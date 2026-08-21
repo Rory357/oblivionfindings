@@ -29,6 +29,8 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    ngaPaerewaBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
@@ -71,7 +73,6 @@ import {
     Pencil,
     Play,
     Plus,
-    ShieldCheck,
     Siren,
     UserPlus,
     Users,
@@ -128,6 +129,8 @@ export default function DrillsIndex({
     detail,
     can,
 }: Props) {
+    const assurance = useNzsAssurance();
+    const nzsBadge = ngaPaerewaBadge(assurance.certification_status);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [pendingSection, setPendingSection] =
         useState<DrillSectionKey>('overview');
@@ -565,17 +568,10 @@ export default function DrillsIndex({
                                                 : 'Fire · drills current'}
                                         </HeroBadge>
                                         <HeroBadge
-                                            icon={ShieldCheck}
-                                            tone={
-                                                b.nga_paerewa_certified
-                                                    ? 'success'
-                                                    : 'warning'
-                                            }
+                                            icon={nzsBadge.icon}
+                                            tone={nzsBadge.tone}
                                         >
-                                            Ngā Paerewa NZS 8134:2021 ·{' '}
-                                            {b.nga_paerewa_certified
-                                                ? 'Certified'
-                                                : 'At risk'}
+                                            {nzsBadge.label}
                                         </HeroBadge>
                                         <HeroBadge
                                             icon={AlertTriangle}

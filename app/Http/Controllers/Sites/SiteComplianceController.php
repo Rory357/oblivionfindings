@@ -11,8 +11,9 @@ use App\Models\SiteComplianceCheck;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteFeedback;
 use App\Models\SiteStaffRequirement;
-use App\Models\User;
-use App\Services\UserSiteAccessService;
+use App\Enums\AssuranceStatus;
+use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\Assurance\SiteCertificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +22,8 @@ use Illuminate\Validation\ValidationException;
 class SiteComplianceController extends Controller
 {
     public function __construct(
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly SiteCertificationService $certifications,
+        private readonly NzsAssuranceResolver $assurance,
     ) {}
 
     public function dashboard(Request $request, Site $site)
@@ -38,6 +40,10 @@ class SiteComplianceController extends Controller
             ->get();
 
         $certsByStatus = $certifications->groupBy('status');
+        $nzsStatus = $this->assurance->certificationForSite($site->id);
+        $substantiated = fn (SiteCertification $certification): bool =>
+            $certification->certification_type !== NzsAssuranceResolver::CERTIFICATION_TYPE
+            || $nzsStatus === AssuranceStatus::CERTIFIED;
 
         // Upcoming compliance checks (next 30 days)
         $upcomingChecks = (clone $checksQuery)
@@ -67,13 +73,13 @@ class SiteComplianceController extends Controller
         // Stats
         $stats = [
             'total_certs' => $certifications->count(),
-            'current' => $certifications->where('status', 'current')->count(),
+            'current' => $certifications->where('status', 'current')->filter($substantiated)->count(),
             'expiring' => $certifications->filter(function ($cert) {
                 return $cert->status === 'current'
                     && $cert->expiry_date
                     && $cert->expiry_date->lte(now()->addDays(30))
                     && $cert->expiry_date->gte(now());
-            })->count(),
+            })->filter($substantiated)->count(),
             'expired' => $overdueCertifications->count(),
             'checks_scheduled' => (clone $checksQuery)->where('status', 'scheduled')->count(),
             'checks_overdue' => $overdueChecks->count(),
@@ -118,15 +124,10 @@ class SiteComplianceController extends Controller
             'document_path' => 'nullable|string|max:500',
         ]);
 
-        DB::transaction(function () use ($site, $validated, $request): void {
-            $site = $this->lockedSite($site);
-            SiteCertification::create([
-                ...$validated,
-                'site_id' => $site->id,
-                'status' => $validated['status'] ?? 'current',
-                'created_by' => $request->user()?->id,
-            ]);
-        });
+        $this->certifications->create($site, $request->user(), [
+            ...$validated,
+            'status' => $validated['status'] ?? 'current',
+        ]);
 
         return redirect()->back()->with('success', 'Certification added successfully.');
     }
@@ -150,12 +151,7 @@ class SiteComplianceController extends Controller
             'reviewed_at' => 'nullable|date|required_with:reviewed_by',
         ]);
 
-        DB::transaction(function () use ($site, $certification, $validated): void {
-            $site = $this->lockedSite($site);
-            $certification = $this->lockedSiteRecord(SiteCertification::class, $site, $certification->id);
-            $this->assertReviewerBelongsToSite($validated['reviewed_by'] ?? null, $site);
-            $certification->update($validated);
-        });
+        $this->certifications->update($site, $certification->id, $request->user(), $validated);
 
         return redirect()->back()->with('success', 'Certification updated successfully.');
     }
@@ -164,10 +160,7 @@ class SiteComplianceController extends Controller
     {
         $this->authorize('update', $site);
 
-        DB::transaction(function () use ($site, $certification): void {
-            $site = $this->lockedSite($site);
-            $this->lockedSiteRecord(SiteCertification::class, $site, $certification->id)->delete();
-        });
+        $this->certifications->revoke($site, $certification->id, $request->user());
 
         return redirect()->back()->with('success', 'Certification removed successfully.');
     }
@@ -568,20 +561,6 @@ class SiteComplianceController extends Controller
             ->whereKey($recordId)
             ->lockForUpdate()
             ->firstOrFail();
-    }
-
-    private function assertReviewerBelongsToSite(?int $reviewerId, Site $site): void
-    {
-        if ($reviewerId === null) {
-            return;
-        }
-
-        $reviewer = User::query()->find($reviewerId);
-        if (! $reviewer || ! in_array($site->id, $this->siteAccess->accessibleSiteIds($reviewer, ['sites.viewAny']), true)) {
-            throw ValidationException::withMessages([
-                'reviewed_by' => 'Choose a current approved reviewer with access to this Site.',
-            ]);
-        }
     }
 
     private function assertStaffRequirementIdentityAvailable(

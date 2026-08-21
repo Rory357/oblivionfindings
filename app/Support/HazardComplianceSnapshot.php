@@ -22,14 +22,13 @@ use Illuminate\Support\Facades\Log;
  *    (matches HsAnalyticsService::drillStatusBySite()).
  *  - sds_expiring → SafetyDataSheet review dates expiring within 30 days or past.
  *
- * `nga_paerewa_certified` and `first_aid_ok` have no backing data source yet, so
- * they default to honest `true` (the same defaults every existing H&S hero
- * relies on) rather than fabricating a status.
+ * Ngā Paerewa certification and first-aider cover are intentionally absent:
+ * those independent Site-scoped signals come from NzsAssuranceResolver.
  */
 class HazardComplianceSnapshot
 {
     /**
-     * @return array{worksafe_awaiting:int, sds_expiring:int, drills_due:int, drills_overdue:int, nga_paerewa_certified:bool, first_aid_ok:bool}
+     * @return array{worksafe_awaiting:int, sds_expiring:int, drills_due:int, drills_overdue:int}
      */
     public static function badges(): array
     {
@@ -38,8 +37,6 @@ class HazardComplianceSnapshot
             'sds_expiring' => self::sdsExpiring(),
             'drills_due' => self::drillCounts()['due'],
             'drills_overdue' => self::drillCounts()['overdue'],
-            'nga_paerewa_certified' => true,
-            'first_aid_ok' => true,
         ];
     }
 

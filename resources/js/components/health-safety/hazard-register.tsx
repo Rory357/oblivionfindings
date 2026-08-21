@@ -127,8 +127,6 @@ export type HazardRegisterData = {
         sds_expiring: number;
         drills_due: number;
         drills_overdue: number;
-        nga_paerewa_certified: boolean;
-        first_aid_ok: boolean;
     };
     filters: HazardFilters;
     sites: Array<{ id: number; name: string; type: string }>;
@@ -780,8 +778,6 @@ export function HazardRegister({
                         sdsExpiring={nzBadges.sds_expiring}
                         drillsDue={nzBadges.drills_due}
                         drillsOverdue={nzBadges.drills_overdue}
-                        ngaPaerewaCertified={nzBadges.nga_paerewa_certified}
-                        firstAidOk={nzBadges.first_aid_ok}
                     />
                 </HeroShell>
             </div>

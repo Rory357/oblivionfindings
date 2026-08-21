@@ -36,7 +36,9 @@ import {
     HeroSegmented,
     HeroShell,
     HeroStatusPill,
+    ngaPaerewaBadge,
     type HeroComplianceBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -55,7 +57,6 @@ import {
     Plus,
     Search,
     ShieldAlert,
-    ShieldCheck,
     TriangleAlert,
     X,
 } from 'lucide-react';
@@ -149,6 +150,7 @@ export default function RiskAssessmentsIndex({
     can,
     filters,
 }: Props) {
+    const assurance = useNzsAssurance();
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [modal, setModal] = useState<{
         kind: RaModalKind;
@@ -320,11 +322,7 @@ export default function RiskAssessmentsIndex({
             tone: c.reviews_overdue > 0 ? 'critical' : 'success',
             label: `Reviews · ${c.reviews_overdue} overdue`,
         },
-        {
-            icon: ShieldCheck,
-            tone: 'success',
-            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
-        },
+        ngaPaerewaBadge(assurance.certification_status),
         {
             icon:
                 c.high_extreme_without_approval > 0

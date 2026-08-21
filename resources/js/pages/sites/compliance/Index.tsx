@@ -22,6 +22,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import {
+    type AssuranceStatus,
+    useNzsAssurance,
+} from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -153,6 +157,7 @@ function statusBorderColor(status: string): string {
             return 'border-l-emerald-500';
         case 'expiring':
         case 'expiring_soon':
+        case 'action_required':
             return 'border-l-amber-500';
         case 'expired':
             return 'border-l-red-500';
@@ -169,6 +174,7 @@ function statusBadgeClass(status: string): string {
             return 'border-status-success/30 text-status-success bg-status-success';
         case 'expiring':
         case 'expiring_soon':
+        case 'action_required':
             return 'border-status-warning/30 text-status-warning bg-status-warning';
         case 'expired':
         case 'overdue':
@@ -199,6 +205,24 @@ function certTypeLabel(t: string): string {
     return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function displayedCertificationStatus(
+    certification: Certification,
+    nzsStatus: AssuranceStatus,
+): string {
+    return certification.certification_type === 'healthcert_certification' &&
+        nzsStatus !== 'certified'
+        ? nzsStatus
+        : certification.status;
+}
+
+function certificationStatusLabel(status: string): string {
+    return status === 'unknown'
+        ? 'Evidence unknown'
+        : status === 'action_required'
+          ? 'Action required'
+          : certTypeLabel(status);
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function SiteComplianceIndex({
@@ -208,6 +232,7 @@ export default function SiteComplianceIndex({
     stats: rawStats,
     can = { manage_compliance: false },
 }: Props) {
+    const assurance = useNzsAssurance();
     const stats: Stats = rawStats ?? {
         total_certs: 0,
         current: 0,
@@ -270,7 +295,10 @@ export default function SiteComplianceIndex({
             ? certifications
             : certifications.filter(
                   (c) =>
-                      c.status.toLowerCase() === certStatusFilter.toLowerCase(),
+                      displayedCertificationStatus(
+                          c,
+                          assurance.certification_status,
+                      ).toLowerCase() === certStatusFilter.toLowerCase(),
               );
 
     // ── Handlers ───────────────────────────────────────────────────────
@@ -573,10 +601,15 @@ export default function SiteComplianceIndex({
                                         const days = daysUntil(
                                             cert.expiry_date,
                                         );
+                                        const displayedStatus =
+                                            displayedCertificationStatus(
+                                                cert,
+                                                assurance.certification_status,
+                                            );
                                         return (
                                             <div
                                                 key={cert.id}
-                                                className={`rounded-lg border border-l-4 ${statusBorderColor(cert.status)} bg-card p-4`}
+                                                className={`rounded-lg border border-l-4 ${statusBorderColor(displayedStatus)} bg-card p-4`}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0 flex-1">
@@ -596,11 +629,11 @@ export default function SiteComplianceIndex({
                                                             <Badge
                                                                 variant="outline"
                                                                 className={statusBadgeClass(
-                                                                    cert.status,
+                                                                    displayedStatus,
                                                                 )}
                                                             >
-                                                                {certTypeLabel(
-                                                                    cert.status,
+                                                                {certificationStatusLabel(
+                                                                    displayedStatus,
                                                                 )}
                                                             </Badge>
                                                         </div>

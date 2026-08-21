@@ -34,6 +34,8 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    ngaPaerewaBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
@@ -88,7 +90,6 @@ import {
     MousePointer2,
     Plus,
     ShieldAlert,
-    ShieldCheck,
     TrendingDown,
     Users,
     XCircle,
@@ -148,6 +149,8 @@ export default function RestraintsIndex({
     detail,
     can,
 }: Props) {
+    const assurance = useNzsAssurance();
+    const nzsBadge = ngaPaerewaBadge(assurance.certification_status);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [eventWizard, setEventWizard] = useState(false);
     const [eventPrescope, setEventPrescope] = useState<Prescope | undefined>(
@@ -670,17 +673,10 @@ export default function RestraintsIndex({
                                             {reductionLabel}
                                         </HeroBadge>
                                         <HeroBadge
-                                            icon={ShieldCheck}
-                                            tone={
-                                                b.nga_paerewa_certified
-                                                    ? 'success'
-                                                    : 'warning'
-                                            }
+                                            icon={nzsBadge.icon}
+                                            tone={nzsBadge.tone}
                                         >
-                                            Ngā Paerewa NZS 8134:2021 ·{' '}
-                                            {b.nga_paerewa_certified
-                                                ? 'Certified'
-                                                : 'At risk'}
+                                            {nzsBadge.label}
                                         </HeroBadge>
                                         <HeroBadge
                                             icon={CalendarClock}

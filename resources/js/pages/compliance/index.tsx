@@ -34,8 +34,10 @@ import {
     HeroStatusPill,
     HeroSummaryMetric,
     HeroSummaryStrip,
+    ngaPaerewaBadge,
     type HeroComplianceBadge,
     type Tone,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -404,6 +406,7 @@ export default function ComplianceIndex({
     obligations,
     relatedIncidents,
 }: Props) {
+    const assurance = useNzsAssurance();
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [wizard, setWizard] = useState<WizardKind>(null);
     const [prefillObligation, setPrefillObligation] = useState<number | null>(
@@ -489,11 +492,7 @@ export default function ComplianceIndex({
                     ? `Care-plan reviews · ${reviewsOverdue} overdue`
                     : 'Care-plan reviews · On track',
         },
-        {
-            icon: ShieldCheck,
-            tone: 'success',
-            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
-        },
+        ngaPaerewaBadge(assurance.certification_status),
         {
             icon: breakGlass > 0 ? BellRing : CheckCircle2,
             tone: breakGlass > 0 ? 'warning' : 'success',

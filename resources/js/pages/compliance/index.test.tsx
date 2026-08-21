@@ -145,6 +145,18 @@ vi.mock('@/pages/health-safety/components/hs-hero-kit', () => ({
         label: string;
         children: ReactNode;
     }) => <section aria-label={label}>{children}</section>,
+    ngaPaerewaBadge: (status: string) => ({
+        icon: () => null,
+        tone: status === 'certified' ? 'success' : 'neutral',
+        label:
+            status === 'certified'
+                ? 'Ngā Paerewa NZS 8134:2021 · Certified'
+                : 'Ngā Paerewa NZS 8134:2021 · Evidence unknown',
+    }),
+    useNzsAssurance: () => ({
+        certification_status: 'unknown',
+        first_aid_coverage_status: 'unknown',
+    }),
 }));
 
 vi.mock('@/pages/health-safety/analytics-charts', () => ({
@@ -358,6 +370,9 @@ describe('Compliance command centre', () => {
             screen.getByText(
                 /Application-wide obligations plus operational assurance across your accessible Sites/,
             ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/Ngā Paerewa NZS 8134:2021 · Evidence unknown/),
         ).toBeVisible();
         expect(
             screen.getAllByText('Site evacuation evidence')[0],

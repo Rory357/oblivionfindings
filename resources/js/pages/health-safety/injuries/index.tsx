@@ -47,7 +47,9 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    ngaPaerewaBadge,
     type HeroComplianceBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
@@ -63,7 +65,6 @@ import {
     Activity,
     AlertTriangle,
     ArrowRightLeft,
-    BadgeCheck,
     BarChart3,
     CheckCircle2,
     ClipboardCheck,
@@ -223,6 +224,7 @@ export default function InjuriesIndex({
     detail,
     can,
 }: Props) {
+    const assurance = useNzsAssurance();
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [wizard, setWizard] = useState<{
         open: boolean;
@@ -481,11 +483,7 @@ export default function InjuriesIndex({
             tone: hero.badges.lost_time_days > 30 ? 'warning' : 'success',
             label: `Lost-time · ${hero.badges.lost_time_days} days`,
         },
-        {
-            icon: BadgeCheck,
-            tone: 'success',
-            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
-        },
+        ngaPaerewaBadge(assurance.certification_status),
     ];
 
     return (

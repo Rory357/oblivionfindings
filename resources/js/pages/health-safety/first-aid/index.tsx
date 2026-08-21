@@ -28,7 +28,9 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    ngaPaerewaBadge,
     type HeroComplianceBadge,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
@@ -66,7 +68,6 @@ import {
     Pencil,
     Plus,
     Search,
-    ShieldCheck,
     Trash2,
     X,
 } from 'lucide-react';
@@ -190,6 +191,7 @@ export default function FirstAidIndex({
     detail,
     report,
 }: Props) {
+    const assurance = useNzsAssurance();
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [reportOpen, setReportOpen] = useState(() => !!report);
     const [pendingSection, setPendingSection] =
@@ -315,11 +317,7 @@ export default function FirstAidIndex({
             tone: 'success',
             label: `ACC45 · ${hero.badges.acc45_month} this month`,
         },
-        {
-            icon: ShieldCheck,
-            tone: 'success',
-            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
-        },
+        ngaPaerewaBadge(assurance.certification_status),
     ];
 
     const tableTitle =

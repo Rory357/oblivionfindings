@@ -192,7 +192,6 @@ export type RestraintHero = {
     badges: {
         unreviewed: number;
         plans_overdue: number;
-        nga_paerewa_certified: boolean;
         reduction_trend_pct: number;
     };
 };

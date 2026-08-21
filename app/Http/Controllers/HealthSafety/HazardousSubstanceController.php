@@ -154,7 +154,6 @@ class HazardousSubstanceController extends Controller
         $badges = [
             'worksafe_awaiting' => $worksafeAwaiting,
             'sds_to_action' => $sdsExpiringHero + $sdsMissingHero,
-            'nga_paerewa_certified' => true,
         ];
 
         return Inertia::render('health-safety/substances/index', [
