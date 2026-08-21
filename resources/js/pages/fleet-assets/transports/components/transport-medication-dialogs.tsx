@@ -69,6 +69,11 @@ export type TransportMedicationLog = {
     is_controlled_drug: boolean;
     witness_required: boolean;
     packed_witness_name?: string | null;
+    packed_witness?: { id: number; name: string } | null;
+    packed_witnessed_at?: string | null;
+    packing_witness_method?: string | null;
+    packing_attestation_event_id?: number | null;
+    packing_attestation_state?: string | null;
     packed_by: { id: number; name: string } | null;
     packed_at: string | null;
     administered_by: { id: number; name: string } | null;
@@ -112,6 +117,21 @@ const administerSteps = [
     },
 ] as const satisfies readonly WizardStep[];
 
+const packingCorrectionSteps = [
+    {
+        key: 'correction',
+        label: 'Correct witness',
+        blurb: 'Authenticate the correct second checker',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Keep the original and append the correction',
+        icon: ClipboardCheck,
+    },
+] as const satisfies readonly WizardStep[];
+
 const returnSteps = [
     {
         key: 'checks',
@@ -130,13 +150,19 @@ const returnSteps = [
 export function buildPackMedicationPayload({
     clientId,
     medication,
-    witnessName,
+    attestationState,
+    witnessedByUserId,
+    witnessCredential,
+    attestationReason,
     notes,
     scan,
 }: {
     clientId: number;
     medication: TransportMedicationOption;
-    witnessName: string;
+    attestationState: 'accepted' | 'refused' | 'unavailable';
+    witnessedByUserId: string;
+    witnessCredential: string;
+    attestationReason: string;
     notes: string;
     scan: MedicationScanCapture;
 }) {
@@ -145,9 +171,32 @@ export function buildPackMedicationPayload({
         medication_id: medication.id,
         medication_name: medication.name,
         is_controlled_drug: medication.controlled_drug,
-        witness_name: witnessName.trim() || null,
+        attestation_state: attestationState,
+        witnessed_by_user_id: witnessedByUserId
+            ? Number(witnessedByUserId)
+            : null,
+        witness_credential: witnessCredential.trim() || null,
+        attestation_reason: attestationReason.trim() || null,
         notes: notes.trim() || null,
         ...toMedicationScanPayload(scan),
+    };
+}
+
+export function buildCorrectPackingAttestationPayload({
+    witnessedByUserId,
+    witnessCredential,
+    correctionReason,
+}: {
+    witnessedByUserId: string;
+    witnessCredential: string;
+    correctionReason: string;
+}) {
+    return {
+        witnessed_by_user_id: witnessedByUserId
+            ? Number(witnessedByUserId)
+            : null,
+        witness_credential: witnessCredential.trim() || null,
+        correction_reason: correctionReason.trim() || null,
     };
 }
 
@@ -204,6 +253,7 @@ export function PackMedicationWizard({
     client,
     residentName,
     medications,
+    witnesses,
     onClose,
     onCompleted,
 }: {
@@ -212,6 +262,7 @@ export function PackMedicationWizard({
     client: { id: number; name: string } | null;
     residentName: string;
     medications: TransportMedicationOption[];
+    witnesses: Array<{ id: number; name: string }>;
     onClose: () => void;
     onCompleted: MutationCompleted;
 }) {
@@ -220,9 +271,15 @@ export function PackMedicationWizard({
         emptyMedicationScanCapture(),
     );
     const [submitting, setSubmitting] = useState(false);
+    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
+        crypto.randomUUID(),
+    );
     const form = useForm({
         medication_id: '',
-        witness_name: '',
+        attestation_state: 'accepted' as 'accepted' | 'refused' | 'unavailable',
+        witnessed_by_user_id: '',
+        witness_credential: '',
+        attestation_reason: '',
         notes: '',
         scan_code: '',
     });
@@ -240,17 +297,30 @@ export function PackMedicationWizard({
         selectedMedication?.controlled_drug
     );
     const requiresScan = !!selectedMedication?.scan_verification;
+    const acceptedForPacking =
+        !requiresWitness || form.data.attestation_state === 'accepted';
+    const witnessDecisionReady =
+        !requiresWitness ||
+        (form.data.attestation_state === 'unavailable'
+            ? !!form.data.attestation_reason.trim()
+            : !!form.data.witnessed_by_user_id &&
+              !!form.data.witness_credential.trim() &&
+              (form.data.attestation_state !== 'refused' ||
+                  !!form.data.attestation_reason.trim()));
     const canContinue =
         !!client &&
         !!selectedMedication &&
-        (!requiresWitness || !!form.data.witness_name.trim()) &&
-        (!requiresScan || hasVerifiedMedicationScan(scanCapture));
+        witnessDecisionReady &&
+        (!acceptedForPacking ||
+            !requiresScan ||
+            hasVerifiedMedicationScan(scanCapture));
 
     const reset = () => {
         setStepIndex(0);
         form.reset();
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
+        setClientRequestUuid(crypto.randomUUID());
     };
 
     const close = () => {
@@ -266,15 +336,27 @@ export function PackMedicationWizard({
         try {
             const result = await submitEmarMutation(
                 `/fleet-assets/transports/${transportId}/pack-medication`,
-                buildPackMedicationPayload({
-                    clientId: client.id,
-                    medication: selectedMedication,
-                    witnessName: form.data.witness_name,
-                    notes: form.data.notes,
-                    scan: scanCapture,
-                }),
                 {
-                    successMessage: 'Medication packed for transit.',
+                    ...buildPackMedicationPayload({
+                        clientId: client.id,
+                        medication: selectedMedication,
+                        attestationState: form.data.attestation_state,
+                        witnessedByUserId: form.data.witnessed_by_user_id,
+                        witnessCredential: form.data.witness_credential,
+                        attestationReason: form.data.attestation_reason,
+                        notes: form.data.notes,
+                        scan: scanCapture,
+                    }),
+                    client_request_uuid: clientRequestUuid,
+                },
+                {
+                    allowQueueWhenOffline: !requiresWitness,
+                    successMessage:
+                        form.data.attestation_state === 'refused'
+                            ? 'Second-checker refusal recorded. Medication was not packed.'
+                            : form.data.attestation_state === 'unavailable'
+                              ? 'Second-checker unavailability recorded. Medication was not packed.'
+                              : 'Medication packed for transit.',
                     queuedMessage:
                         'Medication packing saved offline and will sync automatically when the device reconnects.',
                 },
@@ -349,7 +431,9 @@ export function PackMedicationWizard({
                             ) : (
                                 <Package className="mr-2 h-4 w-4" />
                             )}
-                            Pack medication
+                            {acceptedForPacking
+                                ? 'Pack medication'
+                                : 'Record decision'}
                         </Button>
                     </>
                 )
@@ -381,6 +465,13 @@ export function PackMedicationWizard({
                                         'medication_id',
                                         value === 'none' ? '' : value,
                                     );
+                                    form.setData(
+                                        'attestation_state',
+                                        'accepted',
+                                    );
+                                    form.setData('witnessed_by_user_id', '');
+                                    form.setData('witness_credential', '');
+                                    form.setData('attestation_reason', '');
                                     setScanCapture(
                                         emptyMedicationScanCapture(),
                                     );
@@ -455,31 +546,191 @@ export function PackMedicationWizard({
                         ) : null}
 
                         {requiresWitness ? (
-                            <div className="space-y-2">
-                                <Label htmlFor="pack-witness-name">
-                                    Witness name
-                                </Label>
-                                <Input
-                                    id="pack-witness-name"
-                                    value={form.data.witness_name}
-                                    onChange={(event) => {
-                                        form.clearErrors('witness_name');
-                                        form.setData(
-                                            'witness_name',
-                                            event.target.value,
-                                        );
-                                    }}
-                                    placeholder="Required for controlled drugs"
-                                />
-                                {form.errors.witness_name ? (
-                                    <p className="text-sm text-destructive">
-                                        {form.errors.witness_name}
-                                    </p>
+                            <div className="space-y-3 rounded-lg border p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="pack-attestation-state">
+                                        Second-checker decision
+                                    </Label>
+                                    <Select
+                                        value={form.data.attestation_state}
+                                        onValueChange={(
+                                            value:
+                                                | 'accepted'
+                                                | 'refused'
+                                                | 'unavailable',
+                                        ) => {
+                                            form.clearErrors();
+                                            form.setData(
+                                                'attestation_state',
+                                                value,
+                                            );
+                                            if (value === 'unavailable') {
+                                                form.setData(
+                                                    'witnessed_by_user_id',
+                                                    '',
+                                                );
+                                                form.setData(
+                                                    'witness_credential',
+                                                    '',
+                                                );
+                                            }
+                                            if (value === 'accepted') {
+                                                form.setData(
+                                                    'attestation_reason',
+                                                    '',
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger id="pack-attestation-state">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="accepted">
+                                                Accepted in person
+                                            </SelectItem>
+                                            <SelectItem value="refused">
+                                                Declined to attest
+                                            </SelectItem>
+                                            <SelectItem value="unavailable">
+                                                No eligible checker available
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {form.data.attestation_state !==
+                                'unavailable' ? (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pack-witness">
+                                                Second checker
+                                            </Label>
+                                            <Select
+                                                value={
+                                                    form.data
+                                                        .witnessed_by_user_id ||
+                                                    'none'
+                                                }
+                                                onValueChange={(value) => {
+                                                    form.clearErrors(
+                                                        'witnessed_by_user_id',
+                                                    );
+                                                    form.clearErrors(
+                                                        'witness_credential',
+                                                    );
+                                                    form.setData(
+                                                        'witnessed_by_user_id',
+                                                        value === 'none'
+                                                            ? ''
+                                                            : value,
+                                                    );
+                                                    form.setData(
+                                                        'witness_credential',
+                                                        '',
+                                                    );
+                                                }}
+                                            >
+                                                <SelectTrigger id="pack-witness">
+                                                    <SelectValue placeholder="Select second checker" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">
+                                                        Select second checker
+                                                    </SelectItem>
+                                                    {witnesses.map(
+                                                        (witness) => (
+                                                            <SelectItem
+                                                                key={witness.id}
+                                                                value={String(
+                                                                    witness.id,
+                                                                )}
+                                                            >
+                                                                {witness.name}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            {form.errors
+                                                .witnessed_by_user_id ? (
+                                                <p className="text-sm text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .witnessed_by_user_id
+                                                    }
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pack-witness-credential">
+                                                Second checker password / PIN
+                                            </Label>
+                                            <Input
+                                                id="pack-witness-credential"
+                                                type="password"
+                                                autoComplete="current-password"
+                                                value={
+                                                    form.data.witness_credential
+                                                }
+                                                onChange={(event) => {
+                                                    form.clearErrors(
+                                                        'witness_credential',
+                                                    );
+                                                    form.setData(
+                                                        'witness_credential',
+                                                        event.target.value,
+                                                    );
+                                                }}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                The second checker must be
+                                                present and enter their own
+                                                credential.
+                                            </p>
+                                            {form.errors.witness_credential ? (
+                                                <p className="text-sm text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .witness_credential
+                                                    }
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    </>
+                                ) : null}
+
+                                {form.data.attestation_state !== 'accepted' ? (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="pack-attestation-reason">
+                                            Reason
+                                        </Label>
+                                        <Textarea
+                                            id="pack-attestation-reason"
+                                            value={form.data.attestation_reason}
+                                            onChange={(event) => {
+                                                form.clearErrors(
+                                                    'attestation_reason',
+                                                );
+                                                form.setData(
+                                                    'attestation_reason',
+                                                    event.target.value,
+                                                );
+                                            }}
+                                            rows={3}
+                                        />
+                                        {form.errors.attestation_reason ? (
+                                            <p className="text-sm text-destructive">
+                                                {form.errors.attestation_reason}
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 ) : null}
                             </div>
                         ) : null}
 
-                        {selectedMedication?.scan_verification ? (
+                        {acceptedForPacking &&
+                        selectedMedication?.scan_verification ? (
                             <MedicationScanVerificationPanel
                                 clientId={client?.id ?? null}
                                 medicationId={selectedMedication.id}
@@ -520,7 +771,9 @@ export function PackMedicationWizard({
                 ) : (
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">
-                            Review medication pack
+                            {acceptedForPacking
+                                ? 'Review medication pack'
+                                : 'Review second-checker decision'}
                         </h3>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <ReviewItem
@@ -542,17 +795,311 @@ export function PackMedicationWizard({
                                 }
                             />
                             <ReviewItem
-                                label="Witness"
+                                label="Second checker"
                                 value={
-                                    form.data.witness_name.trim() ||
-                                    'Not required'
+                                    form.data.attestation_state ===
+                                    'unavailable'
+                                        ? 'No eligible checker available'
+                                        : (witnesses.find(
+                                              (witness) =>
+                                                  String(witness.id) ===
+                                                  form.data
+                                                      .witnessed_by_user_id,
+                                          )?.name ?? 'Not required')
                                 }
                             />
+                            {requiresWitness ? (
+                                <ReviewItem
+                                    label="Decision"
+                                    value={
+                                        form.data.attestation_state ===
+                                        'accepted'
+                                            ? 'Accepted in person'
+                                            : form.data.attestation_state ===
+                                                'refused'
+                                              ? 'Declined to attest'
+                                              : 'Unavailable'
+                                    }
+                                />
+                            ) : null}
                         </div>
                         <ReviewItem
                             label="Notes"
                             value={form.data.notes.trim() || 'No notes added'}
                         />
+                        {form.data.attestation_state !== 'accepted' ? (
+                            <ReviewItem
+                                label="Decision reason"
+                                value={form.data.attestation_reason.trim()}
+                            />
+                        ) : null}
+                    </div>
+                )}
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
+export function CorrectPackingAttestationWizard({
+    log,
+    witnesses,
+    onClose,
+    onCompleted,
+}: {
+    log: TransportMedicationLog | null;
+    witnesses: Array<{ id: number; name: string }>;
+    onClose: () => void;
+    onCompleted: MutationCompleted;
+}) {
+    const [stepIndex, setStepIndex] = useState(0);
+    const [submitting, setSubmitting] = useState(false);
+    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
+        crypto.randomUUID(),
+    );
+    const form = useForm({
+        witnessed_by_user_id: '',
+        witness_credential: '',
+        correction_reason: '',
+    });
+    const correctionWitnesses = witnesses.filter(
+        (witness) => witness.id !== log?.packed_witness?.id,
+    );
+    const canContinue =
+        !!log &&
+        !!form.data.witnessed_by_user_id &&
+        !!form.data.witness_credential.trim() &&
+        !!form.data.correction_reason.trim();
+    const selectedWitness = correctionWitnesses.find(
+        (witness) => String(witness.id) === form.data.witnessed_by_user_id,
+    );
+
+    const reset = () => {
+        setStepIndex(0);
+        form.reset();
+        form.clearErrors();
+        setClientRequestUuid(crypto.randomUUID());
+    };
+    const close = () => {
+        reset();
+        onClose();
+    };
+    const submit = async () => {
+        if (!log || !canContinue) return;
+        form.clearErrors();
+        setSubmitting(true);
+        try {
+            const result = await submitEmarMutation(
+                `/fleet-assets/medication-transit/${log.id}/correct-packing-attestation`,
+                {
+                    ...buildCorrectPackingAttestationPayload({
+                        witnessedByUserId: form.data.witnessed_by_user_id,
+                        witnessCredential: form.data.witness_credential,
+                        correctionReason: form.data.correction_reason,
+                    }),
+                    client_request_uuid: clientRequestUuid,
+                },
+                {
+                    allowQueueWhenOffline: false,
+                    successMessage: 'Packing witness correction recorded.',
+                },
+            );
+            if (result.status === 'conflict') return;
+            reset();
+            onClose();
+            onCompleted(false);
+        } catch (error: unknown) {
+            applyFormRequestErrors(
+                error,
+                (field, value) =>
+                    (form.setError as (field: string, value: string) => void)(
+                        field,
+                        value,
+                    ),
+                'Failed to correct the packing witness.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <WizardShell
+            open={!!log}
+            onClose={close}
+            title="Correct packing witness"
+            description="Authenticate the correct second checker and keep the original packing evidence in the journey history."
+            railIcon={ShieldCheck}
+            railTitle="Witness correction"
+            railSub={log?.medication_name ?? 'Medication transit'}
+            steps={packingCorrectionSteps}
+            stepIndex={stepIndex}
+            onStepClick={(index) =>
+                index === 0 || canContinue ? setStepIndex(index) : undefined
+            }
+            pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
+            footerStart={
+                <Button type="button" variant="ghost" onClick={close}>
+                    Cancel
+                </Button>
+            }
+            footerEnd={
+                stepIndex === 0 ? (
+                    <Button
+                        type="button"
+                        onClick={() => setStepIndex(1)}
+                        disabled={!canContinue}
+                    >
+                        Continue
+                    </Button>
+                ) : (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(0)}
+                        >
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Back
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={submitting || !canContinue}
+                        >
+                            {submitting ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                            )}
+                            Record correction
+                        </Button>
+                    </>
+                )
+            }
+        >
+            <WizardStepPane>
+                {stepIndex === 0 ? (
+                    <div className="space-y-5">
+                        <MedicationSummary log={log} />
+                        <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                            <div className="text-xs text-muted-foreground">
+                                Current packing witness
+                            </div>
+                            <div className="mt-1 font-medium">
+                                {log?.packed_witness?.name ??
+                                    (log?.packed_witness_name
+                                        ? `${log.packed_witness_name} (legacy label only)`
+                                        : 'No authenticated witness recorded')}
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="correct-pack-witness">
+                                Correct second checker
+                            </Label>
+                            <Select
+                                value={form.data.witnessed_by_user_id || 'none'}
+                                onValueChange={(value) => {
+                                    form.clearErrors('witnessed_by_user_id');
+                                    form.clearErrors('witness_credential');
+                                    form.setData(
+                                        'witnessed_by_user_id',
+                                        value === 'none' ? '' : value,
+                                    );
+                                    form.setData('witness_credential', '');
+                                }}
+                            >
+                                <SelectTrigger id="correct-pack-witness">
+                                    <SelectValue placeholder="Select second checker" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Select second checker
+                                    </SelectItem>
+                                    {correctionWitnesses.map((witness) => (
+                                        <SelectItem
+                                            key={witness.id}
+                                            value={String(witness.id)}
+                                        >
+                                            {witness.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {form.errors.witnessed_by_user_id ? (
+                                <p className="text-sm text-destructive">
+                                    {form.errors.witnessed_by_user_id}
+                                </p>
+                            ) : null}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="correct-pack-witness-credential">
+                                Second checker password / PIN
+                            </Label>
+                            <Input
+                                id="correct-pack-witness-credential"
+                                type="password"
+                                autoComplete="current-password"
+                                value={form.data.witness_credential}
+                                onChange={(event) => {
+                                    form.clearErrors('witness_credential');
+                                    form.setData(
+                                        'witness_credential',
+                                        event.target.value,
+                                    );
+                                }}
+                            />
+                            {form.errors.witness_credential ? (
+                                <p className="text-sm text-destructive">
+                                    {form.errors.witness_credential}
+                                </p>
+                            ) : null}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="packing-correction-reason">
+                                Correction reason
+                            </Label>
+                            <Textarea
+                                id="packing-correction-reason"
+                                value={form.data.correction_reason}
+                                onChange={(event) => {
+                                    form.clearErrors('correction_reason');
+                                    form.setData(
+                                        'correction_reason',
+                                        event.target.value,
+                                    );
+                                }}
+                                rows={3}
+                            />
+                            {form.errors.correction_reason ? (
+                                <p className="text-sm text-destructive">
+                                    {form.errors.correction_reason}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                            Review packing witness correction
+                        </h3>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <ReviewItem
+                                label="Medication"
+                                value={log?.medication_name ?? '---'}
+                            />
+                            <ReviewItem
+                                label="Correct second checker"
+                                value={selectedWitness?.name ?? 'Not selected'}
+                            />
+                        </div>
+                        <ReviewItem
+                            label="Correction reason"
+                            value={form.data.correction_reason.trim()}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                            The original evidence remains in the journey
+                            history; this appends a linked correction.
+                        </p>
                     </div>
                 )}
             </WizardStepPane>
@@ -576,6 +1123,9 @@ export function AdministerTransportMedicationWizard({
         emptyMedicationScanCapture(),
     );
     const [submitting, setSubmitting] = useState(false);
+    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
+        crypto.randomUUID(),
+    );
     const form = useForm({
         witnessed_by_user_id: '',
         witness_credential: '',
@@ -598,6 +1148,7 @@ export function AdministerTransportMedicationWizard({
         form.reset();
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
+        setClientRequestUuid(crypto.randomUUID());
     };
     const close = () => {
         reset();
@@ -610,13 +1161,17 @@ export function AdministerTransportMedicationWizard({
         try {
             const result = await submitEmarMutation(
                 `/fleet-assets/medication-transit/${log.id}/administer`,
-                buildAdministerMedicationPayload({
-                    witnessedByUserId: form.data.witnessed_by_user_id,
-                    witnessCredential: form.data.witness_credential,
-                    notes: form.data.notes,
-                    scan: scanCapture,
-                }),
                 {
+                    ...buildAdministerMedicationPayload({
+                        witnessedByUserId: form.data.witnessed_by_user_id,
+                        witnessCredential: form.data.witness_credential,
+                        notes: form.data.notes,
+                        scan: scanCapture,
+                    }),
+                    client_request_uuid: clientRequestUuid,
+                },
+                {
+                    allowQueueWhenOffline: !requiresWitness,
                     successMessage: 'Medication administration recorded.',
                     queuedMessage:
                         'Medication transit administration saved offline and will sync automatically when the device reconnects.',
@@ -714,10 +1269,12 @@ export function AdministerTransportMedicationWizard({
                                         form.clearErrors(
                                             'witnessed_by_user_id',
                                         );
+                                        form.clearErrors('witness_credential');
                                         form.setData(
                                             'witnessed_by_user_id',
                                             value === 'none' ? '' : value,
                                         );
+                                        form.setData('witness_credential', '');
                                     }}
                                 >
                                     <SelectTrigger id="administer-witness">

@@ -80,6 +80,7 @@ type Props = {
     recent_residents?: string[];
     clients?: ClientOption[];
     client_medications?: ClientMedication[];
+    medication_witnesses?: Array<{ id: number; name: string }>;
     shifts?: ShiftOption[];
     selected_shift_id?: number | null;
     auth_user: { id: number; name: string };
@@ -175,6 +176,7 @@ export function TransportWizard({
     recent_residents,
     clients,
     client_medications,
+    medication_witnesses,
     shifts,
     selected_shift_id,
     auth_user,
@@ -190,6 +192,7 @@ export function TransportWizard({
         () => client_medications ?? [],
         [client_medications],
     );
+    const safeMedicationWitnesses = medication_witnesses ?? [];
     const safeShifts = useMemo(() => shifts ?? [], [shifts]);
 
     const form = useForm({
@@ -209,7 +212,9 @@ export function TransportWizard({
             medication_name: string;
             is_controlled_drug: boolean;
             witness_required: boolean;
-            witness_name: string;
+            attestation_state: 'accepted';
+            witnessed_by_user_id: number | null;
+            witness_credential: string | null;
             scan_code: string | null;
             scan_source: 'manual' | 'scanner' | null;
             scan_verified: boolean;
@@ -221,9 +226,10 @@ export function TransportWizard({
     const [selectedMedIds, setSelectedMedIds] = useState<Set<number>>(
         new Set(),
     );
-    const [witnessNames, setWitnessNames] = useState<Record<number, string>>(
-        {},
-    );
+    const [witnessIds, setWitnessIds] = useState<Record<number, string>>({});
+    const [witnessCredentials, setWitnessCredentials] = useState<
+        Record<number, string>
+    >({});
     const [scanCaptures, setScanCaptures] = useState<
         Record<number, MedicationScanCapture>
     >({});
@@ -278,7 +284,14 @@ export function TransportWizard({
                 ),
             ),
         );
-        setWitnessNames((current) =>
+        setWitnessIds((current) =>
+            Object.fromEntries(
+                Object.entries(current).filter(([medicationId]) =>
+                    availableMedicationIds.has(Number(medicationId)),
+                ),
+            ),
+        );
+        setWitnessCredentials((current) =>
             Object.fromEntries(
                 Object.entries(current).filter(([medicationId]) =>
                     availableMedicationIds.has(Number(medicationId)),
@@ -307,6 +320,7 @@ export function TransportWizard({
                 preserveScroll: true,
                 only: [
                     'client_medications',
+                    'medication_witnesses',
                     'clients',
                     'vehicles',
                     'recent_residents',
@@ -352,6 +366,7 @@ export function TransportWizard({
                 preserveScroll: true,
                 only: [
                     'client_medications',
+                    'medication_witnesses',
                     'clients',
                     'vehicles',
                     'recent_residents',
@@ -372,6 +387,18 @@ export function TransportWizard({
                     next.delete(med.id);
                     form.clearErrors('medications');
                     setScanCaptures((current) => {
+                        const updated = { ...current };
+                        delete updated[med.id];
+
+                        return updated;
+                    });
+                    setWitnessIds((current) => {
+                        const updated = { ...current };
+                        delete updated[med.id];
+
+                        return updated;
+                    });
+                    setWitnessCredentials((current) => {
                         const updated = { ...current };
                         delete updated[med.id];
 
@@ -399,7 +426,12 @@ export function TransportWizard({
                               is_controlled_drug: m.controlled_drug,
                               witness_required:
                                   m.witness_required || m.controlled_drug,
-                              witness_name: witnessNames[m.id] ?? '',
+                              attestation_state: 'accepted' as const,
+                              witnessed_by_user_id: witnessIds[m.id]
+                                  ? Number(witnessIds[m.id])
+                                  : null,
+                              witness_credential:
+                                  witnessCredentials[m.id]?.trim() || null,
                               scan_code:
                                   scanCaptures[m.id]?.code?.trim() || null,
                               scan_source: hasVerifiedMedicationScan(
@@ -423,12 +455,14 @@ export function TransportWizard({
 
             if (mode === 'pack') {
                 const missingWitness = medications.find(
-                    (m) => m.witness_required && !m.witness_name.trim(),
+                    (m) =>
+                        m.witness_required &&
+                        (!m.witnessed_by_user_id || !m.witness_credential),
                 );
                 if (missingWitness) {
                     form.setError(
                         'medications',
-                        'All controlled drugs require a witness name.',
+                        'All controlled drugs require an eligible second checker and their password or PIN.',
                     );
                     return;
                 }
@@ -480,7 +514,8 @@ export function TransportWizard({
             safeMedications,
             scanCaptures,
             selectedMedIds,
-            witnessNames,
+            witnessCredentials,
+            witnessIds,
             clientRequestUuid,
         ],
     );
@@ -1091,19 +1126,91 @@ export function TransportWizard({
                                                     </div>
                                                 </div>
 
-                                                {/* Witness field for orders that require a second checker */}
+                                                {/* Authenticated second checker for governed medication custody */}
                                                 {isSelected &&
                                                     (med.witness_required ||
                                                         med.controlled_drug) && (
-                                                        <div className="mt-3 ml-7">
-                                                            <label className="text-xs font-medium text-status-critical dark:text-status-critical">
+                                                        <div className="mt-3 ml-7 space-y-3 rounded-md border p-3">
+                                                            <label
+                                                                htmlFor={`transport-witness-${med.id}`}
+                                                                className="text-xs font-medium text-status-critical dark:text-status-critical"
+                                                            >
                                                                 {med.controlled_drug
-                                                                    ? 'Witness Required for Controlled Drug *'
-                                                                    : 'Witness Required *'}
+                                                                    ? 'Second checker required for controlled drug *'
+                                                                    : 'Second checker required *'}
                                                             </label>
-                                                            <Input
+                                                            <Select
                                                                 value={
-                                                                    witnessNames[
+                                                                    witnessIds[
+                                                                        med.id
+                                                                    ] ?? 'none'
+                                                                }
+                                                                onValueChange={(
+                                                                    value,
+                                                                ) => {
+                                                                    form.clearErrors(
+                                                                        'medications',
+                                                                    );
+                                                                    setWitnessIds(
+                                                                        (
+                                                                            prev,
+                                                                        ) => ({
+                                                                            ...prev,
+                                                                            [med.id]:
+                                                                                value ===
+                                                                                'none'
+                                                                                    ? ''
+                                                                                    : value,
+                                                                        }),
+                                                                    );
+                                                                    setWitnessCredentials(
+                                                                        (
+                                                                            previous,
+                                                                        ) => ({
+                                                                            ...previous,
+                                                                            [med.id]:
+                                                                                '',
+                                                                        }),
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <SelectTrigger
+                                                                    id={`transport-witness-${med.id}`}
+                                                                >
+                                                                    <SelectValue placeholder="Select second checker" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">
+                                                                        Select
+                                                                        second
+                                                                        checker
+                                                                    </SelectItem>
+                                                                    {safeMedicationWitnesses.map(
+                                                                        (
+                                                                            witness,
+                                                                        ) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    witness.id
+                                                                                }
+                                                                                value={String(
+                                                                                    witness.id,
+                                                                                )}
+                                                                            >
+                                                                                {
+                                                                                    witness.name
+                                                                                }
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <Input
+                                                                type="password"
+                                                                autoComplete="current-password"
+                                                                aria-label={`Second checker password or PIN for ${med.name}`}
+                                                                value={
+                                                                    witnessCredentials[
                                                                         med.id
                                                                     ] ?? ''
                                                                 }
@@ -1113,11 +1220,11 @@ export function TransportWizard({
                                                                     form.clearErrors(
                                                                         'medications',
                                                                     );
-                                                                    setWitnessNames(
+                                                                    setWitnessCredentials(
                                                                         (
-                                                                            prev,
+                                                                            previous,
                                                                         ) => ({
-                                                                            ...prev,
+                                                                            ...previous,
                                                                             [med.id]:
                                                                                 e
                                                                                     .target
@@ -1125,9 +1232,15 @@ export function TransportWizard({
                                                                         }),
                                                                     );
                                                                 }}
-                                                                placeholder="Name of witness"
-                                                                className="mt-1"
+                                                                placeholder="Second checker password / PIN"
                                                             />
+                                                            <p className="text-xs text-muted-foreground">
+                                                                The second
+                                                                checker must be
+                                                                present and
+                                                                enter their own
+                                                                credential.
+                                                            </p>
                                                         </div>
                                                     )}
 

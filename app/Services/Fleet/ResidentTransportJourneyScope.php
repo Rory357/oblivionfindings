@@ -244,7 +244,7 @@ class ResidentTransportJourneyScope
         $query = User::query()->staff()->whereNotNull('approved_at')->orderBy('name');
         $this->siteAccess->applyFleetRecipientEligibility($query, $siteId);
 
-        return $query->get(['id', 'name'])
+        return $query->get(['id', 'name', 'approved_at', 'role'])
             ->reject(fn (User $user): bool => $excludeUserId !== null && (int) $user->id === $excludeUserId)
             ->filter(fn (User $user): bool => $user->canDo('medications.controlled.witness'))
             ->values();

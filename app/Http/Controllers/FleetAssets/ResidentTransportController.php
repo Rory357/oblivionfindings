@@ -9,10 +9,12 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
+use App\Models\FleetResidentTransportEvent;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
+use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\MedicationScanVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,7 @@ class ResidentTransportController extends Controller
         protected MedicationScanVerificationService $scanVerificationService,
         protected ResidentTransportJourneyScope $journeyScope,
         protected ResidentTransportJourneyService $journeys,
+        protected ControlledMedicationTransportWitnessService $transportWitnesses,
     ) {}
 
     private function canManageMedicationTransit(?User $user): bool
@@ -341,6 +344,7 @@ class ResidentTransportController extends Controller
         ])->values();
 
         $clientMedications = collect();
+        $medicationWitnesses = collect();
         if ($selectedClient && $this->canManageMedicationTransit($actor) && Schema::hasTable('client_medications')) {
             $clientMedications = ClientMedication::query()
                 ->active()
@@ -364,6 +368,13 @@ class ResidentTransportController extends Controller
                     'instructions' => $medication->instructions,
                     'scan_verification' => $this->buildMedicationScanPayload($selectedClient, $medication),
                 ]);
+
+            $medicationWitnesses = $this->transportWitnesses
+                ->eligibleWitnessesForSite((int) $selectedClient->site_id, now(), (int) $actor->id)
+                ->map(fn (User $witness): array => [
+                    'id' => $witness->id,
+                    'name' => $witness->name,
+                ]);
         }
 
         return [
@@ -371,6 +382,7 @@ class ResidentTransportController extends Controller
             'recent_residents' => $recentResidents,
             'clients' => $clients,
             'client_medications' => $clientMedications,
+            'medication_witnesses' => $medicationWitnesses,
             'shifts' => $shifts,
             'selected_shift_id' => $selectedShift?->id,
             'auth_user' => [
@@ -410,7 +422,10 @@ class ResidentTransportController extends Controller
             'medications.*.medication_order_version_id' => ['nullable', 'integer'],
             'medications.*.medication_name' => ['required', 'string', 'max:255'],
             'medications.*.is_controlled_drug' => ['required', 'boolean'],
-            'medications.*.witness_name' => ['nullable', 'string', 'max:255'],
+            'medications.*.attestation_state' => ['nullable', 'string', 'in:accepted'],
+            'medications.*.witnessed_by_user_id' => ['nullable', 'integer'],
+            'medications.*.witness_credential' => ['nullable', 'string', 'max:255'],
+            'medications.*.attestation_reason' => ['nullable', 'string', 'max:1000'],
             'medications.*.scan_code' => ['nullable', 'string', 'max:255'],
             'medications.*.scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'medications.*.scan_verified' => ['nullable', 'boolean'],
@@ -542,12 +557,15 @@ class ResidentTransportController extends Controller
         }
 
         $transitLogs = [];
+        $packingAttestationHistory = [];
         if ($canViewMedicationTransit && Schema::hasTable('fleet_medication_transit_logs')) {
             $transitQuery = FleetMedicationTransitLog::query()
                 ->with([
                     'client:id,first_name,last_name',
                     'medication:id,client_id,name,dosage,barcode,nzulm_code',
                     'packedBy:id,name',
+                    'packedWitness:id,name',
+                    'packingAttestationEvent:id,action,witness_user_id,occurred_at,context',
                     'administeredBy:id,name',
                     'witnessedBy:id,name',
                 ])
@@ -566,6 +584,14 @@ class ResidentTransportController extends Controller
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
+                    'packed_witness' => $log->packedWitness ? [
+                        'id' => $log->packedWitness->id,
+                        'name' => $log->packedWitness->name,
+                    ] : null,
+                    'packed_witnessed_at' => optional($log->packed_witnessed_at)->toISOString(),
+                    'packing_witness_method' => $log->packing_witness_method,
+                    'packing_attestation_event_id' => $log->packing_attestation_event_id,
+                    'packing_attestation_state' => data_get($log->packingAttestationEvent?->context, 'attestation.state'),
                     'packed_by' => $log->packedBy ? [
                         'id' => $log->packedBy->id,
                         'name' => $log->packedBy->name,
@@ -589,11 +615,50 @@ class ResidentTransportController extends Controller
                 ])
                 ->values()
                 ->toArray();
+
+            if (Schema::hasTable('fleet_resident_transport_events')) {
+                $packingAttestationHistory = FleetResidentTransportEvent::query()
+                    ->with([
+                        'actor:id,name',
+                        'witness:id,name',
+                        'medication:id,name,dosage',
+                    ])
+                    ->where('transport_id', $transport->id)
+                    ->where('client_id', $transport->resident_id)
+                    ->where('site_id', $transport->site_id)
+                    ->whereHas('medication', fn ($medication) => $medication
+                        ->where('client_id', $transport->resident_id))
+                    ->whereIn('action', [
+                        'medication_packed',
+                        'medication_packing_refused',
+                        'medication_packing_unavailable',
+                        'medication_packing_attestation_corrected',
+                    ])
+                    ->whereNotNull('context->attestation->state')
+                    ->latest('id')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn (FleetResidentTransportEvent $event): array => [
+                        'id' => $event->id,
+                        'state' => data_get($event->context, 'attestation.state'),
+                        'medication_name' => $event->medication
+                            ? trim($event->medication->name.' '.($event->medication->dosage ?? ''))
+                            : 'Medication record',
+                        'actor_name' => $event->actor?->name,
+                        'witness_name' => $event->witness?->name,
+                        'occurred_at' => optional($event->occurred_at)->toISOString(),
+                        'reason' => data_get($event->context, 'attestation_reason')
+                            ?? data_get($event->context, 'correction_reason'),
+                        'supersedes_event_id' => data_get($event->context, 'supersedes_event_id'),
+                    ])
+                    ->values()
+                    ->toArray();
+            }
         }
 
         $witnesses = $canManageMedicationTransit
-            ? $this->journeyScope
-                ->medicationWitnessesForSite((int) $transport->site_id, (int) $request->user()->id)
+            ? $this->transportWitnesses
+                ->eligibleWitnessesForSite((int) $transport->site_id, now(), (int) $request->user()->id)
                 ->map(fn ($user) => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -655,6 +720,7 @@ class ResidentTransportController extends Controller
                 ] : null,
                 'available_medications' => $availableMedications,
                 'transit_logs' => $transitLogs,
+                'packing_attestation_history' => $packingAttestationHistory,
                 'witnesses' => $witnesses,
                 'can_manage' => $canManageMedicationTransit,
             ],
@@ -698,6 +764,21 @@ class ResidentTransportController extends Controller
                     'type' => 'controlled_drug_witness',
                     'count' => $controlledMissingWitness,
                     'message' => "{$controlledMissingWitness} controlled drug(s) administered without witness",
+                ];
+            }
+
+            $packingAttestationQuery = FleetMedicationTransitLog::query()
+                ->where('transport_id', $transport->id);
+            $this->journeyScope->applyMedicationTransitScope($packingAttestationQuery, $request->user());
+            $packingAttestationGaps = $this->journeys
+                ->governedPackingAttestationGaps($packingAttestationQuery)
+                ->count();
+
+            if ($packingAttestationGaps > 0) {
+                $blockers[] = [
+                    'type' => 'medication_packing_attestation',
+                    'count' => $packingAttestationGaps,
+                    'message' => "{$packingAttestationGaps} medication packing attestation(s) need an authenticated witness or correction",
                 ];
             }
         }
@@ -778,6 +859,8 @@ class ResidentTransportController extends Controller
                 'transport:id,resident_name,transport_type,status,departed_at,arrived_at,asset_id',
                 'transport.asset:id,name,asset_tag',
                 'packedBy:id,name',
+                'packedWitness:id,name',
+                'packingAttestationEvent:id,action,witness_user_id,occurred_at,context',
                 'administeredBy:id,name',
                 'witnessedBy:id,name',
                 'medication',
@@ -818,7 +901,7 @@ class ResidentTransportController extends Controller
 
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
+                $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packing Attested At', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
                 foreach ($exportQuery->lazy(200) as $log) {
                     $this->putCsv($handle, [
                         $log->id,
@@ -826,7 +909,8 @@ class ResidentTransportController extends Controller
                         $log->medication_name,
                         $log->is_controlled_drug ? 'Yes' : 'No',
                         $log->packedBy?->name ?? '',
-                        $log->packed_witness_name ?? '',
+                        $log->packedWitness?->name ?? ($log->packed_witness_name ? '[legacy label] '.$log->packed_witness_name : ''),
+                        optional($log->packed_witnessed_at)->format('Y-m-d H:i') ?? '',
                         optional($log->packed_at)->format('Y-m-d H:i') ?? '',
                         $log->administeredBy?->name ?? '',
                         optional($log->administered_at)->format('Y-m-d H:i') ?? '',
@@ -894,6 +978,11 @@ class ResidentTransportController extends Controller
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
+                    'packed_witness' => $log->packedWitness ? ['id' => $log->packedWitness->id, 'name' => $log->packedWitness->name] : null,
+                    'packed_witnessed_at' => optional($log->packed_witnessed_at)->toISOString(),
+                    'packing_witness_method' => $log->packing_witness_method,
+                    'packing_attestation_event_id' => $log->packing_attestation_event_id,
+                    'packing_attestation_state' => data_get($log->packingAttestationEvent?->context, 'attestation.state'),
                     'packed_by' => $log->packedBy ? ['id' => $log->packedBy->id, 'name' => $log->packedBy->name] : null,
                     'packed_at' => optional($log->packed_at)->toISOString(),
                     'administered_by' => $log->administeredBy ? ['id' => $log->administeredBy->id, 'name' => $log->administeredBy->name] : null,
@@ -915,8 +1004,11 @@ class ResidentTransportController extends Controller
             ],
             'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
             'clients' => $clients,
-            'witnesses' => $this->journeyScope->medicationWitnessesFor(
-                $request->user(),
+            'witnesses' => $this->transportWitnesses->eligibleWitnessesForSites(
+                $selectedTransport
+                    ? [(int) $selectedTransport->site_id]
+                    : $this->journeyScope->accessibleSiteIds($request->user()),
+                now(),
                 (int) $request->user()->id,
             )->map(fn ($user) => [
                 'id' => $user->id,
@@ -954,7 +1046,10 @@ class ResidentTransportController extends Controller
             'medication_order_version_id' => ['nullable', 'integer'],
             'medication_name' => ['required', 'string', 'max:255'],
             'is_controlled_drug' => ['required', 'boolean'],
-            'witness_name' => ['nullable', 'string', 'max:255'],
+            'attestation_state' => ['nullable', 'string', 'in:accepted,refused,unavailable'],
+            'witnessed_by_user_id' => ['nullable', 'integer'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
+            'attestation_reason' => ['nullable', 'string', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
@@ -975,7 +1070,8 @@ class ResidentTransportController extends Controller
 
         $payload = [
             'success' => true,
-            'log' => [
+            'attestation_state' => $result['attestation_state'],
+            'log' => $log ? [
                 'id' => $log->id,
                 'transport_id' => $log->transport_id,
                 'client_id' => $log->client_id,
@@ -983,6 +1079,47 @@ class ResidentTransportController extends Controller
                 'medication_name' => $log->medication_name,
                 'status' => $log->status,
                 'packed_at' => $log->packed_at?->toIso8601String(),
+                'packing_attestation_event_id' => $log->packing_attestation_event_id,
+            ] : null,
+        ];
+
+        if (filled($data['client_request_uuid'] ?? null)) {
+            $payload['sync'] = $this->syncPayload($data, $result['replayed']);
+
+            return response()->json($payload);
+        }
+
+        return back()->with('success', match ($result['attestation_state']) {
+            'refused' => 'Second-checker refusal recorded. Medication was not packed.',
+            'unavailable' => 'Second-checker unavailability recorded. Medication was not packed.',
+            default => 'Medication packed for transit.',
+        });
+    }
+
+    public function correctPackingAttestation(Request $request, FleetMedicationTransitLog $log)
+    {
+        $this->assertCanManageMedicationTransit($request);
+        $log = $this->journeyScope->medicationTransitLogFor($request->user(), (int) $log->id);
+        $data = $request->validate([
+            'witnessed_by_user_id' => ['required', 'integer'],
+            'witness_credential' => ['required', 'string', 'max:255'],
+            'correction_reason' => ['required', 'string', 'max:1000'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+        ]);
+
+        $result = $this->journeys->correctPackingAttestation(
+            $request->user(),
+            (int) $log->id,
+            $data,
+        );
+        $log = $result['log'];
+        $payload = [
+            'success' => true,
+            'log' => [
+                'id' => $log->id,
+                'packing_attestation_event_id' => $log->packing_attestation_event_id,
+                'packed_witnessed_by_user_id' => $log->packed_witnessed_by_user_id,
+                'packed_witnessed_at' => $log->packed_witnessed_at?->toIso8601String(),
             ],
         ];
 
@@ -992,7 +1129,9 @@ class ResidentTransportController extends Controller
             return response()->json($payload);
         }
 
-        return back()->with('success', 'Medication packed for transit.');
+        return back()->with('success', $result['replayed']
+            ? 'The packing witness correction was already recorded.'
+            : 'Packing witness correction recorded.');
     }
 
     public function administerMedication(Request $request, FleetMedicationTransitLog $log)

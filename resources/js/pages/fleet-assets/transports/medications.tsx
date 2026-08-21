@@ -35,6 +35,7 @@ import {
 import { useState } from 'react';
 import {
     AdministerTransportMedicationWizard,
+    CorrectPackingAttestationWizard,
     ReturnTransportMedicationWizard,
     type TransportMedicationLog as MedLog,
 } from './components/transport-medication-dialogs';
@@ -119,6 +120,8 @@ export default function MedicationTransitIndex({
         null,
     );
     const [returningLog, setReturningLog] = useState<MedLog | null>(null);
+    const [correctingPackingLog, setCorrectingPackingLog] =
+        useState<MedLog | null>(null);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -161,12 +164,20 @@ export default function MedicationTransitIndex({
         setReturningLog(null);
     };
 
+    const closePackingCorrectionDialog = () => {
+        setCorrectingPackingLog(null);
+    };
+
     const openAdministerDialog = (log: MedLog) => {
         setAdministeringLog(log);
     };
 
     const openReturnDialog = (log: MedLog) => {
         setReturningLog(log);
+    };
+
+    const openPackingCorrectionDialog = (log: MedLog) => {
+        setCorrectingPackingLog(log);
     };
 
     return (
@@ -549,12 +560,15 @@ export default function MedicationTransitIndex({
                                                                     ?.name ??
                                                                     '---'}
                                                             </div>
-                                                            {log.packed_witness_name && (
+                                                            {(log.packed_witness ||
+                                                                log.packed_witness_name) && (
                                                                 <div className="text-muted-foreground">
-                                                                    Witness:{' '}
-                                                                    {
-                                                                        log.packed_witness_name
-                                                                    }
+                                                                    Second
+                                                                    checker:{' '}
+                                                                    {log
+                                                                        .packed_witness
+                                                                        ?.name ??
+                                                                        `${log.packed_witness_name} (legacy label only)`}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -624,6 +638,22 @@ export default function MedicationTransitIndex({
                                                                     Return
                                                                 </Button>
                                                             )}
+                                                            {(log.witness_required ||
+                                                                log.is_controlled_drug) && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        openPackingCorrectionDialog(
+                                                                            log,
+                                                                        )
+                                                                    }
+                                                                    className="text-xs"
+                                                                >
+                                                                    Correct
+                                                                    witness
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -680,6 +710,14 @@ export default function MedicationTransitIndex({
                     if (!queued) {
                         router.reload({ only: ['logs', 'stats'] });
                     }
+                }}
+            />
+            <CorrectPackingAttestationWizard
+                log={correctingPackingLog}
+                witnesses={safeWitnesses}
+                onClose={closePackingCorrectionDialog}
+                onCompleted={() => {
+                    router.reload({ only: ['logs', 'stats'] });
                 }}
             />
             <ReturnTransportMedicationWizard

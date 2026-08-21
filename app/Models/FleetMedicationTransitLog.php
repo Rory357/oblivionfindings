@@ -25,6 +25,10 @@ class FleetMedicationTransitLog extends Model
         'is_controlled_drug',
         'witness_required',
         'packed_witness_name',
+        'packed_witnessed_by_user_id',
+        'packed_witnessed_at',
+        'packing_witness_method',
+        'packing_attestation_event_id',
         'packed_by_user_id',
         'packed_at',
         'administered_at',
@@ -40,6 +44,7 @@ class FleetMedicationTransitLog extends Model
         'is_controlled_drug' => 'boolean',
         'witness_required' => 'boolean',
         'packed_at' => 'datetime',
+        'packed_witnessed_at' => 'datetime',
         'administered_at' => 'datetime',
         'returned_to_house_at' => 'datetime',
         'medication_order_version' => 'integer',
@@ -88,6 +93,16 @@ class FleetMedicationTransitLog extends Model
     public function packedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'packed_by_user_id');
+    }
+
+    public function packedWitness(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'packed_witnessed_by_user_id');
+    }
+
+    public function packingAttestationEvent(): BelongsTo
+    {
+        return $this->belongsTo(FleetResidentTransportEvent::class, 'packing_attestation_event_id');
     }
 
     public function administeredBy(): BelongsTo

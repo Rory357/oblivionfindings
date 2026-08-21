@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class FleetResidentTransportEvent extends Model
 {
@@ -34,6 +35,17 @@ class FleetResidentTransportEvent extends Model
         'occurred_at' => 'datetime',
         'context' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (): never {
+            throw new LogicException('Resident transport provenance events are immutable; append a correction event instead.');
+        });
+
+        static::deleting(function (): never {
+            throw new LogicException('Resident transport provenance events cannot be deleted.');
+        });
+    }
 
     public function transport(): BelongsTo
     {

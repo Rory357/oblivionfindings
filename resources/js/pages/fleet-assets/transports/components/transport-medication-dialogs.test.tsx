@@ -5,9 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     AdministerTransportMedicationWizard,
+    CorrectPackingAttestationWizard,
     PackMedicationWizard,
     ReturnTransportMedicationWizard,
     buildAdministerMedicationPayload,
+    buildCorrectPackingAttestationPayload,
     buildPackMedicationPayload,
     buildReturnMedicationPayload,
     type TransportMedicationLog,
@@ -58,7 +60,10 @@ describe('transport medication payload contract', () => {
             buildPackMedicationPayload({
                 clientId: 9,
                 medication,
-                witnessName: '',
+                attestationState: 'accepted',
+                witnessedByUserId: '',
+                witnessCredential: '',
+                attestationReason: '',
                 notes: '',
                 scan: idleScan,
             }),
@@ -67,12 +72,27 @@ describe('transport medication payload contract', () => {
             medication_id: 41,
             medication_name: 'Paracetamol',
             is_controlled_drug: false,
-            witness_name: null,
+            attestation_state: 'accepted',
+            witnessed_by_user_id: null,
+            witness_credential: null,
+            attestation_reason: null,
             notes: null,
             scan_code: null,
             scan_source: null,
             scan_verified: false,
             scan_match_source: null,
+        });
+
+        expect(
+            buildCorrectPackingAttestationPayload({
+                witnessedByUserId: '19',
+                witnessCredential: ' corrected-secret ',
+                correctionReason: ' Wrong checker selected ',
+            }),
+        ).toEqual({
+            witnessed_by_user_id: 19,
+            witness_credential: 'corrected-secret',
+            correction_reason: 'Wrong checker selected',
         });
 
         expect(
@@ -121,6 +141,7 @@ describe('transport medication wizard family', () => {
                 client={{ id: 9, name: 'Alex Resident' }}
                 residentName="Alex Resident"
                 medications={[medication]}
+                witnesses={[]}
                 {...common}
             />,
         );
@@ -150,6 +171,27 @@ describe('transport medication wizard family', () => {
         );
         administered.unmount();
 
+        const correction = render(
+            <CorrectPackingAttestationWizard
+                log={{
+                    ...log,
+                    witness_required: true,
+                    packed_witness: { id: 21, name: 'Original Checker' },
+                }}
+                witnesses={[
+                    { id: 21, name: 'Original Checker' },
+                    { id: 22, name: 'Correct Checker' },
+                ]}
+                {...common}
+            />,
+        );
+        expect(
+            screen.getByRole('dialog', { name: 'Correct packing witness' }),
+        ).toHaveAccessibleDescription(
+            'Authenticate the correct second checker and keep the original packing evidence in the journey history.',
+        );
+        correction.unmount();
+
         render(<ReturnTransportMedicationWizard log={log} {...common} />);
         expect(
             screen.getByRole('dialog', { name: 'Record medication return' }),
@@ -174,5 +216,11 @@ describe('transport medication wizard family', () => {
             );
             expect(source).not.toMatch(/<DialogContent(?:\s|>)/);
         }
+
+        expect(showSource).toContain(
+            'const packDialogTriggerRef = useRef<HTMLButtonElement>(null);',
+        );
+        expect(showSource).toMatch(/ref=\{\s*packDialogTriggerRef\s*\}/);
+        expect(showSource).toContain('packDialogTriggerRef.current?.focus()');
     });
 });

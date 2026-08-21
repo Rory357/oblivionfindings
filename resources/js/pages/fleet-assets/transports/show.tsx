@@ -29,6 +29,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     AdministerTransportMedicationWizard,
+    CorrectPackingAttestationWizard,
     PackMedicationWizard,
     ReturnTransportMedicationWizard,
     type TransportMedicationLog as TransitLog,
@@ -45,6 +46,16 @@ type MedicationContext = {
     client: { id: number; name: string } | null;
     available_medications: TransitMedicationOption[];
     transit_logs: TransitLog[];
+    packing_attestation_history: Array<{
+        id: number;
+        state: string;
+        medication_name: string;
+        actor_name: string | null;
+        witness_name: string | null;
+        occurred_at: string | null;
+        reason: string | null;
+        supersedes_event_id: number | null;
+    }>;
     witnesses: Array<{ id: number; name: string }>;
     can_manage: boolean;
 };
@@ -146,6 +157,21 @@ function transitStatusBadge(status: string) {
     }
 }
 
+function packingAttestationLabel(state: string): string {
+    switch (state) {
+        case 'accepted':
+            return 'Accepted';
+        case 'refused':
+            return 'Declined';
+        case 'unavailable':
+            return 'Unavailable';
+        case 'corrected':
+            return 'Corrected';
+        default:
+            return state.replace(/_/g, ' ');
+    }
+}
+
 function formatDurationMinutes(minutes: number | null): string {
     if (minutes == null) return '---';
     return formatDuration(Math.round(minutes) * 60);
@@ -166,6 +192,7 @@ export default function TransportShow({
                 client: null,
                 available_medications: [],
                 transit_logs: [],
+                packing_attestation_history: [],
                 witnesses: [],
                 can_manage: false,
             },
@@ -179,15 +206,20 @@ export default function TransportShow({
         () => medicationContext.transit_logs ?? [],
         [medicationContext.transit_logs],
     );
+    const safePackingAttestationHistory =
+        medicationContext.packing_attestation_history ?? [];
     const safeWitnesses = medicationContext.witnesses ?? [];
     const canManageMedicationTransit = !!medicationContext.can_manage;
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const packDialogTriggerRef = useRef<HTMLButtonElement>(null);
 
     const [packDialogOpen, setPackDialogOpen] = useState(false);
     const [administeringLog, setAdministeringLog] = useState<TransitLog | null>(
         null,
     );
     const [returningLog, setReturningLog] = useState<TransitLog | null>(null);
+    const [correctingPackingLog, setCorrectingPackingLog] =
+        useState<TransitLog | null>(null);
 
     const completeForm = useForm({
         arrived_at: toDatetimeLocal(new Date()),
@@ -248,6 +280,9 @@ export default function TransportShow({
 
     const closePackDialog = () => {
         setPackDialogOpen(false);
+        window.requestAnimationFrame(() =>
+            packDialogTriggerRef.current?.focus(),
+        );
     };
 
     const openPackDialog = () => {
@@ -262,12 +297,20 @@ export default function TransportShow({
         setReturningLog(null);
     };
 
+    const closePackingCorrectionDialog = () => {
+        setCorrectingPackingLog(null);
+    };
+
     const openAdministerDialog = (log: TransitLog) => {
         setAdministeringLog(log);
     };
 
     const openReturnDialog = (log: TransitLog) => {
         setReturningLog(log);
+    };
+
+    const openPackingCorrectionDialog = (log: TransitLog) => {
+        setCorrectingPackingLog(log);
     };
 
     const handleComplete = (e: React.FormEvent) => {
@@ -607,6 +650,9 @@ export default function TransportShow({
                                                 safeMedicationOptions.length >
                                                     0 && (
                                                     <Button
+                                                        ref={
+                                                            packDialogTriggerRef
+                                                        }
                                                         size="sm"
                                                         onClick={openPackDialog}
                                                     >
@@ -658,6 +704,64 @@ export default function TransportShow({
                                             page.
                                         </div>
                                     )}
+
+                                    {safePackingAttestationHistory.length >
+                                    0 ? (
+                                        <div className="space-y-2 rounded-lg border p-4">
+                                            <div className="flex items-center gap-2 text-sm font-semibold">
+                                                <ShieldCheck className="h-4 w-4" />
+                                                Packing second-checker history
+                                            </div>
+                                            <div className="space-y-2">
+                                                {safePackingAttestationHistory.map(
+                                                    (entry) => (
+                                                        <div
+                                                            key={entry.id}
+                                                            className="rounded-md bg-muted/40 px-3 py-2 text-xs"
+                                                        >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-medium">
+                                                                    {
+                                                                        entry.medication_name
+                                                                    }
+                                                                </span>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="text-[10px]"
+                                                                >
+                                                                    {packingAttestationLabel(
+                                                                        entry.state,
+                                                                    )}
+                                                                </Badge>
+                                                                <span className="text-muted-foreground">
+                                                                    {entry.occurred_at
+                                                                        ? formatDateTime(
+                                                                              entry.occurred_at,
+                                                                          )
+                                                                        : 'Time unavailable'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-1 text-muted-foreground">
+                                                                {entry.witness_name
+                                                                    ? `Second checker: ${entry.witness_name}`
+                                                                    : 'No second checker was available'}
+                                                                {entry.actor_name
+                                                                    ? ` · Recorded by ${entry.actor_name}`
+                                                                    : ''}
+                                                            </div>
+                                                            {entry.reason ? (
+                                                                <div className="mt-1 text-muted-foreground">
+                                                                    {
+                                                                        entry.reason
+                                                                    }
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : null}
 
                                     {safeTransitLogs.length === 0 ? (
                                         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
@@ -723,12 +827,15 @@ export default function TransportShow({
                                                                         : 'Pending'}
                                                                 </div>
                                                                 <div>
-                                                                    Witness:{' '}
+                                                                    Packing
+                                                                    second
+                                                                    checker:{' '}
                                                                     {log
-                                                                        .witnessed_by
+                                                                        .packed_witness
                                                                         ?.name ??
-                                                                        log.packed_witness_name ??
-                                                                        '---'}
+                                                                        (log.packed_witness_name
+                                                                            ? `${log.packed_witness_name} (legacy label only)`
+                                                                            : 'Correction required')}
                                                                 </div>
                                                                 <div>
                                                                     Returned:{' '}
@@ -781,6 +888,22 @@ export default function TransportShow({
                                                                             Return
                                                                         </Button>
                                                                     )}
+                                                                    {(log.witness_required ||
+                                                                        log.is_controlled_drug) && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            onClick={() =>
+                                                                                openPackingCorrectionDialog(
+                                                                                    log,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <ShieldCheck className="mr-2 h-4 w-4" />
+                                                                            Correct
+                                                                            witness
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                     </div>
@@ -811,9 +934,11 @@ export default function TransportShow({
                                                         <Pill className="h-3.5 w-3.5 shrink-0" />
                                                     )}
                                                     {blocker.type ===
-                                                        'controlled_drug_witness' && (
+                                                        'controlled_drug_witness' ||
+                                                    blocker.type ===
+                                                        'medication_packing_attestation' ? (
                                                         <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                                                    )}
+                                                    ) : null}
                                                     <span>
                                                         {blocker.message}
                                                     </span>
@@ -1050,10 +1175,17 @@ export default function TransportShow({
                 client={medicationContext.client}
                 residentName={t.resident_name}
                 medications={safeMedicationOptions}
+                witnesses={safeWitnesses}
                 onClose={closePackDialog}
                 onCompleted={(queued) => {
                     if (!queued) refreshMedicationContext();
                 }}
+            />
+            <CorrectPackingAttestationWizard
+                log={correctingPackingLog}
+                witnesses={safeWitnesses}
+                onClose={closePackingCorrectionDialog}
+                onCompleted={() => refreshMedicationContext()}
             />
             <AdministerTransportMedicationWizard
                 log={administeringLog}

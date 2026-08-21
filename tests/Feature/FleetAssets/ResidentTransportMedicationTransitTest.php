@@ -298,7 +298,6 @@ class ResidentTransportMedicationTransitTest extends TestCase
                     'medication_id' => $medication->id,
                     'medication_name' => 'Packed Medication 10mg',
                     'is_controlled_drug' => false,
-                    'witness_name' => '',
                     'scan_code' => $scanCode,
                     'scan_source' => 'manual',
                     'scan_verified' => true,
@@ -323,7 +322,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
         ]);
     }
 
-    public function test_controlled_drug_pack_requires_a_witness_name(): void
+    public function test_controlled_drug_pack_requires_an_authenticated_second_checker(): void
     {
         [$transport, $client] = $this->createInProgressTransport();
 
@@ -339,6 +338,8 @@ class ResidentTransportMedicationTransitTest extends TestCase
             'approval_status' => 'verified',
             'version' => 1,
         ]);
+        $scanCode = app(MedicationScanVerificationService::class)
+            ->internalCode($client, $medication);
 
         $this->actingAs($this->admin)
             ->from("/fleet-assets/transports/{$transport->id}")
@@ -347,16 +348,21 @@ class ResidentTransportMedicationTransitTest extends TestCase
                 'medication_id' => $medication->id,
                 'medication_name' => $medication->name,
                 'is_controlled_drug' => $medication->controlled_drug,
-                'witness_name' => '',
+                'attestation_state' => 'accepted',
+                'witness_name' => 'Unrelated free-text staff label',
                 'notes' => 'Prepared for the appointment.',
+                'scan_code' => $scanCode,
+                'scan_source' => 'manual',
+                'scan_verified' => true,
+                'scan_match_source' => null,
             ])
             ->assertRedirect("/fleet-assets/transports/{$transport->id}")
-            ->assertSessionHasErrors(['witness_name']);
+            ->assertSessionHasErrors(['witnessed_by_user_id']);
 
         $this->assertDatabaseCount('fleet_medication_transit_logs', 0);
     }
 
-    public function test_controlled_drug_administration_requires_a_witness_user(): void
+    public function test_controlled_drug_administration_rejects_label_only_packing_evidence(): void
     {
         [$transport, $client] = $this->createInProgressTransport();
 
@@ -398,7 +404,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
                 'scan_match_source' => 'internal_emar',
             ])
             ->assertRedirect("/fleet-assets/transports/{$transport->id}")
-            ->assertSessionHasErrors(['witnessed_by_user_id']);
+            ->assertSessionHasErrors(['packing_attestation']);
 
         $this->assertNull($log->fresh()->administered_at);
     }
@@ -427,7 +433,6 @@ class ResidentTransportMedicationTransitTest extends TestCase
                 'medication_id' => $medication->id,
                 'medication_name' => $medication->name,
                 'is_controlled_drug' => false,
-                'witness_name' => null,
                 'notes' => 'Packed at the house.',
                 'scan_code' => $scanCode,
                 'scan_source' => 'manual',

@@ -15,9 +15,11 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
 use App\Services\EnhancedMarService;
+use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftOperationalSnapshotService;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -34,6 +36,7 @@ class ResidentTransportJourneyService
         private readonly CoverageRoleService $coverageRoles,
         private readonly ShiftOperationalSnapshotService $snapshots,
         private readonly MedicationScanVerificationService $scanVerification,
+        private readonly ControlledMedicationTransportWitnessService $transportWitnesses,
         private readonly EnhancedMarService $emar,
         private readonly MedicationIncidentIntegrationService $incidents,
     ) {}
@@ -60,7 +63,9 @@ class ResidentTransportJourneyService
             'medications' => collect($data['medications'] ?? [])->map(fn (array $medication): array => [
                 'medication_id' => $medication['medication_id'] ?? null,
                 'medication_order_version_id' => $medication['medication_order_version_id'] ?? null,
-                'witness_name' => trim((string) ($medication['witness_name'] ?? '')),
+                'attestation_state' => $medication['attestation_state'] ?? null,
+                'witnessed_by_user_id' => $medication['witnessed_by_user_id'] ?? null,
+                'attestation_reason_hash' => hash('sha256', (string) ($medication['attestation_reason'] ?? '')),
                 'scan_code_hash' => hash('sha256', (string) ($medication['scan_code'] ?? '')),
             ])->values()->all(),
         ]);
@@ -218,6 +223,15 @@ class ResidentTransportJourneyService
                 ]);
             }
 
+            $ungovernedPackingAttestations = $this->governedPackingAttestationGaps(clone $scopedLogsQuery)
+                ->lockForUpdate()
+                ->count();
+            if ($ungovernedPackingAttestations > 0) {
+                throw ValidationException::withMessages([
+                    'transport' => "Cannot complete transport: {$ungovernedPackingAttestations} medication packing attestation(s) need an authenticated witness or correction.",
+                ]);
+            }
+
             $transport->forceFill([
                 'status' => 'completed',
                 'arrived_at' => $data['arrived_at'] ?? now(),
@@ -299,28 +313,44 @@ class ResidentTransportJourneyService
         }, 3);
     }
 
-    /** @return array{log: FleetMedicationTransitLog, replayed: bool} */
+    /** @return array{log: ?FleetMedicationTransitLog, replayed: bool, attestation_state: string} */
     public function packMedication(User $actor, int $transportId, array $data): array
     {
+        $attestationState = (string) ($data['attestation_state'] ?? 'accepted');
+        if (! in_array($attestationState, ['accepted', 'refused', 'unavailable'], true)) {
+            throw ValidationException::withMessages([
+                'attestation_state' => 'Select whether the second checker accepted, declined, or was unavailable.',
+            ]);
+        }
+        $action = match ($attestationState) {
+            'accepted' => 'medication_packed',
+            'refused' => 'medication_packing_refused',
+            'unavailable' => 'medication_packing_unavailable',
+        };
         $requestUuid = $this->requestUuid($data);
-        $requestHash = $this->requestHash('medication_packed', [
+        $requestHash = $this->requestHash($action, [
             'transport_id' => $transportId,
             'client_id' => $data['client_id'] ?? null,
             'medication_id' => $data['medication_id'] ?? null,
             'medication_order_version_id' => $data['medication_order_version_id'] ?? null,
-            'witness_name' => trim((string) ($data['witness_name'] ?? '')),
+            'attestation_state' => $attestationState,
+            'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
+            'attestation_reason_hash' => hash('sha256', (string) ($data['attestation_reason'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
         ]);
 
-        return DB::transaction(function () use ($actor, $transportId, $data, $requestUuid, $requestHash): array {
+        return DB::transaction(function () use ($actor, $transportId, $data, $attestationState, $action, $requestUuid, $requestHash): array {
             $transport = $this->scope->transportFor($actor, $transportId, true);
-            if ($event = $this->replayedEvent($actor, $requestUuid, 'medication_packed', $requestHash)) {
-                abort_unless((int) $event->transport_id === $transport->id && $event->medication_transit_log_id, 409);
+            if ($event = $this->replayedEvent($actor, $requestUuid, $action, $requestHash)) {
+                abort_unless((int) $event->transport_id === $transport->id, 409);
 
                 return [
-                    'log' => $this->scope->medicationTransitLogFor($actor, (int) $event->medication_transit_log_id),
+                    'log' => $event->medication_transit_log_id
+                        ? $this->scope->medicationTransitLogFor($actor, (int) $event->medication_transit_log_id, true)
+                        : null,
                     'replayed' => true,
+                    'attestation_state' => $attestationState,
                 ];
             }
 
@@ -331,7 +361,35 @@ class ResidentTransportJourneyService
                 $resident,
                 $data,
                 true,
+                $attestationState === 'accepted',
             );
+
+            if ($attestationState !== 'accepted') {
+                $this->recordPackingNonAcceptance(
+                    $transport,
+                    $resident,
+                    $actor,
+                    $prepared,
+                    $data,
+                    $attestationState,
+                    $action,
+                    $requestUuid,
+                    $requestHash,
+                );
+
+                return [
+                    'log' => null,
+                    'replayed' => false,
+                    'attestation_state' => $attestationState,
+                ];
+            }
+
+            $duplicate = FleetMedicationTransitLog::query()
+                ->where('transport_id', $transport->id)
+                ->where('medication_id', $prepared['medication']->id)
+                ->exists();
+            abort_if($duplicate, 409, 'This medication is already packed for the journey.');
+
             $log = $this->createMedicationCustody(
                 $transport,
                 $resident,
@@ -343,7 +401,7 @@ class ResidentTransportJourneyService
                 $requestHash,
             );
 
-            return ['log' => $log, 'replayed' => false];
+            return ['log' => $log, 'replayed' => false, 'attestation_state' => 'accepted'];
         }, 3);
     }
 
@@ -369,6 +427,136 @@ class ResidentTransportJourneyService
         );
     }
 
+    /** @return array{log: FleetMedicationTransitLog, replayed: bool} */
+    public function correctPackingAttestation(User $actor, int $logId, array $data): array
+    {
+        $requestUuid = $this->requestUuid($data);
+        $requestHash = $this->requestHash('medication_packing_attestation_corrected', [
+            'log_id' => $logId,
+            'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
+            'correction_reason_hash' => hash('sha256', (string) ($data['correction_reason'] ?? '')),
+        ]);
+
+        return DB::transaction(function () use ($actor, $logId, $data, $requestUuid, $requestHash): array {
+            $transportId = FleetMedicationTransitLog::query()->whereKey($logId)->value('transport_id');
+            abort_unless($transportId, 404);
+            $transport = $this->scope->transportFor($actor, (int) $transportId, true);
+            $log = $this->scope->medicationTransitLogFor($actor, $logId, true);
+
+            if ($event = $this->replayedEvent(
+                $actor,
+                $requestUuid,
+                'medication_packing_attestation_corrected',
+                $requestHash,
+            )) {
+                abort_unless(
+                    (int) $event->transport_id === $transport->id
+                        && (int) $event->medication_transit_log_id === $log->id,
+                    409,
+                );
+
+                return ['log' => $log->fresh(), 'replayed' => true];
+            }
+
+            abort_unless(
+                $log->witness_required || $log->is_controlled_drug,
+                409,
+                'This packing record does not require a second checker.',
+            );
+            if (blank($data['correction_reason'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'correction_reason' => 'Explain why the packing attestation is being corrected.',
+                ]);
+            }
+
+            $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
+            $medication = ClientMedication::query()
+                ->whereKey($log->medication_id)
+                ->where('client_id', $resident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                (int) $log->client_id === (int) $resident->id
+                    && (int) $log->site_id === (int) $resident->site_id
+                    && (int) $transport->site_id === (int) $resident->site_id,
+                404,
+            );
+
+            $attestation = $this->transportWitnesses->authenticate(
+                $actor,
+                (int) $resident->site_id,
+                (int) ($data['witnessed_by_user_id'] ?? 0),
+                (string) ($data['witness_credential'] ?? ''),
+                now(),
+            );
+            /** @var User $witness */
+            $witness = $attestation['witness'];
+            if ((int) $log->packed_witnessed_by_user_id === (int) $witness->id) {
+                throw ValidationException::withMessages([
+                    'witnessed_by_user_id' => 'Select the correct second checker rather than the checker already recorded.',
+                ]);
+            }
+
+            $subjectDigest = $this->medicationCustodyDigest($transport, $log, $medication);
+            $supersededEvent = $log->packing_attestation_event_id
+                ? FleetResidentTransportEvent::query()
+                    ->whereKey($log->packing_attestation_event_id)
+                    ->where('transport_id', $transport->id)
+                    ->where('medication_transit_log_id', $log->id)
+                    ->lockForUpdate()
+                    ->firstOrFail()
+                : null;
+            $previousDigest = data_get($supersededEvent?->context, 'attestation.subject_digest');
+            abort_unless(
+                $previousDigest === null || hash_equals((string) $previousDigest, $subjectDigest),
+                409,
+                'The packing attestation no longer matches this medication custody record.',
+            );
+
+            $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
+            $event = $this->recordEvent(
+                $transport,
+                'medication_packing_attestation_corrected',
+                $actor,
+                $requestUuid,
+                [
+                    'request_hash' => $requestHash,
+                    'attestation' => $this->attestationContext($attestation, $subjectDigest, 'corrected'),
+                    'supersedes_event_id' => $supersededEvent?->id,
+                    'correction_reason' => trim((string) $data['correction_reason']),
+                ],
+                $log,
+                $medication,
+                $log->medicationOrderVersion,
+                null,
+                $witness->id,
+            );
+            $log->forceFill([
+                'packed_witness_name' => $witness->name,
+                'packed_witnessed_by_user_id' => $witness->id,
+                'packed_witnessed_at' => $attestation['witnessed_at'],
+                'packing_witness_method' => $attestation['method'],
+                'packing_attestation_event_id' => $event->id,
+            ])->save();
+
+            AuditLogger::logOrFail('fleet.medication.packing_attestation.correct', $log, [
+                'actor_id' => $actor->id,
+                'site_id' => $transport->site_id,
+                'client_id' => $resident->id,
+                'transport_id' => $transport->id,
+                'journey_uuid' => $transport->journey_uuid,
+                'medication_id' => $medication->id,
+                'request_uuid' => $requestUuid,
+                'packing_attestation_event_id' => $event->id,
+                'supersedes_event_id' => $supersededEvent?->id,
+                'witness_user_id' => $witness->id,
+                'correction_reason' => trim((string) $data['correction_reason']),
+            ]);
+
+            return ['log' => $log, 'replayed' => false];
+        }, 3);
+    }
+
     /**
      * @return array{log: FleetMedicationTransitLog, replayed: bool}
      */
@@ -378,7 +566,6 @@ class ResidentTransportJourneyService
         $requestHash = $this->requestHash($action, [
             'log_id' => $logId,
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
-            'witness_credential_hash' => hash('sha256', (string) ($data['witness_credential'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
         ]);
@@ -407,8 +594,19 @@ class ResidentTransportJourneyService
                 ->lockForUpdate()
                 ->firstOrFail();
             abort_unless((int) $log->site_id === (int) $resident->site_id, 404);
+            if (
+                $action === 'medication_administered'
+                && $this->governedPackingAttestationGaps(
+                    FleetMedicationTransitLog::query()->whereKey($log->id),
+                )->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'packing_attestation' => 'Correct the packing second-checker evidence before administering this medication.',
+                ]);
+            }
             $scanAudit = $this->verifyMedicationScan($resident, $medication, $data);
             $witness = null;
+            $witnessAttestation = null;
             $administration = null;
 
             if ($action === 'medication_administered') {
@@ -416,6 +614,11 @@ class ResidentTransportJourneyService
                 abort_unless($log->medication_order_version_id === null || $this->currentOrderVersion($medication)?->id === $log->medication_order_version_id, 409, 'The medication order changed after packing. Return this medication to the house for reconciliation.');
                 abort_unless($medication->isAdministrable(), 409, 'This medication order is no longer authorised for administration.');
                 if ($log->witness_required || $medication->requiresWitness()) {
+                    if ($data['queued_offline'] ?? false) {
+                        throw ValidationException::withMessages([
+                            'witness_credential' => 'Authenticated second-checker acceptance must be completed online.',
+                        ]);
+                    }
                     if (empty($data['witnessed_by_user_id'])) {
                         throw ValidationException::withMessages([
                             'witnessed_by_user_id' => 'A second authorised checker is required.',
@@ -426,11 +629,14 @@ class ResidentTransportJourneyService
                             'witness_credential' => 'The witness must enter their password or PIN.',
                         ]);
                     }
-                    $witness = $this->resolveWitness(
+                    $witnessAttestation = $this->transportWitnesses->authenticate(
                         $actor,
                         (int) $resident->site_id,
                         (int) ($data['witnessed_by_user_id'] ?? 0),
+                        (string) ($data['witness_credential'] ?? ''),
+                        now(),
                     );
+                    $witness = $witnessAttestation['witness'];
                 }
 
                 $emarResult = $this->emar->recordAdministration(
@@ -493,6 +699,13 @@ class ResidentTransportJourneyService
                     'scan_source' => $scanAudit['scan_source'],
                     'scan_match_source' => $scanAudit['scan_match_source'],
                     'entered_code_suffix' => $scanAudit['scan_code_suffix'],
+                    ...($witnessAttestation ? [
+                        'attestation' => $this->attestationContext(
+                            $witnessAttestation,
+                            $this->medicationCustodyDigest($transport, $log, $medication),
+                            'accepted',
+                        ),
+                    ] : []),
                     ...$this->offlineProvenance($data),
                 ],
                 $log,
@@ -627,8 +840,12 @@ class ResidentTransportJourneyService
     }
 
     /** @return array{medication: ClientMedication, order_version: ?MedicationOrderVersion, scan_audit: array} */
-    private function resolveMedicationPayload(Client $resident, array $payload, bool $lockForUpdate): array
-    {
+    private function resolveMedicationPayload(
+        Client $resident,
+        array $payload,
+        bool $lockForUpdate,
+        bool $verifyScan = true,
+    ): array {
         $medication = ClientMedication::query()
             ->active()
             ->whereKey((int) ($payload['medication_id'] ?? 0))
@@ -640,16 +857,12 @@ class ResidentTransportJourneyService
             abort_unless($orderVersion && (int) $payload['medication_order_version_id'] === (int) $orderVersion->id, 404);
         }
 
-        if ($medication->requiresWitness() && blank($payload['witness_name'] ?? null)) {
-            throw ValidationException::withMessages([
-                'witness_name' => 'Controlled drugs require a packing witness name.',
-            ]);
-        }
-
         return [
             'medication' => $medication,
             'order_version' => $orderVersion,
-            'scan_audit' => $this->verifyMedicationScan($resident, $medication, $payload),
+            'scan_audit' => $verifyScan
+                ? $this->verifyMedicationScan($resident, $medication, $payload)
+                : null,
         ];
     }
 
@@ -661,6 +874,101 @@ class ResidentTransportJourneyService
             ->where('version_number', $medication->version)
             ->latest('id')
             ->first();
+    }
+
+    private function recordPackingNonAcceptance(
+        FleetResidentTransport $transport,
+        Client $resident,
+        User $actor,
+        array $prepared,
+        array $payload,
+        string $attestationState,
+        string $action,
+        string $requestUuid,
+        string $requestHash,
+    ): void {
+        /** @var ClientMedication $medication */
+        $medication = $prepared['medication'];
+        /** @var MedicationOrderVersion|null $orderVersion */
+        $orderVersion = $prepared['order_version'];
+        abort_unless($medication->requiresWitness(), 409, 'This medication does not require a packing attestation.');
+
+        $reason = trim((string) ($payload['attestation_reason'] ?? ''));
+        if ($reason === '') {
+            throw ValidationException::withMessages([
+                'attestation_reason' => 'Record why the second checker declined or was unavailable.',
+            ]);
+        }
+
+        $attestation = null;
+        $witness = null;
+        if ($attestationState === 'refused') {
+            if ($payload['queued_offline'] ?? false) {
+                throw ValidationException::withMessages([
+                    'witness_credential' => 'Authenticated second-checker refusal must be completed online.',
+                ]);
+            }
+            if (empty($payload['witnessed_by_user_id'])) {
+                throw ValidationException::withMessages([
+                    'witnessed_by_user_id' => 'Select the second checker who declined to attest.',
+                ]);
+            }
+            $attestation = $this->transportWitnesses->authenticate(
+                $actor,
+                (int) $resident->site_id,
+                (int) $payload['witnessed_by_user_id'],
+                (string) ($payload['witness_credential'] ?? ''),
+                now(),
+            );
+            $witness = $attestation['witness'];
+        } elseif (! empty($payload['witnessed_by_user_id']) || filled($payload['witness_credential'] ?? null)) {
+            throw ValidationException::withMessages([
+                'witnessed_by_user_id' => 'Do not name a second checker when recording that no checker was available.',
+            ]);
+        }
+
+        $subjectDigest = $this->medicationCustodyDigest($transport, null, $medication, $actor->id);
+        $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
+        $event = $this->recordEvent(
+            $transport,
+            $action,
+            $actor,
+            $requestUuid,
+            [
+                'request_hash' => $requestHash,
+                'attestation' => $attestation
+                    ? $this->attestationContext($attestation, $subjectDigest, $attestationState)
+                    : [
+                        'state' => $attestationState,
+                        'subject_digest' => $subjectDigest,
+                        'subject_digest_algorithm' => 'sha256',
+                        'subject_payload_version' => 'fleet-medication-custody-v1',
+                    ],
+                'attestation_reason' => $reason,
+                ...$this->offlineProvenance($payload),
+            ],
+            null,
+            $medication,
+            $orderVersion,
+            null,
+            $witness?->id,
+        );
+        AuditLogger::logOrFail('fleet.medication.pack.'.$attestationState, $transport, [
+            'actor_id' => $actor->id,
+            'site_id' => $transport->site_id,
+            'client_id' => $resident->id,
+            'transport_id' => $transport->id,
+            'journey_uuid' => $transport->journey_uuid,
+            'medication_id' => $medication->id,
+            'medication_order_version' => $medication->version,
+            'medication_order_version_id' => $orderVersion?->id,
+            'request_uuid' => $requestUuid,
+            'attestation_event_id' => $event->id,
+            'attestation_state' => $attestationState,
+            'witness_user_id' => $witness?->id,
+            'attestation_reason' => $reason,
+            ...$this->offlineProvenance($payload),
+        ]);
     }
 
     private function createMedicationCustody(
@@ -683,10 +991,40 @@ class ResidentTransportJourneyService
             'medication_id' => $medication->id,
             'medication_order_version_id' => $orderVersion?->id,
             'parent_request_uuid' => $parentRequestUuid,
-            'witness_name' => trim((string) ($payload['witness_name'] ?? '')),
+            'attestation_state' => $payload['attestation_state'] ?? null,
+            'witnessed_by_user_id' => $payload['witnessed_by_user_id'] ?? null,
+            'attestation_reason_hash' => hash('sha256', (string) ($payload['attestation_reason'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($payload['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($payload['scan_code'] ?? '')),
         ]);
+
+        $attestation = null;
+        $witness = null;
+        if ($medication->requiresWitness()) {
+            if ($payload['queued_offline'] ?? false) {
+                throw ValidationException::withMessages([
+                    'witness_credential' => 'Authenticated second-checker acceptance must be completed online.',
+                ]);
+            }
+            if (($payload['attestation_state'] ?? 'accepted') !== 'accepted') {
+                throw ValidationException::withMessages([
+                    'attestation_state' => 'An authenticated second checker must accept before this medication is packed.',
+                ]);
+            }
+            if (empty($payload['witnessed_by_user_id'])) {
+                throw ValidationException::withMessages([
+                    'witnessed_by_user_id' => 'Select the second checker who is present for packing.',
+                ]);
+            }
+            $attestation = $this->transportWitnesses->authenticate(
+                $actor,
+                (int) $resident->site_id,
+                (int) $payload['witnessed_by_user_id'],
+                (string) ($payload['witness_credential'] ?? ''),
+                now(),
+            );
+            $witness = $attestation['witness'];
+        }
 
         $log = FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
@@ -699,9 +1037,10 @@ class ResidentTransportJourneyService
             'medication_name' => trim($medication->name.' '.($medication->dosage ?? '')),
             'is_controlled_drug' => (bool) $medication->controlled_drug,
             'witness_required' => $medication->requiresWitness(),
-            'packed_witness_name' => filled($payload['witness_name'] ?? null)
-                ? trim((string) $payload['witness_name'])
-                : null,
+            'packed_witness_name' => $witness?->name,
+            'packed_witnessed_by_user_id' => $witness?->id,
+            'packed_witnessed_at' => $attestation['witnessed_at'] ?? null,
+            'packing_witness_method' => $attestation['method'] ?? null,
             'packed_by_user_id' => $actor->id,
             'packed_at' => now(),
             'notes' => $payload['notes'] ?? null,
@@ -709,7 +1048,8 @@ class ResidentTransportJourneyService
         $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
 
         $scanAudit = $prepared['scan_audit'];
-        $this->recordEvent(
+        $subjectDigest = $this->medicationCustodyDigest($transport, $log, $medication);
+        $event = $this->recordEvent(
             $transport,
             'medication_packed',
             $actor,
@@ -720,12 +1060,20 @@ class ResidentTransportJourneyService
                 'scan_source' => $scanAudit['scan_source'],
                 'scan_match_source' => $scanAudit['scan_match_source'],
                 'entered_code_suffix' => $scanAudit['scan_code_suffix'],
+                ...($attestation ? [
+                    'attestation' => $this->attestationContext($attestation, $subjectDigest, 'accepted'),
+                ] : []),
                 ...$this->offlineProvenance($payload),
             ],
             $log,
             $medication,
             $orderVersion,
+            null,
+            $witness?->id,
         );
+        if ($attestation) {
+            $log->forceFill(['packing_attestation_event_id' => $event->id])->save();
+        }
         AuditLogger::logOrFail('fleet.medication.pack', $log, [
             'actor_id' => $actor->id,
             'site_id' => $transport->site_id,
@@ -736,6 +1084,8 @@ class ResidentTransportJourneyService
             'medication_order_version' => $medication->version,
             'medication_order_version_id' => $orderVersion?->id,
             'request_uuid' => $requestUuid,
+            'packing_attestation_event_id' => $attestation ? $event->id : null,
+            'witness_user_id' => $witness?->id,
             'scan_source' => $scanAudit['scan_source'],
             'scan_match_source' => $scanAudit['scan_match_source'],
             'entered_code_suffix' => $scanAudit['scan_code_suffix'],
@@ -776,14 +1126,101 @@ class ResidentTransportJourneyService
         ];
     }
 
-    private function resolveWitness(User $actor, int $siteId, int $witnessId): User
+    /**
+     * @param array{witness: User, witnessed_at: CarbonInterface, method: string, authority_permission: string, employment_profile_id: int, competency_state: string,
+     * competency_assessment_id: int, presence_source: string, presence_record_id: int,
+     * presence_started_at: string, presence_ends_at: ?string} $attestation
+     */
+    private function attestationContext(array $attestation, string $subjectDigest, string $state): array
     {
-        abort_unless($witnessId > 0 && $witnessId !== (int) $actor->id, 404);
-        $witness = $this->scope->medicationWitnessesForSite($siteId, $actor->id)
-            ->firstWhere('id', $witnessId);
-        abort_unless($witness, 404);
+        return [
+            'state' => $state,
+            'method' => $attestation['method'],
+            'witnessed_at' => $attestation['witnessed_at']->toIso8601String(),
+            'subject_digest' => $subjectDigest,
+            'subject_digest_algorithm' => 'sha256',
+            'subject_payload_version' => 'fleet-medication-custody-v1',
+            'authority_permission' => $attestation['authority_permission'],
+            'employment_profile_id' => $attestation['employment_profile_id'],
+            'competency_state' => $attestation['competency_state'],
+            'competency_assessment_id' => $attestation['competency_assessment_id'],
+            'presence_source' => $attestation['presence_source'],
+            'presence_record_id' => $attestation['presence_record_id'],
+            'presence_started_at' => $attestation['presence_started_at'],
+            'presence_ends_at' => $attestation['presence_ends_at'],
+        ];
+    }
 
-        return $witness;
+    private function medicationCustodyDigest(
+        FleetResidentTransport $transport,
+        ?FleetMedicationTransitLog $log,
+        ClientMedication $medication,
+        ?int $packingActorId = null,
+    ): string {
+        return hash('sha256', json_encode([
+            'payload_version' => 'fleet-medication-custody-v1',
+            'journey_uuid' => $transport->journey_uuid,
+            'transport_id' => $transport->id,
+            'medication_transit_log_id' => $log?->id,
+            'client_id' => $transport->resident_id,
+            'site_id' => $transport->site_id,
+            'shift_id' => $transport->shift_id,
+            'asset_id' => $transport->asset_id,
+            'medication_id' => $medication->id,
+            'medication_order_version' => $log?->medication_order_version ?? $medication->version,
+            'medication_order_version_id' => $log?->medication_order_version_id ?? $this->currentOrderVersion($medication)?->id,
+            'packed_by_user_id' => $log?->packed_by_user_id ?? $packingActorId,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    }
+
+    public function governedPackingAttestationGaps(Builder $query): Builder
+    {
+        return $query
+            ->where(function (Builder $required): void {
+                $required->where('witness_required', true)
+                    ->orWhere('is_controlled_drug', true);
+            })
+            ->where(function (Builder $gap): void {
+                $gap->whereNull('packing_attestation_event_id')
+                    ->orWhereNull('packed_witnessed_by_user_id')
+                    ->orWhereNull('packed_witnessed_at')
+                    ->orWhereNull('packing_witness_method')
+                    ->orWhere('packing_witness_method', '!=', 'password')
+                    ->orWhereDoesntHave('packingAttestationEvent', function (Builder $event): void {
+                        $event->whereIn('action', [
+                            'medication_packed',
+                            'medication_packing_attestation_corrected',
+                        ])
+                            ->whereIn('context->attestation->state', ['accepted', 'corrected'])
+                            ->where('context->attestation->method', 'password')
+                            ->whereNotNull('context->attestation->subject_digest')
+                            ->whereNotNull('witness_user_id')
+                            ->whereColumn(
+                                'fleet_resident_transport_events.transport_id',
+                                'fleet_medication_transit_logs.transport_id',
+                            )
+                            ->whereColumn(
+                                'fleet_resident_transport_events.medication_transit_log_id',
+                                'fleet_medication_transit_logs.id',
+                            )
+                            ->whereColumn(
+                                'fleet_resident_transport_events.client_id',
+                                'fleet_medication_transit_logs.client_id',
+                            )
+                            ->whereColumn(
+                                'fleet_resident_transport_events.site_id',
+                                'fleet_medication_transit_logs.site_id',
+                            )
+                            ->whereColumn(
+                                'fleet_resident_transport_events.medication_id',
+                                'fleet_medication_transit_logs.medication_id',
+                            )
+                            ->whereColumn(
+                                'fleet_resident_transport_events.witness_user_id',
+                                'fleet_medication_transit_logs.packed_witnessed_by_user_id',
+                            );
+                    });
+            });
     }
 
     private function replayedEvent(
