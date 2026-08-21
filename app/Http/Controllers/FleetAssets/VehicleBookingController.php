@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
 use App\Models\FleetVehicleBooking;
+use App\Models\User;
 use App\Notifications\Fleet\FleetBookingApprovedNotification;
 use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
+use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,11 +19,15 @@ use Inertia\Inertia;
 
 class VehicleBookingController extends Controller
 {
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly VehicleBookingAccessService $bookingAccess,
+    ) {}
 
     public function index(Request $request)
     {
-        $query = FleetVehicleBooking::query()
+        $actor = $this->readActor($request);
+        $query = $this->bookingAccess->accessibleBookings($actor)
             ->with(['asset:id,name,asset_tag', 'user:id,name']);
 
         // CSV export
@@ -54,7 +59,9 @@ class VehicleBookingController extends Controller
         }
 
         if ($request->filled('asset_id')) {
-            $query->where('asset_id', (int) $request->input('asset_id'));
+            $asset = $this->bookingAccess->vehicle($actor, (int) $request->input('asset_id'));
+            abort_unless($asset, 404);
+            $query->where('asset_id', $asset->id);
         }
 
         if ($request->filled('date_from')) {
@@ -89,7 +96,7 @@ class VehicleBookingController extends Controller
 
         // Hero band stats — whole-table (not page-scoped) conditional aggregate.
         $now = now();
-        $heroRow = FleetVehicleBooking::query()
+        $heroRow = $this->bookingAccess->accessibleBookings($actor)
             ->selectRaw(
                 "SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending, " .
                 "SUM(CASE WHEN status = 'approved' AND starts_at >= ? THEN 1 ELSE 0 END) as approved_upcoming, " .
@@ -103,6 +110,7 @@ class VehicleBookingController extends Controller
         // fleet dashboard hero).
         $outingsPastReturn = Schema::hasTable('fleet_outings')
             ? FleetOuting::query()
+                ->whereIn('asset_id', $this->bookingAccess->authorizedVehicleIds($actor))
                 ->where('status', 'active')
                 ->where('planned_return', '<', $now)
                 ->count()
@@ -139,8 +147,8 @@ class VehicleBookingController extends Controller
             // (check_asset_id / check_starts_at / check_ends_at) — closures are
             // no-ops when the params are absent.
             'booking_options' => $request->boolean('new')
-                ? $this->bookingWizardOptions()
-                : Inertia::optional(fn () => $this->bookingWizardOptions()),
+                ? $this->bookingWizardOptions($actor)
+                : Inertia::optional(fn () => $this->bookingWizardOptions($actor)),
             'booking_conflicts' => fn () => $this->bookingConflicts($request),
             'booking_vehicle_status' => fn () => $this->checkedVehicleStatus($request),
             'booking_vehicle_bookings' => fn () => $this->checkedVehicleBookings($request),
@@ -154,7 +162,7 @@ class VehicleBookingController extends Controller
 
             $weekEnd = $weekStart->copy()->addDays(6)->endOfDay();
 
-            $calendarBookings = FleetVehicleBooking::query()
+            $calendarBookings = $this->bookingAccess->accessibleBookings($actor)
                 ->with(['asset:id,name,asset_tag', 'user:id,name'])
                 ->where('starts_at', '<=', $weekEnd)
                 ->where('ends_at', '>=', $weekStart)
@@ -163,9 +171,8 @@ class VehicleBookingController extends Controller
                 ->map($mapBooking)
                 ->values();
 
-            $vehicles = Asset::vehicles()
-                ->orderBy('name')
-                ->get(['id', 'name', 'asset_tag'])
+            $vehicles = $this->bookingAccess->activeVehicles($actor)
+                ->sortBy([['name', 'asc'], ['id', 'asc']])
                 ->map(fn ($v) => [
                     'id' => $v->id,
                     'name' => $v->name,
@@ -199,32 +206,20 @@ class VehicleBookingController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function bookingWizardOptions(): array
+    private function bookingWizardOptions(User $actor): array
     {
         $hasFleetFields = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'home_site_id');
         $hasAccessibility = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'has_wheelchair_ramp');
 
-        $vehiclesQuery = Asset::vehicles()
-            ->where('status', 'active')
-            ->orderBy('name');
-
+        $vehicles = $this->bookingAccess->activeVehicles($actor);
         if ($hasFleetFields) {
-            $vehiclesQuery->with('homeSite');
+            $vehicles->load('homeSite:id,name');
         }
-
-        $accessibilityColumns = $hasAccessibility ? [
-            'has_wheelchair_ramp', 'has_hoist', 'has_child_seat_anchors',
-            'has_medical_storage', 'seating_capacity',
-        ] : [];
-
-        $vehicles = $vehiclesQuery->get(['id', 'name', 'asset_tag', 'status', ...($hasFleetFields ? ['home_site_id'] : []), ...$accessibilityColumns]);
 
         $clients = [];
         if (\Illuminate\Support\Facades\Schema::hasColumn('clients', 'transport_needs')) {
-            $clients = \App\Models\Client::query()
-                ->where('status', 'active')
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'transport_needs'])
+            $clients = $this->bookingAccess->clients($actor)
+                ->sortBy([['first_name', 'asc'], ['last_name', 'asc'], ['id', 'asc']])
                 ->map(fn ($c) => [
                     'id' => $c->id,
                     'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
@@ -250,7 +245,7 @@ class VehicleBookingController extends Controller
                     'seating_capacity' => $v->seating_capacity,
                 ] : []),
             ])->values(),
-            'sites' => \App\Models\Site::query()->orderBy('name')->get(['id', 'name']),
+            'sites' => $this->bookingAccess->sites($actor),
             'clients' => $clients,
         ];
     }
@@ -267,8 +262,12 @@ class VehicleBookingController extends Controller
             return [];
         }
 
-        return FleetVehicleBooking::query()
-            ->where('asset_id', (int) $request->input('check_asset_id'))
+        $actor = $this->readActor($request);
+        $asset = $this->bookingAccess->vehicle($actor, (int) $request->input('check_asset_id'));
+        abort_unless($asset, 404);
+
+        return $this->bookingAccess->accessibleBookings($actor)
+            ->where('asset_id', $asset->id)
             ->whereNotIn('status', ['cancelled', 'rejected', 'returned'])
             ->where('starts_at', '<=', $request->input('check_ends_at'))
             ->where('ends_at', '>=', $request->input('check_starts_at'))
@@ -292,7 +291,13 @@ class VehicleBookingController extends Controller
             return null;
         }
 
-        return Asset::find((int) $request->input('check_asset_id'), ['id', 'status'])?->status;
+        $asset = $this->bookingAccess->vehicle(
+            $this->readActor($request),
+            (int) $request->input('check_asset_id'),
+        );
+        abort_unless($asset, 404);
+
+        return $asset->status;
     }
 
     /**
@@ -310,8 +315,12 @@ class VehicleBookingController extends Controller
         $monthStart = now()->startOfMonth()->subMonth();
         $monthEnd = now()->endOfMonth()->addMonth();
 
-        return FleetVehicleBooking::query()
-            ->where('asset_id', (int) $request->input('check_asset_id'))
+        $actor = $this->readActor($request);
+        $asset = $this->bookingAccess->vehicle($actor, (int) $request->input('check_asset_id'));
+        abort_unless($asset, 404);
+
+        return $this->bookingAccess->accessibleBookings($actor)
+            ->where('asset_id', $asset->id)
             ->whereNotIn('status', ['cancelled', 'rejected'])
             ->where('starts_at', '<=', $monthEnd)
             ->where('ends_at', '>=', $monthStart)
@@ -330,35 +339,65 @@ class VehicleBookingController extends Controller
 
     public function store(Request $request)
     {
+        $actor = $this->readActor($request);
         $data = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            // Structural validation only. Canonical scoped resolution below
+            // deliberately makes missing and foreign direct IDs identical.
+            'asset_id' => ['required', 'integer'],
+            'client_id' => ['nullable', 'integer'],
             'purpose' => ['required', 'string', 'max:500'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'destination' => ['nullable', 'string', 'max:255'],
             'passengers' => ['nullable', 'integer', 'min:0', 'max:50'],
-            'pickup_site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'return_site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'pickup_site_id' => ['nullable', 'integer'],
+            'return_site_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // Verify the booking user has valid driver eligibility
-        $eligibility = \App\Domain\Hr\Models\HrDriverEligibility::query()
-            ->where('user_id', $request->user()->id)
-            ->where('status', 'eligible')
-            ->where('licence_expires_at', '>', now())
-            ->first();
+        // Site(s) -> optional Client -> Asset -> overlapping bookings. The
+        // Asset row is the serialization lock even when no prior booking row
+        // exists, closing the empty-range double-booking race.
+        $booking = DB::transaction(function () use ($data, $request, $actor) {
+            $assetPreview = $this->bookingAccess->vehicle($actor, (int) $data['asset_id']);
+            abort_unless($assetPreview, 404);
+            $assetPreview->loadMissing('client:id,site_id');
 
-        if (!$eligibility) {
-            return back()->withErrors([
-                'driver' => 'You must have valid driver eligibility with a non-expired licence to book a vehicle.',
-            ]);
-        }
+            $client = null;
+            if (isset($data['client_id'])) {
+                $client = $this->bookingAccess->client($actor, (int) $data['client_id']);
+                abort_unless($client, 404);
+            }
 
-        // Server-side overlap prevention with atomic check-and-create
-        $booking = DB::transaction(function () use ($data, $request) {
+            $siteIds = collect([
+                $data['pickup_site_id'] ?? null,
+                $data['return_site_id'] ?? null,
+                $assetPreview->site_id,
+                $assetPreview->site_id ? null : $assetPreview->home_site_id,
+                (!$assetPreview->site_id && !$assetPreview->home_site_id) ? $assetPreview->client?->site_id : null,
+                $client?->site_id,
+            ])->filter()->map(fn (mixed $id): int => (int) $id)->all();
+            abort_unless($this->bookingAccess->lockSites($actor, $siteIds), 404);
+
+            if ($client) {
+                abort_unless($this->bookingAccess->client($actor, (int) $client->id, true), 404);
+            }
+
+            $asset = $this->bookingAccess->vehicle($actor, (int) $data['asset_id'], true);
+            abort_unless($asset && $asset->status === 'active', 404);
+
+            $eligibility = \App\Domain\Hr\Models\HrDriverEligibility::query()
+                ->where('user_id', $actor->id)
+                ->where('status', 'eligible')
+                ->where('licence_expires_at', '>', now())
+                ->first();
+
+            if (!$eligibility) {
+                return false;
+            }
+
             $conflict = FleetVehicleBooking::query()
-                ->where('asset_id', $data['asset_id'])
+                ->where('asset_id', $asset->id)
                 ->whereIn('status', ['pending', 'approved', 'checked_out'])
                 ->where('starts_at', '<', $data['ends_at'])
                 ->where('ends_at', '>', $data['starts_at'])
@@ -369,10 +408,28 @@ class VehicleBookingController extends Controller
                 return null;
             }
 
-            $data['user_id'] = $request->user()->id;
-            $data['status'] = 'pending';
-            return FleetVehicleBooking::create($data);
+            // client_id is minimum-necessary compatibility input for the
+            // accessibility picker only; the booking schema does not own a
+            // Client relationship and must not persist that advisory choice.
+            $bookingData = $data;
+            unset($bookingData['client_id']);
+            $bookingData['asset_id'] = $asset->id;
+            $bookingData['user_id'] = $actor->id;
+            $bookingData['status'] = 'pending';
+            $created = FleetVehicleBooking::create($bookingData);
+
+            AuditLogger::logOrFail('fleet.booking.create', $created, [
+                'asset_id' => $asset->id,
+            ], $request);
+
+            return $created;
         });
+
+        if ($booking === false) {
+            return back()->withErrors([
+                'driver' => 'You must have valid driver eligibility with a non-expired licence to book a vehicle.',
+            ]);
+        }
 
         if (!$booking) {
             return back()->withErrors([
@@ -380,16 +437,15 @@ class VehicleBookingController extends Controller
             ]);
         }
 
-        AuditLogger::log('fleet.booking.create', $booking, [
-            'asset_id' => $data['asset_id'],
-        ]);
-
         return redirect()->route('fleet-assets.bookings.show', $booking)
             ->with('success', 'Booking request submitted.');
     }
 
     public function show(Request $request, FleetVehicleBooking $booking)
     {
+        $actor = $this->readActor($request);
+        $booking = $this->bookingAccess->booking($actor, (int) $booking->getKey());
+        abort_unless($booking, 404);
         $booking->load(['asset:id,name,asset_tag', 'user:id,name,email']);
 
         return Inertia::render('fleet-assets/bookings/show', [
@@ -402,19 +458,25 @@ class VehicleBookingController extends Controller
 
     public function approve(Request $request, FleetVehicleBooking $booking)
     {
-        abort_if($booking->user_id === $request->user()->id, 403, 'Cannot approve your own booking.');
-        abort_unless($booking->status === 'pending', 422, 'Only pending bookings can be approved.');
+        $actor = $this->approvalActor($request);
+        $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
+            $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            abort_if($canonical->user_id === $actor->id, 403, 'Cannot approve your own booking.');
+            abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be approved.');
 
-        $booking->update([
-            'status' => 'approved',
-            'approved_by_user_id' => $request->user()->id,
-        ]);
+            $canonical->update([
+                'status' => 'approved',
+                'approved_by_user_id' => $actor->id,
+            ]);
 
-        AuditLogger::log('fleet.booking.approve', $booking, [
-            'booking_id' => $booking->id,
-        ]);
+            AuditLogger::logOrFail('fleet.booking.approve', $canonical, [
+                'booking_id' => $canonical->id,
+            ], $request);
 
-        $booking->load('asset:id,name');
+            return $canonical;
+        });
+
+        $booking->load(['asset:id,name', 'user']);
         $booking->user->notify(new FleetBookingApprovedNotification($booking));
 
         return back()->with('success', 'Booking approved.');
@@ -422,23 +484,31 @@ class VehicleBookingController extends Controller
 
     public function reject(Request $request, FleetVehicleBooking $booking)
     {
-        abort_unless($booking->status === 'pending', 422, 'Only pending bookings can be rejected.');
+        $actor = $this->approvalActor($request);
+        $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
+            $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be rejected.');
 
-        $data = $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:500'],
-        ]);
+            // Validate action payload only after the scoped canonical row is
+            // locked, preserving missing/foreign direct-ID concealment parity.
+            $data = $request->validate([
+                'rejection_reason' => ['required', 'string', 'max:500'],
+            ]);
 
-        $booking->update([
-            'status' => 'rejected',
-            'rejection_reason' => $data['rejection_reason'],
-        ]);
+            $canonical->update([
+                'status' => 'rejected',
+                'rejection_reason' => $data['rejection_reason'],
+            ]);
 
-        AuditLogger::log('fleet.booking.reject', $booking, [
-            'booking_id' => $booking->id,
-            'reason' => $data['rejection_reason'],
-        ]);
+            AuditLogger::logOrFail('fleet.booking.reject', $canonical, [
+                'booking_id' => $canonical->id,
+                'reason' => $data['rejection_reason'],
+            ], $request);
 
-        $booking->load('asset:id,name');
+            return $canonical;
+        });
+
+        $booking->load(['asset:id,name', 'user']);
         $booking->user->notify(new FleetBookingRejectedNotification($booking));
 
         return back()->with('success', 'Booking rejected.');
@@ -446,68 +516,122 @@ class VehicleBookingController extends Controller
 
     public function checkout(Request $request, FleetVehicleBooking $booking)
     {
-        abort_unless($booking->status === 'approved', 422, 'Only approved bookings can be checked out.');
+        $actor = $this->managerActor($request);
+        DB::transaction(function () use ($request, $booking, $actor): void {
+            $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            abort_unless($canonical->status === 'approved', 422, 'Only approved bookings can be checked out.');
 
-        $data = $request->validate([
-            'odometer_out' => ['nullable', 'numeric', 'min:0'],
-        ]);
+            $data = $request->validate([
+                'odometer_out' => ['nullable', 'numeric', 'min:0'],
+            ]);
 
-        $booking->update([
-            'status' => 'checked_out',
-            'checked_out_at' => now(),
-            'odometer_out' => $data['odometer_out'] ?? null,
-            'checked_out_by' => $request->user()->id,
-        ]);
+            $canonical->update([
+                'status' => 'checked_out',
+                'checked_out_at' => now(),
+                'odometer_out' => $data['odometer_out'] ?? null,
+                'checked_out_by' => $actor->id,
+            ]);
 
-        AuditLogger::log('fleet.booking.checkout', $booking, [
-            'booking_id' => $booking->id,
-        ]);
+            AuditLogger::logOrFail('fleet.booking.checkout', $canonical, [
+                'booking_id' => $canonical->id,
+            ], $request);
+        });
 
         return back()->with('success', 'Vehicle checked out.');
     }
 
     public function returnVehicle(Request $request, FleetVehicleBooking $booking)
     {
-        abort_unless($booking->status === 'checked_out', 422, 'Only checked-out bookings can be returned.');
+        $actor = $this->managerActor($request);
+        DB::transaction(function () use ($request, $booking, $actor): void {
+            $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            abort_unless($canonical->status === 'checked_out', 422, 'Only checked-out bookings can be returned.');
 
-        $data = $request->validate([
-            'odometer_in' => ['nullable', 'numeric', 'min:0'],
-            'condition_on_return' => ['nullable', 'string', 'max:50'],
-            'return_notes' => ['nullable', 'string', 'max:1000'],
-        ]);
+            $data = $request->validate([
+                'odometer_in' => ['nullable', 'numeric', 'min:0'],
+                'condition_on_return' => ['nullable', 'string', 'max:50'],
+                'return_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $booking->update([
-            'status' => 'returned',
-            'returned_at' => now(),
-            'odometer_in' => $data['odometer_in'] ?? null,
-            'condition_on_return' => $data['condition_on_return'] ?? null,
-            'return_notes' => $data['return_notes'] ?? null,
-            'returned_by' => $request->user()->id,
-        ]);
+            $canonical->update([
+                'status' => 'returned',
+                'returned_at' => now(),
+                'odometer_in' => $data['odometer_in'] ?? null,
+                'condition_on_return' => $data['condition_on_return'] ?? null,
+                'return_notes' => $data['return_notes'] ?? null,
+                'returned_by' => $actor->id,
+            ]);
 
-        AuditLogger::log('fleet.booking.return', $booking, [
-            'booking_id' => $booking->id,
-        ]);
+            AuditLogger::logOrFail('fleet.booking.return', $canonical, [
+                'booking_id' => $canonical->id,
+            ], $request);
+        });
 
         return back()->with('success', 'Vehicle returned.');
     }
 
     public function cancel(Request $request, FleetVehicleBooking $booking)
     {
-        abort_unless(
-            in_array($booking->status, ['pending', 'approved', 'checked_out']),
-            422,
-            'This booking cannot be cancelled in its current state.'
-        );
+        $actor = $this->managerActor($request);
+        DB::transaction(function () use ($request, $booking, $actor): void {
+            $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            abort_unless(
+                in_array($canonical->status, ['pending', 'approved', 'checked_out']),
+                422,
+                'This booking cannot be cancelled in its current state.'
+            );
 
-        $booking->update([
-            'status' => 'cancelled',
-        ]);
+            $canonical->update(['status' => 'cancelled']);
 
-        AuditLogger::log('fleet.booking.cancel', $booking, [
-            'booking_id' => $booking->id,
-        ]);
+            AuditLogger::logOrFail('fleet.booking.cancel', $canonical, [
+                'booking_id' => $canonical->id,
+            ], $request);
+        });
 
         return back()->with('success', 'Booking cancelled.');
+    }
+
+    private function readActor(Request $request): User
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+        abort_unless($actor->canDo('fleet.viewAny') || $actor->canDo('assets.viewAny'), 403);
+
+        return $actor;
+    }
+
+    private function approvalActor(Request $request): User
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+        abort_unless($actor->canDo('fleet.bookings.approve') || $actor->canDo('fleet.manage'), 403);
+
+        return $actor;
+    }
+
+    private function managerActor(Request $request): User
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User && $actor->canDo('fleet.manage'), 403);
+
+        return $actor;
+    }
+
+    /**
+     * Re-resolve and lock canonical rows before any lifecycle or replay check.
+     * Lock order is Asset -> booking; the route-bound model is an ID carrier
+     * only and can never supply authoritative status or scope.
+     */
+    private function lockBooking(User $actor, int $bookingId): FleetVehicleBooking
+    {
+        $preview = $this->bookingAccess->booking($actor, $bookingId);
+        abort_unless($preview, 404);
+
+        abort_unless($this->bookingAccess->vehicle($actor, (int) $preview->asset_id, true), 404);
+
+        $booking = $this->bookingAccess->booking($actor, $bookingId, true);
+        abort_unless($booking, 404);
+
+        return $booking;
     }
 }
