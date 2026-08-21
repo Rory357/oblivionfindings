@@ -505,6 +505,38 @@ class ShiftControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_fails_closed_without_side_effects_when_assignment_eligibility_is_unavailable(): void
+    {
+        $baseline = [
+            'shifts' => Shift::query()->count(),
+            'reservations' => CoverageReservation::query()->count(),
+            'timeline' => TimelineEvent::query()->count(),
+            'outbox' => ShiftSignalOutbox::query()->count(),
+        ];
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('evaluate')
+                ->once()
+                ->andThrow(new \RuntimeException('private eligibility infrastructure detail'));
+        });
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.shifts.store'), [
+                'client_id' => $this->client->id,
+                'user_id' => $this->staff->id,
+                'starts_at' => now()->addDay()->format('Y-m-d H:i:s'),
+                'ends_at' => now()->addDay()->addHours(4)->format('Y-m-d H:i:s'),
+                'status' => 'scheduled',
+            ])
+            ->assertStatus(503)
+            ->assertJsonPath('errors.user_id.0', AssignmentEligibilityDecision::UNAVAILABLE_MESSAGE)
+            ->assertJsonMissing(['private eligibility infrastructure detail']);
+
+        $this->assertSame($baseline['shifts'], Shift::query()->count());
+        $this->assertSame($baseline['reservations'], CoverageReservation::query()->count());
+        $this->assertSame($baseline['timeline'], TimelineEvent::query()->count());
+        $this->assertSame($baseline['outbox'], ShiftSignalOutbox::query()->count());
+    }
+
     public function test_manager_can_duplicate_shift_as_unassigned_draft_on_target_date(): void
     {
         config(['app.worker_timezone' => 'Pacific/Auckland']);
@@ -1044,6 +1076,45 @@ class ShiftControllerTest extends TestCase
             'id' => $shift->id,
             'location' => 'New Location',
         ]);
+    }
+
+    public function test_update_fails_closed_and_releases_coverage_when_assignment_eligibility_is_unavailable(): void
+    {
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'location' => 'Original location',
+            'status' => 'scheduled',
+        ]);
+        $originalStartsAt = $shift->starts_at->copy();
+        $originalEndsAt = $shift->ends_at->copy();
+        $baselineReservations = CoverageReservation::query()->count();
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('evaluate')
+                ->once()
+                ->andThrow(new \RuntimeException('private eligibility infrastructure detail'));
+        });
+
+        $this->actingAs($this->admin)
+            ->putJson(route('operations.shifts.update', $shift), [
+                'client_id' => $this->client->id,
+                'starts_at' => $originalStartsAt->copy()->addHour()->format('Y-m-d H:i:s'),
+                'ends_at' => $originalEndsAt->copy()->addHour()->format('Y-m-d H:i:s'),
+                'location' => 'Unsafe changed location',
+                'status' => 'scheduled',
+            ])
+            ->assertStatus(503)
+            ->assertJsonPath('errors.user_id.0', AssignmentEligibilityDecision::UNAVAILABLE_MESSAGE)
+            ->assertJsonMissing(['private eligibility infrastructure detail']);
+
+        $shift->refresh();
+        $this->assertTrue($shift->starts_at->equalTo($originalStartsAt));
+        $this->assertTrue($shift->ends_at->equalTo($originalEndsAt));
+        $this->assertSame('Original location', $shift->location);
+        $this->assertSame($this->staff->id, $shift->user_id);
+        $this->assertSame($baselineReservations, CoverageReservation::query()->count());
     }
 
     public function test_update_prevents_modifying_completed_shift(): void
