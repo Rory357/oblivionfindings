@@ -103,10 +103,10 @@ return [
     | Worker-Facing Timezone
     |--------------------------------------------------------------------------
     |
-    | Frontline schedules and medication windows are shown in the timezone
-    | staff actually work in. Keeping this separate from the application
-    | timezone lets us keep storage/query timestamps in UTC while still
-    | rendering "today" correctly for worker surfaces.
+    | Frontline schedules, fatigue day/week boundaries, and medication windows
+    | use the timezone staff actually work in. Keeping this separate from the
+    | application timezone lets us keep storage/query timestamps in UTC while
+    | still applying the correct local operational calendar.
     |
     */
 

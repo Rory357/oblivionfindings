@@ -21,6 +21,7 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteCoverageRequirement;
+use App\Models\StaffAvailability;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Eligibility\AssignmentEligibilityDecision;
@@ -1403,6 +1404,127 @@ class ShiftControllerTest extends TestCase
 
         $shift = Shift::latest()->first();
         $this->assertEquals($this->serviceContext->id, $shift->service_context_id);
+    }
+
+    public function test_assignment_route_segments_sunday_overnight_hours_across_local_iso_weeks(): void
+    {
+        Notification::fake();
+        config([
+            'app.worker_timezone' => 'Pacific/Auckland',
+            'hr.fatigue.max_hours_per_day' => 24,
+            'hr.fatigue.max_hours_per_week' => 10,
+            'hr.fatigue.warning_threshold_weekly' => 10,
+            'hr.fatigue.min_rest_between_shifts_hours' => 0,
+            'hr.fatigue.max_consecutive_days' => 7,
+        ]);
+
+        $nextWeekMonday = Carbon::now('Pacific/Auckland')
+            ->addWeeks(3)
+            ->startOfWeek(Carbon::MONDAY)
+            ->startOfDay();
+        $previousWeekTuesday = $nextWeekMonday->copy()->subWeek()->addDay();
+        $overnightStart = $nextWeekMonday->copy()->subDay()->setTime(23, 0);
+        $overnightEnd = $nextWeekMonday->copy()->setTime(3, 0);
+
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $previousWeekTuesday->copy()->setTime(8, 0)->utc(),
+            'actual_starts_at' => $previousWeekTuesday->copy()->setTime(8, 0)->utc(),
+            'ends_at' => $previousWeekTuesday->copy()->setTime(16, 0)->utc(),
+            'status' => 'completed',
+            'created_by' => $this->admin->id,
+        ]);
+        StaffAvailability::query()->create([
+            'user_id' => $this->staff->id,
+            'day_of_week' => Carbon::SUNDAY,
+            'starts_at' => '00:00:00',
+            'ends_at' => '23:59:59',
+        ]);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => $overnightStart->utc(),
+            'ends_at' => $overnightEnd->utc(),
+            'status' => 'draft',
+            'coverage_roles' => [],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertSessionHas('success');
+
+        $this->assertSame($this->staff->id, $shift->fresh()->user_id);
+    }
+
+    public function test_assignment_route_blocks_when_monday_segment_exceeds_the_next_local_iso_week(): void
+    {
+        Notification::fake();
+        config([
+            'app.worker_timezone' => 'Pacific/Auckland',
+            'hr.fatigue.max_hours_per_day' => 24,
+            'hr.fatigue.max_hours_per_week' => 10,
+            'hr.fatigue.warning_threshold_weekly' => 10,
+            'hr.fatigue.min_rest_between_shifts_hours' => 0,
+            'hr.fatigue.max_consecutive_days' => 7,
+        ]);
+
+        $nextWeekMonday = Carbon::now('Pacific/Auckland')
+            ->addWeeks(3)
+            ->startOfWeek(Carbon::MONDAY)
+            ->startOfDay();
+        $nextWeekTuesday = $nextWeekMonday->copy()->addDay();
+        $overnightStart = $nextWeekMonday->copy()->subDay()->setTime(23, 0);
+        $overnightEnd = $nextWeekMonday->copy()->setTime(3, 0);
+
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $nextWeekTuesday->copy()->setTime(8, 0)->utc(),
+            'actual_starts_at' => $nextWeekTuesday->copy()->setTime(8, 0)->utc(),
+            'ends_at' => $nextWeekTuesday->copy()->setTime(16, 0)->utc(),
+            'status' => 'completed',
+            'created_by' => $this->admin->id,
+        ]);
+        StaffAvailability::query()->create([
+            'user_id' => $this->staff->id,
+            'day_of_week' => Carbon::SUNDAY,
+            'starts_at' => '00:00:00',
+            'ends_at' => '23:59:59',
+        ]);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => $overnightStart->utc(),
+            'ends_at' => $overnightEnd->utc(),
+            'status' => 'draft',
+            'coverage_roles' => [],
+            'created_by' => $this->admin->id,
+        ]);
+        $timelineCount = TimelineEvent::query()->count();
+        $reservationCount = CoverageReservation::query()->count();
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertUnprocessable()
+            ->assertJsonPath(
+                'errors.user_id.0',
+                "Would exceed 10h weekly maximum (11.0h total in the week starting {$nextWeekMonday->toDateString()}).",
+            );
+
+        $this->assertNull($shift->fresh()->user_id);
+        $this->assertSame($timelineCount, TimelineEvent::query()->count());
+        $this->assertSame($reservationCount, CoverageReservation::query()->count());
+        Notification::assertNothingSent();
     }
 
     private function assignmentBoundaryShift(): Shift
