@@ -1147,7 +1147,10 @@ export function DiscontinueDialog({
     onClose: () => void;
     action?: string;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reason: '',
+        request_key: crypto.randomUUID(),
+    });
     const submit = () => {
         form.post(action ?? `/emar/medications/${medication.id}/discontinue`, {
             preserveScroll: true,
@@ -1206,6 +1209,7 @@ export function DiscontinueDialog({
                     value={form.data.reason}
                     onChange={(e) => form.setData('reason', e.target.value)}
                     placeholder="Why is this medication being ceased?"
+                    maxLength={255}
                 />
             </Field>
         </MedsWizardDialog>

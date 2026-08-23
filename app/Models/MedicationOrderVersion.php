@@ -16,6 +16,8 @@ class MedicationOrderVersion extends Model
         'client_medication_id',
         'client_id',
         'version_number',
+        'cessation_request_key',
+        'cessation_payload_sha256',
         'name',
         'dosage',
         'dose_amount',
@@ -65,9 +67,14 @@ class MedicationOrderVersion extends Model
         'min_hours_between_doses' => 'float',
     ];
 
+    protected $hidden = [
+        'cessation_request_key',
+        'cessation_payload_sha256',
+    ];
+
     public function medication(): BelongsTo
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function client(): BelongsTo

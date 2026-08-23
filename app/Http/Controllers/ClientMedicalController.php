@@ -783,36 +783,35 @@ class ClientMedicalController extends Controller
         $user = $request->user();
         abort_unless(
             ($user?->canDo('medications.view') ?? false)
-            && (($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.orders.manage') ?? false)),
+            && ($user?->canDo('medications.orders.manage') ?? false),
             403,
         );
-
-        $data = $request->validate([
-            'reason' => ['bail', 'required', 'string', 'max:255'],
-        ]);
 
         try {
             $discontinued = app(MedicationOrderLifecycleService::class)->discontinue(
                 $user,
                 $medication,
-                $data['reason'],
+                $request->input('reason'),
                 (int) $client->id,
+                requestKey: $request->input('request_key'),
             );
 
-            try {
-                app(NotificationService::class)->notifyCrud(
-                    $user,
-                    'updated',
-                    'medication',
-                    $discontinued,
-                    $client,
-                    [
-                        'title' => 'Medication discontinued: '.($discontinued->name ?? 'Medication'),
-                        'url' => url("/clients/{$client->id}/medical"),
-                    ],
-                );
-            } catch (\Throwable $notificationFailure) {
-                report($notificationFailure);
+            if ($discontinued->wasChanged('state')) {
+                try {
+                    app(NotificationService::class)->notifyCrud(
+                        $user,
+                        'updated',
+                        'medication',
+                        $discontinued,
+                        $client,
+                        [
+                            'title' => 'Medication discontinued: '.($discontinued->name ?? 'Medication'),
+                            'url' => url("/clients/{$client->id}/medical"),
+                        ],
+                    );
+                } catch (\Throwable $notificationFailure) {
+                    report($notificationFailure);
+                }
             }
 
             return back()->with('success', 'Medication discontinued successfully.');

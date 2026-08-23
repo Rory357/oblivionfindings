@@ -176,6 +176,7 @@ class MedicationScopeDecisionService
         Closure $callback,
         bool $requireAdministrable = false,
         ?int $submittedClientId = null,
+        bool $allowCeased = false,
     ): mixed {
         return DB::transaction(function () use (
             $performer,
@@ -184,6 +185,7 @@ class MedicationScopeDecisionService
             $callback,
             $requireAdministrable,
             $submittedClientId,
+            $allowCeased,
         ) {
             $medication = ClientMedication::query()
                 ->whereKey($submittedMedication->getKey())
@@ -201,6 +203,9 @@ class MedicationScopeDecisionService
             $site = Site::query()->whereKey($siteId)->lockForUpdate()->first();
             $this->notFoundUnless($site !== null && (int) $site->id === $siteId);
             [$shift, $breakGlass] = $this->resolveClientAuthority($performer, $client, $actionAt, null);
+            if (! $allowCeased) {
+                $this->notFoundUnless($medication->state !== 'ceased' && $medication->ceased_at === null);
+            }
             if ($requireAdministrable) {
                 $this->assertMedicationIsActiveFor($medication, $actionAt);
             }

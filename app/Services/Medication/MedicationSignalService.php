@@ -165,6 +165,7 @@ class MedicationSignalService
                 }
 
                 if ($alert !== null && $hasIncidentClaim) {
+                    $signal->refresh();
                     $this->enrichSignalIncidentEvidence($signal, (int) $incidentIdentity, $alert);
                 }
 

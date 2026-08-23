@@ -34,7 +34,7 @@ class MedicationReportingService
 
         $query = ClientMedicationAdministration::with([
             'client:id,first_name,last_name,care_level',
-            'medication:id,name,dosage,controlled_drug,is_prn,route,form,pharmac_therapeutic_group,pharmac_subgroup',
+            'medication:id,name,dosage,controlled_drug,is_prn,route,form,pharmac_therapeutic_group,pharmac_subgroup,deleted_at',
             'administeredBy:id,name',
             'witnessedBy:id,name',
             'serviceContext:id,name',
@@ -74,7 +74,7 @@ class MedicationReportingService
                 'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
                 'client_id' => $a->client_id,
                 'care_level' => $a->client?->care_level,
-                'medication' => $a->medication?->name ?? 'Unknown',
+                'medication' => $a->medication?->historicalDisplayName() ?? 'Unknown',
                 'dosage' => $a->medication?->dosage ?? 'N/A',
                 'route' => $a->medication?->route ?? 'N/A',
                 'form' => $a->medication?->form ?? 'N/A',
@@ -120,7 +120,7 @@ class MedicationReportingService
         $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
-            ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group', 'client:id,first_name,last_name,care_level']);
+            ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group,deleted_at', 'client:id,first_name,last_name,care_level']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -150,7 +150,7 @@ class MedicationReportingService
                 'client_name' => $first->client ? trim("{$first->client->first_name} {$first->client->last_name}") : 'Unknown',
                 'care_level' => $first->client?->care_level,
                 'medication_id' => $first->client_medication_id,
-                'medication_name' => $first->medication?->name ?? 'Unknown',
+                'medication_name' => $first->medication?->historicalDisplayName() ?? 'Unknown',
                 'pharmac_therapeutic_group' => $first->medication?->pharmac_therapeutic_group,
                 'max_per_day' => $maxPerDay ?: null,
                 'total_administrations' => $count,
@@ -195,7 +195,7 @@ class MedicationReportingService
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup', 'administeredBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup,deleted_at', 'administeredBy:id,name'])
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->whereHas('medication', function ($q) use ($type) {
@@ -222,7 +222,7 @@ class MedicationReportingService
                 'date' => $a->administered_at?->toDateTimeString(),
                 'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
                 'care_level' => $a->client?->care_level,
-                'medication' => $a->medication?->name ?? 'Unknown',
+                'medication' => $a->medication?->historicalDisplayName() ?? 'Unknown',
                 'dosage' => $a->medication?->dosage,
                 'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
                 'pharmac_subgroup' => $a->medication?->pharmac_subgroup,
@@ -238,7 +238,7 @@ class MedicationReportingService
         $dateTo = $dateTo ?? now();
 
         $observations = ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at'])
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->where(function ($query) {
                 $query->whereNotNull('blood_glucose_level')
@@ -254,7 +254,7 @@ class MedicationReportingService
                 'date' => $a->administered_at?->toDateTimeString(),
                 'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
                 'care_level' => $a->client?->care_level,
-                'medication' => $a->medication?->name,
+                'medication' => $a->medication?->historicalDisplayName(),
                 'observation_type' => 'administration_observation',
                 'value' => collect([
                     'bsl' => $a->blood_glucose_level,
@@ -377,7 +377,12 @@ class MedicationReportingService
             ->map(fn ($group, $date) => [
                 'date' => $date,
                 'count' => $group->count(),
-                'medications' => $group->pluck('medication.name')->unique()->values()->toArray(),
+                'medications' => $group
+                    ->map(fn ($administration) => $administration->medication?->historicalDisplayName())
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray(),
             ])
             ->values()
             ->toArray();
@@ -396,7 +401,7 @@ class MedicationReportingService
 
         $query = ClientMedicationAdministration::where('status', 'missed')
             ->whereBetween('scheduled_for', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
-            ->with(['medication:id,name,dosage,controlled_drug,high_risk', 'client:id,first_name,last_name']);
+            ->with(['medication:id,name,dosage,controlled_drug,high_risk,deleted_at', 'client:id,first_name,last_name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -416,7 +421,7 @@ class MedicationReportingService
                 'time' => $m->scheduled_for?->format('H:i'),
                 'client' => $m->client ? trim("{$m->client->first_name} {$m->client->last_name}") : 'Unknown',
                 'client_id' => $m->client_id,
-                'medication' => $m->medication?->name ?? 'Unknown',
+                'medication' => $m->medication?->historicalDisplayName() ?? 'Unknown',
                 'dosage' => $m->medication?->dosage ?? 'N/A',
                 'controlled_drug' => $m->medication?->controlled_drug ?? false,
                 'high_risk' => $m->medication?->high_risk ?? false,
@@ -454,7 +459,7 @@ class MedicationReportingService
             ->whereNotNull('administered_at')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->whereRaw("TIMESTAMPDIFF(MINUTE, scheduled_for, administered_at) > {$lateThresholdMinutes}")
-            ->with(['medication:id,name,dosage', 'client:id,first_name,last_name']);
+            ->with(['medication:id,name,dosage,deleted_at', 'client:id,first_name,last_name']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -474,7 +479,7 @@ class MedicationReportingService
                 'date' => $l->administered_at?->toDateString(),
                 'client' => $l->client ? trim("{$l->client->first_name} {$l->client->last_name}") : 'Unknown',
                 'client_id' => $l->client_id,
-                'medication' => $l->medication?->name ?? 'Unknown',
+                'medication' => $l->medication?->historicalDisplayName() ?? 'Unknown',
                 'scheduled_time' => $l->scheduled_for?->format('H:i'),
                 'administered_time' => $l->administered_at?->format('H:i'),
                 'late_minutes' => $l->scheduled_for->diffInMinutes($l->administered_at),

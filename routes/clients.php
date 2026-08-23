@@ -166,7 +166,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::post('/clients/{client}/medical/medications/{medication}/discontinue', [ClientMedicalController::class, 'discontinueMedication'])
-        ->middleware('permission:clients.update|medications.orders.manage')
+        ->middleware('permission:medications.orders.manage')
         ->name('clients.medical.medications.discontinue');
 
     // Client assignments

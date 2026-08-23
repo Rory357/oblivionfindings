@@ -64,7 +64,11 @@ export default function ClientMedical({
     med_charts = [],
     has_open_controlled_discrepancy = false,
 }: Props) {
-    const { labels } = usePage().props as any;
+    const { labels, auth } = usePage().props as any;
+    const canDiscontinue = Boolean(
+        auth?.can?.medications?.view &&
+            auth?.can?.medications?.ordersManage,
+    );
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
     const [medicationToDiscontinue, setMedicationToDiscontinue] = useState<{
@@ -772,7 +776,7 @@ export default function ClientMedical({
                                             >
                                                 View in eMAR
                                             </Button>
-                                            {can_edit &&
+                                            {canDiscontinue &&
                                                 m.state !== 'ceased' &&
                                                 !m.ceased_at && (
                                                     <Button

@@ -225,7 +225,7 @@ class EmarController extends Controller
     {
         return ClientMedicationAdministration::query()
             ->with([
-                'medication:id,name,dosage',
+                'medication:id,name,dosage,deleted_at',
                 'administeredBy:id,name',
                 'attachments.uploadedBy:id,name',
             ])
@@ -238,7 +238,7 @@ class EmarController extends Controller
             ->map(fn (ClientMedicationAdministration $administration) => [
                 'id' => $administration->id,
                 'original_administration_id' => $administration->corrected_of_id,
-                'medication_name' => $administration->medication?->name ?? 'Unknown',
+                'medication_name' => $administration->medication?->historicalDisplayName() ?? 'Unknown',
                 'status' => $administration->status,
                 'dose_given' => $administration->dose_given,
                 'reason' => $administration->reason,
@@ -1237,7 +1237,7 @@ class EmarController extends Controller
             'client:id,first_name,last_name,room_id',
             'client.room:id,name',
             'client.site:id,name',
-            'medication:id,name,dosage,route,max_per_day,indication,controlled_drug',
+            'medication:id,name,dosage,route,max_per_day,indication,controlled_drug,deleted_at',
             'administeredBy:id,name',
             'prnEffectiveness.reviewedByUser:id,name',
         ];
@@ -1267,7 +1267,7 @@ class EmarController extends Controller
             ->where('status', 'given')
             ->where('administered_at', '>=', $now->copy()->subHours(24)->utc())
             ->whereDoesntHave('prnEffectiveness')
-            ->with(['client:id,first_name,last_name', 'medication:id,name'])
+            ->with(['client:id,first_name,last_name', 'medication:id,name,deleted_at'])
             ->latest('administered_at')
             ->limit(50)
             ->get()
@@ -1277,7 +1277,7 @@ class EmarController extends Controller
                 return [
                     'administration_id' => $a->id,
                     'client_id' => $a->client_id,
-                    'medication_name' => $a->medication?->name,
+                    'medication_name' => $a->medication?->historicalDisplayName(),
                     'dose_given' => $a->dose_given,
                     'given_at' => $at?->toIso8601String(),
                     'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
@@ -1442,7 +1442,7 @@ class EmarController extends Controller
             'client_room' => $a->client?->room?->name,
             'client_site' => $a->client?->site?->name,
             'client_medication_id' => $a->client_medication_id,
-            'medication_name' => $a->medication?->name,
+            'medication_name' => $a->medication?->historicalDisplayName(),
             'route' => $a->medication?->route,
             'prescribed_dose' => $a->medication?->dosage,
             'controlled_drug' => (bool) ($a->medication?->controlled_drug ?? false),
@@ -1538,7 +1538,7 @@ class EmarController extends Controller
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->whereBetween('recorded_at', [$dayStart, $dayEnd])
-            ->with(['client:id,first_name,last_name', 'medication:id,name,controlled_drug', 'recordedBy:id,name', 'witnessedBy:id,name'])
+            ->with(['client:id,first_name,last_name', 'medication:id,name,controlled_drug,deleted_at', 'recordedBy:id,name', 'witnessedBy:id,name'])
             ->latest('recorded_at')
             ->limit(100)
             ->get();
@@ -1622,7 +1622,7 @@ class EmarController extends Controller
                 'id' => $e->id,
                 'client_id' => $e->client_id,
                 'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : 'Unknown',
-                'medication_name' => $e->medication?->name,
+                'medication_name' => $e->medication?->historicalDisplayName(),
                 'controlled_drug' => (bool) ($e->medication?->controlled_drug ?? true),
                 'entry_type' => $e->entry_type,
                 'quantity' => $e->quantity,
@@ -2599,7 +2599,7 @@ class EmarController extends Controller
         $activity = empty($roundIds) ? [] : ClientMedicationAdministration::query()
             ->whereIn('medication_round_id', $roundIds)
             ->with([
-                'medication:id,name',
+                'medication:id,name,deleted_at',
                 'administeredBy:id,name',
                 'witnessedBy:id,name',
                 'client:id,first_name,last_name,site_id',
@@ -2613,7 +2613,7 @@ class EmarController extends Controller
                 'id' => $a->id,
                 'status' => $a->status,
                 'medication_id' => $a->client_medication_id,
-                'medication_name' => $a->medication?->name,
+                'medication_name' => $a->medication?->historicalDisplayName(),
                 'dose' => $a->dose_given,
                 'resident_id' => $a->client_id,
                 'resident_name' => $a->client ? trim(($a->client->first_name ?? '').' '.($a->client->last_name ?? '')) : null,
@@ -3059,10 +3059,15 @@ class EmarController extends Controller
         $this->medicationOrderLifecycle->discontinue(
             $performer,
             $medication,
-            'Prescriber cease order — '.$order->prescriber_name
-                .(filled($order->clinical_notes) ? ': '.$order->clinical_notes : ''),
+            mb_substr(
+                'Prescriber cease order — '.$order->prescriber_name
+                    .(filled($order->clinical_notes) ? ': '.$order->clinical_notes : ''),
+                0,
+                255,
+            ),
             (int) $order->client_id,
             $ceasedAt ?? now(),
+            requestKey: 'prescriber-order:'.$order->id,
         );
     }
 
@@ -3134,6 +3139,13 @@ class EmarController extends Controller
             $order,
             now(),
             function (MedicationScopeDecision $scope) use ($validated, $user) {
+                if ($scope->prescription->status !== 'pending'
+                    || $scope->prescription->countersigned_at !== null) {
+                    throw ValidationException::withMessages([
+                        'medication' => 'The requested medication action is not available.',
+                    ]);
+                }
+
                 $countersignedAt = now();
                 $scope->prescription->update([
                     'countersigned_at' => $countersignedAt,
@@ -4956,19 +4968,14 @@ class EmarController extends Controller
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
     {
-        // A documented reason for ceasing an order is required — an undocumented
-        // cessation is a governance gap in NZ medication practice.
-        $validated = $request->validate([
-            'reason' => ['bail', 'required', 'string', 'max:255'],
-        ]);
-
         $user = $request->user();
         abort_unless($user, 403);
 
         $this->medicationOrderLifecycle->discontinue(
             $user,
             $medication,
-            $validated['reason'],
+            $request->input('reason'),
+            requestKey: $request->input('request_key'),
         );
 
         return redirect()->back()->with('success', 'Medication discontinued successfully.');

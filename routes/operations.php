@@ -564,7 +564,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Medication stock updates
     Route::post('/clients/{client}/medical/medications/{medication}/discontinue', [ClientMedicalController::class, 'discontinueMedication'])
-        ->middleware('permission:clients.update|medications.orders.manage')
+        ->middleware('permission:medications.orders.manage')
         ->name('operations.clients.medical.medications.discontinue');
 
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])

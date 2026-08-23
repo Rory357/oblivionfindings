@@ -35,7 +35,7 @@ class MedicationsReportController extends Controller
         $admins = ClientMedicationAdministration::query()
             ->with([
                 'client:id,first_name,last_name',
-                'medication:id,client_id,name,is_prn,controlled_drug',
+                'medication:id,client_id,name,is_prn,controlled_drug,deleted_at',
                 'administeredBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
@@ -66,7 +66,13 @@ class MedicationsReportController extends Controller
                     'dose_given' => $a->dose_given,
                     'notes' => $a->notes,
                     'client' => $a->client,
-                    'medication' => $a->medication,
+                    'medication' => $a->medication ? [
+                        'id' => $a->medication->id,
+                        'client_id' => $a->medication->client_id,
+                        'name' => $a->medication->historicalDisplayName(),
+                        'is_prn' => $a->medication->is_prn,
+                        'controlled_drug' => $a->medication->controlled_drug,
+                    ] : null,
                     'administeredBy' => $a->administeredBy,
                     'serviceContext' => $a->serviceContext ? [
                         'id' => $a->serviceContext->id,
@@ -188,7 +194,7 @@ class MedicationsReportController extends Controller
         $q = ClientMedicationAdministration::query()
             ->with([
                 'client:id,first_name,last_name',
-                'medication:id,client_id,name,is_prn,controlled_drug',
+                'medication:id,client_id,name,is_prn,controlled_drug,deleted_at',
                 'administeredBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
@@ -229,7 +235,7 @@ class MedicationsReportController extends Controller
                         optional($a->administered_at)->toDateTimeString(),
                         optional($a->scheduled_for)->toDateTimeString(),
                         $clientName,
-                        $a->medication?->name ?? '',
+                        $a->medication?->historicalDisplayName() ?? '',
                         $a->status,
                         $a->reason,
                         $a->dose_given,

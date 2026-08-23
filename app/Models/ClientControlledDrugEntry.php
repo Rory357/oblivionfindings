@@ -42,7 +42,7 @@ class ClientControlledDrugEntry extends Model
 
     public function medication()
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function shift()

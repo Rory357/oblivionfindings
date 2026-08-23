@@ -95,7 +95,7 @@ class AuditLogController extends Controller
         $adminTypes = ['dose_administered', 'dose_refused', 'dose_missed'];
         if (empty($eventTypes) || array_intersect($adminTypes, $eventTypes)) {
             $adminQuery = ClientMedicationAdministration::query()
-                ->with(['client:id,first_name,last_name', 'medication:id,name,dosage', 'administeredBy:id,name', 'witnessedBy:id,name'])
+                ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
                 ->select('id', 'client_id', 'client_medication_id', 'administered_by', 'witnessed_by', 'scheduled_for', 'administered_at', 'status', 'reason', 'reason_code', 'dose_given', 'notes');
 
             if ($clientId) {
@@ -122,7 +122,7 @@ class AuditLogController extends Controller
                 }
 
                 $clientName = $admin->client ? trim($admin->client->first_name.' '.$admin->client->last_name) : 'Unknown';
-                $medName = $admin->medication->name ?? 'Unknown medication';
+                $medName = $admin->medication?->historicalDisplayName() ?? 'Unknown medication';
                 $performedBy = $admin->administeredBy->name ?? null;
 
                 $descMap = [

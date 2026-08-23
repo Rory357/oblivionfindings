@@ -77,6 +77,11 @@ describe('medication order discontinuation', () => {
             expect(source).toMatch(/>\s*Discontinue\s*<\/Button>/);
             expect(source).toContain("m.state !== 'ceased'");
             expect(source).toContain('!m.ceased_at');
+            expect(source).toContain('auth?.can?.medications?.view');
+            expect(source).toContain(
+                'auth?.can?.medications?.ordersManage',
+            );
+            expect(source).toContain('canDiscontinue &&');
             expect(source).not.toMatch(/medForm\.delete\(/);
             expect(source).not.toMatch(/medications\/\$\{m\.id\}`/);
         }
@@ -85,6 +90,8 @@ describe('medication order discontinuation', () => {
             resolve(process.cwd(), 'resources/js/pages/emar/_dialogs.tsx'),
             'utf8',
         );
+        expect(detailSource).toContain('request_key: crypto.randomUUID()');
+        expect(detailSource).toContain('maxLength={255}');
         expect(detailSource).toContain("medication.state === 'ceased'");
         expect(detailSource).toContain('medication.ceased_reason');
     });

@@ -26,27 +26,74 @@ class MedicationOrderLifecycleService
     public function discontinue(
         User $performer,
         ClientMedication $submittedMedication,
-        string $reason,
+        mixed $reason,
         ?int $submittedClientId = null,
         ?Carbon $ceasedAt = null,
+        mixed $requestKey = null,
     ): ClientMedication {
         abort_unless($performer->canDo('medications.orders.manage'), 403);
 
-        $reason = trim($reason);
-        $ceasedAt ??= now();
-
-        if ($reason === '' || mb_strlen($reason) > 255) {
-            throw ValidationException::withMessages([
-                'reason' => 'A reason is required and must not exceed 255 characters.',
-            ]);
-        }
+        $authorizationAt = $ceasedAt ?? now();
 
         return $this->scope->forMedication(
             $performer,
             $submittedMedication,
-            $ceasedAt,
-            function (MedicationScopeDecision $decision) use ($reason, $ceasedAt): ClientMedication {
+            $authorizationAt,
+            function (MedicationScopeDecision $decision) use ($reason, $ceasedAt, $requestKey): ClientMedication {
                 $medication = $decision->medication;
+                // When a request waited behind an administration lock, stamp
+                // cessation only after this callback owns the canonical order.
+                // That prevents a completed dose being recorded after the
+                // apparent cessation time merely because the stop request began first.
+                $effectiveCeasedAt = $ceasedAt ?? now();
+
+                // Resolve and conceal the canonical order before evaluating
+                // user-controlled content. A malformed reason must not reveal
+                // whether a foreign medication order exists.
+                if (! is_string($reason)) {
+                    throw ValidationException::withMessages([
+                        'reason' => 'A reason is required and must not exceed 255 characters.',
+                    ]);
+                }
+
+                $reason = trim($reason);
+                if ($reason === '' || mb_strlen($reason) > 255) {
+                    throw ValidationException::withMessages([
+                        'reason' => 'A reason is required and must not exceed 255 characters.',
+                    ]);
+                }
+
+                $requestKey = $this->cessationRequestKey($requestKey, $decision, $reason);
+                $payloadHash = $this->cessationPayloadHash($decision, $reason);
+                $replay = MedicationOrderVersion::query()
+                    ->where('cessation_request_key', $requestKey)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($replay !== null) {
+                    if ((int) $replay->client_medication_id !== (int) $medication->id
+                        || ! is_string($replay->cessation_payload_sha256)
+                        || ! hash_equals($replay->cessation_payload_sha256, $payloadHash)) {
+                        throw ValidationException::withMessages([
+                            'request_key' => 'This request key has already been used for a different medication action.',
+                        ]);
+                    }
+
+                    if ($replay->state !== 'ceased'
+                        || $medication->state !== 'ceased'
+                        || $medication->ceased_at === null
+                        || $replay->ceased_at === null
+                        || (int) $medication->version !== (int) $replay->version_number
+                        || (string) $medication->ceased_reason !== $reason
+                        || (string) $replay->ceased_reason !== $reason
+                        || (int) $medication->ceased_by !== (int) $decision->performer->id
+                        || (int) $replay->changed_by !== (int) $decision->performer->id
+                        || ! $replay->ceased_at->equalTo($medication->ceased_at)) {
+                        throw new \RuntimeException('Medication cessation replay evidence is inconsistent.');
+                    }
+
+                    return $medication;
+                }
 
                 if ($medication->state === 'ceased' || $medication->ceased_at !== null) {
                     throw ValidationException::withMessages([
@@ -64,9 +111,9 @@ class MedicationOrderLifecycleService
                 $medication->forceFill([
                     'state' => 'ceased',
                     'active' => false,
-                    'end_date' => $ceasedAt->toDateString(),
+                    'end_date' => $effectiveCeasedAt->toDateString(),
                     'ceased_reason' => $reason,
-                    'ceased_at' => $ceasedAt,
+                    'ceased_at' => $effectiveCeasedAt,
                     'ceased_by' => $decision->performer->id,
                     'version' => $nextVersion,
                 ])->save();
@@ -75,6 +122,8 @@ class MedicationOrderLifecycleService
                     'client_medication_id' => $medication->id,
                     'client_id' => $decision->client->id,
                     'version_number' => $nextVersion,
+                    'cessation_request_key' => $requestKey,
+                    'cessation_payload_sha256' => $payloadHash,
                     'name' => $medication->name,
                     'dosage' => $medication->dosage,
                     'dose_amount' => $medication->dose_amount,
@@ -97,14 +146,14 @@ class MedicationOrderLifecycleService
                     'pharmacy' => $medication->pharmacy,
                     'start_date' => $medication->start_date,
                     'end_date' => $medication->end_date,
-                    'ceased_at' => $ceasedAt,
+                    'ceased_at' => $effectiveCeasedAt,
                     'ceased_reason' => $reason,
                     'state' => 'ceased',
                     'paused_at' => $medication->paused_at,
                     'active' => false,
                     'change_reason' => mb_substr('Medication discontinued: '.$reason, 0, 255),
                     'changed_by' => $decision->performer->id,
-                    'changed_at' => $ceasedAt,
+                    'changed_at' => $effectiveCeasedAt,
                 ]);
 
                 AuditLogger::logOrFail('medication_order.discontinued', $medication, [
@@ -113,6 +162,9 @@ class MedicationOrderLifecycleService
                     'site_id' => $decision->siteId,
                     'medication_order_version_id' => $version->id,
                     'version_number' => $nextVersion,
+                    'cessation_request_key' => $requestKey,
+                    'cessation_payload_sha256' => $payloadHash,
+                    'ceased_at' => $effectiveCeasedAt->toIso8601String(),
                     'reason' => $reason,
                     'break_glass_access_id' => $decision->breakGlassAccess?->id,
                 ]);
@@ -127,6 +179,49 @@ class MedicationOrderLifecycleService
             },
             requireAdministrable: false,
             submittedClientId: $submittedClientId,
+            allowCeased: true,
         );
+    }
+
+    private function cessationRequestKey(
+        mixed $submittedKey,
+        MedicationScopeDecision $decision,
+        string $reason,
+    ): string {
+        if ($submittedKey === null || $submittedKey === '') {
+            return 'legacy:'.hash('sha256', implode('|', [
+                (string) $decision->medication->id,
+                (string) $decision->client->id,
+                (string) $decision->performer->id,
+                $reason,
+            ]));
+        }
+
+        if (! is_string($submittedKey)) {
+            throw ValidationException::withMessages([
+                'request_key' => 'The medication action request key is invalid.',
+            ]);
+        }
+
+        $requestKey = trim($submittedKey);
+        if ($requestKey === ''
+            || mb_strlen($requestKey) > 100
+            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9._:-]*\z/', $requestKey) !== 1) {
+            throw ValidationException::withMessages([
+                'request_key' => 'The medication action request key is invalid.',
+            ]);
+        }
+
+        return $requestKey;
+    }
+
+    private function cessationPayloadHash(MedicationScopeDecision $decision, string $reason): string
+    {
+        return hash('sha256', json_encode([
+            'client_id' => (int) $decision->client->id,
+            'medication_id' => (int) $decision->medication->id,
+            'performer_id' => (int) $decision->performer->id,
+            'reason' => $reason,
+        ], JSON_THROW_ON_ERROR));
     }
 }

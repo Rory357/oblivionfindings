@@ -88,7 +88,7 @@ class MedicationCessationPrecisionMigrationTest extends TestCase
 
     private function migration(): Migration
     {
-        return require database_path('migrations/2026_08_14_000064_preserve_medication_cessation_time.php');
+        return require database_path('migrations/2026_08_23_000180_preserve_medication_cessation_time.php');
     }
 
     /** @return array{0: User, 1: Client, 2: ClientMedication, 3: MedicationOrderVersion} */

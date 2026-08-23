@@ -45,6 +45,7 @@ export interface AuthPermissions {
     };
     medications?: {
         view?: boolean;
+        ordersManage?: boolean;
         breakGlass?: boolean;
         audit?: { view?: boolean };
         orders?: { manage?: boolean };

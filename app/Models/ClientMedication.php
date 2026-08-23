@@ -385,9 +385,46 @@ class ClientMedication extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (ClientMedication $medication): void {
+            $wasCeased = $medication->getOriginal('state') === 'ceased'
+                || $medication->getRawOriginal('ceased_at') !== null;
+
+            if ($wasCeased && $medication->isDirty()) {
+                throw new \LogicException('Ceased medication orders are immutable.');
+            }
+
+            if (! $medication->isDirty(['state', 'active', 'ceased_at', 'ceased_reason', 'ceased_by'])) {
+                return;
+            }
+
+            if ($medication->state === 'ceased') {
+                if ((bool) $medication->active
+                    || $medication->ceased_at === null
+                    || blank($medication->ceased_reason)
+                    || $medication->ceased_by === null) {
+                    throw new \LogicException('Medication cessation requires immutable reason, actor and time evidence.');
+                }
+
+                return;
+            }
+
+            if ($medication->ceased_at !== null
+                || filled($medication->ceased_reason)
+                || $medication->ceased_by !== null) {
+                throw new \LogicException('Medication cessation evidence is only valid for ceased orders.');
+            }
+        });
+
         static::deleting(function (): never {
             throw new \LogicException('Medication orders are retained; discontinue the order instead.');
         });
+    }
+
+    public function historicalDisplayName(): string
+    {
+        return $this->trashed()
+            ? $this->name.' (legacy removed order)'
+            : $this->name;
     }
 
     /**

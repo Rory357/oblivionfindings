@@ -564,7 +564,7 @@ class EmarReportController extends Controller
         $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Reason Code', 'Administered By', 'Witness', 'BSL', 'Pulse', 'Blood Pressure', 'Notes']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group', 'administeredBy:id,name', 'witnessedBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
@@ -576,7 +576,7 @@ class EmarReportController extends Controller
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
-                        $a->medication?->name ?? '',
+                        $a->medication?->historicalDisplayName() ?? '',
                         $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->status,
                         $a->reason_code,
@@ -596,7 +596,7 @@ class EmarReportController extends Controller
         $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Dose', 'Reason', 'Administered By']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,is_prn,pharmac_therapeutic_group', 'administeredBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,is_prn,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -609,7 +609,7 @@ class EmarReportController extends Controller
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
-                        $a->medication?->name ?? '',
+                        $a->medication?->historicalDisplayName() ?? '',
                         $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->dose_given,
                         $a->reason,
@@ -624,7 +624,7 @@ class EmarReportController extends Controller
         $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Dose', 'Administered By', 'Witness']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,controlled_drug,pharmac_therapeutic_group', 'administeredBy:id,name', 'witnessedBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,controlled_drug,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
@@ -637,7 +637,7 @@ class EmarReportController extends Controller
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
-                        $a->medication?->name ?? '',
+                        $a->medication?->historicalDisplayName() ?? '',
                         $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->status,
                         $a->dose_given,

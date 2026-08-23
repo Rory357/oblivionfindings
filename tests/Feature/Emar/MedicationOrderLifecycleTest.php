@@ -18,6 +18,9 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationOrderLifecycleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\MedicationReportingService;
 use App\Services\NotificationService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -140,11 +143,15 @@ class MedicationOrderLifecycleTest extends TestCase
             ])
             ->assertForbidden();
 
-        $clientEditor = $this->scopedUser(['clients.viewAny', 'clients.update']);
+        $clientEditor = $this->scopedUser([
+            'medications.view',
+            'clients.viewAny',
+            'clients.update',
+        ]);
         $this->activeShift($clientEditor, $this->client);
         $this->actingAs($clientEditor)
             ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
-                'reason' => 'Client editor without medication view must not cease orders',
+                'reason' => 'Client editor without medication order authority must not cease orders',
             ])
             ->assertForbidden();
 
@@ -173,7 +180,13 @@ class MedicationOrderLifecycleTest extends TestCase
 
         $this->actingAs($this->manager)
             ->post("/clients/{$this->client->id}/medical/medications/{$otherMedication->id}/discontinue", [
-                'reason' => 'Forged resident identifier',
+                'reason' => '   ',
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/999999/discontinue", [
+                'reason' => '   ',
             ])
             ->assertNotFound();
 
@@ -303,6 +316,11 @@ class MedicationOrderLifecycleTest extends TestCase
     public function test_confirmed_prescriber_cease_uses_exact_lifecycle_evidence_and_rolls_back_replay_and_audit_failure(): void
     {
         Carbon::setTestNow('2026-08-21 10:15:30');
+        $this->shift->update([
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+        ]);
         $medication = $this->medication(['name' => 'Confirmed prescriber cease']);
         $payload = $this->prescriberCeasePayload($medication, 'Dr Confirmed', 'Course complete');
 
@@ -369,6 +387,11 @@ class MedicationOrderLifecycleTest extends TestCase
     public function test_countersigned_prescriber_cease_uses_exact_lifecycle_evidence_and_rolls_back_replay_and_audit_failure(): void
     {
         Carbon::setTestNow('2026-08-21 11:20:40');
+        $this->shift->update([
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+        ]);
         $medication = $this->medication(['name' => 'Countersigned prescriber cease']);
         $order = $this->pendingCountersignedCeaseOrder($medication, 'Dr Verbal', 'Countersigned stop');
 
@@ -507,6 +530,31 @@ class MedicationOrderLifecycleTest extends TestCase
             'status' => 'given',
             'dose_given' => '1 tablet',
         ]);
+        $controlledEntry = ClientControlledDrugEntry::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $this->shift->id,
+            'service_context_id' => $this->serviceContext->id,
+            'entry_type' => 'administered',
+            'quantity' => 1,
+            'unit' => 'tablet',
+            'on_hand_before' => 10,
+            'on_hand_after' => 9,
+            'recorded_at' => now(),
+            'recorded_by' => $this->manager->id,
+        ]);
+        $version = MedicationOrderVersion::query()->create([
+            'client_medication_id' => $medication->id,
+            'client_id' => $this->client->id,
+            'version_number' => 1,
+            'name' => $medication->name,
+            'dosage' => $medication->dosage,
+            'state' => 'active',
+            'active' => true,
+            'change_reason' => 'Legacy retained baseline',
+            'changed_by' => $this->manager->id,
+            'changed_at' => now(),
+        ]);
         DB::table('client_medications')->where('id', $medication->id)->update([
             'deleted_at' => now(),
             'updated_at' => now(),
@@ -517,30 +565,77 @@ class MedicationOrderLifecycleTest extends TestCase
         $this->assertTrue($historicalOrder->trashed());
         $this->assertNull($historicalOrder->ceased_reason);
         $this->assertFalse(ClientMedication::query()->whereKey($medication->id)->exists());
+        $this->assertSame(
+            'Legacy retained administration order (legacy removed order)',
+            $controlledEntry->fresh()->medication?->historicalDisplayName(),
+        );
+        $this->assertSame(
+            'Legacy retained administration order (legacy removed order)',
+            $version->fresh()->medication?->historicalDisplayName(),
+        );
 
         $csv = $this->actingAs($this->manager)
             ->get('/emar/reports/export?report_type=administration&client_id='.$this->client->id)
             ->assertOk()
             ->streamedContent();
-        $this->assertStringContainsString('Legacy retained administration order', $csv);
+        $this->assertStringContainsString(
+            'Legacy retained administration order (legacy removed order)',
+            $csv,
+        );
+        $mar = app(MedicationReportingService::class)->exportMar(
+            $this->client->id,
+            now()->subDay(),
+            now()->addDay(),
+        );
+        $this->assertSame(
+            'Legacy retained administration order (legacy removed order)',
+            data_get($mar, 'records.0.medication'),
+        );
     }
 
     public function test_replay_and_direct_model_delete_are_fail_closed(): void
     {
         $medication = $this->medication();
+        $requestKey = (string) Str::uuid();
         app(MedicationOrderLifecycleService::class)->discontinue(
             $this->manager,
             $medication,
             'First and only cessation',
             $this->client->id,
+            requestKey: $requestKey,
         );
 
         $this->actingAs($this->manager)
             ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'First and only cessation',
+                'request_key' => $requestKey,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
                 'reason' => 'Replay attempt',
+                'request_key' => $requestKey,
+            ])
+            ->assertSessionHasErrors('request_key');
+
+        $this->actingAs($this->manager)
+            ->post("/clients/{$this->client->id}/medical/medications/{$medication->id}/discontinue", [
+                'reason' => 'Distinct terminal action attempt',
+                'request_key' => (string) Str::uuid(),
             ])
             ->assertSessionHasErrors('medication');
         $this->assertDatabaseCount('medication_order_versions', 1);
+        $this->assertSame(1, AuditLog::query()
+            ->where('action', 'medication_order.discontinued')
+            ->where('auditable_id', $medication->id)
+            ->count());
+
+        $this->actingAs($this->manager)
+            ->put("/emar/medications/{$medication->id}", [
+                'medication_name' => 'Tampered ceased medication',
+            ])
+            ->assertNotFound();
 
         try {
             $medication->fresh()->delete();
@@ -549,8 +644,22 @@ class MedicationOrderLifecycleTest extends TestCase
             $this->assertStringContainsString('discontinue', $exception->getMessage());
         }
 
+        try {
+            $medication->fresh()->update([
+                'name' => 'Tampered ceased medication',
+                'state' => 'active',
+                'active' => true,
+            ]);
+            $this->fail('Ceased medication mutation did not fail closed.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('immutable', $exception->getMessage());
+        }
+
         $this->assertDatabaseHas('client_medications', [
             'id' => $medication->id,
+            'state' => 'ceased',
+            'active' => false,
+            'name' => 'Lifecycle medication order',
             'deleted_at' => null,
         ]);
     }
@@ -737,6 +846,73 @@ class MedicationOrderLifecycleTest extends TestCase
         }
     }
 
+    public function test_discontinue_waiting_behind_an_administration_uses_the_post_lock_cessation_time(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
+        $medication = $this->medication([
+            'name' => 'Administration-first race order',
+            'dose_times' => [$scheduledFor->format('H:i')],
+            'start_date' => $scheduledFor->copy()->subMonth()->toDateString(),
+        ]);
+        $database = $connection->getDatabaseName();
+        $readyPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'med-order-stop-waiting-'.Str::uuid();
+        $process = null;
+        $connection->commit();
+
+        try {
+            $connection->beginTransaction();
+            ClientMedication::query()->whereKey($medication->id)->lockForUpdate()->firstOrFail();
+            $process = $this->startRaceWorker(
+                'discontinue',
+                $readyPath,
+                $database,
+                $medication,
+                'Stopped after in-flight administration',
+            );
+            $this->waitForWorkers([$readyPath]);
+            usleep(1_100_000);
+            $this->assertTrue($process->isRunning());
+
+            $administeredAt = now();
+            app(MedicationScopeDecisionService::class)->forAdministration(
+                $this->manager,
+                $this->client,
+                $medication,
+                $administeredAt,
+                $scheduledFor,
+                null,
+                null,
+                function (MedicationScopeDecision $scope) use ($administeredAt, $scheduledFor): void {
+                    ClientMedicationAdministration::query()->create([
+                        'client_id' => $scope->client->id,
+                        'client_medication_id' => $scope->medication->id,
+                        'shift_id' => $scope->shiftId(),
+                        'service_context_id' => $scope->client->service_context_id,
+                        'administered_by' => $scope->performer->id,
+                        'scheduled_for' => $scheduledFor,
+                        'administered_at' => $administeredAt,
+                        'status' => 'given',
+                        'dose_given' => '1 tablet',
+                    ]);
+                },
+            );
+            $connection->commit();
+
+            $process->wait();
+            $this->assertTrue($process->isSuccessful(), trim($process->getErrorOutput()));
+            $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertTrue($result['success']);
+            $administration = ClientMedicationAdministration::query()
+                ->where('client_medication_id', $medication->id)
+                ->sole();
+            $this->assertTrue($administration->administered_at->lessThanOrEqualTo($medication->fresh()->ceased_at));
+        } finally {
+            $this->finishCommittedRace($connection, array_filter([$process]), [$readyPath]);
+        }
+    }
+
     private function medication(array $overrides = []): ClientMedication
     {
         return ClientMedication::query()->create(array_merge([
@@ -810,11 +986,15 @@ class MedicationOrderLifecycleTest extends TestCase
         $this->assertSame('ceased', $version->state);
         $this->assertSame($reason, $version->ceased_reason);
         $this->assertSame($actor->id, (int) $version->changed_by);
+        $this->assertNotEmpty($version->cessation_request_key);
+        $this->assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $version->cessation_payload_sha256);
         $this->assertTrue($version->ceased_at->equalTo($medication->ceased_at));
         $this->assertTrue($version->changed_at->equalTo($medication->ceased_at));
-        $this->assertTrue($audit->created_at->equalTo($medication->ceased_at));
         $this->assertSame($reason, data_get($audit->meta, 'reason'));
+        $this->assertSame($medication->ceased_at->toIso8601String(), data_get($audit->meta, 'ceased_at'));
         $this->assertSame($version->id, (int) data_get($audit->meta, 'medication_order_version_id'));
+        $this->assertSame($version->cessation_request_key, data_get($audit->meta, 'cessation_request_key'));
+        $this->assertSame($version->cessation_payload_sha256, data_get($audit->meta, 'cessation_payload_sha256'));
 
         return $medication->ceased_at->copy();
     }
