@@ -436,18 +436,9 @@ export default function AlertsIndex({
                 hero={
                     !isCanonicalWorklist ? (
                         <PageHero
-                            icon={Bell}
+                            pageType="task"
                             title={pageTitle}
                             description={pageDescription}
-                            stats={[
-                                { label: 'Total', value: stats.total },
-                                { label: 'Open', value: stats.open },
-                                { label: 'Critical', value: stats.critical },
-                                {
-                                    label: 'Unassigned',
-                                    value: stats.unassigned,
-                                },
-                            ]}
                             actions={
                                 can.create &&
                                 basePath === '/control-room/alerts' ? (
@@ -455,7 +446,7 @@ export default function AlertsIndex({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setNewOpen(true)}
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground backdrop-blur-sm"
                                     >
                                         <Bell className="mr-2 h-4 w-4" />
                                         New alert
@@ -473,14 +464,22 @@ export default function AlertsIndex({
                     onCreate={() => setNewOpen(true)}
                 >
                     {/* Quick filter tabs */}
-                    <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-                        {tabs.map((tab) => (
+                    <div
+                        role="group"
+                        aria-label="Alert queue filters"
+                        className="bg-muted/40 flex flex-wrap gap-1 rounded-lg border p-1"
+                    >
+                        {tabs.map((tab, index) => (
                             <Button
                                 key={tab.label}
+                                data-page-first-action={
+                                    index === 0 ? '' : undefined
+                                }
                                 type="button"
                                 variant="ghost"
+                                aria-pressed={activeTab === tab.label}
                                 onClick={() => applyQuickFilter(tab.filter)}
-                                className={`h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                                className={`frontline-focus frontline-tap h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                     activeTab === tab.label
                                         ? 'bg-background text-foreground shadow-sm'
                                         : 'text-muted-foreground hover:text-foreground'
@@ -502,7 +501,7 @@ export default function AlertsIndex({
 
                     {/* Filter bar */}
                     <Card className="flex flex-row flex-wrap items-end gap-3 rounded-lg p-3">
-                        <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
                             <Filter className="h-4 w-4" />
                             Filters
                         </div>
@@ -633,11 +632,11 @@ export default function AlertsIndex({
 
                     {/* Bulk actions bar */}
                     {selected.size > 0 && (
-                        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2">
+                        <div className="border-primary/30 bg-primary/5 flex items-center gap-3 rounded-lg border px-4 py-2">
                             <span className="text-sm font-medium">
                                 {selected.size} selected
                             </span>
-                            <div className="h-4 w-px bg-border" />
+                            <div className="bg-border h-4 w-px" />
                             {can.manage && (
                                 <Button
                                     variant="outline"
@@ -686,7 +685,7 @@ export default function AlertsIndex({
                         <Card className="gap-0 overflow-x-auto rounded-lg p-0">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b bg-muted/50 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                    <tr className="bg-muted/50 text-muted-foreground border-b text-left text-xs font-medium uppercase tracking-wider">
                                         <th className="w-10 px-3 py-3">
                                             <Checkbox
                                                 checked={allOnPageSelected}
@@ -750,8 +749,8 @@ export default function AlertsIndex({
                                                 colSpan={9}
                                                 className="px-3 py-16 text-center"
                                             >
-                                                <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
-                                                <p className="text-sm text-muted-foreground">
+                                                <Bell className="text-muted-foreground/50 mx-auto mb-3 h-10 w-10" />
+                                                <p className="text-muted-foreground text-sm">
                                                     No alerts found matching
                                                     your filters.
                                                 </p>
@@ -765,7 +764,7 @@ export default function AlertsIndex({
                                                     onClick={() =>
                                                         openWorkspace(alert.id)
                                                     }
-                                                    className={`cursor-pointer border-b border-l-4 border-l-primary/50 transition-colors hover:bg-muted/40 ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
+                                                    className={`border-l-primary/50 hover:bg-muted/40 cursor-pointer border-b border-l-4 transition-colors ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
                                                         selected.has(alert.id)
                                                             ? 'bg-primary/5'
                                                             : ''
@@ -800,7 +799,7 @@ export default function AlertsIndex({
                                                                     0 && (
                                                                     <Badge
                                                                         variant="outline"
-                                                                        className="border-status-warning/30 px-1 py-0 text-[10px] text-status-warning"
+                                                                        className="border-status-warning/30 text-status-warning px-1 py-0 text-[10px]"
                                                                     >
                                                                         L
                                                                         {
@@ -810,7 +809,7 @@ export default function AlertsIndex({
                                                                 )}
                                                         </div>
                                                         {alert.client_name && (
-                                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            <p className="text-muted-foreground mt-0.5 text-xs">
                                                                 {
                                                                     alert.client_name
                                                                 }
@@ -818,7 +817,7 @@ export default function AlertsIndex({
                                                         )}
                                                     </td>
                                                     <td className="px-3 py-2.5">
-                                                        <span className="text-xs text-muted-foreground capitalize">
+                                                        <span className="text-muted-foreground text-xs capitalize">
                                                             {alert.source?.replace(
                                                                 '_',
                                                                 ' ',
@@ -843,7 +842,7 @@ export default function AlertsIndex({
                                                             alert.snoozed_until,
                                                         ) > new Date() ? (
                                                             <span
-                                                                className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                                                                className="text-muted-foreground mt-1 flex items-center gap-1 text-[11px]"
                                                                 title={`Snoozed until ${new Date(alert.snoozed_until).toLocaleString()}`}
                                                             >
                                                                 <BellOff className="h-3 w-3" />
@@ -860,14 +859,14 @@ export default function AlertsIndex({
                                                                 }
                                                             />
                                                         ) : (
-                                                            <span className="text-xs text-muted-foreground">
+                                                            <span className="text-muted-foreground text-xs">
                                                                 -
                                                             </span>
                                                         )}
                                                     </td>
                                                     <td className="px-3 py-2.5">
                                                         <span
-                                                            className="flex items-center gap-1 text-xs text-muted-foreground"
+                                                            className="text-muted-foreground flex items-center gap-1 text-xs"
                                                             title={
                                                                 alert.triggered_at
                                                                     ? new Date(
@@ -893,7 +892,7 @@ export default function AlertsIndex({
                                                                 }
                                                             </span>
                                                         ) : (
-                                                            <span className="text-xs text-muted-foreground italic">
+                                                            <span className="text-muted-foreground text-xs italic">
                                                                 Unassigned
                                                             </span>
                                                         )}
@@ -932,7 +931,7 @@ export default function AlertsIndex({
                     {/* Pagination */}
                     {alerts.links?.length > 3 && (
                         <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                                 Page {alerts.current_page} of {alerts.last_page}{' '}
                                 ({alerts.total} total alerts)
                             </p>

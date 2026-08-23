@@ -93,31 +93,48 @@ export default function ClientTrends({
             <PageLayout
                 hero={
                     <PageHero
-                        variant="compact"
+                        pageType="task"
                         backHref={`/health-clinical/clients/${client.id}/summary`}
                         title="Observation Trends"
                         description={`${clientName} with chartable observation data over time.`}
                         actions={
                             <>
-                                <Link
-                                    href={`/health-clinical/clients/${client.id}/summary`}
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="frontline-tap"
                                 >
-                                    <Button variant="outline" size="sm">
+                                    <Link
+                                        href={`/health-clinical/clients/${client.id}/summary`}
+                                    >
                                         Health Summary
-                                    </Button>
-                                </Link>
-                                <Link href={`/operations/clients/${client.id}`}>
-                                    <Button variant="outline" size="sm">
-                                        Client Profile
-                                    </Button>
-                                </Link>
-                                <Link
-                                    href={`/health-clinical/observations?client_id=${client.id}`}
+                                    </Link>
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="frontline-tap"
                                 >
-                                    <Button variant="outline" size="sm">
+                                    <Link
+                                        href={`/operations/clients/${client.id}`}
+                                    >
+                                        Client Profile
+                                    </Link>
+                                </Button>
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="frontline-tap"
+                                >
+                                    <Link
+                                        href={`/health-clinical/observations?client_id=${client.id}`}
+                                    >
                                         Observation Register
-                                    </Button>
-                                </Link>
+                                    </Link>
+                                </Button>
                             </>
                         }
                     />
@@ -184,11 +201,11 @@ export default function ClientTrends({
                 {!has_chartable_data ? (
                     <Card>
                         <CardContent className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
-                            <Activity className="h-8 w-8 text-muted-foreground" />
+                            <Activity className="text-muted-foreground h-8 w-8" />
                             <h2 className="text-lg font-semibold">
                                 No chartable observations in this range
                             </h2>
-                            <p className="max-w-lg text-sm text-muted-foreground">
+                            <p className="text-muted-foreground max-w-lg text-sm">
                                 Try a wider date range or review the observation
                                 register for non-chartable entries such as
                                 general notes or sleep logs.
@@ -205,7 +222,7 @@ export default function ClientTrends({
                             <p className="text-sm font-medium">
                                 Chartable observations in range
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                                 {chartable_observation_count} entries across
                                 weight, pain, vitals, and fluid intake.
                             </p>

@@ -3,6 +3,7 @@ export {
     PageHero,
     type PageHeroAvatar,
     type PageHeroCategory,
+    type PageHeroPageType,
     type PageHeroProps,
     type PageHeroVariant,
 } from './page-hero';

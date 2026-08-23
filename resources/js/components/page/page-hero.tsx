@@ -25,6 +25,16 @@ import { PageHeroStats, type PageHeroStat } from './page-hero-stats';
 
 export type PageHeroVariant = 'hero' | 'compact' | 'inline';
 
+/**
+ * Semantic top-level page contract.
+ *
+ * Dashboards retain the rich identity/context banner. Task pages put the
+ * first working control closer to the top of the page by using the compact
+ * treatment. `variant` remains available for embedded and legacy callers;
+ * when `pageType` is supplied it is the authoritative density choice.
+ */
+export type PageHeroPageType = 'dashboard' | 'task';
+
 export type PageHeroCategory =
     | 'ops'
     | 'hr'
@@ -47,6 +57,9 @@ export type PageHeroAvatar = {
 };
 
 export interface PageHeroProps {
+    /** Auditable top-level page density. Prefer this for new page shells. */
+    pageType?: PageHeroPageType;
+
     /** Visual density. Default 'hero' renders the full gradient banner. */
     variant?: PageHeroVariant;
 
@@ -120,6 +133,7 @@ function renderIcon(icon: IconLike | ReactNode, className: string): ReactNode {
 
 function HeroVariant(props: PageHeroProps) {
     const {
+        pageType,
         category,
         brandColour,
         backHref,
@@ -174,9 +188,12 @@ function HeroVariant(props: PageHeroProps) {
         // (e.g. resident popover on the avatar stack) can extend past the
         // banner's bottom edge.
         <div
+            data-page-hero=""
+            data-page-hero-type={pageType}
+            data-page-hero-variant="hero"
             style={style}
             className={cn(
-                '@container relative rounded-2xl text-primary-foreground',
+                '@container text-primary-foreground relative rounded-2xl',
                 gradientClass,
                 className,
             )}
@@ -184,39 +201,39 @@ function HeroVariant(props: PageHeroProps) {
             {/* INNER ORB CLIP — purely visual; clipped to the rounded shape so the
                 three decorative circles don't bleed past the banner. */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                <div className="bg-primary-foreground/5 absolute -right-16 -top-16 h-64 w-64 rounded-full" />
+                <div className="bg-primary-foreground/5 absolute -bottom-20 -left-20 h-48 w-48 rounded-full" />
+                <div className="bg-primary-foreground/5 absolute right-1/3 top-1/4 h-24 w-24 rounded-full" />
             </div>
 
             <div className="relative p-6 md:p-8">
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="mb-3 inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 transition-colors hover:text-primary-foreground/90"
+                        className="frontline-focus frontline-tap text-primary-foreground/60 hover:text-primary-foreground/90 -ml-2 mb-1 inline-flex items-center gap-1.5 rounded-md px-2 text-xs transition-colors"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
                         {backLabel}
                     </Link>
                 ) : null}
 
-                <div className="flex flex-col items-center gap-6 @5xl:flex-row @5xl:items-start">
+                <div className="@5xl:flex-row @5xl:items-start flex flex-col items-center gap-6">
                     {avatarStack && avatarStack.length > 0 ? (
                         <PageHeroAvatarStack residents={avatarStack} />
                     ) : avatar ? (
                         <HeroSingleAvatar avatar={avatar} />
                     ) : renderedIcon ? (
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
+                        <div className="border-primary-foreground/20 bg-primary-foreground/10 flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 shadow-xl md:h-28 md:w-28">
                             {renderedIcon}
                         </div>
                     ) : null}
 
-                    <div className="min-w-0 flex-1 text-center @5xl:text-left">
-                        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+                    <div className="@5xl:text-left min-w-0 flex-1 text-center">
+                        <h1 className="break-words text-2xl font-bold tracking-tight md:text-3xl">
                             {title}
                         </h1>
                         {supportingText ? (
-                            <p className="mt-1 text-sm text-primary-foreground/70">
+                            <p className="text-primary-foreground/70 mt-1 text-sm">
                                 {supportingText}
                             </p>
                         ) : null}
@@ -234,9 +251,11 @@ function HeroVariant(props: PageHeroProps) {
                     {(actions ||
                         (stats && stats.length > 0) ||
                         (quickActions && quickActions.length > 0)) && (
-                        <div className="flex w-full flex-col items-center gap-3 @5xl:w-auto @5xl:items-end">
+                        <div className="@5xl:w-auto @5xl:items-end flex w-full flex-col items-center gap-3">
                             {actions ? (
-                                <PageHeroActions>{actions}</PageHeroActions>
+                                <PageHeroActions className="[&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:min-w-11">
+                                    {actions}
+                                </PageHeroActions>
                             ) : null}
                             {stats && stats.length > 0 ? (
                                 <PageHeroStats stats={stats} layout="inline" />
@@ -253,7 +272,7 @@ function HeroVariant(props: PageHeroProps) {
             </div>
 
             {footer ? (
-                <div className="relative overflow-hidden rounded-b-2xl border-t border-primary-foreground/20 px-4">
+                <div className="border-primary-foreground/20 relative overflow-hidden rounded-b-2xl border-t px-4">
                     {footer}
                 </div>
             ) : null}
@@ -274,7 +293,7 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
     const avatarEl = (
         <Avatar
             className={cn(
-                'h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28',
+                'border-primary-foreground/20 h-24 w-24 shrink-0 border-4 shadow-xl md:h-28 md:w-28',
                 avatar.popover &&
                     'cursor-pointer transition-shadow duration-200',
                 avatar.popover &&
@@ -285,7 +304,7 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
             {avatar.src ? (
                 <AvatarImage src={avatar.src} alt={avatar.fallback} />
             ) : null}
-            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
+            <AvatarFallback className="bg-primary-foreground/10 text-primary-foreground text-2xl font-semibold">
                 {avatar.fallback}
             </AvatarFallback>
         </Avatar>
@@ -315,6 +334,7 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
 
 function CompactVariant(props: PageHeroProps) {
     const {
+        pageType,
         backHref,
         backLabel = 'Back',
         title,
@@ -327,8 +347,11 @@ function CompactVariant(props: PageHeroProps) {
     const supportingText = description ?? subtitle;
     return (
         <div
+            data-page-hero=""
+            data-page-hero-type={pageType}
+            data-page-hero-variant="compact"
             className={cn(
-                'flex flex-col gap-4 md:flex-row md:items-start md:justify-between',
+                'flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between',
                 className,
             )}
         >
@@ -336,24 +359,24 @@ function CompactVariant(props: PageHeroProps) {
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                        className="frontline-focus frontline-tap text-muted-foreground hover:text-foreground -ml-2 inline-flex items-center gap-2 rounded-md px-2 text-sm"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         {backLabel}
                     </Link>
                 ) : null}
-                <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
+                <h1 className="mt-1 break-words text-xl font-semibold tracking-tight md:text-2xl">
                     {title}
                 </h1>
                 {supportingText ? (
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                    <p className="text-muted-foreground mt-2 max-w-2xl break-words text-sm leading-relaxed">
                         {supportingText}
                     </p>
                 ) : null}
                 {children ? <div className="mt-3">{children}</div> : null}
             </div>
             {actions ? (
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto [&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:min-w-11">
                     {actions}
                 </div>
             ) : null}
@@ -362,10 +385,14 @@ function CompactVariant(props: PageHeroProps) {
 }
 
 function InlineVariant(props: PageHeroProps) {
-    const { title, description, subtitle, actions, className } = props;
+    const { pageType, title, description, subtitle, actions, className } =
+        props;
     const supportingText = description ?? subtitle;
     return (
         <div
+            data-page-hero=""
+            data-page-hero-type={pageType}
+            data-page-hero-variant="inline"
             className={cn('flex items-start justify-between gap-3', className)}
         >
             <div className="min-w-0">
@@ -373,7 +400,7 @@ function InlineVariant(props: PageHeroProps) {
                     {title}
                 </h1>
                 {supportingText ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="text-muted-foreground mt-1 text-sm">
                         {supportingText}
                     </p>
                 ) : null}
@@ -388,7 +415,12 @@ function InlineVariant(props: PageHeroProps) {
 }
 
 export function PageHero(props: PageHeroProps) {
-    const variant = props.variant ?? 'hero';
+    const variant =
+        props.pageType === 'task'
+            ? 'compact'
+            : props.pageType === 'dashboard'
+              ? 'hero'
+              : (props.variant ?? 'hero');
     if (variant === 'compact') return <CompactVariant {...props} />;
     if (variant === 'inline') return <InlineVariant {...props} />;
     return <HeroVariant {...props} />;

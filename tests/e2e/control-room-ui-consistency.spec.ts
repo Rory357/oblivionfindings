@@ -39,6 +39,13 @@ const viewports = [
     { width: 390, height: 844, slug: 'mobile' },
 ] as const;
 
+const heroDensityViewports = [
+    { width: 1440, height: 900, maxHeroToAction: 180 },
+    { width: 1280, height: 800, maxHeroToAction: 180 },
+    { width: 1024, height: 768, maxHeroToAction: 180 },
+    { width: 390, height: 844, maxHeroToAction: 240 },
+] as const;
+
 const evidenceDirectory = resolve(
     process.env.CONTROL_ROOM_UI_EVIDENCE_DIR ??
         resolve(
@@ -140,6 +147,79 @@ test.describe('control room — UI consistency acceptance', () => {
                     animations: 'disabled',
                 });
             }
+        }
+    });
+
+    test('the compact task-page hero keeps the first queue action above the fold', async ({
+        page,
+    }) => {
+        for (const viewport of heroDensityViewports) {
+            await page.setViewportSize(viewport);
+            await page.goto('/control-room/integration-alerts', {
+                waitUntil: 'domcontentloaded',
+            });
+
+            const hero = page.locator(
+                '[data-page-hero-type="task"][data-page-hero-variant="compact"]',
+            );
+            const quickFilters = page.getByRole('group', {
+                name: 'Alert queue filters',
+            });
+            const firstAction = quickFilters
+                .locator('[data-page-first-action]')
+                .first();
+
+            await expect(hero).toBeVisible();
+            await expect(quickFilters).toBeVisible();
+            await expect(firstAction).toBeVisible();
+            await expect(
+                quickFilters.locator('[aria-pressed="true"]'),
+            ).toHaveCount(1);
+
+            const [heroBounds, actionBounds] = await Promise.all([
+                hero.boundingBox(),
+                firstAction.boundingBox(),
+            ]);
+
+            expect(heroBounds).not.toBeNull();
+            expect(actionBounds).not.toBeNull();
+            expect(actionBounds!.width).toBeGreaterThanOrEqual(44);
+            expect(actionBounds!.height).toBeGreaterThanOrEqual(44);
+            expect(actionBounds!.y - heroBounds!.y).toBeLessThanOrEqual(
+                viewport.maxHeroToAction,
+            );
+            expect(actionBounds!.y + actionBounds!.height).toBeLessThanOrEqual(
+                viewport.height,
+            );
+
+            await firstAction.focus();
+            await expect(firstAction).toBeFocused();
+            const focusOutline = await firstAction.evaluate((element) => {
+                const style = window.getComputedStyle(element);
+                return {
+                    style: style.outlineStyle,
+                    width: Number.parseFloat(style.outlineWidth),
+                };
+            });
+            expect(focusOutline.style).not.toBe('none');
+            expect(focusOutline.width).toBeGreaterThanOrEqual(2);
+
+            const documentWidth = await page.evaluate(() => ({
+                client: document.documentElement.clientWidth,
+                scroll: document.documentElement.scrollWidth,
+            }));
+            expect(documentWidth.scroll).toBeLessThanOrEqual(
+                documentWidth.client + 1,
+            );
+
+            await page.screenshot({
+                path: resolve(
+                    evidenceDirectory,
+                    `hero-density-${viewport.width}x${viewport.height}-integration-alerts.png`,
+                ),
+                fullPage: false,
+                animations: 'disabled',
+            });
         }
     });
 

@@ -198,7 +198,7 @@ export function MyDayHero({
             <a
                 href={site.href}
                 className={
-                    'rounded-sm border-b-2 border-primary-foreground/40 px-0.5 transition-colors hover:border-primary-foreground hover:bg-primary-foreground/10'
+                    'border-primary-foreground/40 hover:border-primary-foreground hover:bg-primary-foreground/10 rounded-sm border-b-2 px-0.5 transition-colors'
                 }
             >
                 {site.name}
@@ -497,6 +497,7 @@ export function MyDayHero({
         <PageTabs
             onDark
             dense
+            listClassName="[&_[role=tab]]:min-h-11 [&_[role=tab]]:min-w-11"
             value={String(activeResidentId)}
             onValueChange={(next) =>
                 onResidentChange(next === 'all' ? 'all' : Number(next))
@@ -531,6 +532,7 @@ export function MyDayHero({
 
     return (
         <PageHero
+            pageType="dashboard"
             avatar={singleAvatar}
             avatarStack={avatarStack}
             title={heroTitle}
@@ -559,7 +561,7 @@ export function MyDayHero({
                         data-test={
                             clockedIn ? 'clock-out-button' : 'clock-in-button'
                         }
-                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        className="frontline-tap bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
                         {clockedIn ? (
                             <Square className="h-3.5 w-3.5" />
@@ -574,6 +576,7 @@ export function MyDayHero({
                         size="sm"
                         onClick={onBreakToggle}
                         disabled={!clockedIn || !onBreakToggle}
+                        className="frontline-tap"
                     >
                         {isOnBreak ? (
                             <Pause className="h-3.5 w-3.5" />
@@ -588,6 +591,7 @@ export function MyDayHero({
                         size="sm"
                         onClick={onOpenTimesheet}
                         disabled={!onOpenTimesheet}
+                        className="frontline-tap"
                     >
                         <FileText className="h-3.5 w-3.5" />{' '}
                         {clockedIn
