@@ -75,6 +75,16 @@ class EventServiceProvider extends ServiceProvider
     ];
 
     /**
+     * Laravel registers its core event provider through Application::configure(),
+     * so the framework already installs the verification listener once. This
+     * application provider must not install the same fallback a second time.
+     */
+    protected function configureEmailVerification(): void
+    {
+        // Handled by Laravel's core event provider.
+    }
+
+    /**
      * Determine whether events and listeners should be automatically discovered.
      */
     public function shouldDiscoverEvents(): bool

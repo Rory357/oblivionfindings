@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 
@@ -16,6 +17,21 @@ test('sends verification notification', function () {
         ->assertRedirect(route('home'));
 
     Notification::assertSentTo($user, VerifyEmail::class);
+});
+
+test('registered event sends one verification notification and remains idempotent after verification', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+
+    event(new Registered($user));
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+
+    $user->markEmailAsVerified();
+    event(new Registered($user));
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 1);
 });
 
 test('does not send verification notification if email is verified', function () {
