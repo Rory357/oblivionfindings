@@ -1,6 +1,5 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
-import { ConfirmChip } from '@/components/control-room/alert-workspace-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,8 +33,16 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, RefreshCw, Settings2, Trash2, X } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import {
+    Check,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Settings2,
+    Trash2,
+    X,
+} from 'lucide-react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 // --- TypeScript Interfaces ---
 
@@ -262,16 +269,21 @@ function SignalRuleDialog({
         is_active: rule?.is_active ?? true,
     });
     const [processing, setProcessing] = useState(false);
+    const [conditionsError, setConditionsError] = useState<string | null>(null);
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
         setProcessing(true);
+        setConditionsError(null);
 
         let parsedConditions = null;
         if (form.conditions.trim()) {
             try {
                 parsedConditions = JSON.parse(form.conditions);
             } catch {
+                setConditionsError(
+                    'Enter valid JSON, for example {"site_id": 1}.',
+                );
                 setProcessing(false);
                 return;
             }
@@ -314,12 +326,17 @@ function SignalRuleDialog({
         router[method](url, data, {
             onFinish: () => setProcessing(false),
             onSuccess: () => onClose(),
+            onError: (errors) => {
+                if (errors.conditions) {
+                    setConditionsError(errors.conditions);
+                }
+            },
         });
     }
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? 'Edit Signal Rule' : 'Create Signal Rule'}
@@ -332,9 +349,12 @@ function SignalRuleDialog({
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="rule-name">Name</Label>
+                        <Label htmlFor="rule-name">
+                            Rule name <span aria-hidden="true">*</span>
+                        </Label>
                         <Input
                             id="rule-name"
+                            className="frontline-tap"
                             value={form.name}
                             onChange={(e) =>
                                 setForm({ ...form, name: e.target.value })
@@ -343,16 +363,21 @@ function SignalRuleDialog({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label>Signal Type</Label>
+                            <Label htmlFor="rule-signal-type">
+                                Signal type
+                            </Label>
                             <Select
                                 value={form.signal_type_id}
                                 onValueChange={(v) =>
                                     setForm({ ...form, signal_type_id: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="rule-signal-type"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="Any type" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -368,14 +393,19 @@ function SignalRuleDialog({
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Signal Source</Label>
+                            <Label htmlFor="rule-signal-source">
+                                Signal source
+                            </Label>
                             <Select
                                 value={form.signal_source_id}
                                 onValueChange={(v) =>
                                     setForm({ ...form, signal_source_id: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="rule-signal-source"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="Any source" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -392,11 +422,14 @@ function SignalRuleDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="rule-priority">Priority</Label>
+                            <Label htmlFor="rule-priority">
+                                Rule priority <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="rule-priority"
+                                className="frontline-tap"
                                 type="number"
                                 min={0}
                                 max={1000}
@@ -411,14 +444,19 @@ function SignalRuleDialog({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Output Severity</Label>
+                            <Label htmlFor="rule-output-severity">
+                                Output severity
+                            </Label>
                             <Select
                                 value={form.output_severity}
                                 onValueChange={(v) =>
                                     setForm({ ...form, output_severity: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="rule-output-severity"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="Inherit" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -433,10 +471,11 @@ function SignalRuleDialog({
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="rule-escalation">
-                                Escalation Level
+                                Escalation level
                             </Label>
                             <Input
                                 id="rule-escalation"
+                                className="frontline-tap"
                                 type="number"
                                 min={0}
                                 max={10}
@@ -451,13 +490,14 @@ function SignalRuleDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="rule-dedup">
-                                Dedup Window (min)
+                                Deduplication window (minutes)
                             </Label>
                             <Input
                                 id="rule-dedup"
+                                className="frontline-tap"
                                 type="number"
                                 min={0}
                                 value={form.dedup_window_minutes}
@@ -471,14 +511,17 @@ function SignalRuleDialog({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Playbook</Label>
+                            <Label htmlFor="rule-playbook">Playbook</Label>
                             <Select
                                 value={form.playbook_id}
                                 onValueChange={(v) =>
                                     setForm({ ...form, playbook_id: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="rule-playbook"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="None" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -501,18 +544,37 @@ function SignalRuleDialog({
                         </Label>
                         <Textarea
                             id="rule-conditions"
+                            aria-invalid={conditionsError ? true : undefined}
+                            aria-describedby={
+                                conditionsError
+                                    ? 'rule-conditions-error'
+                                    : undefined
+                            }
                             rows={4}
                             className="font-mono text-sm"
                             value={form.conditions}
-                            onChange={(e) =>
-                                setForm({ ...form, conditions: e.target.value })
-                            }
+                            onChange={(e) => {
+                                setForm({
+                                    ...form,
+                                    conditions: e.target.value,
+                                });
+                                setConditionsError(null);
+                            }}
                             placeholder='{"site_id": 1, "severity_hint": "critical"}'
                         />
+                        {conditionsError ? (
+                            <p
+                                id="rule-conditions-error"
+                                role="alert"
+                                className="text-status-critical text-sm"
+                            >
+                                {conditionsError}
+                            </p>
+                        ) : null}
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+                        <div className="flex min-h-11 items-center gap-2">
                             <Switch
                                 id="rule-suppress"
                                 checked={form.suppress_in_maintenance}
@@ -523,11 +585,14 @@ function SignalRuleDialog({
                                     })
                                 }
                             />
-                            <Label htmlFor="rule-suppress">
+                            <Label
+                                htmlFor="rule-suppress"
+                                className="frontline-tap inline-flex cursor-pointer items-center"
+                            >
                                 Suppress during maintenance
                             </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-h-11 items-center gap-2">
                             <Switch
                                 id="rule-dedup-toggle"
                                 checked={form.deduplicate}
@@ -535,11 +600,14 @@ function SignalRuleDialog({
                                     setForm({ ...form, deduplicate: v })
                                 }
                             />
-                            <Label htmlFor="rule-dedup-toggle">
+                            <Label
+                                htmlFor="rule-dedup-toggle"
+                                className="frontline-tap inline-flex cursor-pointer items-center"
+                            >
                                 Deduplicate
                             </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-h-11 items-center gap-2">
                             <Switch
                                 id="rule-active"
                                 checked={form.is_active}
@@ -547,19 +615,29 @@ function SignalRuleDialog({
                                     setForm({ ...form, is_active: v })
                                 }
                             />
-                            <Label htmlFor="rule-active">Active</Label>
+                            <Label
+                                htmlFor="rule-active"
+                                className="frontline-tap inline-flex cursor-pointer items-center"
+                            >
+                                Rule active
+                            </Label>
                         </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
                         <Button
                             type="button"
                             variant="outline"
+                            className="frontline-tap"
                             onClick={onClose}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={processing}>
+                        <Button
+                            type="submit"
+                            className="frontline-tap"
+                            disabled={processing}
+                        >
                             {processing
                                 ? 'Saving...'
                                 : isEdit
@@ -653,7 +731,7 @@ function TriageQueueDialog({
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? 'Edit Triage Queue' : 'Create Triage Queue'}
@@ -665,11 +743,14 @@ function TriageQueueDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="queue-name">Name</Label>
+                            <Label htmlFor="queue-name">
+                                Queue name <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="queue-name"
+                                className="frontline-tap"
                                 value={form.name}
                                 onChange={(e) =>
                                     setForm({ ...form, name: e.target.value })
@@ -678,9 +759,12 @@ function TriageQueueDialog({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="queue-code">Code</Label>
+                            <Label htmlFor="queue-code">
+                                Queue code <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="queue-code"
+                                className="frontline-tap"
                                 value={form.code}
                                 onChange={(e) =>
                                     setForm({ ...form, code: e.target.value })
@@ -691,11 +775,14 @@ function TriageQueueDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="queue-tier">Tier</Label>
+                            <Label htmlFor="queue-tier">
+                                Queue tier <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="queue-tier"
+                                className="frontline-tap"
                                 type="number"
                                 min={1}
                                 max={5}
@@ -708,10 +795,11 @@ function TriageQueueDialog({
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="queue-escalate-mins">
-                                Auto-Escalate After (min)
+                                Auto-escalate after (minutes)
                             </Label>
                             <Input
                                 id="queue-escalate-mins"
+                                className="frontline-tap"
                                 type="number"
                                 min={1}
                                 value={form.auto_escalate_after_minutes}
@@ -728,7 +816,7 @@ function TriageQueueDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="queue-desc">Description</Label>
+                        <Label htmlFor="queue-desc">Queue description</Label>
                         <Textarea
                             id="queue-desc"
                             rows={2}
@@ -742,15 +830,18 @@ function TriageQueueDialog({
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>Handle Severities</Label>
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">
+                            Handle severities
+                        </legend>
                         <div className="flex flex-wrap gap-3">
                             {severityOptions.map((s) => (
                                 <label
                                     key={s}
-                                    className="flex items-center gap-1.5 text-sm"
+                                    className="frontline-tap flex cursor-pointer items-center gap-2 rounded-md text-sm"
                                 >
                                     <Checkbox
+                                        aria-label={`Handle ${s} severity`}
                                         checked={form.handle_severities.includes(
                                             s,
                                         )}
@@ -765,17 +856,20 @@ function TriageQueueDialog({
                                 </label>
                             ))}
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div className="space-y-2">
-                        <Label>Handle Sources</Label>
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">
+                            Handle sources
+                        </legend>
                         <div className="flex flex-wrap gap-3">
                             {sourceOptions.map((s) => (
                                 <label
                                     key={s}
-                                    className="flex items-center gap-1.5 text-sm"
+                                    className="frontline-tap flex cursor-pointer items-center gap-2 rounded-md text-sm"
                                 >
                                     <Checkbox
+                                        aria-label={`Handle ${s} source`}
                                         checked={form.handle_sources.includes(
                                             s,
                                         )}
@@ -787,17 +881,20 @@ function TriageQueueDialog({
                                 </label>
                             ))}
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div className="space-y-2">
-                        <Label>Assigned Roles</Label>
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">
+                            Assigned roles
+                        </legend>
                         <div className="flex flex-wrap gap-3">
                             {roleOptions.map((r) => (
                                 <label
                                     key={r}
-                                    className="flex items-center gap-1.5 text-sm"
+                                    className="frontline-tap flex cursor-pointer items-center gap-2 rounded-md text-sm"
                                 >
                                     <Checkbox
+                                        aria-label={`Assign ${r.replace(/_/g, ' ')} role`}
                                         checked={form.assigned_roles.includes(
                                             r,
                                         )}
@@ -809,17 +906,22 @@ function TriageQueueDialog({
                                 </label>
                             ))}
                         </div>
-                    </div>
+                    </fieldset>
 
                     <div className="space-y-2">
-                        <Label>Escalate To Queue</Label>
+                        <Label htmlFor="queue-escalate-to">
+                            Escalation queue
+                        </Label>
                         <Select
                             value={form.escalate_to_queue_id}
                             onValueChange={(v) =>
                                 setForm({ ...form, escalate_to_queue_id: v })
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger
+                                id="queue-escalate-to"
+                                className="frontline-tap"
+                            >
                                 <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
@@ -835,7 +937,7 @@ function TriageQueueDialog({
                         </Select>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-h-11 items-center gap-2">
                         <Switch
                             id="queue-active"
                             checked={form.is_active}
@@ -843,18 +945,28 @@ function TriageQueueDialog({
                                 setForm({ ...form, is_active: v })
                             }
                         />
-                        <Label htmlFor="queue-active">Active</Label>
+                        <Label
+                            htmlFor="queue-active"
+                            className="frontline-tap inline-flex cursor-pointer items-center"
+                        >
+                            Queue active
+                        </Label>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
                         <Button
                             type="button"
                             variant="outline"
+                            className="frontline-tap"
                             onClick={onClose}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={processing}>
+                        <Button
+                            type="submit"
+                            className="frontline-tap"
+                            disabled={processing}
+                        >
                             {processing
                                 ? 'Saving...'
                                 : isEdit
@@ -926,7 +1038,7 @@ function MaintenanceWindowDialog({
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit
@@ -940,9 +1052,13 @@ function MaintenanceWindowDialog({
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="mw-name">Name</Label>
+                        <Label htmlFor="mw-name">
+                            Maintenance window name{' '}
+                            <span aria-hidden="true">*</span>
+                        </Label>
                         <Input
                             id="mw-name"
+                            className="frontline-tap"
                             value={form.name}
                             onChange={(e) =>
                                 setForm({ ...form, name: e.target.value })
@@ -953,7 +1069,9 @@ function MaintenanceWindowDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="mw-desc">Description</Label>
+                        <Label htmlFor="mw-desc">
+                            Maintenance window description
+                        </Label>
                         <Textarea
                             id="mw-desc"
                             rows={2}
@@ -967,16 +1085,21 @@ function MaintenanceWindowDialog({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label>Signal Source</Label>
+                            <Label htmlFor="mw-signal-source">
+                                Signal source
+                            </Label>
                             <Select
                                 value={form.signal_source_id}
                                 onValueChange={(v) =>
                                     setForm({ ...form, signal_source_id: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="mw-signal-source"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="All sources" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -992,14 +1115,17 @@ function MaintenanceWindowDialog({
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Site</Label>
+                            <Label htmlFor="mw-site">Site</Label>
                             <Select
                                 value={form.site_id}
                                 onValueChange={(v) =>
                                     setForm({ ...form, site_id: v })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="mw-site"
+                                    className="frontline-tap"
+                                >
                                     <SelectValue placeholder="All sites" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1016,11 +1142,14 @@ function MaintenanceWindowDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="mw-starts">Starts At</Label>
+                            <Label htmlFor="mw-starts">
+                                Starts at <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="mw-starts"
+                                className="frontline-tap"
                                 type="datetime-local"
                                 value={form.starts_at}
                                 onChange={(e) =>
@@ -1033,9 +1162,12 @@ function MaintenanceWindowDialog({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="mw-ends">Ends At</Label>
+                            <Label htmlFor="mw-ends">
+                                Ends at <span aria-hidden="true">*</span>
+                            </Label>
                             <Input
                                 id="mw-ends"
+                                className="frontline-tap"
                                 type="datetime-local"
                                 value={form.ends_at}
                                 onChange={(e) =>
@@ -1049,15 +1181,20 @@ function MaintenanceWindowDialog({
                         </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
                         <Button
                             type="button"
                             variant="outline"
+                            className="frontline-tap"
                             onClick={onClose}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={processing}>
+                        <Button
+                            type="submit"
+                            className="frontline-tap"
+                            disabled={processing}
+                        >
                             {processing
                                 ? 'Saving...'
                                 : isEdit
@@ -1088,21 +1225,106 @@ function DeleteConfirmDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="w-[calc(100vw-1rem)] max-w-sm [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
+                    <Button
+                        variant="outline"
+                        className="frontline-tap"
+                        onClick={onClose}
+                    >
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={onConfirm}>
+                    <Button
+                        variant="destructive"
+                        className="frontline-tap"
+                        onClick={onConfirm}
+                    >
                         Delete
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function OptionDeleteControl({
+    optionName,
+    onConfirm,
+}: {
+    optionName: string;
+    onConfirm: () => void;
+}) {
+    const [arming, setArming] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const confirmRef = useRef<HTMLButtonElement>(null);
+    const shouldReturnFocus = useRef(false);
+
+    useEffect(() => {
+        if (arming) {
+            confirmRef.current?.focus();
+        } else if (shouldReturnFocus.current) {
+            shouldReturnFocus.current = false;
+            triggerRef.current?.focus();
+        }
+    }, [arming]);
+
+    function cancel() {
+        shouldReturnFocus.current = true;
+        setArming(false);
+    }
+
+    if (!arming) {
+        return (
+            <Button
+                ref={triggerRef}
+                aria-label={`Delete ${optionName}`}
+                variant="outline"
+                size="sm"
+                className="frontline-tap"
+                onClick={() => setArming(true)}
+            >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+            </Button>
+        );
+    }
+
+    return (
+        <span
+            className="inline-flex flex-wrap items-center gap-1"
+            onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancel();
+                }
+            }}
+        >
+            <Button
+                ref={confirmRef}
+                aria-label={`Confirm delete ${optionName}`}
+                variant="destructive"
+                size="sm"
+                className="frontline-tap"
+                onClick={() => {
+                    onConfirm();
+                    setArming(false);
+                }}
+            >
+                <Check className="mr-1 h-3.5 w-3.5" /> Delete?
+            </Button>
+            <Button
+                aria-label={`Cancel deleting ${optionName}`}
+                variant="ghost"
+                size="sm"
+                className="frontline-tap"
+                onClick={cancel}
+            >
+                <X className="h-3.5 w-3.5" />
+            </Button>
+        </span>
     );
 }
 
@@ -1225,23 +1447,41 @@ export default function ControlRoomSettings({
                         onValueChange={handleTabChange}
                         className="mt-6"
                     >
-                        <TabsList>
-                            <TabsTrigger value="rules">
+                        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+                            <TabsTrigger
+                                value="rules"
+                                className="frontline-tap"
+                            >
                                 Signal Rules
                             </TabsTrigger>
-                            <TabsTrigger value="queues">
+                            <TabsTrigger
+                                value="queues"
+                                className="frontline-tap"
+                            >
                                 Triage Queues
                             </TabsTrigger>
-                            <TabsTrigger value="sources">
+                            <TabsTrigger
+                                value="sources"
+                                className="frontline-tap"
+                            >
                                 Signal Sources
                             </TabsTrigger>
-                            <TabsTrigger value="maintenance">
+                            <TabsTrigger
+                                value="maintenance"
+                                className="frontline-tap"
+                            >
                                 Maintenance
                             </TabsTrigger>
-                            <TabsTrigger value="signal-outbox">
+                            <TabsTrigger
+                                value="signal-outbox"
+                                className="frontline-tap"
+                            >
                                 Signal Outbox
                             </TabsTrigger>
-                            <TabsTrigger value="ticket-options">
+                            <TabsTrigger
+                                value="ticket-options"
+                                className="frontline-tap"
+                            >
                                 Ticket Options
                             </TabsTrigger>
                         </TabsList>
@@ -1249,12 +1489,13 @@ export default function ControlRoomSettings({
                         {/* --- Tab 1: Signal Rules --- */}
                         <TabsContent value="rules" className="mt-4">
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
+                                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                     <CardTitle className="text-base">
                                         Signal Rules
                                     </CardTitle>
                                     <Button
                                         size="sm"
+                                        className="frontline-tap"
                                         onClick={() => {
                                             setEditingRule(null);
                                             setRuleDialogOpen(true);
@@ -1266,7 +1507,7 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {signalRules.length === 0 ? (
-                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                        <p className="text-muted-foreground py-8 text-center text-sm">
                                             No signal rules configured yet.
                                             Create one to get started.
                                         </p>
@@ -1274,26 +1515,26 @@ export default function ControlRoomSettings({
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                    <tr className="text-muted-foreground border-b text-left">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Signal Type
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Source
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Priority
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Severity
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Dedup
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Active
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1310,11 +1551,11 @@ export default function ControlRoomSettings({
                                                             <td className="py-2.5 pr-4 font-medium">
                                                                 {rule.name}
                                                             </td>
-                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                            <td className="text-muted-foreground py-2.5 pr-4">
                                                                 {rule.signal_type_name ??
                                                                     'Any'}
                                                             </td>
-                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                            <td className="text-muted-foreground py-2.5 pr-4">
                                                                 {rule.signal_source_name ??
                                                                     'Any'}
                                                             </td>
@@ -1341,22 +1582,31 @@ export default function ControlRoomSettings({
                                                                     : '-'}
                                                             </td>
                                                             <td className="py-2.5 pr-4">
-                                                                <Switch
-                                                                    checked={
-                                                                        rule.is_active
-                                                                    }
-                                                                    onCheckedChange={() =>
-                                                                        handleToggleRuleActive(
-                                                                            rule,
-                                                                        )
-                                                                    }
-                                                                />
+                                                                <label
+                                                                    htmlFor={`signal-rule-active-${rule.id}`}
+                                                                    className="frontline-tap flex cursor-pointer items-center justify-center rounded-md"
+                                                                >
+                                                                    <Switch
+                                                                        id={`signal-rule-active-${rule.id}`}
+                                                                        aria-label={`Signal rule ${rule.name} active`}
+                                                                        checked={
+                                                                            rule.is_active
+                                                                        }
+                                                                        onCheckedChange={() =>
+                                                                            handleToggleRuleActive(
+                                                                                rule,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </label>
                                                             </td>
                                                             <td className="py-2.5">
                                                                 <div className="flex gap-1">
                                                                     <Button
+                                                                        aria-label={`Edit signal rule ${rule.name}`}
                                                                         variant="ghost"
                                                                         size="sm"
+                                                                        className="frontline-tap"
                                                                         onClick={() => {
                                                                             setEditingRule(
                                                                                 rule,
@@ -1369,15 +1619,17 @@ export default function ControlRoomSettings({
                                                                         <Pencil className="h-3.5 w-3.5" />
                                                                     </Button>
                                                                     <Button
+                                                                        aria-label={`Delete signal rule ${rule.name}`}
                                                                         variant="ghost"
                                                                         size="sm"
+                                                                        className="frontline-tap"
                                                                         onClick={() =>
                                                                             setDeleteRuleId(
                                                                                 rule.id,
                                                                             )
                                                                         }
                                                                     >
-                                                                        <Trash2 className="h-3.5 w-3.5 text-status-critical" />
+                                                                        <Trash2 className="text-status-critical h-3.5 w-3.5" />
                                                                     </Button>
                                                                 </div>
                                                             </td>
@@ -1394,12 +1646,13 @@ export default function ControlRoomSettings({
                         {/* --- Tab 2: Triage Queues --- */}
                         <TabsContent value="queues" className="mt-4">
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
+                                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                     <CardTitle className="text-base">
                                         Triage Queues
                                     </CardTitle>
                                     <Button
                                         size="sm"
+                                        className="frontline-tap"
                                         onClick={() => {
                                             setEditingQueue(null);
                                             setQueueDialogOpen(true);
@@ -1411,39 +1664,39 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {triageQueues.length === 0 ? (
-                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                        <p className="text-muted-foreground py-8 text-center text-sm">
                                             No triage queues configured yet.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                    <tr className="text-muted-foreground border-b text-left">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Code
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Tier
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Severities
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Sources
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Auto-Escalate
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Next Queue
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Open
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Active
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1461,7 +1714,7 @@ export default function ControlRoomSettings({
                                                                 <td className="py-2.5 pr-4 font-medium">
                                                                     {queue.name}
                                                                 </td>
-                                                                <td className="py-2.5 pr-4 font-mono text-xs text-muted-foreground">
+                                                                <td className="text-muted-foreground py-2.5 pr-4 font-mono text-xs">
                                                                     {queue.code}
                                                                 </td>
                                                                 <td className="py-2.5 pr-4">
@@ -1533,7 +1786,7 @@ export default function ControlRoomSettings({
                                                                         ? `${queue.auto_escalate_after_minutes}m`
                                                                         : '-'}
                                                                 </td>
-                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                <td className="text-muted-foreground py-2.5 pr-4">
                                                                     {queue.escalate_to_queue_name ??
                                                                         '-'}
                                                                 </td>
@@ -1553,21 +1806,30 @@ export default function ControlRoomSettings({
                                                                     </Badge>
                                                                 </td>
                                                                 <td className="py-2.5 pr-4">
-                                                                    <Switch
-                                                                        checked={
-                                                                            queue.is_active
-                                                                        }
-                                                                        onCheckedChange={() =>
-                                                                            handleToggleQueueActive(
-                                                                                queue,
-                                                                            )
-                                                                        }
-                                                                    />
+                                                                    <label
+                                                                        htmlFor={`triage-queue-active-${queue.id}`}
+                                                                        className="frontline-tap flex cursor-pointer items-center justify-center rounded-md"
+                                                                    >
+                                                                        <Switch
+                                                                            id={`triage-queue-active-${queue.id}`}
+                                                                            aria-label={`Triage queue ${queue.name} active`}
+                                                                            checked={
+                                                                                queue.is_active
+                                                                            }
+                                                                            onCheckedChange={() =>
+                                                                                handleToggleQueueActive(
+                                                                                    queue,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </label>
                                                                 </td>
                                                                 <td className="py-2.5">
                                                                     <Button
+                                                                        aria-label={`Edit triage queue ${queue.name}`}
                                                                         variant="ghost"
                                                                         size="sm"
+                                                                        className="frontline-tap"
                                                                         onClick={() => {
                                                                             setEditingQueue(
                                                                                 queue,
@@ -1595,7 +1857,7 @@ export default function ControlRoomSettings({
                         <TabsContent value="sources" className="mt-4">
                             {signalSources.length === 0 ? (
                                 <Card>
-                                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                                    <CardContent className="text-muted-foreground py-8 text-center text-sm">
                                         No signal sources configured.
                                     </CardContent>
                                 </Card>
@@ -1610,7 +1872,7 @@ export default function ControlRoomSettings({
                                                             {source.name}
                                                         </CardTitle>
                                                         {source.vendor && (
-                                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            <p className="text-muted-foreground mt-0.5 text-xs">
                                                                 {source.vendor}
                                                             </p>
                                                         )}
@@ -1630,7 +1892,7 @@ export default function ControlRoomSettings({
                                             <CardContent className="space-y-3">
                                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                                     <div>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="text-muted-foreground text-xs">
                                                             Last Heartbeat
                                                         </p>
                                                         <p
@@ -1642,7 +1904,7 @@ export default function ControlRoomSettings({
                                                         </p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="text-muted-foreground text-xs">
                                                             Last Signal
                                                         </p>
                                                         <p className="font-medium">
@@ -1653,7 +1915,7 @@ export default function ControlRoomSettings({
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs text-muted-foreground">
+                                                    <p className="text-muted-foreground text-xs">
                                                         24h Signal Count
                                                     </p>
                                                     <p className="text-lg font-semibold">
@@ -1663,7 +1925,7 @@ export default function ControlRoomSettings({
                                                 {source.capabilities.length >
                                                     0 && (
                                                     <div>
-                                                        <p className="mb-1 text-xs text-muted-foreground">
+                                                        <p className="text-muted-foreground mb-1 text-xs">
                                                             Capabilities
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
@@ -1700,27 +1962,27 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {signalOutbox.length === 0 ? (
-                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                        <p className="text-muted-foreground py-8 text-center text-sm">
                                             No failed signal deliveries.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                    <tr className="text-muted-foreground border-b text-left">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Signal
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Status
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Attempts
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Last Attempt
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Error
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1740,7 +2002,7 @@ export default function ControlRoomSettings({
                                                                         ?.signal_type ??
                                                                         `Outbox #${row.id}`}
                                                                 </div>
-                                                                <div className="text-xs text-muted-foreground">
+                                                                <div className="text-muted-foreground text-xs">
                                                                     {row.signal
                                                                         ? `Signal #${row.signal.id} - Asset #${row.signal.asset_id}`
                                                                         : 'Missing source signal'}
@@ -1762,19 +2024,21 @@ export default function ControlRoomSettings({
                                                             <td className="py-2.5 pr-4">
                                                                 {row.attempts}
                                                             </td>
-                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                            <td className="text-muted-foreground py-2.5 pr-4">
                                                                 {formatDateTime(
                                                                     row.last_attempt_at,
                                                                 )}
                                                             </td>
-                                                            <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
+                                                            <td className="text-muted-foreground max-w-[280px] truncate py-2.5 pr-4">
                                                                 {row.last_error ??
                                                                     '-'}
                                                             </td>
                                                             <td className="py-2.5">
                                                                 <Button
+                                                                    aria-label={`Retry signal delivery ${row.id}`}
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    className="frontline-tap"
                                                                     disabled={
                                                                         !row.can_retry
                                                                     }
@@ -1801,12 +2065,13 @@ export default function ControlRoomSettings({
                         {/* --- Tab 5: Maintenance Windows --- */}
                         <TabsContent value="maintenance" className="mt-4">
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
+                                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                     <CardTitle className="text-base">
                                         Maintenance Windows
                                     </CardTitle>
                                     <Button
                                         size="sm"
+                                        className="frontline-tap"
                                         onClick={() => {
                                             setEditingMw(null);
                                             setMwDialogOpen(true);
@@ -1818,30 +2083,30 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {maintenanceWindows.length === 0 ? (
-                                        <p className="py-8 text-center text-sm text-muted-foreground">
+                                        <p className="text-muted-foreground py-8 text-center text-sm">
                                             No maintenance windows scheduled.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                    <tr className="text-muted-foreground border-b text-left">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Source / Site
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Starts At
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Ends At
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Status
                                                         </th>
-                                                        <th className="pr-4 pb-2 font-medium">
+                                                        <th className="pb-2 pr-4 font-medium">
                                                             Created By
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1859,7 +2124,7 @@ export default function ControlRoomSettings({
                                                                 <td className="py-2.5 pr-4 font-medium">
                                                                     {mw.name}
                                                                 </td>
-                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                <td className="text-muted-foreground py-2.5 pr-4">
                                                                     {mw.signal_source_name ??
                                                                         'All sources'}
                                                                 </td>
@@ -1889,7 +2154,7 @@ export default function ControlRoomSettings({
                                                                         }
                                                                     </Badge>
                                                                 </td>
-                                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                <td className="text-muted-foreground py-2.5 pr-4">
                                                                     {mw.created_by_name ??
                                                                         '-'}
                                                                 </td>
@@ -1901,8 +2166,10 @@ export default function ControlRoomSettings({
                                                                                 'active') && (
                                                                             <>
                                                                                 <Button
+                                                                                    aria-label={`Edit maintenance window ${mw.name}`}
                                                                                     variant="ghost"
                                                                                     size="sm"
+                                                                                    className="frontline-tap"
                                                                                     onClick={() => {
                                                                                         setEditingMw(
                                                                                             mw,
@@ -1915,15 +2182,17 @@ export default function ControlRoomSettings({
                                                                                     <Pencil className="h-3.5 w-3.5" />
                                                                                 </Button>
                                                                                 <Button
+                                                                                    aria-label={`Cancel maintenance window ${mw.name}`}
                                                                                     variant="ghost"
                                                                                     size="sm"
+                                                                                    className="frontline-tap"
                                                                                     onClick={() =>
                                                                                         handleCancelWindow(
                                                                                             mw.id,
                                                                                         )
                                                                                     }
                                                                                 >
-                                                                                    <X className="h-3.5 w-3.5 text-status-critical" />
+                                                                                    <X className="text-status-critical h-3.5 w-3.5" />
                                                                                 </Button>
                                                                             </>
                                                                         )}
@@ -1959,12 +2228,14 @@ export default function ControlRoomSettings({
                                 const items = configOptions?.[group] ?? [];
                                 return (
                                     <Card key={group}>
-                                        <CardHeader className="flex flex-row items-center justify-between">
+                                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
                                             <CardTitle className="text-base">
                                                 {groupLabels[group] ?? group}
                                             </CardTitle>
                                             <Button
+                                                aria-label={`Add ${groupLabels[group]} option`}
                                                 size="sm"
+                                                className="frontline-tap"
                                                 onClick={() => {
                                                     setOptionGroup(group);
                                                     setOptionValue('');
@@ -1980,7 +2251,7 @@ export default function ControlRoomSettings({
                                         </CardHeader>
                                         <CardContent>
                                             {items.length === 0 ? (
-                                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                                <p className="text-muted-foreground py-4 text-center text-sm">
                                                     No options configured. Click
                                                     Add to create one.
                                                 </p>
@@ -1989,9 +2260,9 @@ export default function ControlRoomSettings({
                                                     {items.map((opt) => (
                                                         <div
                                                             key={opt.id}
-                                                            className="flex items-center justify-between rounded-lg border px-4 py-2.5"
+                                                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2.5"
                                                         >
-                                                            <div className="flex items-center gap-3">
+                                                            <div className="flex min-w-0 items-center gap-3">
                                                                 {opt.color && (
                                                                     <span
                                                                         className="inline-block h-3 w-3 rounded-full"
@@ -2001,13 +2272,13 @@ export default function ControlRoomSettings({
                                                                         }}
                                                                     />
                                                                 )}
-                                                                <div>
-                                                                    <span className="text-sm font-medium">
+                                                                <div className="min-w-0">
+                                                                    <span className="break-words text-sm font-medium">
                                                                         {
                                                                             opt.label
                                                                         }
                                                                     </span>
-                                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                                    <span className="text-muted-foreground ml-2 break-all text-xs">
                                                                         (
                                                                         {
                                                                             opt.value
@@ -2015,7 +2286,7 @@ export default function ControlRoomSettings({
                                                                         )
                                                                     </span>
                                                                     {opt.description && (
-                                                                        <p className="text-xs text-muted-foreground">
+                                                                        <p className="text-muted-foreground text-xs">
                                                                             {
                                                                                 opt.description
                                                                             }
@@ -2023,30 +2294,33 @@ export default function ControlRoomSettings({
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Switch
-                                                                    checked={
-                                                                        opt.is_active
-                                                                    }
-                                                                    onCheckedChange={() =>
-                                                                        router.put(
-                                                                            `/control-room/settings/options/${opt.id}`,
-                                                                            {
-                                                                                is_active:
-                                                                                    !opt.is_active,
-                                                                            },
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <ConfirmChip
-                                                                    label="Delete"
-                                                                    icon={
-                                                                        Trash2
-                                                                    }
-                                                                    destructive
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <label
+                                                                    htmlFor={`ticket-option-active-${opt.id}`}
+                                                                    className="frontline-tap flex cursor-pointer items-center justify-center rounded-md"
+                                                                >
+                                                                    <Switch
+                                                                        id={`ticket-option-active-${opt.id}`}
+                                                                        aria-label={`${groupLabels[group]} option ${opt.label} (${opt.value}) active`}
+                                                                        checked={
+                                                                            opt.is_active
+                                                                        }
+                                                                        onCheckedChange={() =>
+                                                                            router.put(
+                                                                                `/control-room/settings/options/${opt.id}`,
+                                                                                {
+                                                                                    is_active:
+                                                                                        !opt.is_active,
+                                                                                },
+                                                                                {
+                                                                                    preserveScroll: true,
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </label>
+                                                                <OptionDeleteControl
+                                                                    optionName={`${groupLabels[group]} option ${opt.label} (${opt.value})`}
                                                                     onConfirm={() =>
                                                                         router.delete(
                                                                             `/control-room/settings/options/${opt.id}`,
@@ -2074,14 +2348,24 @@ export default function ControlRoomSettings({
                             open={optionDialogOpen}
                             onOpenChange={setOptionDialogOpen}
                         >
-                            <DialogContent>
+                            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                                 <DialogHeader>
                                     <DialogTitle>Add Option</DialogTitle>
+                                    <DialogDescription>
+                                        Add a reusable value to the selected
+                                        Control Room option group.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-3 py-2">
                                     <div>
-                                        <Label>Value (slug)</Label>
+                                        <Label htmlFor="option-value">
+                                            Option value (slug){' '}
+                                            <span aria-hidden="true">*</span>
+                                        </Label>
                                         <Input
+                                            id="option-value"
+                                            className="frontline-tap"
+                                            required
                                             value={optionValue}
                                             onChange={(e) =>
                                                 setOptionValue(
@@ -2097,8 +2381,14 @@ export default function ControlRoomSettings({
                                         />
                                     </div>
                                     <div>
-                                        <Label>Display Label</Label>
+                                        <Label htmlFor="option-label">
+                                            Display label{' '}
+                                            <span aria-hidden="true">*</span>
+                                        </Label>
                                         <Input
+                                            id="option-label"
+                                            className="frontline-tap"
+                                            required
                                             value={optionLabel}
                                             onChange={(e) =>
                                                 setOptionLabel(e.target.value)
@@ -2107,9 +2397,12 @@ export default function ControlRoomSettings({
                                         />
                                     </div>
                                     <div>
-                                        <Label>Color (hex)</Label>
+                                        <Label htmlFor="option-color">
+                                            Option colour (hex)
+                                        </Label>
                                         <div className="flex items-center gap-2">
                                             <Input
+                                                id="option-color"
                                                 value={optionColor}
                                                 onChange={(e) =>
                                                     setOptionColor(
@@ -2117,7 +2410,7 @@ export default function ControlRoomSettings({
                                                     )
                                                 }
                                                 placeholder="#ef4444"
-                                                className="flex-1"
+                                                className="frontline-tap flex-1"
                                             />
                                             {optionColor && (
                                                 <span
@@ -2131,8 +2424,12 @@ export default function ControlRoomSettings({
                                         </div>
                                     </div>
                                     <div>
-                                        <Label>Description (optional)</Label>
+                                        <Label htmlFor="option-description">
+                                            Option description (optional)
+                                        </Label>
                                         <Input
+                                            id="option-description"
+                                            className="frontline-tap"
                                             value={optionDesc}
                                             onChange={(e) =>
                                                 setOptionDesc(e.target.value)
@@ -2144,6 +2441,7 @@ export default function ControlRoomSettings({
                                 <DialogFooter>
                                     <Button
                                         variant="ghost"
+                                        className="frontline-tap"
                                         onClick={() =>
                                             setOptionDialogOpen(false)
                                         }
@@ -2151,6 +2449,7 @@ export default function ControlRoomSettings({
                                         Cancel
                                     </Button>
                                     <Button
+                                        className="frontline-tap"
                                         disabled={
                                             !optionValue.trim() ||
                                             !optionLabel.trim()
