@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Finance\Jobs\PostPayrollJournalJob;
+use App\Domain\Finance\Jobs\ProcessPayrollAllocationsJob;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankTransaction;
@@ -64,6 +65,11 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
     $run->refresh();
     expect(round((float) $payslips->sum('gross_pay'), 2))
         ->toBe(round((float) $run->total_gross, 2));
+
+    // JournalPosted is an outermost-commit event. RefreshDatabase intentionally
+    // keeps this test inside an outer transaction, so exercise the canonical
+    // downstream job directly while the event boundary is tested separately.
+    ProcessPayrollAllocationsJob::dispatchSync((int) $run->id);
 
     $run->refresh();
     $journal = FinJournal::query()

@@ -3,6 +3,7 @@
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinFixedAsset;
+use App\Domain\Finance\Models\FinFixedAssetDisposal;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Services\FixedAssetService;
 use App\Models\User;
@@ -79,9 +80,10 @@ it('disposing a mapped asset posts a single balanced disposal journal', function
     expect($result->status)->toBe('disposed')
         ->and((string) $result->disposal_proceeds)->toBe('500.00');
 
-    $journal = FinJournal::where('source_type', FinFixedAsset::class)
-        ->where('source_id', $asset->id)
-        ->firstOrFail();
+    $disposal = FinFixedAssetDisposal::query()
+        ->where('fixed_asset_id', $asset->id)
+        ->sole();
+    $journal = $disposal->journal()->firstOrFail();
     [$debits, $credits] = disposalJournalTotals($journal);
 
     // DR bank 500 + DR accum 400 + DR loss 100 = 1,000; CR asset 1,000.
@@ -98,7 +100,10 @@ it('disposing a mapped asset posts a single balanced disposal journal', function
         ->and((string) $loss->debit)->toBe('100.00');
 
     // Exactly one disposal journal for this asset.
-    expect(FinJournal::where('source_type', FinFixedAsset::class)->where('source_id', $asset->id)->count())->toBe(1);
+    expect($journal->source_type)->toBe(FinFixedAssetDisposal::class)
+        ->and($journal->source_id)->toBe($disposal->id)
+        ->and(FinJournal::where('source_type', FinFixedAssetDisposal::class)
+            ->where('source_id', $disposal->id)->count())->toBe(1);
 });
 
 it('refuses to dispose at a gain/loss when the 8400 account is missing (no unbalanced journal)', function () {
@@ -125,5 +130,6 @@ it('refuses to dispose at a gain/loss when the 8400 account is missing (no unbal
 
     // Rolled back: asset still active, no journal posted.
     expect($asset->refresh()->status)->toBe('active')
-        ->and(FinJournal::where('source_type', FinFixedAsset::class)->where('source_id', $asset->id)->count())->toBe(0);
+        ->and(FinFixedAssetDisposal::where('fixed_asset_id', $asset->id)->count())->toBe(0)
+        ->and(FinJournal::where('source_type', FinFixedAssetDisposal::class)->count())->toBe(0);
 });

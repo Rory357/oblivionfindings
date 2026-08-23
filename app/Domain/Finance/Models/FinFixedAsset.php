@@ -2,21 +2,24 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Models\Asset;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinFixedAssetFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinFixedAsset extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinFixedAssetFactory::new();
+        return FinFixedAssetFactory::new();
     }
 
     protected $table = 'fin_fixed_assets';
@@ -74,6 +77,11 @@ class FinFixedAsset extends Model
         return $this->hasMany(FinFixedAssetDepreciation::class, 'fixed_asset_id');
     }
 
+    public function disposal(): HasOne
+    {
+        return $this->hasOne(FinFixedAssetDisposal::class, 'fixed_asset_id');
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -85,12 +93,12 @@ class FinFixedAsset extends Model
      */
     public function linkedAsset(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Asset::class, 'linked_asset_id');
+        return $this->belongsTo(Asset::class, 'linked_asset_id');
     }
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeActive($query)
