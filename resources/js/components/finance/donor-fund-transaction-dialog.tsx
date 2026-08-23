@@ -26,6 +26,11 @@ import {
 
 export type DonorFundTxnAccount = { id: number; code: string; name: string };
 export type DonorFundTxnBankAccount = { id: number; name: string };
+export type DonorFundTxnBill = {
+    id: number;
+    bill_number: string;
+    total_amount: number;
+};
 export type DonorFundGlSummary = { code: string; name: string } | null;
 
 /** The fund the transaction posts against — enough to render the trust-journal preview. */
@@ -37,11 +42,14 @@ export type DonorFundTxnFund = {
     available_balance: number;
     /** The fund's GL account (liability/equity). Present only when the fund maps to one. */
     gl_account: DonorFundGlSummary;
+    /** Revenue account used to recognise a restricted-fund release. */
+    release_account: DonorFundGlSummary;
 };
 
 type TxnType = 'receipt' | 'expenditure';
 
 const today = () => new Date().toISOString().split('T')[0];
+const newIdempotencyKey = () => globalThis.crypto.randomUUID();
 
 /**
  * Donor Fund transaction wizard — record a receipt (money in) or expenditure
@@ -49,8 +57,9 @@ const today = () => new Date().toISOString().split('T')[0];
  * segmented control switches the payload between `finance.donor-funds.receipt`
  * and `.expenditure`. Both post a balanced trust journal when the fund maps to a
  * GL account: a receipt DRs Bank (or the chosen bank account's GL) and CRs the
- * fund; an expenditure DRs the chosen expense account and CRs the fund — so the
- * review step shows a live posting preview.
+ * fund; an expenditure releases the fund liability to the funding stream's
+ * revenue account without posting the underlying expense a second time. The
+ * workflow stays blocked until the required accounting mappings exist.
  */
 export function DonorFundTransactionDialog({
     open,
@@ -58,6 +67,7 @@ export function DonorFundTransactionDialog({
     fund,
     expenseAccounts,
     bankAccounts,
+    eligibleBills,
     initialType = 'receipt',
 }: {
     open: boolean;
@@ -65,6 +75,7 @@ export function DonorFundTransactionDialog({
     fund: DonorFundTxnFund;
     expenseAccounts: DonorFundTxnAccount[];
     bankAccounts: DonorFundTxnBankAccount[];
+    eligibleBills: DonorFundTxnBill[];
     initialType?: TxnType;
 }) {
     const STEPS: readonly WizardStep[] = [
@@ -85,6 +96,7 @@ export function DonorFundTransactionDialog({
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
     const form = useForm<{
+        idempotency_key: string;
         type: TxnType;
         transaction_date: string;
         description: string;
@@ -92,7 +104,9 @@ export function DonorFundTransactionDialog({
         reference: string;
         bank_account_id: string;
         expense_account_id: string;
+        bill_id: string;
     }>({
+        idempotency_key: newIdempotencyKey(),
         type: initialType,
         transaction_date: today(),
         description: '',
@@ -100,6 +114,7 @@ export function DonorFundTransactionDialog({
         reference: '',
         bank_account_id: '',
         expense_account_id: '',
+        bill_id: '',
     });
     const { data, setData, processing, errors } = form;
 
@@ -111,12 +126,19 @@ export function DonorFundTransactionDialog({
         value: String(a.id),
         label: `${a.code} · ${a.name}`,
     }));
+    const billOptions = eligibleBills.map((bill) => ({
+        value: String(bill.id),
+        label: `${bill.bill_number} · ${formatMoney(bill.total_amount)}`,
+    }));
     const amount = Number(data.amount) || 0;
 
     const overBalance =
         data.type === 'expenditure' &&
         fund.is_restricted &&
         amount > fund.available_balance;
+    const accountingReady =
+        fund.gl_account !== null &&
+        (data.type === 'receipt' || fund.release_account !== null);
 
     // Trust-journal preview — only posts when the fund maps to a GL account.
     const journalLines: PostingLine[] = useMemo(() => {
@@ -140,33 +162,28 @@ export function DonorFundTransactionDialog({
                 },
             ];
         }
-        // expenditure — needs an expense account to post; otherwise no journal.
-        const expense = expenseAccounts.find(
-            (a) => String(a.id) === data.expense_account_id,
-        );
-        if (!expense) return [];
+        if (!fund.release_account) return [];
         return [
-            {
-                accountCode: expense.code,
-                accountName: expense.name,
-                debit: amount,
-                memo: 'Fund expenditure',
-            },
             {
                 accountCode: fund.gl_account.code,
                 accountName: fund.gl_account.name,
+                debit: amount,
+                memo: 'Release fund balance',
+            },
+            {
+                accountCode: fund.release_account.code,
+                accountName: fund.release_account.name,
                 credit: amount,
-                memo: 'Fund balance',
+                memo: 'Recognise fund release',
             },
         ];
     }, [
         fund.gl_account,
+        fund.release_account,
         amount,
         data.type,
         data.bank_account_id,
-        data.expense_account_id,
         bankAccounts,
-        expenseAccounts,
     ]);
 
     const txnValid =
@@ -174,6 +191,8 @@ export function DonorFundTransactionDialog({
         !!data.description.trim() &&
         data.amount !== '' &&
         amount > 0 &&
+        (data.type === 'receipt' || data.bill_id !== '') &&
+        accountingReady &&
         !overBalance;
 
     const setType = (t: TxnType) => setData('type', t);
@@ -181,6 +200,7 @@ export function DonorFundTransactionDialog({
     const close = () => {
         reset();
         form.reset();
+        form.setData('idempotency_key', newIdempotencyKey());
         form.clearErrors();
         onClose();
     };
@@ -190,6 +210,7 @@ export function DonorFundTransactionDialog({
         form.transform((d) =>
             isReceipt
                 ? {
+                      idempotency_key: d.idempotency_key,
                       transaction_date: d.transaction_date,
                       description: d.description,
                       amount: d.amount,
@@ -197,11 +218,13 @@ export function DonorFundTransactionDialog({
                       bank_account_id: d.bank_account_id || null,
                   }
                 : {
+                      idempotency_key: d.idempotency_key,
                       transaction_date: d.transaction_date,
                       description: d.description,
                       amount: d.amount,
                       reference: d.reference || null,
                       expense_account_id: d.expense_account_id || null,
+                      bill_id: d.bill_id,
                   },
         );
         form.post(
@@ -370,20 +393,34 @@ export function DonorFundTransactionDialog({
                                 />
                             </Field>
                         ) : (
-                            <Field
-                                label="Expense account"
-                                hint="posts the journal"
-                                error={errors.expense_account_id}
-                            >
-                                <SelectInput
-                                    value={data.expense_account_id}
-                                    onChange={(v) =>
-                                        setData('expense_account_id', v)
-                                    }
-                                    placeholder="Select expense account"
-                                    options={expenseOptions}
-                                />
-                            </Field>
+                            <>
+                                <Field
+                                    label="Approved bill"
+                                    required
+                                    error={errors.bill_id}
+                                >
+                                    <SelectInput
+                                        value={data.bill_id}
+                                        onChange={(v) => setData('bill_id', v)}
+                                        placeholder="Select approved bill"
+                                        options={billOptions}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Expense account"
+                                    hint="optional classification"
+                                    error={errors.expense_account_id}
+                                >
+                                    <SelectInput
+                                        value={data.expense_account_id}
+                                        onChange={(v) =>
+                                            setData('expense_account_id', v)
+                                        }
+                                        placeholder="Select expense account"
+                                        options={expenseOptions}
+                                    />
+                                </Field>
+                            </>
                         )}
                         {overBalance && (
                             <div className="sm:col-span-2">
@@ -391,6 +428,17 @@ export function DonorFundTransactionDialog({
                                     This exceeds the fund's available balance (
                                     {formatMoney(fund.available_balance)}).
                                     Restricted funds can't be overspent.
+                                </InfoCard>
+                            </div>
+                        )}
+                        {!accountingReady && (
+                            <div className="sm:col-span-2">
+                                <InfoCard icon={Wallet} tone="crit">
+                                    Configure the fund liability account
+                                    {isReceipt
+                                        ? ''
+                                        : ' and funding-stream release account'}{' '}
+                                    before recording this transaction.
                                 </InfoCard>
                             </div>
                         )}
@@ -459,8 +507,10 @@ export function DonorFundTransactionDialog({
                                 {fund.gl_account
                                     ? isReceipt
                                         ? 'No journal will post until an amount is entered.'
-                                        : 'Choose an expense account to post the trust journal — otherwise only the fund balance updates.'
-                                    : 'This fund has no GL account mapped, so no journal will post — only the fund balance updates.'}
+                                        : fund.release_account
+                                          ? 'Enter an amount to preview the fund-release journal.'
+                                          : "This fund's funding stream needs a release revenue account before expenditure can be recorded."
+                                    : 'This fund needs a liability or equity GL account before this transaction can be recorded.'}
                             </InfoCard>
                         </div>
                     )}

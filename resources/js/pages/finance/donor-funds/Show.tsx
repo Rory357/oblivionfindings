@@ -5,6 +5,7 @@ import {
     type DonorFundGlSummary,
     type DonorFundTxnAccount,
     type DonorFundTxnBankAccount,
+    type DonorFundTxnBill,
 } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
 import { PageHero, PageLayout } from '@/components/page';
@@ -65,6 +66,7 @@ interface FundData {
     is_restricted: boolean;
     gl_account_name: string | null;
     gl_account: DonorFundGlSummary;
+    release_account: DonorFundGlSummary;
     funding_stream_name: string | null;
     created_by: string | null;
 }
@@ -110,6 +112,7 @@ interface Props extends PageProps {
     reports: Report[];
     expenseAccounts: Account[];
     bankAccounts: BankAccount[];
+    eligibleBills: DonorFundTxnBill[];
     canManage: boolean;
 }
 
@@ -178,6 +181,7 @@ export default function DonorFundShow({
     reports,
     expenseAccounts,
     bankAccounts,
+    eligibleBills,
     canManage = false,
 }: Props) {
     const badge = statusBadge[fund.status] ?? statusBadge.active;
@@ -763,9 +767,11 @@ export default function DonorFundShow({
                         is_restricted: fund.is_restricted,
                         available_balance: fund.available_balance,
                         gl_account: fund.gl_account,
+                        release_account: fund.release_account,
                     }}
                     expenseAccounts={expenseAccounts as DonorFundTxnAccount[]}
                     bankAccounts={bankAccounts as DonorFundTxnBankAccount[]}
+                    eligibleBills={eligibleBills}
                 />
             )}
         </AppLayout>

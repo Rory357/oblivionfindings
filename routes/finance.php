@@ -741,6 +741,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/donor-funds/{fund}/expenditure', [DonorFundController::class, 'expenditure'])
         ->name('donor-funds.expenditure')
         ->middleware('permission:finance.admin');
+    Route::post('/donor-funds/{fund}/transactions/{transaction}/reverse', [DonorFundController::class, 'reverse'])
+        ->name('donor-funds.transactions.reverse')
+        ->middleware('permission:finance.admin');
     Route::post('/donor-funds/{fund}/report', [DonorFundController::class, 'report'])
         ->name('donor-funds.report')
         ->middleware('permission:finance.reports.view');

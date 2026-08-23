@@ -126,7 +126,7 @@ class DuskDatabaseSeeder extends Seeder
             'evv.record', 'evv.verify', 'evv.viewAny',
             'finance.admin', 'finance.ap.manage', 'finance.ap.view', 'finance.ar.manage', 'finance.ar.view',
             'finance.assets.manage', 'finance.assets.view', 'finance.bank.manage', 'finance.bank.view',
-            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.payments.manageAllSites', 'finance.ledger.manage', 'finance.ledger.view',
+            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.payments.manageAllSites', 'finance.donorFunds.manageAllSites', 'finance.ledger.manage', 'finance.ledger.view',
             'finance.petty_cash.manage', 'finance.petty_cash.view', 'finance.reports.view',
             'finance.tax.manage', 'finance.tax.view',
             'fleet.driverSessions.manage', 'fleet.fuel.manage', 'fleet.reports.view', 'fleet.trips.manage', 'fleet.viewAny',

@@ -4,14 +4,19 @@ namespace Tests\Feature\Finance;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinDonorFund;
 use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinFiscalPeriod;
+use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Services\AccountsPayableService;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Models\User;
 use Database\Seeders\FinanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class DonorFundReportingTest extends TestCase
@@ -36,14 +41,24 @@ class DonorFundReportingTest extends TestCase
     public function test_receipt_expenditure_and_report_generation_use_posted_journals(): void
     {
         $user = User::factory()->create(['organization_id' => 1]);
+        $site = ensureCanonicalHrStaffProfile($user);
         $this->actingAs($user);
 
+        $stream = FinFundingStream::create([
+            'organization_id' => 1,
+            'code' => 'DONOR-REPORT',
+            'name' => 'Donor Reporting',
+            'funder_type' => 'other',
+            'default_revenue_account_id' => $this->account('4220')->id,
+            'is_active' => true,
+        ]);
         $fund = FinDonorFund::factory()->create([
             'organization_id' => 1,
             'fund_code' => 'DONOR-001',
             'fund_name' => 'Community Grant Fund',
             'fund_type' => 'grant',
             'gl_account_id' => $this->account('2600')->id,
+            'funding_stream_id' => $stream->id,
             'total_received' => 0,
             'total_spent' => 0,
             'total_committed' => 0,
@@ -64,6 +79,7 @@ class DonorFundReportingTest extends TestCase
         $transactionDate = now()->toDateString();
 
         $receipt = $service->recordReceipt($fund, [
+            'idempotency_key' => (string) Str::uuid(),
             'transaction_date' => $transactionDate,
             'description' => 'Grant receipt',
             'amount' => 500,
@@ -71,12 +87,15 @@ class DonorFundReportingTest extends TestCase
             'bank_account_id' => $bankAccount->id,
         ]);
 
+        $bill = $this->approvedBill($user, '125.00', $site->id);
         $expenditure = $service->recordExpenditure($fund->refresh(), [
+            'idempotency_key' => (string) Str::uuid(),
             'transaction_date' => $transactionDate,
             'description' => 'Programme supplies',
             'amount' => 125,
             'reference' => 'DON-SPEND-001',
             'expense_account_id' => $this->account('6500')->id,
+            'bill_id' => $bill->id,
         ]);
 
         $report = $service->generateReport($fund->refresh(), now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString());
@@ -93,15 +112,46 @@ class DonorFundReportingTest extends TestCase
         $this->assertSame('125.00', (string) $report->total_expenditure);
         $this->assertSame('375.00', (string) $report->closing_balance);
         $this->assertSame('draft', $report->status);
+        $this->assertSame(
+            ['transaction_date', 'type', 'description', 'amount'],
+            array_keys($report->report_data['transactions'][0]),
+        );
 
         $this->assertJournalHasBalancedLines($receipt->journal_id, [
             ['1000', '500.00', '0.00'],
             ['2600', '0.00', '500.00'],
         ]);
         $this->assertJournalHasBalancedLines($expenditure->journal_id, [
-            ['6500', '125.00', '0.00'],
-            ['2600', '0.00', '125.00'],
+            ['2600', '125.00', '0.00'],
+            ['4220', '0.00', '125.00'],
         ]);
+    }
+
+    private function approvedBill(User $user, string $amount, int $siteId): FinBill
+    {
+        $bill = FinBill::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $siteId,
+            'status' => 'draft',
+            'bill_date' => now()->toDateString(),
+            'due_date' => now()->addMonth()->toDateString(),
+            'subtotal' => $amount,
+            'gst_amount' => '0.00',
+            'total_amount' => $amount,
+            'amount_paid' => '0.00',
+        ]);
+        FinBillLine::create([
+            'bill_id' => $bill->id,
+            'description' => 'Programme supplies',
+            'quantity' => 1,
+            'unit_price' => $amount,
+            'gst_rate' => 0,
+            'gst_amount' => '0.00',
+            'line_total' => $amount,
+            'account_id' => $this->account('6500')->id,
+        ]);
+
+        return app(AccountsPayableService::class)->approveBill($bill, $user->id);
     }
 
     private function account(string $code): FinAccount

@@ -21,6 +21,7 @@ class FinancePermissionsSeeder extends Seeder
             ['key' => 'finance.insights.viewAllSites', 'description' => 'View Financial Insights across all active Sites'],
             ['key' => 'finance.payments.viewAllSites', 'description' => 'View payment allocation history across all active Sites'],
             ['key' => 'finance.payments.manageAllSites', 'description' => 'Manage payment settlement across all active Sites'],
+            ['key' => 'finance.donorFunds.manageAllSites', 'description' => 'Manage donor-fund bill applications across all active Sites'],
 
             // General Ledger
             ['key' => 'finance.ledger.view', 'description' => 'View chart of accounts, journals, and ledger entries'],
