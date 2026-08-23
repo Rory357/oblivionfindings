@@ -20,8 +20,12 @@ use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
+use LogicException;
+use RuntimeException;
 use Tests\TestCase;
 
 class RespiteScopeIntegrityTest extends TestCase
@@ -389,6 +393,12 @@ class RespiteScopeIntegrityTest extends TestCase
     {
         [$accessibleStay, $resident] = $this->stayAt($this->site, true);
         [$foreignLocationStay] = $this->stayAt($this->foreignSite, true, $resident);
+        $foreignPack = RespiteEvidencePack::query()->create([
+            'stay_id' => $foreignLocationStay->id,
+            'booking_id' => $foreignLocationStay->booking_id,
+            'status' => 'draft',
+            'items' => [],
+        ]);
         $role = $this->coordinator->roles()->firstOrFail();
         $role->permissions()->syncWithoutDetaching(
             Permission::query()->where('key', 'clients.viewAny')->pluck('id'),
@@ -400,6 +410,9 @@ class RespiteScopeIntegrityTest extends TestCase
         $this->actingAs($this->coordinator)
             ->get(route('respite.stays.show', $foreignLocationStay))
             ->assertNotFound();
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.export', $foreignPack))
+            ->assertNotFound();
 
         $role->permissions()->syncWithoutDetaching(
             Permission::query()->where('key', 'sites.viewAll')->pluck('id'),
@@ -409,6 +422,27 @@ class RespiteScopeIntegrityTest extends TestCase
         $this->actingAs($globalCoordinator)
             ->get(route('respite.stays.show', $foreignLocationStay))
             ->assertOk();
+        $this->actingAs($globalCoordinator)
+            ->get(route('respite.evidence-packs.export', $foreignPack))
+            ->assertOk();
+
+        $exportAuditCount = RespiteAuditLog::query()
+            ->where('auditable_type', $foreignPack->getMorphClass())
+            ->where('auditable_id', $foreignPack->id)
+            ->where('action', RespiteAuditLog::ACTION_EXPORTED)
+            ->count();
+        $role->permissions()->detach(
+            Permission::query()->where('key', 'respite.evidence.view')->value('id'),
+        );
+
+        $this->actingAs($this->coordinator->fresh())
+            ->get(route('respite.evidence-packs.export', $foreignPack))
+            ->assertForbidden();
+        $this->assertSame($exportAuditCount, RespiteAuditLog::query()
+            ->where('auditable_type', $foreignPack->getMorphClass())
+            ->where('auditable_id', $foreignPack->id)
+            ->where('action', RespiteAuditLog::ACTION_EXPORTED)
+            ->count());
     }
 
     public function test_evidence_item_rejects_foreign_record_metadata_without_mutation_or_audit(): void
@@ -560,8 +594,289 @@ class RespiteScopeIntegrityTest extends TestCase
         $pack->refresh();
         $this->assertSame($itemsBeforeSeal, $pack->items);
         $this->assertNull($pack->sealed_at);
+        $this->assertNull($pack->sealed_manifest_version);
+        $this->assertNull($pack->sealed_manifest_digest);
         $this->assertDatabaseMissing('respite_audit_logs', ['auditable_id' => $pack->id, 'action' => 'sealed']);
         Event::assertNotDispatched(RespiteEvent::class);
+    }
+
+    public function test_seal_snapshots_custom_item_changes_and_export_uses_the_versioned_digest(): void
+    {
+        [$stay, $resident, $booking] = $this->stayAt($this->site, true);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'items' => [],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.add-item', $pack), [
+                'type' => 'note',
+                'title' => 'Retained whānau evidence',
+                'description' => 'User supplied evidence must survive sealing.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.add-item', $pack), [
+                'type' => 'note',
+                'title' => 'Remove before seal',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $removedItem = collect($pack->fresh()->items)->firstWhere('title', 'Remove before seal');
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.remove-item', $pack), [
+                'item_id' => $removedItem['id'],
+                'reason' => 'Not part of the final evidence set.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Complete evidence set.'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $pack->refresh();
+        $sealedManifest = $pack->items;
+        $this->assertSame(RespiteEvidencePack::SEALED_MANIFEST_VERSION, $pack->sealed_manifest_version);
+        $this->assertTrue($pack->hasValidSealedManifest($this->site->id, $resident->id));
+        $this->assertNotNull(collect($sealedManifest)->firstWhere('title', 'Retained whānau evidence'));
+        $this->assertNull(collect($sealedManifest)->firstWhere('title', 'Remove before seal'));
+        $this->assertSame(0, collect($sealedManifest)->firstWhere('id', 'manifest_daily_notes')['count']);
+
+        RespiteDailyNote::factory()->create([
+            'stay_id' => $stay->id,
+            'client_id' => $resident->id,
+        ]);
+
+        $response = $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.export', $pack))
+            ->assertOk();
+        $payload = json_decode($response->streamedContent(), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame($sealedManifest, $payload['manifest']);
+        $this->assertSame($resident->id, $payload['client_id']);
+        $this->assertSame($this->site->id, $payload['site_id']);
+        $this->assertSame(RespiteEvidencePack::SEALED_MANIFEST_VERSION, $payload['sealed_manifest_version']);
+        $this->assertSame(
+            RespiteEvidencePack::sealedContentDigestFor(
+                array_intersect_key($payload, array_flip([
+                    'pack_id',
+                    'stay_id',
+                    'booking_id',
+                    'client_id',
+                    'site_id',
+                    'status',
+                    'sealed_at',
+                    'summary',
+                    'manifest',
+                ])),
+                $payload['sealed_manifest_version'],
+            ),
+            $payload['sealed_manifest_digest'],
+        );
+    }
+
+    public function test_export_rejects_a_tampered_sealed_manifest_without_recording_an_export(): void
+    {
+        [$stay, , $booking] = $this->stayAt($this->site, true);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'items' => [],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Complete evidence set.'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $pack->forceFill(['items' => [['id' => 'tampered']]])->saveQuietly();
+
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.export', $pack))
+            ->assertStatus(409);
+
+        $this->assertDatabaseMissing('respite_audit_logs', [
+            'auditable_type' => $pack->getMorphClass(),
+            'auditable_id' => $pack->id,
+            'action' => RespiteAuditLog::ACTION_EXPORTED,
+        ]);
+    }
+
+    public function test_sealed_content_is_immutable_and_header_or_partial_seal_tampering_fails_closed(): void
+    {
+        [$stay, , $booking] = $this->stayAt($this->site, true);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'summary' => 'Canonical sealed summary',
+            'items' => [],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Complete evidence set.'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $pack->refresh();
+        try {
+            $pack->update(['summary' => 'Model-layer rewrite']);
+            $this->fail('A sealed pack content mutation was accepted.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('immutable', $exception->getMessage());
+        }
+        try {
+            $pack->delete();
+            $this->fail('A sealed pack deletion was accepted.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('cannot be deleted', $exception->getMessage());
+        }
+
+        $sealedAt = $pack->getRawOriginal('sealed_at');
+        DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+            'summary' => 'Storage-layer rewrite',
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.show', $pack))
+            ->assertStatus(409);
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.export', $pack))
+            ->assertStatus(409);
+
+        DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+            'summary' => 'Canonical sealed summary',
+            'sealed_at' => null,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get(route('respite.evidence-packs.export', $pack))
+            ->assertStatus(409);
+
+        DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+            'sealed_at' => $sealedAt,
+        ]);
+
+        $this->assertDatabaseMissing('respite_audit_logs', [
+            'auditable_type' => $pack->getMorphClass(),
+            'auditable_id' => $pack->id,
+            'action' => RespiteAuditLog::ACTION_VIEWED,
+        ]);
+        $this->assertDatabaseMissing('respite_audit_logs', [
+            'auditable_type' => $pack->getMorphClass(),
+            'auditable_id' => $pack->id,
+            'action' => RespiteAuditLog::ACTION_EXPORTED,
+        ]);
+    }
+
+    public function test_seal_rejects_duplicate_manifest_item_ids_without_partial_state(): void
+    {
+        Event::fake([RespiteEvent::class]);
+        [$stay, , $booking] = $this->stayAt($this->site, true);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'items' => [
+                ['id' => 'duplicate-item', 'type' => 'note', 'title' => 'First item'],
+                ['id' => 'duplicate-item', 'type' => 'note', 'title' => 'Second item'],
+            ],
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Invalid duplicate set.'])
+            ->assertSessionHasErrors('manifest');
+
+        $pack->refresh();
+        $this->assertSame('draft', $pack->status);
+        $this->assertNull($pack->sealed_at);
+        $this->assertNull($pack->sealed_manifest_version);
+        $this->assertNull($pack->sealed_manifest_digest);
+        $this->assertDatabaseMissing('respite_audit_logs', [
+            'auditable_type' => $pack->getMorphClass(),
+            'auditable_id' => $pack->id,
+            'action' => 'sealed',
+        ]);
+        Event::assertNotDispatched(RespiteEvent::class);
+    }
+
+    public function test_seal_governance_migration_preflights_bindings_backfills_and_refuses_lossy_down(): void
+    {
+        [$stay, , $booking] = $this->stayAt($this->site, true);
+        $otherBooking = RespiteBooking::factory()->create([
+            'client_id' => $stay->client_id,
+            'location_id' => $this->site->id,
+        ]);
+        $pack = RespiteEvidencePack::query()->create([
+            'stay_id' => $stay->id,
+            'booking_id' => $booking->id,
+            'status' => 'draft',
+            'items' => [],
+        ]);
+        $migration = require database_path(
+            'migrations/2026_08_23_000220_govern_respite_evidence_pack_seals.php',
+        );
+
+        $migration->down();
+
+        try {
+            DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+                'booking_id' => $otherBooking->id,
+                'status' => 'sealed',
+                'sealed_at' => now(),
+                'items' => json_encode([['id' => 'legacy-evidence']], JSON_THROW_ON_ERROR),
+            ]);
+
+            try {
+                $migration->up();
+                $this->fail('A mismatched legacy seal was governed without reconciliation.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('requires reconciliation', $exception->getMessage());
+            }
+            $this->assertFalse(Schema::hasColumn('respite_evidence_packs', 'sealed_manifest_version'));
+            $this->assertFalse(Schema::hasColumn('respite_evidence_packs', 'sealed_manifest_digest'));
+
+            DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+                'booking_id' => $booking->id,
+            ]);
+            $migration->up();
+
+            $pack->refresh();
+            $this->assertTrue($pack->hasValidSealedManifest($this->site->id, (int) $stay->client_id));
+
+            try {
+                $migration->down();
+                $this->fail('Governed sealed evidence was discarded by migration rollback.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('while sealed evidence packs exist', $exception->getMessage());
+            }
+
+            DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+                'status' => 'draft',
+                'sealed_at' => null,
+                'sealed_manifest_version' => null,
+                'sealed_manifest_digest' => null,
+            ]);
+            $migration->down();
+        } finally {
+            if (! Schema::hasColumn('respite_evidence_packs', 'sealed_manifest_version')) {
+                DB::table('respite_evidence_packs')->where('id', $pack->id)->update([
+                    'status' => 'draft',
+                    'sealed_at' => null,
+                ]);
+                $migration->up();
+            }
+        }
+
+        $this->assertTrue(Schema::hasColumn('respite_evidence_packs', 'sealed_manifest_version'));
+        $this->assertTrue(Schema::hasColumn('respite_evidence_packs', 'sealed_manifest_digest'));
     }
 
     public function test_seal_replay_is_serialized_and_produces_one_audit_and_one_event(): void
@@ -579,10 +894,13 @@ class RespiteScopeIntegrityTest extends TestCase
             ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Complete and seal.'])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
+        $pack->refresh();
+        $sealedManifestDigest = $pack->sealed_manifest_digest;
         $this->actingAs($this->coordinator)
             ->post(route('respite.evidence-packs.seal', $pack), ['seal_reason' => 'Replay seal.'])
             ->assertSessionHas('error', 'Evidence pack is already sealed.');
 
+        $this->assertSame($sealedManifestDigest, $pack->fresh()->sealed_manifest_digest);
         $this->assertSame(1, RespiteAuditLog::query()
             ->where('auditable_type', $pack->getMorphClass())
             ->where('auditable_id', $pack->id)
@@ -671,7 +989,7 @@ class RespiteScopeIntegrityTest extends TestCase
                 ->andReturnUsing(function (ClientIncident $incident, ?User $actor) use ($realJourney): never {
                     $realJourney->ensureForSubmittedIncident($incident, $actor);
 
-                    throw new \RuntimeException('Forced failure after derived incident effects.');
+                    throw new RuntimeException('Forced failure after derived incident effects.');
                 });
         });
     }

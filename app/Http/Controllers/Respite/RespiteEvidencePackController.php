@@ -20,6 +20,8 @@ use Inertia\Response;
 
 class RespiteEvidencePackController extends Controller
 {
+    private const INTEGRITY_ERROR = 'This sealed evidence pack failed integrity verification and cannot be used.';
+
     public function __construct(
         private readonly RespiteStayScope $stayScope,
     ) {}
@@ -38,7 +40,9 @@ class RespiteEvidencePackController extends Controller
 
         $packs->getCollection()->each(function (RespiteEvidencePack $pack) use ($request): void {
             [$pack, $stay] = $this->authorizedPack($request, $pack);
-            $this->assertPackBindings($stay, $pack, null);
+            if (! $this->assertValidSealIfPresent($stay, $pack)) {
+                $this->assertPackBindings($stay, $pack, null);
+            }
         });
 
         return Inertia::render('respite/evidence-packs/index', [
@@ -120,7 +124,9 @@ class RespiteEvidencePackController extends Controller
     public function show(RespiteEvidencePack $evidencePack): Response
     {
         [$evidencePack, $stay] = $this->authorizedPack(request(), $evidencePack);
-        $this->assertPackBindings($stay, $evidencePack, null);
+        if (! $this->assertValidSealIfPresent($stay, $evidencePack)) {
+            $this->assertPackBindings($stay, $evidencePack, null);
+        }
         $evidencePack->load(['stay.client', 'sealedBy']);
 
         RespiteAuditLog::log(
@@ -147,11 +153,11 @@ class RespiteEvidencePackController extends Controller
 
         $updated = DB::transaction(function () use ($request, $evidencePack, $validated): bool {
             [$evidencePack, $stay] = $this->authorizedPack($request, $evidencePack, true);
-            $this->assertPackBindings($stay, $evidencePack, 'manifest', true);
-
-            if ($evidencePack->sealed_at) {
+            if ($this->assertValidSealIfPresent($stay, $evidencePack)) {
                 return false;
             }
+
+            $this->assertPackBindings($stay, $evidencePack, 'manifest', true);
 
             $oldValues = $evidencePack->only(['summary', 'status']);
             $attributes = $validated;
@@ -197,11 +203,11 @@ class RespiteEvidencePackController extends Controller
 
         $added = DB::transaction(function () use ($request, $evidencePack, $validated): bool {
             [$evidencePack, $stay] = $this->authorizedPack($request, $evidencePack, true);
-            $this->assertPackBindings($stay, $evidencePack, 'metadata', true);
-
-            if ($evidencePack->sealed_at) {
+            if ($this->assertValidSealIfPresent($stay, $evidencePack)) {
                 return false;
             }
+
+            $this->assertPackBindings($stay, $evidencePack, 'metadata', true);
 
             $this->assertPackBindings($stay, $evidencePack, 'metadata', true, true);
 
@@ -256,11 +262,11 @@ class RespiteEvidencePackController extends Controller
 
         $removed = DB::transaction(function () use ($request, $evidencePack, $validated): bool {
             [$evidencePack, $stay] = $this->authorizedPack($request, $evidencePack, true);
-            $this->assertPackBindings($stay, $evidencePack, 'item_id', true);
-
-            if ($evidencePack->sealed_at) {
+            if ($this->assertValidSealIfPresent($stay, $evidencePack)) {
                 return false;
             }
+
+            $this->assertPackBindings($stay, $evidencePack, 'item_id', true);
 
             $items = $evidencePack->items ?? [];
             $removedItem = null;
@@ -307,15 +313,21 @@ class RespiteEvidencePackController extends Controller
 
         $sealedPack = DB::transaction(function () use ($request, $evidencePack, $validated): ?RespiteEvidencePack {
             [$evidencePack, $stay] = $this->authorizedPack($request, $evidencePack, true);
-            $this->assertPackBindings($stay, $evidencePack, 'manifest', true);
-
-            if ($evidencePack->sealed_at) {
+            if ($this->assertValidSealIfPresent($stay, $evidencePack)) {
                 return null;
             }
+
+            $this->assertPackBindings($stay, $evidencePack, 'manifest', true);
 
             $this->assertPackBindings($stay, $evidencePack, 'manifest', true, true);
 
             $manifest = $this->buildManifestForPack($evidencePack, $stay, 'manifest', true, true);
+            if (! RespiteEvidencePack::hasDeterministicManifestStructure($manifest)) {
+                throw ValidationException::withMessages([
+                    'manifest' => 'Evidence pack items must have unique, non-empty identifiers before sealing.',
+                ]);
+            }
+
             $incomplete = collect($manifest)->where('required', true)->where('complete', false)->values();
             if ($incomplete->isNotEmpty()) {
                 throw ValidationException::withMessages([
@@ -324,11 +336,22 @@ class RespiteEvidencePackController extends Controller
             }
 
             $sealedAt = now();
+            $sealedManifestDigest = RespiteEvidencePack::sealedContentDigestFor(
+                $evidencePack->sealedContentProjection(
+                    $this->stayScope->siteId($stay),
+                    (int) $stay->client_id,
+                    $manifest,
+                    $sealedAt,
+                    'sealed',
+                ),
+            );
             $evidencePack->update([
                 'status' => 'sealed',
                 'items' => $manifest,
                 'sealed_at' => $sealedAt,
                 'sealed_by_user_id' => $request->user()?->id,
+                'sealed_manifest_version' => RespiteEvidencePack::SEALED_MANIFEST_VERSION,
+                'sealed_manifest_digest' => $sealedManifestDigest,
                 'updated_by' => $request->user()?->id,
             ]);
 
@@ -337,7 +360,11 @@ class RespiteEvidencePackController extends Controller
                 'sealed',
                 $request->user()?->id,
                 null,
-                ['sealed_at' => $sealedAt->toIso8601String()],
+                [
+                    'sealed_at' => $sealedAt->toIso8601String(),
+                    'sealed_manifest_version' => RespiteEvidencePack::SEALED_MANIFEST_VERSION,
+                    'sealed_manifest_digest' => $sealedManifestDigest,
+                ],
                 $validated['seal_reason'],
                 RespiteAuditLog::CATEGORY_EVIDENCE
             );
@@ -367,7 +394,9 @@ class RespiteEvidencePackController extends Controller
             ->first();
 
         if ($pack) {
-            $this->assertPackBindings($stay, $pack, null);
+            if (! $this->assertValidSealIfPresent($stay, $pack)) {
+                $this->assertPackBindings($stay, $pack, null);
+            }
         }
 
         return Inertia::render('respite/evidence-packs/for-stay', [
@@ -378,33 +407,51 @@ class RespiteEvidencePackController extends Controller
 
     public function export(RespiteEvidencePack $evidencePack)
     {
-        [$evidencePack, $stay] = $this->authorizedPack(request(), $evidencePack);
-        $this->assertPackBindings($stay, $evidencePack, null);
+        [$packId, $encodedPayload] = DB::transaction(function () use ($evidencePack): array {
+            [$lockedPack, $stay] = $this->authorizedPack(request(), $evidencePack, true);
+            $siteId = $this->stayScope->siteId($stay);
 
-        RespiteAuditLog::log(
-            $evidencePack,
-            RespiteAuditLog::ACTION_EXPORTED,
-            auth()->id(),
-            null,
-            ['export_format' => 'json'],
-            null,
-            RespiteAuditLog::CATEGORY_EVIDENCE
-        );
+            if ($this->assertValidSealIfPresent($stay, $lockedPack)) {
+                $content = $lockedPack->sealedContentProjection($siteId, (int) $stay->client_id);
+            } else {
+                $this->assertPackBindings($stay, $lockedPack, null);
+                $content = $lockedPack->sealedContentProjection(
+                    $siteId,
+                    (int) $stay->client_id,
+                    $this->buildManifestForPack($lockedPack, $stay, null),
+                );
+            }
 
-        $manifest = $this->buildManifestForPack($evidencePack, $stay, null);
-        $payload = [
-            'pack_id' => $evidencePack->id,
-            'stay_id' => $evidencePack->stay_id,
-            'booking_id' => $evidencePack->booking_id,
-            'status' => $evidencePack->status,
-            'sealed_at' => optional($evidencePack->sealed_at)->toIso8601String(),
-            'summary' => $evidencePack->summary,
-            'manifest' => $manifest,
-        ];
+            $payload = [
+                ...$content,
+                'sealed_manifest_version' => $lockedPack->sealed_manifest_version,
+                'sealed_manifest_digest' => $lockedPack->sealed_manifest_digest,
+            ];
+            $encodedPayload = json_encode(
+                $payload,
+                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
+            );
 
-        return response()->streamDownload(function () use ($payload) {
-            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        }, "respite-evidence-pack-{$evidencePack->id}.json", [
+            RespiteAuditLog::log(
+                $lockedPack,
+                RespiteAuditLog::ACTION_EXPORTED,
+                auth()->id(),
+                null,
+                [
+                    'export_format' => 'json',
+                    'sealed_manifest_version' => $lockedPack->sealed_manifest_version,
+                    'sealed_manifest_digest' => $lockedPack->sealed_manifest_digest,
+                ],
+                null,
+                RespiteAuditLog::CATEGORY_EVIDENCE
+            );
+
+            return [$lockedPack->id, $encodedPayload];
+        }, 3);
+
+        return response()->streamDownload(function () use ($encodedPayload) {
+            echo $encodedPayload;
+        }, "respite-evidence-pack-{$packId}.json", [
             'Content-Type' => 'application/json',
         ]);
     }
@@ -474,6 +521,24 @@ class RespiteEvidencePackController extends Controller
     ): void {
         $this->stayScope->assertEvidenceGraph($stay, $pack, $field, $lock, $requireCurrentPlans);
         $this->customItems($pack, $stay, $field, $lock, $requireCurrentPlans);
+    }
+
+    private function assertValidSealIfPresent(RespiteStay $stay, RespiteEvidencePack $pack): bool
+    {
+        if (! $pack->hasSealEvidence()) {
+            return false;
+        }
+
+        abort_unless(
+            $pack->hasValidSealedManifest(
+                $this->stayScope->siteId($stay),
+                (int) $stay->client_id,
+            ),
+            409,
+            self::INTEGRITY_ERROR,
+        );
+
+        return true;
     }
 
     /**
