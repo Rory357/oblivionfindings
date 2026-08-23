@@ -21,7 +21,7 @@ test('the alert index delegates adjacent datasets to the canonical scoped workli
 });
 
 test('the canonical worklist query scopes rows aggregates queue counts and creation options', function () {
-    $source = file_get_contents(app_path('Services/ControlRoom/AlertWorklistQuery.php'));
+    $source = file_get_contents(dirname(__DIR__, 2).'/app/Services/ControlRoom/AlertWorklistQuery.php');
 
     expect($source)
         ->toContain('private function visibleAlerts(')

@@ -13,8 +13,11 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\BillingService;
 use App\Services\Operations\TimesheetHrSyncService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use Tests\TestCase;
 
@@ -162,6 +165,34 @@ class TimesheetApprovalServiceTest extends TestCase
         $this->assertNull($fresh->returned_notes);
     }
 
+    public function test_editable_update_rechecks_the_locked_workflow_state_after_a_stale_read(): void
+    {
+        $staleTimesheet = $this->makeDraftTimesheet($this->staff);
+
+        DB::table('timesheets')
+            ->where('id', $staleTimesheet->id)
+            ->update([
+                'status' => 'submitted',
+                'submitted_by' => $this->staff->id,
+                'submitted_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        try {
+            app(TimesheetApprovalService::class)->updateEditable($staleTimesheet, [
+                'notes' => 'A stale draft update must not overwrite submission.',
+            ]);
+            $this->fail('Expected the locked workflow state to reject the stale update.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('timesheet', $exception->errors());
+        }
+
+        $fresh = $staleTimesheet->fresh();
+        $this->assertSame('submitted', $fresh->status);
+        $this->assertSame('Draft notes', $fresh->notes);
+        $this->assertSame($this->staff->id, $fresh->submitted_by);
+    }
+
     protected function mockApprovalSideEffects(int $times): void
     {
         $this->mock(TimesheetHrSyncService::class, function ($mock) use ($times): void {
@@ -174,7 +205,7 @@ class TimesheetApprovalServiceTest extends TestCase
             $mock->shouldReceive('generateFromTimesheet')
                 ->times($times)
                 ->with(Mockery::type(Timesheet::class))
-                ->andReturn(new \Illuminate\Database\Eloquent\Collection());
+                ->andReturn(new Collection);
         });
     }
 

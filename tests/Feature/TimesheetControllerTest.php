@@ -297,6 +297,41 @@ class TimesheetControllerTest extends TestCase
         $this->assertSame($sideEffectsBefore, $this->timesheetSideEffectCounts());
     }
 
+    public function test_manager_authority_does_not_bypass_foreign_site_client_scope(): void
+    {
+        $manager = $this->makeRoleUser('team_lead');
+        $this->createEmployeeProfile($manager);
+        $this->grantPermissions($manager, [
+            'timesheets.update',
+            'timesheets.manageAny',
+        ]);
+        $this->assertFalse($manager->canDo('reports.viewAny'));
+        $foreignSite = Site::factory()->create([
+            'name' => 'Rata House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'first_name' => 'ForeignManager',
+            'last_name' => 'Client',
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff);
+        $before = $timesheet->fresh()->getRawOriginal();
+        $sideEffectsBefore = $this->timesheetSideEffectCounts();
+
+        $this->actingAs($manager)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $foreignClient->id,
+                'notes' => 'Manager Site bypass must not persist',
+            ]))
+            ->assertForbidden();
+
+        $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        $this->assertSame($sideEffectsBefore, $this->timesheetSideEffectCounts());
+    }
+
     public function test_owner_can_reassign_manual_draft_to_secondary_site_client(): void
     {
         $secondarySite = Site::factory()->create([
@@ -314,6 +349,12 @@ class TimesheetControllerTest extends TestCase
             'secondary_site_ids' => [$secondarySite->id],
         ]);
         $timesheet = $this->makeManualTimesheet($this->staff);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
 
         $this->actingAs($this->staff)
             ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
@@ -324,9 +365,11 @@ class TimesheetControllerTest extends TestCase
 
         $fresh = $timesheet->fresh();
         $this->assertSame($secondaryClient->id, $fresh->client_id);
+        $this->assertSame($secondarySite->id, $fresh->site_id);
         $this->assertSame($secondarySite->id, $fresh->shift_site_id);
         $this->assertSame(trim($secondaryClient->first_name.' '.$secondaryClient->last_name), $fresh->client_name_snapshot);
         $this->assertSame('draft', $fresh->status);
+        $this->assertDatabaseMissing('timesheet_client_allocations', ['id' => $allocation->id]);
     }
 
     public function test_owner_can_clear_manual_draft_client_without_retaining_client_snapshots_or_allocations(): void
@@ -368,6 +411,53 @@ class TimesheetControllerTest extends TestCase
         $this->assertSame('draft', $fresh->status);
         $this->assertDatabaseMissing('timesheet_client_allocations', ['id' => $allocation->id]);
         $this->assertSame(0, $fresh->clientAllocations()->count());
+    }
+
+    public function test_manual_client_reassignment_and_allocation_delete_roll_back_when_update_fails(): void
+    {
+        $secondarySite = Site::factory()->create([
+            'name' => 'Miro House',
+            'type' => 'house',
+        ]);
+        $secondaryClient = Client::factory()->create([
+            'first_name' => 'Rollback',
+            'last_name' => 'Client',
+            'site_id' => $secondarySite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $this->staff->hrEmployeeProfile()->update([
+            'secondary_site_ids' => [$secondarySite->id],
+        ]);
+        $timesheet = $this->makeManualTimesheet($this->staff);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
+        $before = $timesheet->fresh()->getRawOriginal();
+
+        $this->mock(TimesheetReconciliationService::class)
+            ->shouldReceive('reconcile')
+            ->once()
+            ->andThrow(ValidationException::withMessages([
+                'timesheet' => 'Forced post-reassignment update failure.',
+            ]));
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), $this->validUpdatePayload($timesheet, [
+                'client_id' => $secondaryClient->id,
+                'notes' => 'This reassignment must roll back',
+            ]))
+            ->assertSessionHasErrors('timesheet');
+
+        $this->assertSame($before, $timesheet->fresh()->getRawOriginal());
+        $this->assertDatabaseHas('timesheet_client_allocations', [
+            'id' => $allocation->id,
+            'timesheet_id' => $timesheet->id,
+            'client_id' => $this->client->id,
+        ]);
     }
 
     public function test_linked_shift_client_remains_authoritative_during_update(): void
@@ -719,6 +809,12 @@ class TimesheetControllerTest extends TestCase
             'returned_by' => $this->admin->id,
             'returned_notes' => 'Finance correction requested.',
         ]);
+        $allocation = $timesheet->clientAllocations()->create([
+            'client_id' => $this->client->id,
+            'hours' => '7.50',
+            'allocation_method' => 'single',
+            'sort_order' => 0,
+        ]);
 
         $this->assertTrue($this->finance->canDo('reports.viewAny'));
         $this->assertFalse($this->finance->canDo('timesheets.update'));
@@ -739,9 +835,11 @@ class TimesheetControllerTest extends TestCase
 
         $fresh = $timesheet->fresh();
         $this->assertSame($globalClient->id, $fresh->client_id);
+        $this->assertSame($globalSite->id, $fresh->site_id);
         $this->assertSame($globalSite->id, $fresh->shift_site_id);
         $this->assertSame('submitted', $fresh->status);
         $this->assertSame($this->finance->id, $fresh->submitted_by);
+        $this->assertDatabaseMissing('timesheet_client_allocations', ['id' => $allocation->id]);
     }
 
     public function test_resubmit_endpoint_rejects_invalid_payload_without_changing_status(): void

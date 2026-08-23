@@ -17,7 +17,6 @@ use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TimesheetController extends Controller
@@ -997,11 +996,14 @@ class TimesheetController extends Controller
             ? $this->manualSnapshot($timesheet->staff ?? $auth, $manualActivityType, $manualSiteId)
             : $this->draftSnapshot($data['client_id'], $linkedShift, $timesheet->staff ?? $auth, $data['notes'] ?? $timesheet->notes);
         $snapshotFallback = $clearingManualClient ? null : $timesheet;
+        $canonicalSiteId = $linkedShift
+            ? $timesheet->site_id
+            : ($snapshot['site_id'] ?? $manualSiteId);
 
-        $timesheet->fill([
+        $result = $this->timesheetApprovals()->updateEditable($timesheet, [
             'client_id' => $data['client_id'],
             'activity_type' => $clearingManualClient ? $manualActivityType : $timesheet->activity_type,
-            'site_id' => $clearingManualClient ? $manualSiteId : $timesheet->site_id,
+            'site_id' => $canonicalSiteId,
             'work_date' => $data['work_date'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
@@ -1024,15 +1026,7 @@ class TimesheetController extends Controller
             'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
 
-        DB::transaction(function () use ($timesheet, $clearingManualClient): void {
-            $timesheet->save();
-
-            if ($clearingManualClient) {
-                $timesheet->clientAllocations()->delete();
-            }
-
-            app(TimesheetReconciliationService::class)->reconcile($timesheet);
-        });
+        $timesheet = $result->timesheet;
 
         $timesheet->load(['shift.client']);
         $client = $timesheet->shift?->client;
@@ -1197,11 +1191,14 @@ class TimesheetController extends Controller
                 $data['notes'] ?? $timesheet->notes,
             );
         $snapshotFallback = $clearingManualClient ? null : $timesheet;
+        $canonicalSiteId = $linkedShift
+            ? $timesheet->site_id
+            : ($snapshot['site_id'] ?? $manualSiteId);
 
         $result = $this->timesheetApprovals()->resubmit($timesheet, $auth, [
             'client_id' => $data['client_id'],
             'activity_type' => $clearingManualClient ? $manualActivityType : $timesheet->activity_type,
-            'site_id' => $clearingManualClient ? $manualSiteId : $timesheet->site_id,
+            'site_id' => $canonicalSiteId,
             'work_date' => $data['work_date'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],

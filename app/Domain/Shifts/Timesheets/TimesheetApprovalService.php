@@ -49,6 +49,39 @@ class TimesheetApprovalService
     }
 
     /**
+     * Persist editable fields without allowing a concurrent workflow
+     * transition to be overwritten by a stale route-bound model.
+     *
+     * @param  array<string, mixed>  $updates
+     */
+    public function updateEditable(Timesheet $timesheet, array $updates): TimesheetWorkflowResult
+    {
+        try {
+            return DB::transaction(function () use ($timesheet, $updates): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
+
+                $this->assertSubmittable($locked, 'updated');
+                $originalClientId = $this->clientId($locked);
+
+                $locked->fill($updates);
+                $locked->save();
+
+                $this->invalidateChangedManualAllocations($locked, $originalClientId);
+                $this->reconciliation->reconcile($locked->fresh() ?? $locked);
+
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    true,
+                );
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
+
+            throw $exception;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $updates
      */
     public function resubmit(Timesheet $timesheet, User $actor, array $updates): TimesheetWorkflowResult
@@ -58,17 +91,12 @@ class TimesheetApprovalService
                 $locked = $this->lock($timesheet);
 
                 $this->assertSubmittable($locked, 'resubmitted');
+                $originalClientId = $this->clientId($locked);
 
                 $locked->fill($updates);
                 $locked->save();
 
-                // A shiftless manual entry with no primary client cannot keep
-                // materialised client allocations. Keep this deletion inside
-                // the resubmit transaction so any later workflow failure also
-                // restores the original allocation and snapshot state.
-                if ($locked->shift_id === null && $locked->client_id === null) {
-                    $locked->clientAllocations()->delete();
-                }
+                $this->invalidateChangedManualAllocations($locked, $originalClientId);
 
                 $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
 
@@ -256,6 +284,26 @@ class TimesheetApprovalService
         return Timesheet::query()
             ->lockForUpdate()
             ->findOrFail($timesheet->id);
+    }
+
+    protected function clientId(Timesheet $timesheet): ?int
+    {
+        return $timesheet->client_id !== null
+            ? (int) $timesheet->client_id
+            : null;
+    }
+
+    protected function invalidateChangedManualAllocations(Timesheet $timesheet, ?int $originalClientId): void
+    {
+        $newClientId = $this->clientId($timesheet);
+
+        // Materialised allocations belong to the previous primary client
+        // selection. Invalidate them whenever a shiftless manual entry changes
+        // or clears that client, inside the same transaction as the mutation.
+        if ($timesheet->shift_id === null
+            && ($newClientId === null || $originalClientId !== $newClientId)) {
+            $timesheet->clientAllocations()->delete();
+        }
     }
 
     protected function assertSubmittable(Timesheet $timesheet, string $action): void
