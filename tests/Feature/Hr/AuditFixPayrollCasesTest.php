@@ -72,11 +72,14 @@ beforeEach(function () {
 
 function makeApprovedTimesheet(User $staff, User $approver, ?Client $client = null): Timesheet
 {
-    $client ??= Client::factory()->create();
+    $client ??= Client::factory()->create([
+        'site_id' => $staff->hrEmployeeProfile?->primary_site_id,
+    ]);
 
     return Timesheet::query()->create([
         'user_id' => $staff->id,
         'client_id' => $client->id,
+        'site_id' => $client->site_id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -182,7 +185,7 @@ test('an employee with approved leave but no timesheets still gets a run item', 
 /* ---------------------------------------------------------------------- */
 
 test('a submitted timesheet inside a locked payroll run cannot be returned for changes or approved', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     makeApprovedTimesheet($this->staff, $this->hr, $client);
 
     $service = app(PayrollExportService::class);

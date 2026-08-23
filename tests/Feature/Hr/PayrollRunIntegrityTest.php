@@ -5,13 +5,19 @@ use App\Domain\Hr\Models\HrPayRateRule;
 use App\Domain\Hr\Services\PayrollExportService;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create([
+        'name' => 'Payroll integrity Site',
+    ]);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -42,13 +48,14 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'hourly_rate' => '30.00',
+        'primary_site_id' => $this->site->id,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
     ]);
 });
 
 test('payroll run items apply multi rate rules per timesheet instead of single rule for entire period', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -80,6 +87,7 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
     Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDays(2)->toDateString(),
         'starts_at' => now()->subDays(2)->setTime(9, 0),
         'ends_at' => now()->subDays(2)->setTime(17, 0),
@@ -95,6 +103,7 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
     Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -116,11 +125,12 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
 });
 
 test('payroll run cannot be locked when linked timesheets fail validation', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     $timesheet = Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -136,8 +146,9 @@ test('payroll run cannot be locked when linked timesheets fail validation', func
     $service = app(PayrollExportService::class);
     $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
 
-    // Simulate post-run mutation that should block lock.
-    $timesheet->update(['status' => 'draft']);
+    // Simulate out-of-band corruption that the immutable source digest must
+    // still detect even if a caller bypasses the model-level claim guard.
+    DB::table('timesheets')->where('id', $timesheet->id)->update(['status' => 'draft']);
 
     expect(fn () => $service->lockRun($run->fresh(), $this->hr->id))
         ->toThrow(ValidationException::class);
@@ -148,7 +159,7 @@ test('payroll run cannot be locked when linked timesheets fail validation', func
 });
 
 test('locking a run cascades linked approved timesheets to paid', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -166,6 +177,7 @@ test('locking a run cascades linked approved timesheets to paid', function () {
     $timesheet = Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -189,7 +201,7 @@ test('locking a run cascades linked approved timesheets to paid', function () {
 });
 
 test('paid cascade is idempotent', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -207,6 +219,7 @@ test('paid cascade is idempotent', function () {
     Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -229,7 +242,7 @@ test('paid cascade is idempotent', function () {
 });
 
 test('timesheets outside the run period are not marked paid', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -247,6 +260,7 @@ test('timesheets outside the run period are not marked paid', function () {
     $inPeriod = Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -262,6 +276,7 @@ test('timesheets outside the run period are not marked paid', function () {
     $outOfPeriod = Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subMonth()->toDateString(),
         'starts_at' => now()->subMonth()->setTime(9, 0),
         'ends_at' => now()->subMonth()->setTime(17, 0),
@@ -288,7 +303,7 @@ test('timesheets outside the run period are not marked paid', function () {
 });
 
 test('paid cascade bypasses the workflow guard for a pre-stamped approved timesheet', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -306,6 +321,7 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
     $timesheet = Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),
@@ -339,7 +355,7 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
 // right after (PostPayrollJournalJob) has payslips to read — otherwise the run
 // stays locked with a null journal_id and the job dies to failed_jobs.
 test('locking a run generates payslips so the GL journal has data to read', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
         'name' => 'Default Support Rule',
@@ -357,6 +373,7 @@ test('locking a run generates payslips so the GL journal has data to read', func
     Timesheet::query()->create([
         'user_id' => $this->staff->id,
         'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'work_date' => now()->subDay()->toDateString(),
         'starts_at' => now()->subDay()->setTime(9, 0),
         'ends_at' => now()->subDay()->setTime(17, 0),

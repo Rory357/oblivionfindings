@@ -2,15 +2,21 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrPayrollSourceUse;
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Operations\TimesheetReconciliationService;
+use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class Timesheet extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $appends = [
         'is_snapshot_complete',
@@ -103,14 +109,14 @@ class Timesheet extends Model
      * {@see self::dominantAllocationMethod()}), so caching the materialised
      * collection avoids a repeat query/synthesis per row.
      *
-     * @var \Illuminate\Support\Collection<int, array<string, mixed>>|null
+     * @var Collection<int, array<string, mixed>>|null
      */
-    private ?\Illuminate\Support\Collection $effectiveClientAllocationsMemo = null;
+    private ?Collection $effectiveClientAllocationsMemo = null;
 
     protected static function booted(): void
     {
         static::saving(function (self $timesheet): void {
-            app(\App\Services\ShiftSafetyInvariantService::class)->assertTimesheet($timesheet);
+            app(ShiftSafetyInvariantService::class)->assertTimesheet($timesheet);
         });
 
         static::creating(function (self $timesheet): void {
@@ -119,6 +125,47 @@ class Timesheet extends Model
         });
 
         static::updating(function (self $timesheet): void {
+            if ($timesheet->isDirty([
+                'user_id',
+                'client_id',
+                'shift_id',
+                'shift_site_id',
+                'shift_service_context_id',
+                'site_id',
+                'work_date',
+                'starts_at',
+                'ends_at',
+                'break_minutes',
+                'mileage_km',
+                'sleepover',
+                'on_call',
+                'public_holiday',
+                'status',
+                'pay_rate',
+                'pay_type',
+            ]) && ($activePayrollUse = HrPayrollSourceUse::query()
+                ->where('timesheet_id', $timesheet->getKey())
+                ->whereNotNull('active_source_identity')
+                ->first())) {
+                $paidTransitionFields = ['status', 'exported_to_payroll_at', 'payroll_reference'];
+                $isReleasedPayrollRun = $activePayrollUse->payrollRun()
+                    ->whereNotNull('locked_at')
+                    ->whereIn('status', ['locked', 'exported'])
+                    ->exists();
+                $isCanonicalPaidTransition = $timesheet->getOriginal('status') === 'approved'
+                    && $timesheet->status === 'paid'
+                    && $isReleasedPayrollRun
+                    && $timesheet->payroll_reference === "hr-payroll-run:{$activePayrollUse->payroll_run_id}"
+                    && array_diff(array_keys($timesheet->getDirty()), $paidTransitionFields) === [];
+                if ($isCanonicalPaidTransition) {
+                    return;
+                }
+
+                throw ValidationException::withMessages([
+                    'timesheet' => 'This timesheet is claimed by an active payroll run. Correct the draft payroll run first.',
+                ]);
+            }
+
             if ($timesheet->isDirty(['shift_id', 'user_id'])) {
                 $timesheet->ensureUniqueShiftUserPair();
             }
@@ -178,6 +225,25 @@ class Timesheet extends Model
                 throw new \LogicException('Payroll-linked timesheets cannot change workflow state after export confirmation.');
             }
         });
+
+        static::deleting(function (self $timesheet): void {
+            if (HrPayrollSourceUse::query()
+                ->where('timesheet_id', $timesheet->getKey())
+                ->whereNotNull('active_source_identity')
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'timesheet' => 'Payroll-claimed timesheet evidence cannot be deleted.',
+                ]);
+            }
+        });
+    }
+
+    public function hasActivePayrollClaim(): bool
+    {
+        return HrPayrollSourceUse::query()
+            ->where('timesheet_id', $this->getKey())
+            ->whereNotNull('active_source_identity')
+            ->exists();
     }
 
     public static function ensureNoDuplicateShiftUserPair(?int $shiftId, ?int $userId, ?int $ignoreTimesheetId = null): void
@@ -222,7 +288,7 @@ class Timesheet extends Model
             ]);
         }
 
-        app(\App\Services\Operations\TimesheetReconciliationService::class)
+        app(TimesheetReconciliationService::class)
             ->assertWorkflowAllowed($this, (string) $this->status, false);
     }
 
@@ -263,9 +329,9 @@ class Timesheet extends Model
      * the timesheet's primary client + total hours so legacy data keeps the
      * same shape without a destructive backfill.
      *
-     * @return \Illuminate\Support\Collection<int, array{client_id:int,hours:float,allocation_method:string,starts_at:?string,ends_at:?string,notes:?string,sort_order:int}>
+     * @return Collection<int, array{client_id:int,hours:float,allocation_method:string,starts_at:?string,ends_at:?string,notes:?string,sort_order:int}>
      */
-    public function effectiveClientAllocations(): \Illuminate\Support\Collection
+    public function effectiveClientAllocations(): Collection
     {
         if ($this->effectiveClientAllocationsMemo !== null) {
             return $this->effectiveClientAllocationsMemo;
@@ -345,12 +411,12 @@ class Timesheet extends Model
 
     public function attendanceSession()
     {
-        return $this->belongsTo(\App\Domain\Hr\Models\HrAttendanceSession::class, 'attendance_session_id');
+        return $this->belongsTo(HrAttendanceSession::class, 'attendance_session_id');
     }
 
     public function mileageJournal()
     {
-        return $this->belongsTo(\App\Domain\Finance\Models\FinJournal::class, 'mileage_journal_id');
+        return $this->belongsTo(FinJournal::class, 'mileage_journal_id');
     }
 
     public function shiftSite()
@@ -405,6 +471,7 @@ class Timesheet extends Model
         }
 
         $minutes = $this->starts_at->diffInMinutes($this->ends_at) - (int) $this->break_minutes;
+
         return round(max($minutes, 0) / 60, 2);
     }
 

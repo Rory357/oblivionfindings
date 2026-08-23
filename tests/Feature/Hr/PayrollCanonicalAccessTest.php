@@ -75,6 +75,7 @@ function payrollCanonicalTimesheet(User $staff, Site $site, User $approver, stri
     return Timesheet::query()->create([
         'user_id' => $staff->id,
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'work_date' => $date,
         'starts_at' => $date.' 09:00:00',
         'ends_at' => $date.' 17:00:00',
@@ -111,7 +112,7 @@ test('view-only payroll lists only indivisible runs wholly proven at accessible 
         ->and($response->inertiaProps('statusCounts.total'))->toBe(1);
 });
 
-test('explicit payroll export authority sees application-wide runs without marker identity', function () {
+test('payroll export action alone remains scoped to the callers canonical Sites', function () {
     $manager = payrollCanonicalStaff('Application payroll manager', $this->allowedSite);
     grantPayrollCanonicalPermission($manager, 'hr.payroll.view');
     grantPayrollCanonicalPermission($manager, 'hr.payroll.export');
@@ -125,14 +126,16 @@ test('explicit payroll export authority sees application-wide runs without marke
     $response = $this->actingAs($manager)->get(route('hr.payroll.index'))->assertOk();
     $ids = collect($response->inertiaProps('runs.data'))->pluck('id');
 
-    expect($ids)->toContain($allowed->id, $hidden->id, $mixed->id)
-        ->and($response->inertiaProps('statusCounts.total'))->toBe(3);
+    expect($ids)->toContain($allowed->id)
+        ->not->toContain($hidden->id, $mixed->id)
+        ->and($response->inertiaProps('statusCounts.total'))->toBe(1);
 });
 
 test('creating an application payroll run collects approved work across Sites', function () {
     $manager = payrollCanonicalStaff('Application payroll operator', $this->allowedSite);
     grantPayrollCanonicalPermission($manager, 'hr.payroll.view');
     grantPayrollCanonicalPermission($manager, 'hr.payroll.export');
+    grantPayrollCanonicalPermission($manager, 'hr.employees.viewAllSites');
 
     $allowedStaff = payrollCanonicalStaff('First Site employee', $this->allowedSite, [
         'hourly_rate' => 30,
@@ -159,6 +162,7 @@ test('profile names and default selection are application identities', function 
     $manager = payrollCanonicalStaff('Payroll profile manager', $this->allowedSite);
     grantPayrollCanonicalPermission($manager, 'hr.payroll.view');
     grantPayrollCanonicalPermission($manager, 'hr.payroll.export');
+    grantPayrollCanonicalPermission($manager, 'hr.employees.viewAllSites');
 
     $payload = [
         'name' => 'Canonical payroll profile',

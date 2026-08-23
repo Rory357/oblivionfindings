@@ -48,6 +48,7 @@ function pes_lockedRunWithPayslip(array $slip = []): array
 
     $run = HrPayrollRun::create([
         'tenant_id' => 1,
+        'source_provenance_status' => 'legacy_no_paid_leave',
         'period_start' => now()->startOfMonth()->toDateString(),
         'period_end' => now()->endOfMonth()->toDateString(),
         'status' => 'locked',
@@ -115,7 +116,7 @@ it('surfaces a failed GL post on the run and clears it on a successful retry', f
 
     try {
         PostPayrollJournalJob::dispatchSync($run);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // expected — the job rethrows after persisting gl_error
     }
 

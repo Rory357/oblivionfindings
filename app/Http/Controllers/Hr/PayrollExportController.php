@@ -118,8 +118,8 @@ class PayrollExportController extends Controller
                 'status' => $request->query('status'),
             ],
             'can' => [
-                'manage' => $user->canDo('hr.payroll.export'),
-                'export_data' => $user->canDo('hr.payroll.export'),
+                'manage' => $this->payrollAccess->canManageApplicationPayroll($user),
+                'export_data' => $this->payrollAccess->canManageApplicationPayroll($user),
             ],
         ]);
     }
@@ -130,12 +130,14 @@ class PayrollExportController extends Controller
     public function createRun(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         $data = $request->validate([
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after:period_start'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'idempotency_key' => ['nullable', 'string', 'max:128'],
         ]);
 
         try {
@@ -143,10 +145,9 @@ class PayrollExportController extends Controller
                 Carbon::parse($data['period_start']),
                 Carbon::parse($data['period_end']),
                 $user->id,
+                $data['idempotency_key'] ?? null,
+                $data['notes'] ?? null,
             );
-            if (! empty($data['notes'])) {
-                $run->update(['notes' => $data['notes']]);
-            }
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()->withErrors(['period' => $e->getMessage()]);
         }
@@ -160,12 +161,12 @@ class PayrollExportController extends Controller
     public function lockRun(Request $request, HrPayrollRun $run)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
         $run = $this->payrollAccess->payrollRun($user, $run);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
-        // Locking auto-generates payslips only when none exist yet; capture that
-        // so we notify employees exactly once (and not again if an admin already
-        // generated + notified via the Payslips screen).
+        // Locking creates or verifies the exact run-backed payslip set; capture
+        // whether it already existed so employees are notified only once.
         $payslipsExistedBeforeLock = $run->payslips()->exists();
 
         try {
@@ -206,8 +207,9 @@ class PayrollExportController extends Controller
     public function retryGlPost(Request $request, HrPayrollRun $run)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
         $run = $this->payrollAccess->payrollRun($user, $run);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         if ($run->locked_at === null) {
             return redirect()->back()->withErrors(['gl' => 'Lock the run before posting its journal.']);
@@ -233,8 +235,9 @@ class PayrollExportController extends Controller
     public function payNet(Request $request, HrPayrollRun $run)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
         $run = $this->payrollAccess->payrollRun($user, $run);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         if ($run->journal_id === null) {
             return redirect()->back()->with('error', 'Post the payroll run to the GL before paying net pay.');
@@ -266,8 +269,9 @@ class PayrollExportController extends Controller
     public function downloadNetPayFile(Request $request, HrPayrollRun $run)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
         $run = $this->payrollAccess->payrollRun($user, $run);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         abort_unless($run->net_paid_at !== null, 404, 'Net pay has not been disbursed for this run.');
 
@@ -291,8 +295,9 @@ class PayrollExportController extends Controller
     public function export(Request $request, HrPayrollRun $run)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
         $run = $this->payrollAccess->payrollRun($user, $run);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         $validated = $request->validate([
             'profile_id' => ['nullable', 'integer', Rule::exists('hr_payroll_export_profiles', 'id')],
@@ -329,7 +334,8 @@ class PayrollExportController extends Controller
     public function storeProfile(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         $fieldKeys = array_keys($this->payrollService->exportFieldCatalog());
         $sourceRule = Rule::in(array_merge($fieldKeys, ['static']));
@@ -398,7 +404,8 @@ class PayrollExportController extends Controller
     public function updateProfile(Request $request, HrPayrollExportProfile $profile)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         $fieldKeys = array_keys($this->payrollService->exportFieldCatalog());
         $sourceRule = Rule::in(array_merge($fieldKeys, ['static']));
@@ -470,7 +477,8 @@ class PayrollExportController extends Controller
     public function setDefaultProfile(Request $request, HrPayrollExportProfile $profile)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user, 403);
+        $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
         try {
             DB::transaction(function () use ($profile, $user) {

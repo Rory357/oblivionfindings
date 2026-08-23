@@ -8,6 +8,7 @@ use App\Models\Timesheet;
 use App\Services\Operations\PayrollRateResolver;
 use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class BackfillOperationalSnapshots extends Command
@@ -111,14 +112,25 @@ class BackfillOperationalSnapshots extends Command
                         if ($failure) {
                             $summary['timesheets']['unrepairable']++;
                             $this->pushSample($samples['timesheets'], $timesheet->id, $failure);
+
                             continue;
                         }
 
-                        if ($this->wouldChange($timesheet, $payload)) {
+                        $wouldChange = $this->wouldChange($timesheet, $payload);
+                        $claimBlocksWrite = $wouldChange && (
+                            $dryRun
+                                ? $timesheet->hasActivePayrollClaim()
+                                : ! $this->applyTimesheetPayloadIfUnclaimed($timesheet->id, $payload)
+                        );
+                        if ($claimBlocksWrite) {
+                            $summary['timesheets']['unrepairable']++;
+                            $this->pushSample(
+                                $samples['timesheets'],
+                                $timesheet->id,
+                                'claimed by an active payroll run; correct the draft before backfill',
+                            );
+                        } elseif ($wouldChange) {
                             $summary['timesheets']['updated']++;
-                            if (! $dryRun) {
-                                $timesheet->forceFill($payload)->saveQuietly();
-                            }
                         } else {
                             $summary['timesheets']['skipped']++;
                         }
@@ -165,6 +177,7 @@ class BackfillOperationalSnapshots extends Command
                         if ($failure) {
                             $summary['billing_entries']['unrepairable']++;
                             $this->pushSample($samples['billing_entries'], $entry->id, $failure);
+
                             continue;
                         }
 
@@ -217,6 +230,7 @@ class BackfillOperationalSnapshots extends Command
                         if ($failure) {
                             $summary['fleet_transports']['unrepairable']++;
                             $this->pushSample($samples['fleet_transports'], $transport->id, $failure);
+
                             continue;
                         }
 
@@ -271,6 +285,21 @@ class BackfillOperationalSnapshots extends Command
         return false;
     }
 
+    /** @param array<string, mixed> $payload */
+    protected function applyTimesheetPayloadIfUnclaimed(int $timesheetId, array $payload): bool
+    {
+        return DB::transaction(function () use ($timesheetId, $payload): bool {
+            $timesheet = Timesheet::query()->lockForUpdate()->findOrFail($timesheetId);
+            if ($timesheet->hasActivePayrollClaim()) {
+                return false;
+            }
+
+            $timesheet->forceFill($payload)->saveQuietly();
+
+            return true;
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -285,7 +314,7 @@ class BackfillOperationalSnapshots extends Command
             return null;
         }
 
-        return 'Missing required snapshot fields: ' . implode(', ', $missing);
+        return 'Missing required snapshot fields: '.implode(', ', $missing);
     }
 
     /**

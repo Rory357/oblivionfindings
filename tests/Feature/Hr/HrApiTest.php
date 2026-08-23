@@ -256,6 +256,16 @@ test('hr api endpoints use canonical Site access and explicit application global
     $this->viewer->permissionOverrides()->syncWithoutDetaching([
         $exportPermission->id => ['allowed' => true],
     ]);
+    $this->actingAs($this->viewer->fresh(), 'sanctum')
+        ->getJson('/api/hr/payroll/runs')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $allowedPayrollRun->id);
+
+    $allSitesPermission = Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail();
+    $this->viewer->permissionOverrides()->syncWithoutDetaching([
+        $allSitesPermission->id => ['allowed' => true],
+    ]);
     $applicationPayroll = $this->actingAs($this->viewer->fresh(), 'sanctum')
         ->getJson('/api/hr/payroll/runs')
         ->assertOk()

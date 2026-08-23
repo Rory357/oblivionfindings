@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrPayrollAccessService;
 use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
@@ -24,6 +25,7 @@ class PayslipController extends Controller
         protected PayslipService $payslipService,
         private readonly HrPerformanceAccessService $performanceAccess,
         private readonly HrCurrentStaffService $currentStaff,
+        private readonly HrPayrollAccessService $payrollAccess,
     ) {}
 
     /**
@@ -102,19 +104,8 @@ class PayslipController extends Controller
         $profiles = collect();
 
         if (! empty($data['payroll_run_id'])) {
-            $run = HrPayrollRun::query()->findOrFail($data['payroll_run_id']);
-            $runUserIds = $run->items()
-                ->pluck('user_id')
-                ->filter()
-                ->map(fn ($userId): int => (int) $userId)
-                ->unique()
-                ->values();
-            $visibleRunUserIds = $this->performanceAccess
-                ->currentUserIds($user)
-                ->whereIn('users.id', $runUserIds)
-                ->pluck('users.id')
-                ->map(fn ($userId): int => (int) $userId);
-            abort_unless($runUserIds->diff($visibleRunUserIds)->isEmpty(), 404);
+            $run = $this->payrollAccess->payrollRun($user, (int) $data['payroll_run_id']);
+            $this->payrollAccess->assertCanManageApplicationPayroll($user);
         } elseif (! empty($data['employee_profile_id'])) {
             $profile = $this->performanceAccess
                 ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)

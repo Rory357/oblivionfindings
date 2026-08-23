@@ -27,59 +27,64 @@ class TimesheetHrSyncService
             return;
         }
 
-        $timesheet->loadMissing([
-            'user.hrEmployeeProfile',
-            'shift.site:id,name',
-            'shift.client:id,first_name,last_name,site_id',
-            'shift.serviceContext:id,name',
-            'client:id,first_name,last_name',
-        ]);
-
-        $timesheet->forceFill($this->snapshots->snapshotForTimesheet($timesheet))->saveQuietly();
-
-        $rate = $this->rateResolver->resolve($timesheet);
-        $hours = $this->calculatePayableHours($timesheet);
-        $tenantId = $this->resolveTenantId($timesheet);
-
-        // For HR time entry, use dominant_type when mixed so the entry
-        // carries a meaningful single classification alongside the cost.
-        $hrPayType = $rate['pay_type'] === 'mixed'
-            ? ($rate['dominant_type'] ?? 'standard')
-            : $rate['pay_type'];
-
-        $entryValues = [
-            'tenant_id' => $tenantId,
-            'user_id' => $timesheet->user_id,
-            'shift_id' => $timesheet->shift_id,
-            'client_id' => $timesheet->client_id,
-            'site_id' => $timesheet->shift_site_id,
-            'entry_date' => $timesheet->work_date,
-            'clock_in' => $timesheet->starts_at,
-            'clock_out' => $timesheet->ends_at,
-            'break_minutes' => $timesheet->break_minutes ?? 0,
-            'total_hours' => $hours,
-            'entry_type' => 'timesheet',
-            'status' => 'approved',
-            'pay_type' => $hrPayType,
-            'is_sleepover' => (bool) $timesheet->sleepover,
-            'is_on_call' => (bool) $timesheet->on_call,
-            'is_public_holiday' => (bool) $timesheet->public_holiday,
-            'mileage_km' => $timesheet->mileage_km ?? 0,
-            'notes' => sprintf(
-                'Shift timesheet — %s',
-                $timesheet->client_name_snapshot ?? 'Snapshot missing'
-            ),
-            'approved_by' => $timesheet->approved_by,
-            'approved_at' => $timesheet->approved_at,
-        ];
-
-        DB::transaction(function () use ($timesheet, $tenantId, $entryValues, $rate): void {
+        DB::transaction(function () use ($timesheet): void {
             // The timesheet row is the concurrency gate. It makes the
-            // source lookup + optional create atomic even though historical
-            // schemas only indexed (rather than uniquely constrained) source.
+            // payroll-claim check, snapshot update and source lookup atomic.
             $lockedTimesheet = Timesheet::query()
                 ->lockForUpdate()
                 ->findOrFail($timesheet->id);
+
+            if ($lockedTimesheet->status !== 'approved') {
+                return;
+            }
+
+            if ($lockedTimesheet->hasActivePayrollClaim()) {
+                throw ValidationException::withMessages([
+                    'timesheet' => 'This timesheet is claimed by an active payroll run. Correct the draft payroll run before synchronising HR evidence.',
+                ]);
+            }
+
+            $lockedTimesheet->load([
+                'user.hrEmployeeProfile',
+                'shift.site:id,name',
+                'shift.client:id,first_name,last_name,site_id',
+                'shift.serviceContext:id,name',
+                'client:id,first_name,last_name',
+            ]);
+            $lockedTimesheet
+                ->forceFill($this->snapshots->snapshotForTimesheet($lockedTimesheet))
+                ->saveQuietly();
+
+            $rate = $this->rateResolver->resolve($lockedTimesheet);
+            $tenantId = $this->resolveTenantId($lockedTimesheet);
+            $hrPayType = $rate['pay_type'] === 'mixed'
+                ? ($rate['dominant_type'] ?? 'standard')
+                : $rate['pay_type'];
+            $entryValues = [
+                'tenant_id' => $tenantId,
+                'user_id' => $lockedTimesheet->user_id,
+                'shift_id' => $lockedTimesheet->shift_id,
+                'client_id' => $lockedTimesheet->client_id,
+                'site_id' => $lockedTimesheet->shift_site_id,
+                'entry_date' => $lockedTimesheet->work_date,
+                'clock_in' => $lockedTimesheet->starts_at,
+                'clock_out' => $lockedTimesheet->ends_at,
+                'break_minutes' => $lockedTimesheet->break_minutes ?? 0,
+                'total_hours' => $this->calculatePayableHours($lockedTimesheet),
+                'entry_type' => 'timesheet',
+                'status' => 'approved',
+                'pay_type' => $hrPayType,
+                'is_sleepover' => (bool) $lockedTimesheet->sleepover,
+                'is_on_call' => (bool) $lockedTimesheet->on_call,
+                'is_public_holiday' => (bool) $lockedTimesheet->public_holiday,
+                'mileage_km' => $lockedTimesheet->mileage_km ?? 0,
+                'notes' => sprintf(
+                    'Shift timesheet — %s',
+                    $lockedTimesheet->client_name_snapshot ?? 'Snapshot missing',
+                ),
+                'approved_by' => $lockedTimesheet->approved_by,
+                'approved_at' => $lockedTimesheet->approved_at,
+            ];
 
             $canonicalEntries = HrTimeEntry::query()
                 ->where('source_type', 'timesheet')

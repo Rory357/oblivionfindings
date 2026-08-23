@@ -103,6 +103,10 @@ class PayslipService
                 throw new \DomainException('A paid payslip cannot be regenerated.');
             }
 
+            if ($payslip?->payroll_run_id !== null) {
+                throw new \DomainException('A run-backed payslip is immutable and cannot be regenerated outside its payroll run.');
+            }
+
             if ($payslip) {
                 $payslip->fill($values)->save();
 
@@ -124,7 +128,33 @@ class PayslipService
     public function generateBulkPayslips(HrPayrollRun $run): Collection
     {
         return DB::transaction(function () use ($run) {
+            $run = HrPayrollRun::query()
+                ->lockForUpdate()
+                ->findOrFail($run->getKey());
+            if ($run->locked_at === null || ! in_array($run->status, ['locked', 'exported'], true)) {
+                throw new \LogicException('Run-backed payslips can be generated only after the payroll run is locked.');
+            }
+            if (! in_array($run->source_provenance_status, ['verified', 'legacy_no_paid_leave'], true)) {
+                throw new \LogicException('Run-backed payslips require verified payroll source provenance.');
+            }
+
             $items = $run->items()->with('user')->get();
+            $existing = $run->payslips()->lockForUpdate()->get();
+            if ($existing->isNotEmpty()) {
+                $itemsByUser = $items->keyBy(fn ($item): int => (int) $item->user_id);
+                $hasExactCoverage = $existing->count() === $itemsByUser->count()
+                    && $existing->every(function (HrPayslip $payslip) use ($itemsByUser): bool {
+                        $item = $itemsByUser->get((int) $payslip->user_id);
+
+                        return $item !== null
+                            && bccomp((string) $payslip->gross_pay, (string) $item->gross_pay, 2) === 0;
+                    });
+                if (! $hasExactCoverage) {
+                    throw new \LogicException('Run-backed payslips are incomplete or do not match the locked payroll items.');
+                }
+
+                return $existing;
+            }
             $payslips = collect();
 
             foreach ($items as $item) {

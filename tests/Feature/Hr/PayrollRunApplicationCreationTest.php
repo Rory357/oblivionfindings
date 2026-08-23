@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\Role;
 use App\Models\User;
@@ -20,6 +21,23 @@ beforeEach(function () {
 });
 
 test('payroll run creation uses one application period without user partition context', function () {
+    $worker = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    ensureCanonicalHrStaffProfile($worker, overrides: [
+        'hourly_rate' => '30.00',
+    ]);
+    HrLeaveRequest::query()->create([
+        'user_id' => $worker->id,
+        'leave_type' => 'annual',
+        'starts_at' => now()->startOfMonth()->addDays(2)->startOfDay(),
+        'ends_at' => now()->startOfMonth()->addDays(2)->startOfDay(),
+        'hours_requested' => '8.00',
+        'status' => 'approved',
+        'created_by' => $worker->id,
+    ]);
+
     $response = $this->actingAs($this->hr)->post('/hr/payroll/runs', [
         'period_start' => now()->startOfMonth()->toDateString(),
         'period_end' => now()->startOfMonth()->addDays(13)->toDateString(),

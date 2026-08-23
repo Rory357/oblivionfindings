@@ -126,11 +126,12 @@ test('IRD payroll filing creation conceals a run containing hidden Site staff', 
     expect(FinIrdFiling::query()->where('payroll_run_id', $run->id)->exists())->toBeFalse();
 });
 
-test('explicit payroll export access permits application-wide IRD payroll filing', function () {
+test('explicit payroll export and all-Site access permit application-wide IRD payroll filing', function () {
     $viewer = ($this->viewer)([
         'finance.tax.manage',
         'hr.payroll.view',
         'hr.payroll.export',
+        'hr.employees.viewAllSites',
     ]);
     $hiddenStaff = ($this->staff)($this->hiddenSite);
     $run = ($this->postedRun)([$hiddenStaff]);

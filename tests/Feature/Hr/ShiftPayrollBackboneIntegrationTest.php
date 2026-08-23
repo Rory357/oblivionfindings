@@ -141,7 +141,7 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     $run = app(PayrollExportService::class)->createRun(
         periodStart: $workerNow->copy()->subWeek()->startOfDay(),
         periodEnd: $workerNow->copy()->endOfDay(),
-        createdBy: $finance->id,
+        createdBy: $hr->id,
     );
 
     $item = $run->items()->where('user_id', $worker->id)->first();
@@ -271,7 +271,7 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
     $run = app(PayrollExportService::class)->createRun(
         periodStart: now()->subWeek()->startOfDay(),
         periodEnd: now()->endOfDay(),
-        createdBy: $finance->id,
+        createdBy: $hr->id,
     );
 
     $item = $run->items()->where('user_id', $worker->id)->firstOrFail();

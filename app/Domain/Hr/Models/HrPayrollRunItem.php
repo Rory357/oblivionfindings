@@ -7,10 +7,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrPayrollRunItem extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'payroll_run_id',
@@ -56,7 +57,7 @@ class HrPayrollRunItem extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function payrollRun(): BelongsTo
@@ -67,5 +68,10 @@ class HrPayrollRunItem extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function sourceUses(): HasMany
+    {
+        return $this->hasMany(HrPayrollSourceUse::class, 'payroll_run_item_id');
     }
 }

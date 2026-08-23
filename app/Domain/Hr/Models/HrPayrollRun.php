@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrPayrollRun extends Model
 {
@@ -23,6 +24,10 @@ class HrPayrollRun extends Model
 
     protected $fillable = [
         'tenant_id',
+        'command_key_sha256',
+        'command_payload_sha256',
+        'source_provenance_status',
+        'correction_of_run_id',
         'period_start',
         'period_end',
         'status',
@@ -42,6 +47,9 @@ class HrPayrollRun extends Model
         'gl_posted_at',
         'gl_error',
         'net_paid_at',
+        'voided_at',
+        'voided_by',
+        'void_reason',
         'payment_journal_id',
         'cost_allocated_at',
         'oncost_allocated_at',
@@ -61,6 +69,9 @@ class HrPayrollRun extends Model
         'journal_id' => 'integer',
         'gl_posted_at' => 'datetime',
         'net_paid_at' => 'datetime',
+        'voided_at' => 'datetime',
+        'voided_by' => 'integer',
+        'correction_of_run_id' => 'integer',
         'payment_journal_id' => 'integer',
         'cost_allocated_at' => 'datetime',
         'oncost_allocated_at' => 'datetime',
@@ -80,6 +91,21 @@ class HrPayrollRun extends Model
         return $this->hasMany(HrPayslip::class, 'payroll_run_id');
     }
 
+    public function sourceUses(): HasMany
+    {
+        return $this->hasMany(HrPayrollSourceUse::class, 'payroll_run_id');
+    }
+
+    public function correctionOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'correction_of_run_id');
+    }
+
+    public function correction(): HasOne
+    {
+        return $this->hasOne(self::class, 'correction_of_run_id');
+    }
+
     public function lockedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'locked_by');
@@ -88,6 +114,11 @@ class HrPayrollRun extends Model
     public function exportedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'exported_by');
+    }
+
+    public function voidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
     }
 
     public function exportProfile(): BelongsTo

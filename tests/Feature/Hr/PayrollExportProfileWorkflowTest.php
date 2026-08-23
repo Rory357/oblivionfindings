@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,10 @@ beforeEach(function () {
     Storage::fake('private');
 
     $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create([
+        'name' => 'Payroll export profile Site',
+    ]);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -38,6 +43,7 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
     ]);
@@ -71,6 +77,7 @@ test('hr can create default payroll export profile and export mapped csv', funct
         'period_start' => now()->subDays(14)->toDateString(),
         'period_end' => now()->subDay()->toDateString(),
         'status' => 'locked',
+        'source_provenance_status' => 'legacy_no_paid_leave',
         'locked_at' => now()->subHours(2),
         'locked_by' => $this->hr->id,
         'total_hours' => 8,

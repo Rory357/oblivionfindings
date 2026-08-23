@@ -17,6 +17,7 @@ class HrPayrollRunFactory extends Factory
 
         return [
             'tenant_id' => 1,
+            'source_provenance_status' => 'legacy_no_paid_leave',
             'period_start' => $periodStart->toDateString(),
             'period_end' => $periodStart->copy()->addDays(13)->toDateString(),
             'status' => 'draft',

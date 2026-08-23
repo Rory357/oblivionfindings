@@ -54,6 +54,40 @@ class HrLeaveRequest extends Model
         'escalated_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $request): void {
+            if (! $request->isDirty([
+                'user_id',
+                'leave_type',
+                'starts_at',
+                'ends_at',
+                'hours_requested',
+                'status',
+            ])) {
+                return;
+            }
+
+            if (HrPayrollSourceUse::query()
+                ->where('leave_request_id', $request->getKey())
+                ->whereNotNull('active_source_identity')
+                ->exists()) {
+                throw new \LogicException(
+                    'This leave request is claimed by an active payroll run and cannot be changed.',
+                );
+            }
+        });
+
+        static::deleting(function (self $request): void {
+            if (HrPayrollSourceUse::query()
+                ->where('leave_request_id', $request->getKey())
+                ->whereNotNull('active_source_identity')
+                ->exists()) {
+                throw new \LogicException('Payroll-claimed leave evidence cannot be deleted.');
+            }
+        });
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Relationships */
     /* ------------------------------------------------------------------ */

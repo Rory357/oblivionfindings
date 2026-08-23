@@ -46,7 +46,9 @@ class TimesheetAmendmentService
             $originalValues[$field] = $value instanceof \DateTimeInterface ? $value->toISOString() : $value;
         }
 
-        $isPayrollLinked = filled($timesheet->payroll_reference) || filled($timesheet->exported_to_payroll_at);
+        $isPayrollLinked = filled($timesheet->payroll_reference)
+            || filled($timesheet->exported_to_payroll_at)
+            || $timesheet->hasActivePayrollClaim();
 
         $amendment = TimesheetAmendment::create([
             'timesheet_id' => $timesheet->id,
@@ -97,7 +99,8 @@ class TimesheetAmendmentService
                 ->findOrFail($amendment->timesheet_id);
 
             $isPayrollLinked = filled($timesheet->payroll_reference)
-                || filled($timesheet->exported_to_payroll_at);
+                || filled($timesheet->exported_to_payroll_at)
+                || $timesheet->hasActivePayrollClaim();
 
             if ($isPayrollLinked) {
                 // Exported timesheets: approve the correction record but do NOT

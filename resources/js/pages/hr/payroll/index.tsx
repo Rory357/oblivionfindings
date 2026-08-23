@@ -38,7 +38,7 @@ interface PayrollRun {
     id: number;
     period_start: string;
     period_end: string;
-    status: 'draft' | 'locked' | 'exported';
+    status: 'draft' | 'locked' | 'exported' | 'void';
     total_hours: number;
     total_gross: number;
     items_count: number;
@@ -95,6 +95,10 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         className:
             'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Exported',
+    },
+    void: {
+        className: 'border-muted-foreground/30 text-muted-foreground bg-muted',
+        label: 'Voided',
     },
 };
 

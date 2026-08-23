@@ -52,6 +52,8 @@ class PayrollJournalService
                 return $existingJournal;
             }
 
+            $this->assertReleasablePayrollRun($payrollRun);
+
             // Load all payslips for this run
             $payslips = HrPayslip::where('payroll_run_id', $payrollRun->id)->get();
 
@@ -237,14 +239,16 @@ class PayrollJournalService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            if ($payrollRun->payment_journal_id !== null) {
+                return FinJournal::query()->findOrFail($payrollRun->payment_journal_id);
+            }
+
+            $this->assertReleasablePayrollRun($payrollRun);
+
             if ($payrollRun->journal_id === null) {
                 throw new RuntimeException(
                     "Payroll run #{$payrollRun->id} must be posted to the GL before net pay can be paid."
                 );
-            }
-
-            if ($payrollRun->payment_journal_id !== null) {
-                return FinJournal::query()->findOrFail($payrollRun->payment_journal_id);
             }
 
             $orgId = $payrollRun->tenant_id;
@@ -310,6 +314,21 @@ class PayrollJournalService
 
             return $journal;
         });
+    }
+
+    private function assertReleasablePayrollRun(HrPayrollRun $payrollRun): void
+    {
+        if (! in_array($payrollRun->source_provenance_status, ['verified', 'legacy_no_paid_leave'], true)) {
+            throw new RuntimeException(
+                "Payroll run #{$payrollRun->id} has unverified paid-leave provenance and cannot be posted or paid.",
+            );
+        }
+        if ($payrollRun->locked_at === null
+            || ! in_array($payrollRun->status, ['locked', 'exported'], true)) {
+            throw new RuntimeException(
+                "Payroll run #{$payrollRun->id} must be locked before it can be posted or paid.",
+            );
+        }
     }
 
     /**
