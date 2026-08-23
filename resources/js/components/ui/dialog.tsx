@@ -2,18 +2,47 @@ import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
+import {
+  clearOverlayFocusReturn,
+  OverlayFocusReturnProvider,
+  rememberOverlayActiveElement,
+  rememberOverlayTrigger,
+  restoreOverlayFocus,
+  useOverlayFocusReturn,
+} from "@/components/ui/overlay-focus-return"
 import { cn } from "@/lib/utils"
 
 function Dialog({
+  children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  return (
+    <OverlayFocusReturnProvider>
+      <DialogPrimitive.Root data-slot="dialog" {...props}>
+        {children}
+      </DialogPrimitive.Root>
+    </OverlayFocusReturnProvider>
+  )
 }
 
 function DialogTrigger({
+  onClick,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+  const returnFocusRef = useOverlayFocusReturn()
+
+  return (
+    <DialogPrimitive.Trigger
+      data-slot="dialog-trigger"
+      {...props}
+      onClick={(event) => {
+        onClick?.(event)
+        if (!event.defaultPrevented) {
+          rememberOverlayTrigger(returnFocusRef, event.currentTarget)
+        }
+      }}
+    />
+  )
 }
 
 function DialogPortal({
@@ -47,8 +76,12 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  const returnFocusRef = useOverlayFocusReturn()
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -59,6 +92,22 @@ function DialogContent({
           className
         )}
         {...props}
+        onOpenAutoFocus={(event) => {
+          rememberOverlayActiveElement(returnFocusRef)
+          onOpenAutoFocus?.(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (event.defaultPrevented) {
+            clearOverlayFocusReturn(returnFocusRef)
+            return
+          }
+
+          if (returnFocusRef) {
+            event.preventDefault()
+            restoreOverlayFocus(returnFocusRef)
+          }
+        }}
       >
         {children}
         <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">

@@ -2,16 +2,47 @@ import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 import * as React from 'react';
 
+import {
+    clearOverlayFocusReturn,
+    OverlayFocusReturnProvider,
+    rememberOverlayActiveElement,
+    rememberOverlayTrigger,
+    restoreOverlayFocus,
+    useOverlayFocusReturn,
+} from '@/components/ui/overlay-focus-return';
 import { cn } from '@/lib/utils';
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-    return <SheetPrimitive.Root data-slot="sheet" {...props} />;
+function Sheet({
+    children,
+    ...props
+}: React.ComponentProps<typeof SheetPrimitive.Root>) {
+    return (
+        <OverlayFocusReturnProvider>
+            <SheetPrimitive.Root data-slot="sheet" {...props}>
+                {children}
+            </SheetPrimitive.Root>
+        </OverlayFocusReturnProvider>
+    );
 }
 
 function SheetTrigger({
+    onClick,
     ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
-    return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
+    const returnFocusRef = useOverlayFocusReturn();
+
+    return (
+        <SheetPrimitive.Trigger
+            data-slot="sheet-trigger"
+            {...props}
+            onClick={(event) => {
+                onClick?.(event);
+                if (!event.defaultPrevented) {
+                    rememberOverlayTrigger(returnFocusRef, event.currentTarget);
+                }
+            }}
+        />
+    );
 }
 
 function SheetClose({
@@ -49,6 +80,8 @@ function SheetContent({
     overlayClassName,
     closeButtonClassName,
     closeLabel = 'Close',
+    onOpenAutoFocus,
+    onCloseAutoFocus,
     ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
     side?: 'top' | 'right' | 'bottom' | 'left';
@@ -56,6 +89,8 @@ function SheetContent({
     closeButtonClassName?: string;
     closeLabel?: string;
 }) {
+    const returnFocusRef = useOverlayFocusReturn();
+
     return (
         <SheetPortal>
             <SheetOverlay className={overlayClassName} />
@@ -74,6 +109,22 @@ function SheetContent({
                     className,
                 )}
                 {...props}
+                onOpenAutoFocus={(event) => {
+                    rememberOverlayActiveElement(returnFocusRef);
+                    onOpenAutoFocus?.(event);
+                }}
+                onCloseAutoFocus={(event) => {
+                    onCloseAutoFocus?.(event);
+                    if (event.defaultPrevented) {
+                        clearOverlayFocusReturn(returnFocusRef);
+                        return;
+                    }
+
+                    if (returnFocusRef) {
+                        event.preventDefault();
+                        restoreOverlayFocus(returnFocusRef);
+                    }
+                }}
             >
                 {children}
                 <SheetPrimitive.Close
