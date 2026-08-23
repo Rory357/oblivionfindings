@@ -6,10 +6,13 @@ use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\RespiteBooking;
+use App\Models\RespiteBookingRequest;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
+use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -70,6 +73,238 @@ class RespiteStayScope
             });
     }
 
+    public function applyAccessibleBookingRequestScope(Builder $query, ?User $user): Builder
+    {
+        return $query->whereHas(
+            'client',
+            fn (Builder $clients) => $this->applyAccessibleClientScope($clients, $user),
+        );
+    }
+
+    public function applyAccessibleClientScope(Builder $query, ?User $user): Builder
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+        if (! $user || $siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->whereIn('site_id', $siteIds);
+        if ($user->canDo('clients.viewAny')) {
+            return $query;
+        }
+        if (! $user->canDo('clients.viewAssigned')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas(
+            'supportWorkers',
+            fn (Builder $workers) => $workers->whereKey($user->id),
+        );
+    }
+
+    public function applyAccessibleStaffScope(Builder $query, ?User $user): Builder
+    {
+        return $this->siteAccess->applyStaffScope(
+            $query,
+            $user,
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    public function applyAccessibleServiceContextScope(Builder $query, ?User $user): Builder
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+        if (! $user || $siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->where('is_active', true)
+            ->availableToSites($siteIds);
+    }
+
+    public function resolveAuthorizedClient(
+        Request $request,
+        int $clientId,
+        bool $lock = false,
+    ): Client {
+        $user = $request->user();
+        abort_unless($user, 404);
+
+        $query = $this->applyAccessibleClientScope(Client::query(), $user);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $client = $query->findOrFail($clientId);
+        abort_unless(Gate::forUser($user)->allows('view', $client), 404);
+        $this->assertCanonicalSitesAvailable($client, null, $lock);
+
+        return $client;
+    }
+
+    public function resolveAuthorizedBookingRequest(
+        Request $request,
+        int $requestId,
+        bool $lock = false,
+    ): RespiteBookingRequest {
+        $user = $request->user();
+        abort_unless($user, 404);
+
+        $candidate = $this->applyAccessibleBookingRequestScope(
+            RespiteBookingRequest::query(),
+            $user,
+        )->findOrFail($requestId);
+
+        $clientQuery = Client::query();
+        if ($lock) {
+            $clientQuery->lockForUpdate();
+        }
+        $client = $clientQuery->find($candidate->client_id);
+        abort_unless($client && Gate::forUser($user)->allows('view', $client), 404);
+        $this->assertCanonicalSitesAvailable($client, null, $lock);
+
+        $requestQuery = $this->applyAccessibleBookingRequestScope(
+            RespiteBookingRequest::query(),
+            $user,
+        )
+            ->whereKey($candidate->id)
+            ->where('client_id', $client->id);
+        if ($lock) {
+            $requestQuery->lockForUpdate();
+        }
+
+        $bookingRequest = $requestQuery->firstOrFail();
+        $bookingRequest->setRelation('client', $client);
+
+        return $bookingRequest;
+    }
+
+    public function resolveAuthorizedBooking(
+        Request $request,
+        int $bookingId,
+        bool $lock = false,
+    ): RespiteBooking {
+        $user = $request->user();
+        abort_unless($user, 404);
+
+        $candidate = $this->applyAccessibleBookingScope(
+            RespiteBooking::query(),
+            $user,
+        )->findOrFail($bookingId);
+
+        $clientQuery = Client::query();
+        if ($lock) {
+            $clientQuery->lockForUpdate();
+        }
+        $client = $clientQuery->find($candidate->client_id);
+        abort_unless($client && Gate::forUser($user)->allows('view', $client), 404);
+        $this->assertCanonicalSitesAvailable($client, $candidate->location_id, $lock);
+
+        $sourceRequest = null;
+        if ($candidate->booking_request_id) {
+            $sourceRequestQuery = RespiteBookingRequest::withTrashed()
+                ->whereKey($candidate->booking_request_id)
+                ->where('client_id', $client->id);
+            if ($lock) {
+                $sourceRequestQuery->lockForUpdate();
+            }
+            $sourceRequest = $sourceRequestQuery->first();
+            abort_unless($sourceRequest, 404);
+        }
+
+        $bookingQuery = $this->applyAccessibleBookingScope(
+            RespiteBooking::query(),
+            $user,
+        )
+            ->whereKey($candidate->id)
+            ->where('client_id', $client->id);
+        if ($lock) {
+            $bookingQuery->lockForUpdate();
+        }
+
+        $booking = $bookingQuery->firstOrFail();
+        $booking->setRelation('client', $client);
+        if ($sourceRequest) {
+            $booking->setRelation('request', $sourceRequest);
+        }
+
+        return $booking;
+    }
+
+    public function assertAuthorizedSiteId(Request $request, int $siteId): void
+    {
+        $this->resolveAuthorizedSite($request, $siteId);
+    }
+
+    public function resolveAuthorizedSite(
+        Request $request,
+        int $siteId,
+        bool $lock = false,
+    ): Site {
+        $user = $request->user();
+        abort_unless($user, 404);
+
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+        abort_unless($siteId > 0 && in_array($siteId, $siteIds, true), 404);
+
+        $query = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereKey($siteId);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->firstOrFail();
+    }
+
+    public function resolveAuthorizedStaffAtSite(
+        Request $request,
+        int $staffId,
+        int $siteId,
+        bool $lock = false,
+    ): User {
+        $user = $request->user();
+        abort_unless($user, 404);
+        $this->assertAuthorizedSiteId($request, $siteId);
+
+        $query = $this->applyAccessibleStaffScope(User::query(), $user)
+            ->whereKey($staffId)
+            ->whereHas('hrEmployeeProfile', function (Builder $profiles) use ($siteId): void {
+                $profiles->where(function (Builder $sites) use ($siteId): void {
+                    $sites->where('primary_site_id', $siteId)
+                        ->orWhereJsonContains('secondary_site_ids', $siteId);
+                });
+            });
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->firstOrFail();
+    }
+
+    public function resolveAuthorizedServiceContextForClient(
+        Request $request,
+        int $serviceContextId,
+        Client $client,
+        bool $lock = false,
+    ): ServiceContext {
+        $user = $request->user();
+        abort_unless($user && $client->site_id, 404);
+        $this->assertAuthorizedSiteId($request, (int) $client->site_id);
+
+        $query = $this->applyAccessibleServiceContextScope(ServiceContext::query(), $user)
+            ->availableToSite((int) $client->site_id)
+            ->whereKey($serviceContextId);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->firstOrFail();
+    }
+
     public function resolveAuthorizedStay(
         Request $request,
         int $stayId,
@@ -113,32 +348,65 @@ class RespiteStayScope
         $user = $request->user();
         abort_unless($user, 404);
 
+        $candidate = $this->applyStayScope(
+            RespiteStay::query(),
+            $user,
+            $siteBypassPermissions,
+            $requireClientPermission,
+        )->findOrFail($stayId);
+
+        $clientQuery = Client::query();
+        if ($lock) {
+            $clientQuery->lockForUpdate();
+        }
+        $client = $clientQuery->find($candidate->client_id);
+
+        $bookingCandidate = RespiteBooking::query()
+            ->whereKey($candidate->booking_id)
+            ->where('client_id', $candidate->client_id)
+            ->first();
+        $this->assertCanonicalSitesAvailable($client, $bookingCandidate?->location_id, $lock);
+        $sourceRequest = null;
+        if ($bookingCandidate?->booking_request_id) {
+            $sourceRequestQuery = RespiteBookingRequest::withTrashed()
+                ->whereKey($bookingCandidate->booking_request_id)
+                ->where('client_id', $candidate->client_id);
+            if ($lock) {
+                $sourceRequestQuery->lockForUpdate();
+            }
+            $sourceRequest = $sourceRequestQuery->first();
+        }
+
+        $bookingQuery = RespiteBooking::query()
+            ->whereKey($candidate->booking_id)
+            ->where('client_id', $candidate->client_id);
+        if ($lock) {
+            $bookingQuery->lockForUpdate();
+        }
+        $booking = $bookingQuery->first();
+
         $stayQuery = $this->applyStayScope(
             RespiteStay::query(),
             $user,
             $siteBypassPermissions,
             $requireClientPermission,
-        );
+        )
+            ->whereKey($candidate->id)
+            ->where('booking_id', $candidate->booking_id)
+            ->where('client_id', $candidate->client_id);
         if ($lock) {
             $stayQuery->lockForUpdate();
         }
-
-        $stay = $stayQuery->findOrFail($stayId);
-
-        $bookingQuery = RespiteBooking::query();
-        $clientQuery = Client::query();
-        if ($lock) {
-            $bookingQuery->lockForUpdate();
-            $clientQuery->lockForUpdate();
-        }
-
-        $booking = $bookingQuery->find($stay->booking_id);
-        $client = $clientQuery->find($stay->client_id);
+        $stay = $stayQuery->firstOrFail();
 
         abort_unless(
             $booking
                 && $client
                 && (int) $booking->client_id === (int) $stay->client_id,
+            404,
+        );
+        abort_unless(
+            ! $booking->booking_request_id || $sourceRequest,
             404,
         );
 
@@ -157,8 +425,37 @@ class RespiteStayScope
 
         $stay->setRelation('booking', $booking);
         $stay->setRelation('client', $client);
+        if ($sourceRequest) {
+            $booking->setRelation('request', $sourceRequest);
+        }
 
         return $stay;
+    }
+
+    private function assertCanonicalSitesAvailable(
+        ?Client $client,
+        mixed $locationId,
+        bool $lock,
+    ): void {
+        abort_unless($client?->site_id, 404);
+
+        $siteIds = collect([$client->site_id, $locationId])
+            ->filter(fn ($siteId) => (int) $siteId > 0)
+            ->map(fn ($siteId) => (int) $siteId)
+            ->unique()
+            ->sort()
+            ->values();
+        $query = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $siteIds)
+            ->orderBy('id');
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        abort_unless($query->get(['id'])->count() === $siteIds->count(), 404);
     }
 
     public function siteId(RespiteStay $stay): int

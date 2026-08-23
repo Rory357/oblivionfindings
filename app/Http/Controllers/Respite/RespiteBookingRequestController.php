@@ -11,6 +11,8 @@ use App\Models\RespiteReferral;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceContext;
 use App\Services\Respite\RespiteShiftSync;
+use App\Services\Respite\RespiteStateTransitionService;
+use App\Services\Respite\RespiteStayScope;
 use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,9 +26,18 @@ class RespiteBookingRequestController extends Controller
 {
     private const FUNDING_STATUSES = ['not_required', 'pending_approval', 'approved', 'declined', 'expired'];
 
+    public function __construct(
+        private readonly RespiteStateTransitionService $states,
+        private readonly RespiteStayScope $scope,
+    ) {}
+
     public function index(Request $request): Response
     {
-        $query = RespiteBookingRequest::query()
+        $accessibleRequests = fn () => $this->scope->applyAccessibleBookingRequestScope(
+            RespiteBookingRequest::query(),
+            $request->user(),
+        );
+        $query = $accessibleRequests()
             ->with(['client', 'serviceContext', 'approvedBy', 'serviceAgreement'])
             ->where('status', '!=', 'approved');
 
@@ -47,41 +58,60 @@ class RespiteBookingRequestController extends Controller
             'requests' => $requests,
             'filters' => $request->only(['status', 'q']),
             'stats' => [
-                'submitted' => RespiteBookingRequest::where('status', 'submitted')->count(),
-                'approved' => RespiteBookingRequest::where('status', 'approved')->count(),
-                'rejected' => RespiteBookingRequest::where('status', 'rejected')->count(),
+                'submitted' => $accessibleRequests()->where('status', 'submitted')->count(),
+                'approved' => $accessibleRequests()->where('status', 'approved')->count(),
+                'rejected' => $accessibleRequests()->where('status', 'rejected')->count(),
             ],
         ]);
     }
 
     public function create(Request $request): Response
     {
+        $clients = $this->scope->applyAccessibleClientScope(Client::query(), $request->user())
+            ->select('id', 'first_name', 'last_name')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+        $defaultClientId = $request->integer('client_id');
+
         return Inertia::render('respite/requests/create', [
-            'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->orderBy('first_name')->get(),
-            'serviceContexts' => ServiceContext::select('id', 'name')->orderBy('name')->get(),
+            'clients' => $clients,
+            'serviceContexts' => $this->scope->applyAccessibleServiceContextScope(
+                ServiceContext::query(),
+                $request->user(),
+            )
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
             'serviceAgreements' => ServiceAgreement::query()
+                ->whereHas(
+                    'client',
+                    fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $request->user()),
+                )
                 ->active()
                 ->orderBy('title')
                 ->get(['id', 'client_id', 'title', 'reference_number', 'ends_at', 'total_budget', 'budget_used', 'total_hours', 'hours_used']),
             'fundingSources' => RespiteFundingSource::options(),
-            'defaultClientId' => $request->query('client_id'),
+            'defaultClientId' => $defaultClientId > 0 && $clients->contains('id', $defaultClientId)
+                ? $defaultClientId
+                : null,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'service_context_id' => 'nullable|exists:service_contexts,id',
+            'client_id' => 'required|integer|min:1',
+            'service_context_id' => 'nullable|integer|min:1',
             'requested_start' => 'required|date',
             'requested_end' => 'required|date|after:requested_start',
             'requirements' => 'nullable|array',
             'intake_snapshot' => 'nullable|array',
             'preference_notes' => 'nullable|string',
-            'referral_id' => 'nullable|exists:respite_referrals,id',
+            'referral_id' => 'nullable|integer|min:1',
             'funding_source' => ['nullable', 'string', Rule::in(RespiteFundingSource::keys())],
             'funding_reference' => 'nullable|string|max:255',
-            'service_agreement_id' => 'nullable|exists:service_agreements,id',
+            'service_agreement_id' => 'nullable|integer|min:1',
             'funding_status' => ['nullable', Rule::in(self::FUNDING_STATUSES)],
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
@@ -95,35 +125,62 @@ class RespiteBookingRequestController extends Controller
             'allocated_days' => 'nullable|integer|min:1',
         ]);
 
-        $client = Client::findOrFail($validated['client_id']);
-        $this->authorize('view', $client);
+        [$requestModel, $referral] = DB::transaction(function () use ($request, $validated): array {
+            $client = $this->scope->resolveAuthorizedClient($request, (int) $validated['client_id'], true);
+            $this->scope->resolveAuthorizedSite($request, (int) $client->site_id, true);
+            if (! empty($validated['service_context_id'])) {
+                $this->scope->resolveAuthorizedServiceContextForClient(
+                    $request,
+                    (int) $validated['service_context_id'],
+                    $client,
+                    true,
+                );
+            }
+            $referral = null;
 
-        $validated = $this->normaliseFunding($validated);
+            if (! empty($validated['referral_id'])) {
+                $referral = RespiteReferral::query()
+                    ->whereKey($validated['referral_id'])
+                    ->where('client_id', $client->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        $validated['status'] = 'submitted';
-        $validated['created_by'] = auth()->id();
+                $alreadyLinked = $referral->linked_booking_request_id !== null
+                    || RespiteBookingRequest::withTrashed()
+                        ->where('referral_id', $referral->id)
+                        ->lockForUpdate()
+                        ->exists();
+                if ($referral->status === 'declined' || $alreadyLinked) {
+                    throw ValidationException::withMessages([
+                        'referral_id' => $referral->status === 'declined'
+                            ? 'A declined referral cannot create a booking request.'
+                            : 'This referral already has a booking request.',
+                    ]);
+                }
+            }
 
-        $requestModel = RespiteBookingRequest::create($validated);
+            $updates = $this->normaliseFunding($validated, true, $referral);
+            $updates['status'] = 'submitted';
+            $updates['created_by'] = auth()->id();
 
-        // Advance the source referral out of the triage queue and record the
-        // link, so the workspace can hide the "Create booking request" action
-        // once a request exists for it.
-        if (! empty($validated['referral_id'])) {
-            $referral = RespiteReferral::find($validated['referral_id']);
-
-            if ($referral && $referral->status !== 'declined') {
+            $requestModel = RespiteBookingRequest::create($updates);
+            if ($referral) {
                 $referral->update([
                     'linked_booking_request_id' => $requestModel->id,
                     'status' => 'accepted',
                     'updated_by' => auth()->id(),
                 ]);
-
-                event(new RespiteEvent('respite.referral.updated', [
-                    'id' => $referral->id,
-                    'client_id' => $referral->client_id,
-                    'status' => $referral->status,
-                ]));
             }
+
+            return [$requestModel, $referral];
+        }, 3);
+
+        if ($referral) {
+            event(new RespiteEvent('respite.referral.updated', [
+                'id' => $referral->id,
+                'client_id' => $referral->client_id,
+                'status' => $referral->status,
+            ]));
         }
 
         event(new RespiteEvent('respite.booking_request.submitted', [
@@ -146,10 +203,15 @@ class RespiteBookingRequestController extends Controller
 
     public function show(RespiteBookingRequest $request): Response
     {
+        $httpRequest = request();
+        $request = $this->scope->resolveAuthorizedBookingRequest($httpRequest, (int) $request->id);
         $request->load(['client', 'serviceContext', 'approvedBy', 'serviceAgreement']);
-        $this->authorize('view', $request->client);
 
-        $booking = RespiteBooking::where('booking_request_id', $request->id)
+        $booking = $this->scope->applyAccessibleBookingScope(
+            RespiteBooking::query(),
+            $httpRequest->user(),
+        )
+            ->where('booking_request_id', $request->id)
             ->with('serviceAgreement')
             ->first();
 
@@ -161,8 +223,7 @@ class RespiteBookingRequestController extends Controller
 
     public function update(Request $httpRequest, RespiteBookingRequest $request): RedirectResponse
     {
-        $request->loadMissing('client');
-        $this->authorize('view', $request->client);
+        $this->states->assertRequestAccessible($httpRequest, (int) $request->id);
 
         $validated = $httpRequest->validate([
             'requested_start' => 'sometimes|date',
@@ -172,11 +233,11 @@ class RespiteBookingRequestController extends Controller
             'preference_notes' => 'nullable|string',
             'funding_source' => ['nullable', 'string', Rule::in(RespiteFundingSource::keys())],
             'funding_reference' => 'nullable|string|max:255',
-            'service_agreement_id' => 'nullable|exists:service_agreements,id',
+            'service_agreement_id' => 'nullable|integer|min:1',
             'funding_status' => ['nullable', Rule::in(self::FUNDING_STATUSES)],
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
-            'status' => 'sometimes|in:draft,submitted,under_review,approved,rejected,waitlisted',
+            'status' => ['sometimes', Rule::in(RespiteStateTransitionService::REQUEST_GENERIC_STATUSES)],
             'waitlist_position' => 'nullable|integer|min:1',
             'priority' => 'nullable|in:routine,priority,crisis',
             'expected_availability_date' => 'nullable|date',
@@ -188,41 +249,63 @@ class RespiteBookingRequestController extends Controller
             'decision_notes' => 'nullable|string',
         ]);
 
-        $funding = $this->normaliseFunding([
-            'client_id' => $request->client_id,
-            'referral_id' => $request->referral_id,
-            'funding_source' => $validated['funding_source'] ?? $request->funding_source,
-            'funding_reference' => $validated['funding_reference'] ?? $request->funding_reference,
-            'service_agreement_id' => $validated['service_agreement_id'] ?? $request->service_agreement_id,
-            'funding_status' => $validated['funding_status'] ?? $request->funding_status,
-            'funding_approved_ref' => $validated['funding_approved_ref'] ?? $request->funding_approved_ref,
-            'funding_approved_at' => $validated['funding_approved_at'] ?? $request->funding_approved_at,
-            'intake_snapshot' => $validated['intake_snapshot'] ?? $request->intake_snapshot,
-            'priority' => $validated['priority'] ?? $request->priority,
-            'is_emergency' => $validated['is_emergency'] ?? $request->is_emergency,
-            'fast_tracked' => $validated['fast_tracked'] ?? $request->fast_tracked,
-            'series_id' => $validated['series_id'] ?? $request->series_id,
-            'recurrence_rule' => $validated['recurrence_rule'] ?? $request->recurrence_rule,
-            'allocated_days' => $validated['allocated_days'] ?? $request->allocated_days,
-        ]);
-        $validated = array_merge($validated, array_intersect_key($funding, array_flip([
-            'funding_source',
-            'funding_reference',
-            'service_agreement_id',
-            'funding_status',
-            'funding_approved_ref',
-            'funding_approved_at',
-            'intake_snapshot',
-            'priority',
-            'is_emergency',
-            'fast_tracked',
-            'series_id',
-            'recurrence_rule',
-            'allocated_days',
-        ])));
+        $request = $this->states->transitionRequest(
+            $httpRequest,
+            (int) $request->id,
+            function (RespiteBookingRequest $request) use ($validated): RespiteBookingRequest {
+                $this->states->assertRequestUpdate(
+                    $request->status,
+                    array_key_exists('status', $validated) ? $validated['status'] : null,
+                );
 
-        $validated['updated_by'] = auth()->id();
-        $request->update($validated);
+                if (array_key_exists('status', $validated) && $validated['status'] !== $request->status) {
+                    $this->states->assertRequestHasNoBooking(
+                        RespiteBooking::withTrashed()
+                            ->where('booking_request_id', $request->id)
+                            ->lockForUpdate()
+                            ->first(['id']) !== null,
+                    );
+                }
+
+                $funding = $this->normaliseFunding([
+                    'client_id' => $request->client_id,
+                    'referral_id' => $request->referral_id,
+                    'funding_source' => $validated['funding_source'] ?? $request->funding_source,
+                    'funding_reference' => $validated['funding_reference'] ?? $request->funding_reference,
+                    'service_agreement_id' => $validated['service_agreement_id'] ?? $request->service_agreement_id,
+                    'funding_status' => $validated['funding_status'] ?? $request->funding_status,
+                    'funding_approved_ref' => $validated['funding_approved_ref'] ?? $request->funding_approved_ref,
+                    'funding_approved_at' => $validated['funding_approved_at'] ?? $request->funding_approved_at,
+                    'intake_snapshot' => $validated['intake_snapshot'] ?? $request->intake_snapshot,
+                    'priority' => $validated['priority'] ?? $request->priority,
+                    'is_emergency' => $validated['is_emergency'] ?? $request->is_emergency,
+                    'fast_tracked' => $validated['fast_tracked'] ?? $request->fast_tracked,
+                    'series_id' => $validated['series_id'] ?? $request->series_id,
+                    'recurrence_rule' => $validated['recurrence_rule'] ?? $request->recurrence_rule,
+                    'allocated_days' => $validated['allocated_days'] ?? $request->allocated_days,
+                ], true);
+                $updates = array_merge($validated, array_intersect_key($funding, array_flip([
+                    'funding_source',
+                    'funding_reference',
+                    'service_agreement_id',
+                    'funding_status',
+                    'funding_approved_ref',
+                    'funding_approved_at',
+                    'intake_snapshot',
+                    'priority',
+                    'is_emergency',
+                    'fast_tracked',
+                    'series_id',
+                    'recurrence_rule',
+                    'allocated_days',
+                ])));
+
+                $updates['updated_by'] = auth()->id();
+                $request->update($updates);
+
+                return $request;
+            },
+        );
 
         event(new RespiteEvent('respite.booking_request.updated', [
             'id' => $request->id,
@@ -235,79 +318,97 @@ class RespiteBookingRequestController extends Controller
 
     public function approve(Request $httpRequest, RespiteBookingRequest $request): RedirectResponse
     {
+        $this->states->assertRequestAccessible($httpRequest, (int) $request->id);
+
         $validated = $httpRequest->validate([
             'funding_override_reason' => 'nullable|string|max:500',
         ]);
 
-        $request->loadMissing('client', 'serviceAgreement');
-        $this->authorize('view', $request->client);
+        [$request, $booking] = $this->states->transitionRequest(
+            $httpRequest,
+            (int) $request->id,
+            function (RespiteBookingRequest $request) use ($httpRequest, $validated): array {
+                $this->states->assertRequestApproval($request->status);
+                $this->scope->resolveAuthorizedSite(
+                    $httpRequest,
+                    (int) $request->client->site_id,
+                    true,
+                );
+                if ($request->service_context_id) {
+                    $this->scope->resolveAuthorizedServiceContextForClient(
+                        $httpRequest,
+                        (int) $request->service_context_id,
+                        $request->client,
+                        true,
+                    );
+                }
+                $this->states->assertRequestHasNoBooking(
+                    RespiteBooking::withTrashed()
+                        ->where('booking_request_id', $request->id)
+                        ->lockForUpdate()
+                        ->first(['id']) !== null,
+                );
+                $funding = $this->normaliseFunding([
+                    'client_id' => $request->client_id,
+                    'referral_id' => $request->referral_id,
+                    'funding_source' => $request->funding_source,
+                    'funding_reference' => $request->funding_reference,
+                    'service_agreement_id' => $request->service_agreement_id,
+                    'funding_status' => $request->funding_status,
+                    'funding_approved_ref' => $request->funding_approved_ref,
+                    'funding_approved_at' => $request->funding_approved_at,
+                ], true);
+                $request->unsetRelation('serviceAgreement');
+                $request->load('serviceAgreement');
 
-        $booking = DB::transaction(function () use ($request, $validated) {
-            $fundingStatus = $this->effectiveFundingStatus($request->funding_status, $request->funding_source);
-            $approvedAt = $request->funding_approved_at ?: ($fundingStatus === 'approved' ? now() : null);
+                $fundingStatus = $funding['funding_status'];
+                $approvedAt = $funding['funding_approved_at'] ?? null;
 
-            $request->update([
-                'status' => 'approved',
-                'funding_status' => $fundingStatus,
-                'funding_approved_at' => $approvedAt,
-                'approved_by_user_id' => auth()->id(),
-                'approved_at' => now(),
-                'updated_by' => auth()->id(),
-            ]);
+                $request->update([
+                    'status' => 'approved',
+                    'funding_status' => $fundingStatus,
+                    'funding_approved_at' => $approvedAt,
+                    'approved_by_user_id' => auth()->id(),
+                    'approved_at' => now(),
+                    'updated_by' => auth()->id(),
+                ]);
 
-            $booking = RespiteBooking::firstOrNew(['booking_request_id' => $request->id]);
-            $approvals = $booking->approvals ?? [];
+                $approvals = [];
+                if ($fundingStatus === 'pending_approval' && filled($validated['funding_override_reason'] ?? null)) {
+                    $approvals['funding_override'] = [
+                        'reason' => $validated['funding_override_reason'],
+                        'recorded_by' => auth()->id(),
+                        'recorded_at' => now()->toIso8601String(),
+                    ];
+                }
 
-            if ($fundingStatus === 'pending_approval' && filled($validated['funding_override_reason'] ?? null)) {
-                $approvals['funding_override'] = [
-                    'reason' => $validated['funding_override_reason'],
-                    'recorded_by' => auth()->id(),
-                    'recorded_at' => now()->toIso8601String(),
-                ];
-            }
-
-            $booking->fill([
-                'client_id' => $request->client_id,
-                'start_at' => $request->requested_start,
-                'end_at' => $request->requested_end,
-                'funding_source' => $request->funding_source,
-                'funding_reference' => $request->funding_reference,
-                'service_agreement_id' => $request->service_agreement_id,
-                'funding_status' => $fundingStatus,
-                'agreement_status' => $this->agreementStatusFor($request->serviceAgreement),
-                'funding_approved_ref' => $request->funding_approved_ref,
-                'funding_approved_at' => $approvedAt,
-                'approvals' => $approvals ?: $booking->approvals,
-                'series_id' => $request->series_id,
-                'recurrence_rule' => $request->recurrence_rule,
-                'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
-                'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
-                'updated_by' => auth()->id(),
-            ]);
-
-            if (! $booking->exists) {
-                $booking->fill([
+                $booking = RespiteBooking::create([
+                    'booking_request_id' => $request->id,
                     'client_id' => $request->client_id,
                     'start_at' => $request->requested_start,
                     'end_at' => $request->requested_end,
                     'status' => 'pending',
+                    'funding_source' => $request->funding_source,
+                    'funding_reference' => $request->funding_reference,
+                    'service_agreement_id' => $request->service_agreement_id,
+                    'funding_status' => $fundingStatus,
+                    'agreement_status' => $this->agreementStatusFor($request->serviceAgreement),
+                    'funding_approved_ref' => $request->funding_approved_ref,
+                    'funding_approved_at' => $approvedAt,
+                    'approvals' => $approvals ?: null,
+                    'series_id' => $request->series_id,
+                    'recurrence_rule' => $request->recurrence_rule,
+                    'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
+                    'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
                     'created_by' => auth()->id(),
+                    'updated_by' => auth()->id(),
                 ]);
-            }
 
-            $booking->save();
+                app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id());
 
-            $serviceContextId = $request->service_context_id
-                ?: Client::query()->whereKey($request->client_id)->value('service_context_id');
-
-            if (empty($serviceContextId)) {
-                $serviceContextId = ServiceContext::defaultId();
-            }
-
-            app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id(), $serviceContextId);
-
-            return $booking;
-        });
+                return [$request, $booking];
+            },
+        );
 
         event(new RespiteEvent('respite.booking_request.approved', [
             'id' => $request->id,
@@ -332,77 +433,108 @@ class RespiteBookingRequestController extends Controller
 
     public function promote(Request $httpRequest, RespiteBookingRequest $request): RedirectResponse
     {
+        $this->states->assertRequestAccessible($httpRequest, (int) $request->id);
+
         $validated = $httpRequest->validate([
-            'location_id' => 'nullable|exists:sites,id',
+            'location_id' => 'nullable|integer|min:1',
             'capacity_override_reason' => 'nullable|string|max:500',
         ]);
 
-        $request->loadMissing('client', 'serviceAgreement', 'referral');
-        $this->authorize('view', $request->client);
-
-        if ($request->status !== 'waitlisted') {
-            throw ValidationException::withMessages([
-                'status' => 'Only waitlisted requests can be promoted.',
-            ]);
+        if (array_key_exists('location_id', $validated) && $validated['location_id'] !== null) {
+            $this->states->assertAuthorizedSite($httpRequest, (int) $validated['location_id']);
         }
 
-        $booking = DB::transaction(function () use ($request, $validated) {
-            $fundingStatus = $this->effectiveFundingStatus($request->funding_status, $request->funding_source);
+        [$request, $booking] = $this->states->transitionRequest(
+            $httpRequest,
+            (int) $request->id,
+            function (RespiteBookingRequest $request) use ($httpRequest, $validated): array {
+                $this->states->assertRequestPromotion($request->status);
+                $siteId = (int) (($validated['location_id'] ?? null) ?: $request->client->site_id);
+                $this->scope->resolveAuthorizedSite($httpRequest, $siteId, true);
+                if ($request->service_context_id) {
+                    $this->scope->resolveAuthorizedServiceContextForClient(
+                        $httpRequest,
+                        (int) $request->service_context_id,
+                        $request->client,
+                        true,
+                    );
+                }
+                $this->states->assertRequestHasNoBooking(
+                    RespiteBooking::withTrashed()
+                        ->where('booking_request_id', $request->id)
+                        ->lockForUpdate()
+                        ->first(['id']) !== null,
+                );
+                $funding = $this->normaliseFunding([
+                    'client_id' => $request->client_id,
+                    'referral_id' => $request->referral_id,
+                    'funding_source' => $request->funding_source,
+                    'funding_reference' => $request->funding_reference,
+                    'service_agreement_id' => $request->service_agreement_id,
+                    'funding_status' => $request->funding_status,
+                    'funding_approved_ref' => $request->funding_approved_ref,
+                    'funding_approved_at' => $request->funding_approved_at,
+                ], true);
+                $request->unsetRelation('serviceAgreement');
+                $request->load('serviceAgreement');
 
-            $request->update([
-                'status' => 'approved',
-                'approved_by_user_id' => auth()->id(),
-                'approved_at' => now(),
-                'updated_by' => auth()->id(),
-            ]);
+                $fundingStatus = $funding['funding_status'];
+                $approvedAt = $funding['funding_approved_at'] ?? null;
+                $request->update([
+                    'status' => 'approved',
+                    'funding_status' => $fundingStatus,
+                    'funding_approved_at' => $approvedAt,
+                    'approved_by_user_id' => auth()->id(),
+                    'approved_at' => now(),
+                    'updated_by' => auth()->id(),
+                ]);
 
-            $booking = RespiteBooking::firstOrNew(['booking_request_id' => $request->id]);
-            $approvals = $booking->approvals ?? [];
-            $approvals['waitlist_promotion'] = [
-                'position' => $request->waitlist_position,
-                'priority' => $request->priority,
-                'promoted_by' => auth()->id(),
-                'promoted_at' => now()->toIso8601String(),
-            ];
-
-            if (filled($validated['capacity_override_reason'] ?? null)) {
-                $approvals['capacity_override'] = [
-                    'reason' => $validated['capacity_override_reason'],
-                    'recorded_by' => auth()->id(),
-                    'recorded_at' => now()->toIso8601String(),
+                $approvals = [
+                    'waitlist_promotion' => [
+                        'position' => $request->waitlist_position,
+                        'priority' => $request->priority,
+                        'promoted_by' => auth()->id(),
+                        'promoted_at' => now()->toIso8601String(),
+                    ],
                 ];
-            }
 
-            $booking->fill([
-                'client_id' => $request->client_id,
-                'start_at' => $request->requested_start,
-                'end_at' => $request->requested_end,
-                'status' => $booking->exists ? $booking->status : 'pending',
-                'location_id' => $validated['location_id'] ?? $booking->location_id,
-                'funding_source' => $request->funding_source,
-                'funding_reference' => $request->funding_reference,
-                'service_agreement_id' => $request->service_agreement_id,
-                'funding_status' => $fundingStatus,
-                'agreement_status' => $this->agreementStatusFor($request->serviceAgreement),
-                'approvals' => $approvals,
-                'capacity_override_reason' => $validated['capacity_override_reason'] ?? null,
-                'series_id' => $request->series_id,
-                'recurrence_rule' => $request->recurrence_rule,
-                'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
-                'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
-                'created_by' => $booking->exists ? $booking->created_by : auth()->id(),
-                'updated_by' => auth()->id(),
-            ]);
-            $booking->save();
+                if (filled($validated['capacity_override_reason'] ?? null)) {
+                    $approvals['capacity_override'] = [
+                        'reason' => $validated['capacity_override_reason'],
+                        'recorded_by' => auth()->id(),
+                        'recorded_at' => now()->toIso8601String(),
+                    ];
+                }
 
-            $serviceContextId = $request->service_context_id
-                ?: Client::query()->whereKey($request->client_id)->value('service_context_id')
-                ?: ServiceContext::defaultId();
+                $booking = RespiteBooking::create([
+                    'booking_request_id' => $request->id,
+                    'client_id' => $request->client_id,
+                    'start_at' => $request->requested_start,
+                    'end_at' => $request->requested_end,
+                    'status' => 'pending',
+                    'location_id' => $validated['location_id'] ?? null,
+                    'funding_source' => $request->funding_source,
+                    'funding_reference' => $request->funding_reference,
+                    'service_agreement_id' => $request->service_agreement_id,
+                    'funding_status' => $fundingStatus,
+                    'funding_approved_ref' => $request->funding_approved_ref,
+                    'funding_approved_at' => $approvedAt,
+                    'agreement_status' => $this->agreementStatusFor($request->serviceAgreement),
+                    'approvals' => $approvals,
+                    'capacity_override_reason' => $validated['capacity_override_reason'] ?? null,
+                    'series_id' => $request->series_id,
+                    'recurrence_rule' => $request->recurrence_rule,
+                    'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
+                    'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
+                    'created_by' => auth()->id(),
+                    'updated_by' => auth()->id(),
+                ]);
 
-            app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id(), $serviceContextId);
+                app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id());
 
-            return $booking;
-        });
+                return [$request, $booking];
+            },
+        );
 
         event(new RespiteEvent('respite.booking_request.promoted', [
             'id' => $request->id,
@@ -413,13 +545,28 @@ class RespiteBookingRequestController extends Controller
         return back()->with('success', 'Waitlisted request promoted.');
     }
 
-    private function normaliseFunding(array $data): array
-    {
-        $referral = isset($data['referral_id'])
-            ? RespiteReferral::query()->find($data['referral_id'])
-            : null;
+    private function normaliseFunding(
+        array $data,
+        bool $lock = false,
+        ?RespiteReferral $resolvedReferral = null,
+    ): array {
+        $referral = $resolvedReferral;
+        if (! $referral && ! empty($data['referral_id'])) {
+            $referralQuery = RespiteReferral::query()
+                ->whereKey($data['referral_id'])
+                ->when(
+                    isset($data['client_id']),
+                    fn ($query) => $query->where('client_id', $data['client_id']),
+                );
+            if ($lock) {
+                $referralQuery->lockForUpdate();
+            }
+            $referral = $referralQuery->first();
+        }
 
-        if ($referral && isset($data['client_id']) && (int) $referral->client_id !== (int) $data['client_id']) {
+        if (! empty($data['referral_id'])
+            && (! $referral
+                || (isset($data['client_id']) && (int) $referral->client_id !== (int) $data['client_id']))) {
             throw ValidationException::withMessages([
                 'referral_id' => 'The referral must belong to the selected client.',
             ]);
@@ -462,10 +609,19 @@ class RespiteBookingRequestController extends Controller
             ]);
         }
 
-        if (! empty($data['service_agreement_id'])) {
-            $agreement = ServiceAgreement::query()->findOrFail($data['service_agreement_id']);
+        if (array_key_exists('service_agreement_id', $data) && $data['service_agreement_id'] !== null) {
+            $agreementQuery = ServiceAgreement::query()
+                ->whereKey($data['service_agreement_id'])
+                ->when(
+                    isset($data['client_id']),
+                    fn ($query) => $query->where('client_id', $data['client_id']),
+                );
+            if ($lock) {
+                $agreementQuery->lockForUpdate();
+            }
+            $agreement = $agreementQuery->first();
 
-            if (isset($data['client_id']) && (int) $agreement->client_id !== (int) $data['client_id']) {
+            if (! $agreement) {
                 throw ValidationException::withMessages([
                     'service_agreement_id' => 'The service agreement must belong to the selected client.',
                 ]);
