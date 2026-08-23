@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use RuntimeException;
 
 class FinInvoice extends Model
 {
@@ -37,6 +40,7 @@ class FinInvoice extends Model
         'source',
         'source_type',
         'source_id',
+        'quote_source_id',
         'subtotal',
         'tax_amount',
         'total_amount',
@@ -109,17 +113,90 @@ class FinInvoice extends Model
     }
 
     /**
-     * Next sequential invoice number for an organisation (INV-00001).
+     * Establish and lock the durable per-storage-context number sequence.
+     *
+     * Callers that also lock a source aggregate must take this mutex first.
      */
-    public static function nextNumber(?int $orgId): string
+    public static function lockNumberSequence(?int $orgId): void
     {
-        $latest = static::forOrganization($orgId)
+        $orgId = static::validatedStorageContextId($orgId);
+        if (DB::connection()->transactionLevel() < 1) {
+            throw new RuntimeException('Invoice number allocation requires an active transaction.');
+        }
+
+        $floor = static::ledgerNumberFloor($orgId);
+        DB::table('fin_invoice_sequences')->insertOrIgnore([
+            'organization_id' => $orgId,
+            'next_number' => $floor,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $sequence = DB::table('fin_invoice_sequences')
+            ->where('organization_id', $orgId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $sequence) {
+            throw new RuntimeException('The invoice number sequence could not be established.');
+        }
+    }
+
+    /**
+     * Allocate the next sequential invoice number while holding the durable
+     * per-storage-context sequence mutex (INV-00001 by default).
+     */
+    public static function nextNumber(?int $orgId, int $minimum = 1, int $padding = 5): string
+    {
+        $orgId = static::validatedStorageContextId($orgId);
+        if ($minimum < 1 || $padding < 1) {
+            throw new InvalidArgumentException('Invoice number bounds must be positive integers.');
+        }
+
+        static::lockNumberSequence($orgId);
+
+        $sequence = DB::table('fin_invoice_sequences')
+            ->where('organization_id', $orgId)
+            ->lockForUpdate()
+            ->first();
+        if (! $sequence) {
+            throw new RuntimeException('The invoice number sequence is missing.');
+        }
+
+        $next = max((int) $sequence->next_number, static::ledgerNumberFloor($orgId), $minimum);
+        DB::table('fin_invoice_sequences')
+            ->where('organization_id', $orgId)
+            ->update([
+                'next_number' => $next + 1,
+                'updated_at' => now(),
+            ]);
+
+        return 'INV-'.str_pad((string) $next, $padding, '0', STR_PAD_LEFT);
+    }
+
+    private static function validatedStorageContextId(?int $orgId): int
+    {
+        if ($orgId === null || $orgId < 1) {
+            throw new InvalidArgumentException('A valid invoice storage context is required.');
+        }
+
+        return $orgId;
+    }
+
+    private static function ledgerNumberFloor(int $orgId): int
+    {
+        $maximum = static::query()
             ->withTrashed()
-            ->orderBy('id', 'desc')
-            ->value('invoice_number');
+            ->where('organization_id', $orgId)
+            ->pluck('invoice_number')
+            ->reduce(function (int $current, string $invoiceNumber): int {
+                if (! preg_match('/^INV-(\d+)$/', $invoiceNumber, $matches)) {
+                    return $current;
+                }
 
-        $next = ($latest && preg_match('/INV-(\d+)$/', $latest, $m)) ? ((int) $m[1] + 1) : 1;
+                return max($current, (int) $matches[1]);
+            }, 0);
 
-        return 'INV-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+        return $maximum + 1;
     }
 }

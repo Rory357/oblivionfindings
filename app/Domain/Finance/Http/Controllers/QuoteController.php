@@ -2,25 +2,21 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
-use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Finance\Services\QuoteLifecycleService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\PriceBook;
 use App\Models\Quote;
-use App\Models\ServiceAgreement;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class QuoteController extends Controller
 {
-    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
-
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly QuoteLifecycleService $lifecycle,
     ) {}
 
     public function index(Request $request)
@@ -237,8 +233,7 @@ class QuoteController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
-
-        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
+        $this->lifecycle->assertAccessible($auth, (int) $quote);
 
         $data = $request->validate([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
@@ -248,24 +243,7 @@ class QuoteController extends Controller
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired'],
         ]);
 
-        if (array_key_exists('client_id', $data)) {
-            $this->siteAccess->assertCanAccessClientId(
-                $auth,
-                (int) $data['client_id'],
-                ['reports.viewAny'],
-            );
-
-            if (
-                (int) $data['client_id'] !== (int) $quote->client_id
-                && ($quote->converted_to_agreement_id || $quote->converted_to_invoice_id)
-            ) {
-                throw ValidationException::withMessages([
-                    'client_id' => 'A converted quote cannot be reassigned to another Client.',
-                ]);
-            }
-        }
-
-        $quote->update($data);
+        $this->lifecycle->update($auth, (int) $quote, $data);
 
         return redirect()->back()->with('success', 'Quote updated.');
     }
@@ -275,12 +253,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
-
-        $quote->update([
-            'status' => 'sent',
-            'sent_at' => now(),
-        ]);
+        $this->lifecycle->send($auth, (int) $quote);
 
         return redirect()->back()->with('success', 'Quote sent.');
     }
@@ -290,12 +263,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
-
-        $quote->update([
-            'status' => 'accepted',
-            'accepted_at' => now(),
-        ]);
+        $this->lifecycle->accept($auth, (int) $quote);
 
         return redirect()->back()->with('success', 'Quote accepted.');
     }
@@ -305,30 +273,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = $this->accessibleQuotes($auth)
-            ->with(['lineItems'])
-            ->findOrFail($quote);
-
-        $agreement = ServiceAgreement::create([
-            'client_id' => $quote->client_id,
-            'title' => $quote->title,
-            'status' => 'draft',
-            'created_by' => $auth->id,
-        ]);
-
-        foreach ($quote->lineItems as $item) {
-            $agreement->lineItems()->create([
-                'description' => $item->description,
-                'quantity' => $item->quantity,
-                'unit_price' => $item->unit_price,
-                'budget_allocated' => $item->amount,
-            ]);
-        }
-
-        $quote->update([
-            'status' => 'converted',
-            'converted_to_agreement_id' => $agreement->id,
-        ]);
+        $this->lifecycle->convertToAgreement($auth, (int) $quote);
 
         return redirect()->back()->with('success', 'Quote converted to service agreement.');
     }
@@ -343,70 +288,13 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = $this->accessibleQuotes($auth)
-            ->with(['lineItems', 'client'])
-            ->findOrFail($quote);
+        $result = $this->lifecycle->convertToInvoice($auth, (int) $quote);
+        $invoice = $result['invoice'];
 
-        if ($quote->converted_to_invoice_id) {
-            return redirect()->route('finance.invoices.show', $quote->converted_to_invoice_id)
+        if ($result['replayed']) {
+            return redirect()->route('finance.invoices.show', $invoice)
                 ->with('success', 'Quote already converted to an invoice.');
         }
-
-        $invoice = DB::transaction(function () use ($quote, $auth) {
-            $subtotal = '0';
-            $taxTotal = '0';
-            $lines = [];
-
-            foreach ($quote->lineItems as $index => $item) {
-                $net = (string) $item->amount;            // line subtotal (ex-GST)
-                $tax = bcmul($net, '0.15', 2);            // NZ GST 15%
-                $lineTotal = bcadd($net, $tax, 2);
-                $subtotal = bcadd($subtotal, $net, 2);
-                $taxTotal = bcadd($taxTotal, $tax, 2);
-
-                $lines[] = [
-                    'description' => $item->description,
-                    'quantity' => $item->quantity,
-                    'unit_price' => $item->unit_price,
-                    'tax_amount' => $tax,
-                    'line_total' => $lineTotal,
-                    'sort_order' => $index,
-                ];
-            }
-
-            $invoice = FinInvoice::create([
-                'organization_id' => self::APPLICATION_STORAGE_CONTEXT_ID,
-                'client_id' => $quote->client_id,
-                'invoice_number' => FinInvoice::nextNumber(self::APPLICATION_STORAGE_CONTEXT_ID),
-                'invoice_date' => now()->toDateString(),
-                'due_date' => now()->addDays(30)->toDateString(),
-                'client_name' => $quote->client_name
-                    ?: ($quote->client ? trim($quote->client->first_name.' '.$quote->client->last_name) : null),
-                'client_email' => $quote->client_email,
-                'subtotal' => $subtotal,
-                'tax_amount' => $taxTotal,
-                'total_amount' => bcadd($subtotal, $taxTotal, 2),
-                'currency_code' => 'NZD',
-                'status' => 'draft',
-                'source' => 'quote',
-                'source_type' => Quote::class,
-                'source_id' => $quote->id,
-                'notes' => $quote->notes,
-                'terms' => $quote->terms,
-                'created_by' => $auth->id,
-            ]);
-
-            foreach ($lines as $line) {
-                $invoice->lines()->create($line);
-            }
-
-            $quote->update([
-                'status' => 'converted',
-                'converted_to_invoice_id' => $invoice->id,
-            ]);
-
-            return $invoice;
-        });
 
         return redirect()->route('finance.invoices.show', $invoice)
             ->with('success', "Quote converted to invoice {$invoice->invoice_number}.");

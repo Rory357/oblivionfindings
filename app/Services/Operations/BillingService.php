@@ -336,16 +336,11 @@ class BillingService
 
     protected function generateInvoiceNumber(): string
     {
-        $lastInvoice = FinInvoice::withTrashed()
-            ->where('organization_id', self::APPLICATION_STORAGE_CONTEXT_ID)
-            ->orderByDesc('id')
-            ->first();
-
-        $nextNumber = $lastInvoice
-            ? ((int) preg_replace('/[^0-9]/', '', $lastInvoice->invoice_number)) + 1
-            : 1001;
-
-        return 'INV-'.str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+        return FinInvoice::nextNumber(
+            self::APPLICATION_STORAGE_CONTEXT_ID,
+            minimum: 1001,
+            padding: 6,
+        );
     }
 
     protected function formatClientAddress($client): ?string

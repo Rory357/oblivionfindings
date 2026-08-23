@@ -14,6 +14,7 @@ class ServiceAgreement extends Model
 
     protected $fillable = [
         'client_id',
+        'source_quote_id',
         'title',
         'reference_number',
         'status',
@@ -96,6 +97,11 @@ class ServiceAgreement extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function sourceQuote()
+    {
+        return $this->belongsTo(Quote::class, 'source_quote_id');
     }
 
     public function creator()

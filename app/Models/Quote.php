@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinInvoice;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,9 @@ class Quote extends Model
         'accepted_at',
         'converted_to_agreement_id',
         'converted_to_invoice_id',
+        'converted_by',
+        'converted_at',
+        'conversion_digest',
         'created_by',
     ];
 
@@ -39,6 +43,7 @@ class Quote extends Model
         'total_amount' => 'decimal:2',
         'sent_at' => 'datetime',
         'accepted_at' => 'datetime',
+        'converted_at' => 'datetime',
     ];
 
     public function client()
@@ -59,5 +64,15 @@ class Quote extends Model
     public function serviceAgreement()
     {
         return $this->belongsTo(ServiceAgreement::class, 'converted_to_agreement_id');
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(FinInvoice::class, 'converted_to_invoice_id');
+    }
+
+    public function convertedBy()
+    {
+        return $this->belongsTo(User::class, 'converted_by');
     }
 }
