@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { Users } from 'lucide-react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -89,8 +89,10 @@ describe('StaffHeader responsive actions', () => {
             screen.getByRole('link', { name: 'Notifications (3)' }),
         ).toHaveClass('frontline-focus', 'h-11', 'w-11');
 
-        const controls = within(group as HTMLElement).getAllByRole(
-            /button|link/,
+        const controls = Array.from(
+            (group as HTMLElement).querySelectorAll<HTMLElement>(
+                'button, a[href]',
+            ),
         );
         expect(
             controls.map(

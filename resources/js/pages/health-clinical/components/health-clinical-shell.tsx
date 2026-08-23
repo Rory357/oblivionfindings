@@ -151,9 +151,7 @@ function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
         },
         {
             icon:
-                signOff === null || signOff > 0
-                    ? AlertTriangle
-                    : CheckCircle2,
+                signOff === null || signOff > 0 ? AlertTriangle : CheckCircle2,
             tone:
                 signOff === null
                     ? 'neutral'
