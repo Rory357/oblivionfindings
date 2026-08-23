@@ -27,6 +27,14 @@ class ClientConsentPolicy
     public function update(User $user, ClientConsent $consent): bool
     {
         return $user->canDo('consents.manage')
+            && $user->canDo('consents.viewAny')
+            && $this->matchesCanonicalSite($consent)
+            && $user->can('view', $consent->client);
+    }
+
+    public function downloadEvidence(User $user, ClientConsent $consent): bool
+    {
+        return $user->canDo('consents.manage')
             && $this->matchesCanonicalSite($consent)
             && $user->can('view', $consent->client);
     }

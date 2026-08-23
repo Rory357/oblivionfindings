@@ -181,6 +181,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->middleware('permission:consents.viewAny')
             ->whereNumber('client')
             ->name('operations.clients.consents.index');
+        Route::get('/clients/{client}/consents/{consent}/evidence', [ClientConsentController::class, 'downloadEvidence'])
+            ->whereNumber('client')
+            ->whereNumber('consent')
+            ->name('operations.clients.consents.evidence.download');
 
         Route::prefix('/clients/{client}/consent-requests')
             ->whereNumber('client')
@@ -354,7 +358,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Consent mutations use the consent domain capabilities, not broad client
     // editing. Controllers also authorize the parent client and nested record.
     Route::post('/clients/{client}/consents', [ClientConsentController::class, 'store'])
-        ->middleware('permission:consents.record')
         ->whereNumber('client')
         ->name('operations.clients.consents.store');
     Route::post('/clients/{client}/consents/{consent}/withdraw', [ClientConsentController::class, 'withdraw'])

@@ -27,6 +27,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     Clock,
+    Download,
     FileCheck,
     Plus,
     Shield,
@@ -352,7 +353,7 @@ export default function ConsentsIndex({
                                             className={`overflow-hidden border ${catColor}`}
                                         >
                                             <CardContent className="p-4">
-                                                <div className="flex items-start justify-between gap-3">
+                                                <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
                                                     <div className="flex items-start gap-3">
                                                         <div
                                                             className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${style.bg}`}
@@ -448,24 +449,44 @@ export default function ConsentsIndex({
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {c.status === 'given' &&
-                                                        !c.is_expired && (
+                                                    <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                                                        {c.signed_document_download_url && (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className="h-7 border-status-critical/30 text-xs text-status-critical hover:bg-status-critical-bg"
-                                                                onClick={() => {
-                                                                    setShowWithdraw(
-                                                                        c.id,
-                                                                    );
-                                                                    setWithdrawReason(
-                                                                        '',
-                                                                    );
-                                                                }}
+                                                                className="h-10 gap-1.5 text-xs sm:h-8"
+                                                                asChild
                                                             >
-                                                                Withdraw
+                                                                <a
+                                                                    href={
+                                                                        c.signed_document_download_url
+                                                                    }
+                                                                >
+                                                                    <Download className="h-3.5 w-3.5" />
+                                                                    Signed
+                                                                    document
+                                                                </a>
                                                             </Button>
                                                         )}
+                                                        {c.status === 'given' &&
+                                                            !c.is_expired && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-10 border-status-critical/30 text-xs text-status-critical hover:bg-status-critical-bg sm:h-8"
+                                                                    onClick={() => {
+                                                                        setShowWithdraw(
+                                                                            c.id,
+                                                                        );
+                                                                        setWithdrawReason(
+                                                                            '',
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Withdraw
+                                                                </Button>
+                                                            )}
+                                                    </div>
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -637,13 +658,13 @@ export default function ConsentsIndex({
                                             : 'Click to upload signed consent form'}
                                     </p>
                                     <p className="text-[10px] text-primary">
-                                        PDF, Image, or scanned document
+                                        PDF, JPEG, or PNG up to 10 MB
                                     </p>
                                 </div>
                                 <input
                                     type="file"
                                     className="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                                     onChange={(e) =>
                                         setConsentFile(
                                             e.target.files?.[0] ?? null,

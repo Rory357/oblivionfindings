@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Consents\ConsentEvidenceService;
 use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +69,18 @@ class ClientConsent extends Model
         'renewal_reminder_sent_at',
         'superseded_by_consent_id',
         'signed_document_path',
+        'signed_document_disk',
+        'signed_document_original_name',
+        'signed_document_mime_type',
+        'signed_document_size_bytes',
+        'signed_document_sha256',
+        'signed_document_command_sha256',
+        'signed_document_malware_disposition',
+        'signed_document_scanner',
+        'signed_document_scanned_at',
+        'signed_document_retained_until',
+        'signed_document_disposed_at',
+        'signed_document_uploaded_by_user_id',
         'evidence_type',
         'conditions',
         'special_conditions',
@@ -83,6 +96,10 @@ class ClientConsent extends Model
         'withdrawn_at' => 'datetime',
         'expires_at' => 'datetime',
         'renewal_reminder_sent_at' => 'datetime',
+        'signed_document_scanned_at' => 'datetime',
+        'signed_document_retained_until' => 'datetime',
+        'signed_document_disposed_at' => 'datetime',
+        'signed_document_size_bytes' => 'integer',
         'capacity_assessed' => 'boolean',
         'best_interests_decision' => 'boolean',
         'best_interests_consultees' => 'array',
@@ -90,6 +107,22 @@ class ClientConsent extends Model
         'decision_contract_version' => 'integer',
         'decision_evidence' => 'array',
         'gate_satisfying' => 'boolean',
+    ];
+
+    protected $hidden = [
+        'signed_document_path',
+        'signed_document_disk',
+        'signed_document_original_name',
+        'signed_document_mime_type',
+        'signed_document_size_bytes',
+        'signed_document_sha256',
+        'signed_document_command_sha256',
+        'signed_document_malware_disposition',
+        'signed_document_scanner',
+        'signed_document_scanned_at',
+        'signed_document_retained_until',
+        'signed_document_disposed_at',
+        'signed_document_uploaded_by_user_id',
     ];
 
     /**
@@ -259,6 +292,35 @@ class ClientConsent extends Model
         return $this->status === 'given'
             && $this->expires_at
             && $this->expires_at->isPast();
+    }
+
+    /**
+     * Only clean, retained evidence on the non-public disk may cross the
+     * authenticated download boundary. Revocation does not erase the historic
+     * record; the policy separately limits access to consent managers.
+     */
+    public function hasDownloadableSignedDocument(): bool
+    {
+        return is_string($this->signed_document_path)
+            && ConsentEvidenceService::isOpaquePath($this->signed_document_path)
+            && $this->signed_document_disk === 'private'
+            && in_array($this->signed_document_mime_type, [
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+            ], true)
+            && is_int($this->signed_document_size_bytes)
+            && $this->signed_document_size_bytes >= 1
+            && $this->signed_document_size_bytes <= ConsentEvidenceService::MAX_BYTES
+            && is_string($this->signed_document_sha256)
+            && preg_match('/\A[0-9a-f]{64}\z/D', $this->signed_document_sha256) === 1
+            && $this->signed_document_malware_disposition === 'clean'
+            && is_string($this->signed_document_scanner)
+            && trim($this->signed_document_scanner) !== ''
+            && $this->signed_document_scanned_at !== null
+            && $this->signed_document_disposed_at === null
+            && ($this->signed_document_retained_until === null
+                || $this->signed_document_retained_until->isFuture());
     }
 
     /**
