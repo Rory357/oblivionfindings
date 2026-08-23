@@ -120,12 +120,12 @@ class AlertsEventsControllerTest extends TestCase
     {
         $device = Device::factory()->create();
 
-        DeviceEvent::create([
+        $this->deviceEvent([
             'device_id' => $device->id, 'event_type' => 'heartbeat',
             'severity' => 'info', 'occurred_at' => now(),
             'processed_at' => null,
         ]);
-        DeviceEvent::create([
+        $this->deviceEvent([
             'device_id' => $device->id, 'event_type' => 'heartbeat',
             'severity' => 'info', 'occurred_at' => now(),
             'processed_at' => now(),
@@ -268,12 +268,12 @@ class AlertsEventsControllerTest extends TestCase
     {
         $device = Device::factory()->create();
 
-        DeviceEvent::create([
+        $this->deviceEvent([
             'device_id' => $device->id, 'event_type' => 'heartbeat',
             'severity' => 'info', 'occurred_at' => now(),
             'processed_at' => null,
         ]);
-        DeviceEvent::create([
+        $this->deviceEvent([
             'device_id' => $device->id, 'event_type' => 'heartbeat',
             'severity' => 'info', 'occurred_at' => now(),
             'processed_at' => now(),
@@ -383,14 +383,14 @@ class AlertsEventsControllerTest extends TestCase
         $this->siteAssignment($device, $siteA, now()->subHours(6), $transferAt);
         $this->siteAssignment($device, $siteB, $transferAt);
 
-        $eventA = DeviceEvent::query()->create([
+        $eventA = $this->deviceEvent([
             'device_id' => $device->id,
             'event_type' => 'site_a_only_event',
             'severity' => 'critical',
             'source' => 'site-a-private-source',
             'occurred_at' => $transferAt->copy()->subHour(),
         ]);
-        $eventB = DeviceEvent::query()->create([
+        $eventB = $this->deviceEvent([
             'device_id' => $device->id,
             'event_type' => 'site_b_only_event',
             'severity' => 'warning',
@@ -450,7 +450,7 @@ class AlertsEventsControllerTest extends TestCase
         $this->siteAssignment($foreignDevice, $foreignSite, now()->subDay());
 
         for ($index = 1; $index <= 51; $index++) {
-            DeviceEvent::query()->create([
+            $this->deviceEvent([
                 'device_id' => $visibleDevice->id,
                 'event_type' => 'visible-page-event',
                 'severity' => 'info',
@@ -458,7 +458,7 @@ class AlertsEventsControllerTest extends TestCase
                 'occurred_at' => $occurredAt->copy()->addSeconds($index),
             ]);
         }
-        DeviceEvent::query()->create([
+        $this->deviceEvent([
             'device_id' => $foreignDevice->id,
             'event_type' => 'foreign-page-event',
             'severity' => 'critical',
@@ -488,14 +488,14 @@ class AlertsEventsControllerTest extends TestCase
         $deviceB = Device::factory()->create();
         $this->siteAssignment($deviceA, $siteA, now()->subDay());
         $this->siteAssignment($deviceB, $siteB, now()->subDay());
-        DeviceEvent::query()->create([
+        $this->deviceEvent([
             'device_id' => $deviceA->id,
             'event_type' => 'global-site-a-event',
             'severity' => 'info',
             'source' => 'global-site-a-source',
             'occurred_at' => now()->subHour(),
         ]);
-        DeviceEvent::query()->create([
+        $this->deviceEvent([
             'device_id' => $deviceB->id,
             'event_type' => 'global-site-b-event',
             'severity' => 'warning',
@@ -543,10 +543,12 @@ class AlertsEventsControllerTest extends TestCase
         $mixedDevice = Device::factory()->create();
         $deletedDevice = Device::factory()->create();
         $assignedAt = now()->subDay();
+        $mixedOccurredAt = now()->subHour()->startOfSecond();
+        $mixedReleasedAt = $mixedOccurredAt->copy()->addMinutes(30);
 
         $this->siteAssignment($foreignDevice, $siteB, $assignedAt);
-        $this->siteAssignment($mixedDevice, $siteA, $assignedAt);
-        $this->siteAssignment($mixedDevice, $siteB, $assignedAt);
+        $this->siteAssignment($mixedDevice, $siteA, $assignedAt, $mixedReleasedAt);
+        $this->siteAssignment($mixedDevice, $siteB, $assignedAt, $mixedReleasedAt);
         $this->siteAssignment($deletedDevice, $siteA, $assignedAt);
         DeviceEvent::query()->create([
             'device_id' => $foreignDevice->id,
@@ -560,7 +562,7 @@ class AlertsEventsControllerTest extends TestCase
             'event_type' => 'mixed-custody-secret',
             'severity' => 'critical',
             'source' => 'mixed-custody-source',
-            'occurred_at' => now()->subHour(),
+            'occurred_at' => $mixedOccurredAt,
         ]);
         DeviceEvent::query()->create([
             'device_id' => $deletedDevice->id,
@@ -695,6 +697,10 @@ class AlertsEventsControllerTest extends TestCase
     /** @param list<string> $permissions */
     private function permissionViewer(array $permissions): User
     {
+        $permissions = array_values(array_unique([
+            'securityDevices.viewAny',
+            ...$permissions,
+        ]));
         $viewer = User::factory()->create(['approved_at' => now()]);
         $permissionModels = Permission::query()->whereIn('key', $permissions)->get();
         $this->assertCount(count($permissions), $permissionModels, 'A required permission was not seeded.');
@@ -705,6 +711,14 @@ class AlertsEventsControllerTest extends TestCase
         );
 
         return $viewer;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function deviceEvent(array $attributes): DeviceEvent
+    {
+        return DeviceEvent::withoutEvents(
+            fn (): DeviceEvent => DeviceEvent::query()->create($attributes),
+        );
     }
 
     private function siteAssignment(
