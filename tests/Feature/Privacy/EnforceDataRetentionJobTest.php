@@ -261,18 +261,24 @@ class EnforceDataRetentionJobTest extends TestCase
         $this->assertSame(3, DataRetentionExecution::query()->count());
     }
 
-    public function test_record_mutation_and_evidence_roll_back_together_on_failure(): void
+    public function test_entire_execution_and_evidence_roll_back_together_when_a_later_record_fails(): void
     {
         Carbon::setTestNow('2026-08-14 10:00:00');
         $service = app(RetentionExecutionService::class);
         $previewer = User::factory()->create();
         $approver = User::factory()->create();
-        $client = $this->oldClient();
+        $firstClient = $this->oldClient();
+        $secondClient = $this->oldClient();
         $policy = $this->approvedPolicy($service, $previewer, $approver, [
             'retention_period_years' => 1,
         ]);
-        DataRetentionExecutionItem::creating(function (): void {
-            throw new RuntimeException('Simulated evidence persistence failure.');
+        $itemAttempts = 0;
+        DataRetentionExecutionItem::creating(function () use (&$itemAttempts): void {
+            $itemAttempts++;
+
+            if ($itemAttempts === 2) {
+                throw new RuntimeException('Simulated evidence persistence failure.');
+            }
         });
 
         try {
@@ -284,7 +290,9 @@ class EnforceDataRetentionJobTest extends TestCase
             DataRetentionExecutionItem::flushEventListeners();
         }
 
-        $this->assertFalse(Client::withTrashed()->findOrFail($client->id)->trashed());
+        $this->assertSame(2, $itemAttempts);
+        $this->assertFalse(Client::withTrashed()->findOrFail($firstClient->id)->trashed());
+        $this->assertFalse(Client::withTrashed()->findOrFail($secondClient->id)->trashed());
         $this->assertSame(0, DataRetentionExecutionItem::query()->count());
         $this->assertSame(0, AnonymizationLog::query()->count());
         $this->assertDatabaseHas('data_retention_executions', [

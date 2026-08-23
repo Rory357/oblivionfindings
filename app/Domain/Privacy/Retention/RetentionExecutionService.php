@@ -173,11 +173,6 @@ final class RetentionExecutionService
 
         try {
             $result = $this->runApprovedExecution($execution, $policy, $fingerprint);
-            $execution->forceFill([
-                'status' => 'completed',
-                'result' => $result,
-                'completed_at' => now(),
-            ])->save();
 
             return [
                 'status' => 'completed',
@@ -186,6 +181,7 @@ final class RetentionExecutionService
             ];
         } catch (\Throwable $exception) {
             $contractException = $exception instanceof RetentionContractException ? $exception : null;
+            $execution->refresh();
             $execution->forceFill([
                 'status' => $contractException?->blocked ? 'blocked' : 'failed',
                 'failure_code' => $contractException?->reasonCode ?? Str::snake(class_basename($exception)),
@@ -205,10 +201,35 @@ final class RetentionExecutionService
         DataRetentionPolicy $policy,
         string $fingerprint,
     ): array {
+        // A retention run is one governed outcome: records, evidence, audit,
+        // policy state, and the completed marker must commit or roll back together.
+        return DB::transaction(function () use ($execution, $policy, $fingerprint): array {
+            /** @var DataRetentionExecution $currentExecution */
+            $currentExecution = DataRetentionExecution::query()
+                ->lockForUpdate()
+                ->findOrFail($execution->id);
+            $result = $this->runApprovedExecutionTransaction($currentExecution, $policy, $fingerprint);
+
+            $currentExecution->forceFill([
+                'status' => 'completed',
+                'result' => $result,
+                'completed_at' => now(),
+            ])->save();
+
+            return $result;
+        }, 3);
+    }
+
+    /** @return array<string, mixed> */
+    private function runApprovedExecutionTransaction(
+        DataRetentionExecution $execution,
+        DataRetentionPolicy $policy,
+        string $fingerprint,
+    ): array {
         /** @var DataRetentionPolicy $current */
-        $current = DB::transaction(fn () => DataRetentionPolicy::query()
+        $current = DataRetentionPolicy::query()
             ->lockForUpdate()
-            ->findOrFail($policy->id));
+            ->findOrFail($policy->id);
         $owner = $this->registry->resolve($current->model_type);
         $owner->validateNativeContract($current);
 
@@ -265,7 +286,7 @@ final class RetentionExecutionService
         }
 
         $current->forceFill(['last_applied_at' => now()])->save();
-        AuditLogger::log('data_retention.executed', $current, [
+        AuditLogger::logOrFail('data_retention.executed', $current, [
             'actor_id' => $execution->actor_user_id,
             'status' => 'completed',
             'items_processed' => $counts['anonymized'] + $counts['soft_deleted'] + $counts['archived'],
