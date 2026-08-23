@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Operations;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
@@ -107,7 +109,7 @@ class OperationsDashboardActivitySitePrivacyTest extends TestCase
                 ->where('stats.hours_this_week', fn ($hours): bool => (float) $hours === 4.0)
                 ->where('stats.timesheets_pending', 1)
                 ->where('attention.incidents.count', 1)
-                ->where('metrics.compliance.current', 1)
+                ->where('metrics.compliance.current', 2)
                 ->where('hero.sites_count', 1)
                 ->where('top_sites.0.id', $fixture['siteA']->id)
                 ->where('top_sites.0.name', $fixture['siteA']->name)
@@ -131,16 +133,45 @@ class OperationsDashboardActivitySitePrivacyTest extends TestCase
                         && $fixture['timesheetsB']->every(fn (Timesheet $timesheet): bool => ! $ids->contains('timesheet-'.$timesheet->id));
                 }));
         $this->assertForeignSentinelsAbsent($activity, $fixture);
+
+        $filterExpectations = [
+            'shifts' => [
+                'ids' => $fixture['shiftsA']->map(fn (Shift $shift): string => 'shift-'.$shift->id),
+                'links' => $fixture['shiftsA']->map(fn (Shift $shift): string => '/operations/shifts/'.$shift->id),
+            ],
+            'timesheets' => [
+                'ids' => $fixture['timesheetsA']->map(fn (Timesheet $timesheet): string => 'timesheet-'.$timesheet->id),
+                'links' => $fixture['timesheetsA']->map(fn (Timesheet $timesheet): string => '/operations/timesheets/'.$timesheet->id),
+            ],
+            'clients' => [
+                'ids' => collect(['client-'.$fixture['clientA']->id]),
+                'links' => collect(['/operations/clients/'.$fixture['clientA']->id]),
+            ],
+        ];
+
+        foreach ($filterExpectations as $filter => $expected) {
+            $filteredActivity = $this->actingAs($actor)
+                ->get('/operations/activity?filter='.$filter)
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('filter', $filter)
+                    ->where('activities', fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all()
+                        === $expected['ids']->sort()->values()->all()
+                        && collect($rows)->pluck('link')->sort()->values()->all()
+                        === $expected['links']->sort()->values()->all()));
+
+            $this->assertForeignSentinelsAbsent($filteredActivity, $fixture);
+        }
     }
 
-    public function test_explicit_dashboard_action_and_global_site_permission_are_both_required_for_global_positive(): void
+    public function test_seeded_global_role_with_both_dashboard_permissions_can_see_all_sites(): void
     {
         $fixture = $this->twoSiteFixture();
-        $actor = $this->userWithPermissions([
-            'operations.dashboard.view',
-            'operations.dashboard.viewAllSites',
-            'timesheets.manageAny',
-        ]);
+        $actor = $this->userWithPermissions([]);
+        $actor->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+
+        $this->assertTrue($actor->canDo('operations.dashboard.view'));
+        $this->assertTrue($actor->canDo('operations.dashboard.viewAllSites'));
 
         $dashboard = $this->actingAs($actor)->get('/operations')->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -256,14 +287,38 @@ class OperationsDashboardActivitySitePrivacyTest extends TestCase
 
     private function completedShift(Site $site, Client $client, User $staff, int $hour): Shift
     {
-        return Shift::factory()->completed()->create([
+        $startsAt = today()->setTime($hour, 0);
+        $endsAt = $startsAt->copy()->addHours(4);
+        $shift = Shift::factory()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
             'user_id' => $staff->id,
-            'starts_at' => today()->setTime($hour),
-            'ends_at' => today()->setTime($hour)->addHours(4),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'actual_starts_at' => $startsAt,
+            'actual_ends_at' => $endsAt,
+            'expected_break_minutes' => 0,
+            'status' => 'completed',
+            'created_by' => $staff->id,
+            'started_by' => $staff->id,
+            'completed_by' => $staff->id,
             'updated_at' => now(),
         ]);
+
+        HrAttendanceSession::query()->create([
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $site->id,
+            'clock_in_at' => $startsAt,
+            'clock_out_at' => $endsAt,
+            'break_minutes' => 0,
+            'status' => 'closed',
+            'source' => 'manual',
+            'created_by' => $staff->id,
+            'closed_by' => $staff->id,
+        ]);
+
+        return $shift;
     }
 
     private function timesheet(
@@ -278,6 +333,11 @@ class OperationsDashboardActivitySitePrivacyTest extends TestCase
 
         return $factory->create([
             'shift_id' => $shift->id,
+            'attendance_session_id' => HrAttendanceSession::query()
+                ->where('shift_id', $shift->id)
+                ->where('user_id', $staff->id)
+                ->sole()
+                ->id,
             'user_id' => $staff->id,
             'client_id' => $client->id,
             'shift_site_id' => $site->id,
