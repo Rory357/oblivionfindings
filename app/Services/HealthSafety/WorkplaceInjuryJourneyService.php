@@ -43,6 +43,7 @@ class WorkplaceInjuryJourneyService
                 ->lockForUpdate()
                 ->findOrFail($injury->getKey());
             $actor = $this->decisionActor($locked);
+            $canSignWorksafeDecision = $actor->canDo('hazards.manage');
 
             $event = $this->hsEvents->recordEvent([
                 'source' => $locked,
@@ -52,10 +53,12 @@ class WorkplaceInjuryJourneyService
                 'reported_at' => $locked->created_at,
                 'site_id' => $locked->site_id,
                 'staff_id' => $locked->user_id,
-                'worksafe_notifiable' => (bool) $locked->worksafe_notifiable,
-                'worksafe_decided_by_user_id' => $actor->id,
-                'worksafe_decision_reason' => $this->worksafeDecisionReason($locked),
-                'worksafe_decision_source' => 'incident_report',
+                ...($canSignWorksafeDecision ? [
+                    'worksafe_notifiable' => (bool) $locked->worksafe_notifiable,
+                    'worksafe_decided_by_user_id' => $actor->id,
+                    'worksafe_decision_reason' => $this->worksafeDecisionReason($locked),
+                    'worksafe_decision_source' => 'incident_report',
+                ] : []),
                 'created_by' => $locked->created_by ?? $actor->id,
             ]);
 
@@ -97,9 +100,9 @@ class WorkplaceInjuryJourneyService
             $event->refresh();
         }
 
-        if ($event->worksafe_notifiable !== (bool) $injury->worksafe_notifiable
-            || $event->worksafe_decided_at === null
-            || $event->worksafe_decided_by_user_id === null
+        if ($actor->canDo('hazards.manage')
+            && ($event->worksafe_notifiable !== (bool) $injury->worksafe_notifiable
+                || ! $event->hasSignedWorksafeDecision())
         ) {
             $event = $this->hsEvents->recordWorksafeDecision(
                 $event,

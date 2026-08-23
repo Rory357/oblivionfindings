@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -84,6 +85,32 @@ class HsEventWorksafeTest extends TestCase
         $this->assertNotNull($event->worksafe_acknowledged_at);
     }
 
+    public function test_cannot_acknowledge_a_source_notification_before_qualified_sign_off(): void
+    {
+        $event = HsEvent::factory()->create([
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_notified_at' => now(),
+            'worksafe_method' => 'online',
+            'worksafe_decided_at' => null,
+            'worksafe_decided_by_user_id' => null,
+            'worksafe_decision_reason' => null,
+            'worksafe_decision_source' => null,
+            'worksafe_decision_tree_version' => null,
+            'worksafe_source_effective_date' => null,
+        ]);
+
+        $this->actingAs($this->hsOfficer())
+            ->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/worksafe/acknowledge", [
+                'acknowledged_at' => '2026-06-19',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertNull($event->fresh()->worksafe_acknowledged_at);
+    }
+
     public function test_cannot_notify_a_non_notifiable_event(): void
     {
         $actor = $this->hsOfficer();
@@ -104,6 +131,31 @@ class HsEventWorksafeTest extends TestCase
     public function test_cannot_notify_an_undecided_event(): void
     {
         $event = HsEvent::factory()->worksafeUndecided()->create();
+
+        $this->actingAs($this->hsOfficer())
+            ->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/worksafe/notify", [
+                'notified_at' => '2026-06-18',
+                'method' => 'phone',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertNull($event->fresh()->worksafe_notified_at);
+    }
+
+    public function test_cannot_notify_a_preliminary_positive_without_signed_ruleset_provenance(): void
+    {
+        $event = HsEvent::factory()->create([
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_PENDING,
+            'worksafe_decided_at' => null,
+            'worksafe_decided_by_user_id' => null,
+            'worksafe_decision_reason' => null,
+            'worksafe_decision_source' => null,
+            'worksafe_decision_tree_version' => null,
+            'worksafe_source_effective_date' => null,
+        ]);
 
         $this->actingAs($this->hsOfficer())
             ->from('/health-safety/events')
@@ -180,6 +232,14 @@ class HsEventWorksafeTest extends TestCase
             $event->worksafe_decision_reason,
         );
         $this->assertSame('manual', $event->worksafe_decision_source);
+        $this->assertSame(
+            NotifiableEventClassifier::DECISION_TREE_VERSION,
+            $event->worksafe_decision_tree_version,
+        );
+        $this->assertSame(
+            NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE,
+            $event->worksafe_source_effective_date?->toDateString(),
+        );
 
         $audit = AuditLog::query()
             ->where('action', 'healthSafety.event.worksafeDecisionRecorded')
@@ -345,6 +405,30 @@ class HsEventWorksafeTest extends TestCase
         $this->assertNull($event->fresh()->worksafe_notifiable);
     }
 
+    public function test_domain_service_rejects_an_unqualified_decision_actor_without_mutation(): void
+    {
+        $event = HsEvent::factory()->worksafeUndecided()->create();
+        $reporter = User::factory()->create();
+
+        try {
+            app(HsEventService::class)->recordWorksafeDecision(
+                $event,
+                true,
+                'The preliminary source record recommends WorkSafe escalation.',
+                $reporter,
+            );
+            self::fail('An unqualified reporter must not sign the canonical WorkSafe decision.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'The WorkSafe decision requires qualified H&S authority.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull($event->fresh()->worksafe_notifiable);
+        $this->assertNull($event->worksafe_decided_at);
+    }
+
     public function test_record_event_defaults_to_undecided_when_no_source_decision_exists(): void
     {
         $source = Site::factory()->create();
@@ -375,6 +459,7 @@ class HsEventWorksafeTest extends TestCase
             'site_id' => $source->id,
             'staff_id' => $actor->id,
             'worksafe_notifiable' => true,
+            'worksafe_decided_by_user_id' => $actor->id,
             'worksafe_decision_reason' => 'The source classifier identified a serious event that meets the threshold.',
             'worksafe_decision_source' => 'classifier',
         ]);
@@ -386,9 +471,66 @@ class HsEventWorksafeTest extends TestCase
         $this->assertNotNull($event->worksafe_decided_at);
         $this->assertSame('classifier', $event->worksafe_decision_source);
         $this->assertSame(
+            NotifiableEventClassifier::DECISION_TREE_VERSION,
+            $event->worksafe_decision_tree_version,
+        );
+        $this->assertSame(
+            NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE,
+            $event->worksafe_source_effective_date?->toDateString(),
+        );
+        $this->assertSame(
             'The source classifier identified a serious event that meets the threshold.',
             $event->worksafe_decision_reason,
         );
+    }
+
+    public function test_classifier_recommendation_without_an_explicit_signer_remains_needs_review(): void
+    {
+        $reporter = User::factory()->create();
+        $source = Site::factory()->create();
+
+        $event = app(HsEventService::class)->recordEvent([
+            'source' => $source,
+            'event_category' => HsEvent::CATEGORY_HAZARD,
+            'severity' => HsEvent::SEVERITY_HIGH,
+            'site_id' => $source->id,
+            'created_by' => $reporter->id,
+            'worksafe_notifiable' => true,
+            'worksafe_decision_reason' => 'The preliminary classifier recommends escalation.',
+            'worksafe_decision_source' => 'classifier',
+        ]);
+
+        $this->assertNotNull($event);
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_decided_at);
+        $this->assertNull($event->worksafe_decided_by_user_id);
+        $this->assertNull($event->worksafe_decision_tree_version);
+        $this->assertNull($event->worksafe_source_effective_date);
+    }
+
+    public function test_classifier_recommendation_cannot_use_an_unqualified_reporter_as_signer(): void
+    {
+        $reporter = User::factory()->create();
+        $source = Site::factory()->create();
+
+        $event = app(HsEventService::class)->recordEvent([
+            'source' => $source,
+            'event_category' => HsEvent::CATEGORY_HAZARD,
+            'severity' => HsEvent::SEVERITY_HIGH,
+            'site_id' => $source->id,
+            'created_by' => $reporter->id,
+            'worksafe_notifiable' => true,
+            'worksafe_decided_by_user_id' => $reporter->id,
+            'worksafe_decision_reason' => 'The preliminary classifier recommends escalation.',
+            'worksafe_decision_source' => 'classifier',
+        ]);
+
+        $this->assertNotNull($event);
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_decided_at);
+        $this->assertNull($event->worksafe_decided_by_user_id);
+        $this->assertNull($event->worksafe_decision_tree_version);
+        $this->assertNull($event->worksafe_source_effective_date);
     }
 
     public function test_site_preservation_requires_an_explicit_evidence_backed_decision_and_release(): void

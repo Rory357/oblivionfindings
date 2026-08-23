@@ -27,8 +27,9 @@ class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
                 'source' => $record,
                 'event_category' => HsEvent::CATEGORY_EXPOSURE,
                 'severity' => $severity,
-                // Classify against the WorkSafe NZ notifiable threshold (HSWA 2015
-                // ss.23–25): hospitalisation/death, or a critical-severity event.
+                // Reduced source fields can only raise a preliminary positive
+                // trigger. Generic severity and every negative path still need
+                // the full WorkSafe tree and qualified H&S sign-off.
                 'worksafe_notifiable' => $this->classifier->isNotifiable($record->medical_treatment, $severity),
                 'occurred_at' => $record->exposed_at,
                 'reported_at' => $record->created_at,

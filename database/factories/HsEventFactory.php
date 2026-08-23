@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\User;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class HsEventFactory extends Factory
@@ -31,6 +32,8 @@ class HsEventFactory extends Factory
             'worksafe_decided_by_user_id' => null,
             'worksafe_decision_reason' => null,
             'worksafe_decision_source' => null,
+            'worksafe_decision_tree_version' => null,
+            'worksafe_source_effective_date' => null,
             'worksafe_status' => null,
             'investigation_required' => false,
             'idempotency_key' => HsEvent::buildIdempotencyKey($sourceType, $sourceId, $eventCategory),
@@ -84,6 +87,8 @@ class HsEventFactory extends Factory
             'worksafe_decided_by_user_id' => $actor->id,
             'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
             'worksafe_decision_source' => 'manual',
+            'worksafe_decision_tree_version' => NotifiableEventClassifier::DECISION_TREE_VERSION,
+            'worksafe_source_effective_date' => NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE,
             'worksafe_status' => null,
         ]);
     }
@@ -96,6 +101,8 @@ class HsEventFactory extends Factory
             'worksafe_decided_by_user_id' => $actor?->id ?? User::factory(),
             'worksafe_decision_reason' => 'Assessed as meeting the WorkSafe notification threshold.',
             'worksafe_decision_source' => 'manual',
+            'worksafe_decision_tree_version' => NotifiableEventClassifier::DECISION_TREE_VERSION,
+            'worksafe_source_effective_date' => NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE,
             'worksafe_status' => HsEvent::WORKSAFE_PENDING,
             'investigation_required' => true,
         ]);

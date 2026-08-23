@@ -50,11 +50,7 @@ final class HsEventClosureService
             HsClosureReadiness::EXCEPTIONAL,
         );
 
-        $decisionOk = $event->worksafe_notifiable !== null
-            && $event->worksafe_decided_at !== null
-            && $event->worksafe_decided_by_user_id !== null
-            && filled($event->worksafe_decision_reason)
-            && filled($event->worksafe_decision_source);
+        $decisionOk = $event->hasSignedWorksafeDecision();
         $requirements[] = $this->requirement(
             'worksafe_decision',
             $decisionOk,

@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
@@ -52,6 +53,7 @@ class HsEventController extends Controller
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
         private readonly IncidentJourneyService $journeys,
         private readonly IncidentJourneyPresenter $journeyPresenter,
+        private readonly NotifiableEventClassifier $notifiableEvents,
     ) {}
 
     /**
@@ -134,6 +136,7 @@ class HsEventController extends Controller
             'staff_name' => $e->staff?->name,
             'worksafe_notifiable' => $e->worksafe_notifiable,
             'worksafe_status' => $e->worksafe_status,
+            'worksafe_decision_signed' => $e->hasSignedWorksafeDecision(),
             'handover' => [
                 'status' => $e->handover_status,
                 'owner' => $e->owner ? ['id' => $e->owner->id, 'name' => $e->owner->name] : null,
@@ -835,8 +838,10 @@ class HsEventController extends Controller
             ], true);
         $canNotifyWorksafe = $canManage
             && $hsEvent->worksafe_notifiable === true
+            && $hsEvent->hasSignedWorksafeDecision()
             && $hsEvent->worksafe_status === HsEvent::WORKSAFE_PENDING;
         $canAcknowledgeWorksafe = $canManage
+            && $hsEvent->hasSignedWorksafeDecision()
             && $hsEvent->worksafe_status === HsEvent::WORKSAFE_NOTIFIED;
         $canReviewSitePreservation = $canManage
             && $hsEvent->worksafe_notifiable === true
@@ -849,7 +854,7 @@ class HsEventController extends Controller
             && $hsEvent->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE;
         $nextAction = match (true) {
             $canAccept => ['label' => 'Accept this H&S handover', 'href' => null],
-            $canDecideWorksafe && $hsEvent->worksafe_notifiable === null => [
+            $canDecideWorksafe && ! $hsEvent->hasSignedWorksafeDecision() => [
                 'label' => 'Record the WorkSafe decision',
                 'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-decision",
             ],
@@ -928,6 +933,10 @@ class HsEventController extends Controller
                 'status' => $hsEvent->worksafe_status,
                 'decision_reason' => $hsEvent->worksafe_decision_reason,
                 'decision_source' => $hsEvent->worksafe_decision_source,
+                'decision_signed' => $hsEvent->hasSignedWorksafeDecision(),
+                'decision_tree_version' => $hsEvent->worksafe_decision_tree_version,
+                'source_effective_date' => $hsEvent->worksafe_source_effective_date?->toDateString(),
+                'decision_support' => $this->notifiableEvents->policy(),
                 'decided_at' => $hsEvent->worksafe_decided_at?->toIso8601String(),
                 'decided_by' => $hsEvent->worksafeDecidedBy ? [
                     'id' => $hsEvent->worksafeDecidedBy->id,

@@ -19,6 +19,7 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -217,9 +218,23 @@ class HsEventRegisterTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('events.data.0.worksafe_notifiable', null)
+                ->where('events.data.0.worksafe_decision_signed', false)
                 ->where('detail.worksafe.notifiable', null)
                 ->where('detail.worksafe.status', null)
                 ->where('detail.worksafe.decision_reason', null)
+                ->where('detail.worksafe.decision_signed', false)
+                ->where(
+                    'detail.worksafe.decision_support.version',
+                    NotifiableEventClassifier::DECISION_TREE_VERSION,
+                )
+                ->where(
+                    'detail.worksafe.decision_support.source_effective_date',
+                    NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE,
+                )
+                ->where(
+                    'detail.worksafe.decision_support.content_owner',
+                    NotifiableEventClassifier::CONTENT_OWNER,
+                )
                 ->where('detail.worksafe.decided_at', null)
                 ->where('detail.worksafe.decided_by', null)
                 ->where('detail.worksafe.can_decide', true)
@@ -247,6 +262,7 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.worksafe.notifiable', false)
                 ->where('detail.worksafe.decision_reason', $notNotifiable->worksafe_decision_reason)
                 ->where('detail.worksafe.decision_source', 'manual')
+                ->where('detail.worksafe.decision_signed', true)
                 ->where('detail.worksafe.decided_by.id', $actor->id)
                 ->where('detail.worksafe.decided_by.name', $actor->name)
                 ->where('detail.worksafe.can_decide', true)
@@ -320,6 +336,39 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.worksafe.can_decide', false)
                 ->where('detail.worksafe.can_notify', false)
                 ->where('detail.worksafe.can_acknowledge', true)
+            );
+    }
+
+    public function test_preliminary_positive_still_routes_the_hs_lead_to_record_a_signed_decision(): void
+    {
+        $site = $this->activeSite('Rimu House');
+        $actor = $this->hsOfficer($site);
+        $event = HsEvent::factory()->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'worksafe_notifiable' => true,
+            'worksafe_status' => HsEvent::WORKSAFE_PENDING,
+            'worksafe_decided_at' => null,
+            'worksafe_decided_by_user_id' => null,
+            'worksafe_decision_reason' => null,
+            'worksafe_decision_source' => null,
+            'worksafe_decision_tree_version' => null,
+            'worksafe_source_effective_date' => null,
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.notifiable', true)
+                ->where('detail.worksafe.decision_signed', false)
+                ->where('detail.worksafe.can_decide', true)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.handover_summary.next_action.label', 'Record the WorkSafe decision')
+                ->where(
+                    'detail.handover_summary.next_action.href',
+                    "/health-safety/events/{$event->id}?action=worksafe-decision",
+                )
             );
     }
 

@@ -150,6 +150,29 @@ function eventDetail(overrides: EventDetailOverrides = {}): EventDetail {
             decision_reason:
                 'The event does not meet the statutory notification threshold.',
             decision_source: 'manual',
+            decision_signed: true,
+            decision_tree_version: 'worksafe-hswa-ss23-25-v1',
+            source_effective_date: '2016-04-04',
+            decision_support: {
+                version: 'worksafe-hswa-ss23-25-v1',
+                source_effective_date: '2016-04-04',
+                source_reviewed_date: '2026-08-23',
+                next_mandatory_review_date: '2027-04-01',
+                source_url:
+                    'https://www.worksafe.govt.nz/notifications/what-events-need-to-be-notified/',
+                content_owner:
+                    'Health & Safety / Legal & Compliance / Product',
+                specified_injury_or_illness: [
+                    'amputation_requiring_immediate_treatment',
+                ],
+                specified_injury_or_illness_labels: [
+                    'Amputation requiring immediate treatment beyond first aid',
+                ],
+                dangerous_incidents: ['implosion_explosion_or_fire'],
+                dangerous_incident_labels: [
+                    'An implosion, explosion or fire',
+                ],
+            },
             decided_at: '2026-07-14T02:20:00Z',
             decided_by: { id: 9, name: 'Tama Lewis' },
             reference: null,
@@ -826,6 +849,9 @@ describe('EventDetailDialog WorkSafe governance', () => {
                     status: null,
                     decision_reason: null,
                     decision_source: null,
+                    decision_signed: false,
+                    decision_tree_version: null,
+                    source_effective_date: null,
                     decided_at: null,
                     decided_by: null,
                     reference: null,
@@ -860,6 +886,27 @@ describe('EventDetailDialog WorkSafe governance', () => {
 
         expect(screen.getByLabelText('Notifiable')).toBeInTheDocument();
         expect(screen.getByLabelText('Not notifiable')).toBeInTheDocument();
+        expect(
+            screen.getByText(/Preliminary decision support/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/Specified injury \/ illness matrix \(1\)/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/Dangerous-incident matrix \(1\)/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/content owner.*Health & Safety/i),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/review before.*1 Apr 2027/i)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', {
+                name: /Review the official WorkSafe criteria/,
+            }),
+        ).toHaveAttribute(
+            'href',
+            'https://www.worksafe.govt.nz/notifications/what-events-need-to-be-notified/',
+        );
         expect(screen.getByLabelText('Decision rationale')).toBeRequired();
 
         fireEvent.click(screen.getByLabelText('Notifiable'));
@@ -901,6 +948,40 @@ describe('EventDetailDialog WorkSafe governance', () => {
                 name: 'Update WorkSafe decision',
             }),
         ).toBeEnabled();
+    });
+
+    it('keeps a preliminary positive in qualified-review state', () => {
+        renderDialog(
+            eventDetail({
+                handover: acceptedHandover,
+                worksafe: {
+                    ...eventDetail().worksafe,
+                    notifiable: true,
+                    status: 'pending',
+                    decision_reason: null,
+                    decision_source: null,
+                    decision_signed: false,
+                    decision_tree_version: null,
+                    source_effective_date: null,
+                    decided_at: null,
+                    decided_by: null,
+                    can_decide: true,
+                    can_notify: false,
+                },
+            }),
+        );
+
+        expect(
+            screen.getAllByText('Decision needs qualified sign-off').length,
+        ).toBeGreaterThan(0);
+        expect(
+            screen.getByRole('button', { name: 'Record WorkSafe decision' }),
+        ).toBeEnabled();
+        expect(
+            screen.queryByRole('button', {
+                name: 'Record WorkSafe notification',
+            }),
+        ).not.toBeInTheDocument();
     });
 
     it('shows notification pending with the notify action', () => {
@@ -1024,6 +1105,9 @@ describe('EventDetailDialog WorkSafe governance', () => {
                     status: null,
                     decision_reason: null,
                     decision_source: null,
+                    decision_signed: false,
+                    decision_tree_version: null,
+                    source_effective_date: null,
                     decided_at: null,
                     decided_by: null,
                 },

@@ -55,6 +55,8 @@ class HsEventService
      *     worksafe_decided_by_user_id?: int|null,
      *     worksafe_decision_reason?: string|null,
      *     worksafe_decision_source?: string|null,
+     *     worksafe_decision_tree_version?: string|null,
+     *     worksafe_source_effective_date?: \DateTimeInterface|string|null,
      *     created_by?: int|null,
      *     control_room_alert_id?: int|null,
      *     handover_status?: string,
@@ -71,19 +73,29 @@ class HsEventService
         $worksafeNotifiable = $hasWorksafeDecision
             ? (bool) $data['worksafe_notifiable']
             : null;
-        $decisionActorId = $hasWorksafeDecision
-            ? ($data['worksafe_decided_by_user_id']
-                ?? $data['created_by']
-                ?? auth()->id()
-                ?? $data['staff_id']
-                ?? null)
-            : null;
         $candidateDecisionSource = trim((string) ($data['worksafe_decision_source']
             ?? ($source instanceof ClientIncident ? 'incident_report' : 'classifier')));
+        $decisionActorId = $hasWorksafeDecision
+            ? ($candidateDecisionSource === 'classifier'
+                ? ($data['worksafe_decided_by_user_id'] ?? null)
+                : ($data['worksafe_decided_by_user_id']
+                    ?? $data['created_by']
+                    ?? auth()->id()
+                    ?? $data['staff_id']
+                    ?? null))
+            : null;
+        $decisionTreeVersion = trim((string) ($data['worksafe_decision_tree_version']
+            ?? NotifiableEventClassifier::DECISION_TREE_VERSION));
+        $sourceEffectiveDate = $data['worksafe_source_effective_date']
+            ?? NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE;
+        $decisionActor = is_numeric($decisionActorId)
+            ? User::query()->find((int) $decisionActorId)
+            : null;
         $hasCompleteDecision = $hasWorksafeDecision
-            && is_numeric($decisionActorId)
-            && (int) $decisionActorId > 0
-            && in_array($candidateDecisionSource, ['manual', 'incident_report', 'classifier'], true);
+            && $decisionActor?->canDo('hazards.manage') === true
+            && in_array($candidateDecisionSource, ['manual', 'incident_report', 'classifier'], true)
+            && $decisionTreeVersion !== ''
+            && filled($sourceEffectiveDate);
         $decisionSource = $hasCompleteDecision
             ? $candidateDecisionSource
             : null;
@@ -120,10 +132,12 @@ class HsEventService
                 $decisionAt,
                 $decisionReason,
                 $decisionSource,
+                $decisionTreeVersion,
                 $hasCompleteDecision,
                 $idempotencyKey,
                 $severity,
                 $source,
+                $sourceEffectiveDate,
                 $worksafeNotifiable,
             ): HsEvent {
                 $event = HsEvent::create([
@@ -145,6 +159,8 @@ class HsEventService
                     'worksafe_decided_by_user_id' => $hasCompleteDecision ? $decisionActorId : null,
                     'worksafe_decision_reason' => $decisionReason,
                     'worksafe_decision_source' => $decisionSource,
+                    'worksafe_decision_tree_version' => $hasCompleteDecision ? $decisionTreeVersion : null,
+                    'worksafe_source_effective_date' => $hasCompleteDecision ? $sourceEffectiveDate : null,
                     'worksafe_status' => $hasCompleteDecision && $worksafeNotifiable
                         ? HsEvent::WORKSAFE_PENDING
                         : null,
@@ -312,6 +328,8 @@ class HsEventService
     ): HsEvent {
         $reason = trim($reason);
         $source = trim($source);
+        $decisionTreeVersion = NotifiableEventClassifier::DECISION_TREE_VERSION;
+        $sourceEffectiveDate = NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE;
 
         if (mb_strlen($reason) < 10) {
             throw new \DomainException('A WorkSafe decision reason of at least 10 characters is required.');
@@ -321,7 +339,19 @@ class HsEventService
             throw new \DomainException('The WorkSafe decision source is not supported.');
         }
 
-        return DB::transaction(function () use ($event, $notifiable, $reason, $actor, $source): HsEvent {
+        if (! $actor->canDo('hazards.manage')) {
+            throw new \DomainException('The WorkSafe decision requires qualified H&S authority.');
+        }
+
+        return DB::transaction(function () use (
+            $actor,
+            $decisionTreeVersion,
+            $event,
+            $notifiable,
+            $reason,
+            $source,
+            $sourceEffectiveDate,
+        ): HsEvent {
             $incident = $this->lockIncidentForWorksafeProjection($event);
             $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
             $this->assertWorksafeDecisionMutable($locked);
@@ -345,6 +375,8 @@ class HsEventService
                 && $locked->worksafe_decided_by_user_id !== null
                 && trim((string) $locked->worksafe_decision_reason) === $reason
                 && (string) $locked->worksafe_decision_source === $source
+                && (string) $locked->worksafe_decision_tree_version === $decisionTreeVersion
+                && $locked->worksafe_source_effective_date?->toDateString() === $sourceEffectiveDate
                 && ($notifiable
                     || ($locked->worksafe_reference === null
                         && $locked->worksafe_method === null
@@ -364,6 +396,8 @@ class HsEventService
                 'worksafe_decided_by_user_id' => $actor->id,
                 'worksafe_decision_reason' => $reason,
                 'worksafe_decision_source' => $source,
+                'worksafe_decision_tree_version' => $decisionTreeVersion,
+                'worksafe_source_effective_date' => $sourceEffectiveDate,
             ];
 
             if ($notifiable) {
@@ -426,6 +460,12 @@ class HsEventService
                 throw new \DomainException($locked->worksafe_notifiable === null
                     ? 'Record the WorkSafe notifiability decision before recording a notification.'
                     : 'This event is not WorkSafe-notifiable.');
+            }
+
+            if (! $locked->hasSignedWorksafeDecision()) {
+                throw new \DomainException(
+                    'Record a signed WorkSafe decision with the current ruleset and effective source date before recording a notification.',
+                );
             }
 
             if ($locked->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
@@ -496,6 +536,12 @@ class HsEventService
         return DB::transaction(function () use ($event, $acknowledgedAt): HsEvent {
             $incident = $this->lockIncidentForWorksafeProjection($event);
             $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            if (! $locked->hasSignedWorksafeDecision()) {
+                throw new \DomainException(
+                    'Record a signed WorkSafe decision with the current ruleset and effective source date before recording an acknowledgement.',
+                );
+            }
+
             if ($locked->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
                 throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
             }
@@ -677,7 +723,9 @@ class HsEventService
      *     decided_at: string|null,
      *     decided_by_user_id: int|null,
      *     reason: string|null,
-     *     source: string|null
+     *     source: string|null,
+     *     decision_tree_version: string|null,
+     *     source_effective_date: string|null
      * }
      */
     private function worksafeDecisionSnapshot(HsEvent $event): array
@@ -689,6 +737,8 @@ class HsEventService
             'decided_by_user_id' => $event->worksafe_decided_by_user_id,
             'reason' => $event->worksafe_decision_reason,
             'source' => $event->worksafe_decision_source,
+            'decision_tree_version' => $event->worksafe_decision_tree_version,
+            'source_effective_date' => $event->worksafe_source_effective_date?->toDateString(),
         ];
     }
 
@@ -699,7 +749,9 @@ class HsEventService
      *     decided_at: null,
      *     decided_by_user_id: null,
      *     reason: null,
-     *     source: null
+     *     source: null,
+     *     decision_tree_version: null,
+     *     source_effective_date: null
      * }
      */
     private function emptyWorksafeDecisionSnapshot(): array
@@ -711,6 +763,8 @@ class HsEventService
             'decided_by_user_id' => null,
             'reason' => null,
             'source' => null,
+            'decision_tree_version' => null,
+            'source_effective_date' => null,
         ];
     }
 

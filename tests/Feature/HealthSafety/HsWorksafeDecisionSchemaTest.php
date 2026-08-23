@@ -28,6 +28,8 @@ class HsWorksafeDecisionSchemaTest extends TestCase
             'worksafe_decided_by_user_id',
             'worksafe_decision_reason',
             'worksafe_decision_source',
+            'worksafe_decision_tree_version',
+            'worksafe_source_effective_date',
         ]));
 
         $column = collect(Schema::getColumns('hs_events'))

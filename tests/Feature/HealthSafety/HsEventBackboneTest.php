@@ -235,7 +235,7 @@ class HsEventBackboneTest extends TestCase
     // WorkplaceInjury → HsEvent wiring
     // ──────────────────────────────────────────────────────
 
-    public function test_worksafe_notifiable_injury_creates_hs_event_with_worksafe_flags(): void
+    public function test_source_notifiable_injury_escalates_but_leaves_the_hs_decision_unsigned(): void
     {
         $injury = WorkplaceInjury::factory()->create([
             'worksafe_notifiable' => true,
@@ -246,8 +246,8 @@ class HsEventBackboneTest extends TestCase
             'source_type' => WorkplaceInjury::class,
             'source_id' => $injury->id,
             'event_category' => 'injury',
-            'worksafe_notifiable' => true,
-            'worksafe_status' => 'pending',
+            'worksafe_notifiable' => null,
+            'worksafe_status' => null,
             'investigation_required' => true,
         ]);
     }

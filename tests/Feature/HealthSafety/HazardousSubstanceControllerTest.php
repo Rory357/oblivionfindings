@@ -285,7 +285,7 @@ class HazardousSubstanceControllerTest extends TestCase
         $this->assertTrue($record->medical_attention_sought);
     }
 
-    public function test_exposure_observer_raises_notifiable_hsevent_for_hospitalisation(): void
+    public function test_exposure_observer_escalates_hospitalisation_for_qualified_worksafe_review(): void
     {
         $substance = HazardousSubstance::factory()->create();
         $record = SubstanceExposureRecord::factory()->notifiable()->create(['hazardous_substance_id' => $substance->id]);
@@ -297,11 +297,13 @@ class HazardousSubstanceControllerTest extends TestCase
         $event = HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->first();
         $this->assertNotNull($event);
         $this->assertSame(HsEvent::CATEGORY_EXPOSURE, $event->event_category);
-        $this->assertTrue((bool) $event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_decided_at);
+        $this->assertNull($event->worksafe_decided_by_user_id);
         $this->assertSame(HsEvent::SEVERITY_HIGH, $event->severity);
     }
 
-    public function test_exposure_observer_not_notifiable_for_medical_treatment(): void
+    public function test_exposure_observer_leaves_reduced_medical_treatment_input_undecided(): void
     {
         $substance = HazardousSubstance::factory()->create();
         $record = SubstanceExposureRecord::factory()->requiringMedicalAttention()->create(['hazardous_substance_id' => $substance->id]);
@@ -310,7 +312,7 @@ class HazardousSubstanceControllerTest extends TestCase
 
         $event = HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->first();
         $this->assertNotNull($event);
-        $this->assertFalse((bool) $event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_notifiable);
     }
 
     /* ---- Deep-link fallback ---- */

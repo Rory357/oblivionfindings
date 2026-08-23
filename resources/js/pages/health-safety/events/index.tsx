@@ -97,6 +97,7 @@ type EventRow = {
     staff_name: string | null;
     worksafe_notifiable: boolean | null;
     worksafe_status: string | null;
+    worksafe_decision_signed: boolean;
     handover: {
         status: string;
         owner: { id: number; name: string } | null;
@@ -494,26 +495,28 @@ export default function HsEventsIndex({
             can.manage &&
             ev.status !== 'closed' &&
             ['accepted', 'not_required'].includes(ev.handover.status);
+        const needsSignedWorksafeDecision = !ev.worksafe_decision_signed;
         if (canDecideWorksafe) {
             items.push({
                 icon:
-                    ev.worksafe_notifiable === null ? (
+                    needsSignedWorksafeDecision ? (
                         <ShieldAlert className="h-3.5 w-3.5" />
                     ) : (
                         <ShieldCheck className="h-3.5 w-3.5" />
                     ),
                 label:
-                    ev.worksafe_notifiable === null
+                    needsSignedWorksafeDecision
                         ? 'Record WorkSafe decision'
                         : 'Update WorkSafe decision',
                 sub: worksafeLabel(worksafe),
-                tone: ev.worksafe_notifiable === null ? 'critical' : undefined,
+                tone: needsSignedWorksafeDecision ? 'critical' : undefined,
                 onClick: () =>
                     openEvent(ev.id, { action: 'worksafe_decision' }),
             });
         }
         if (
             ev.worksafe_notifiable === true &&
+            ev.worksafe_decision_signed &&
             can.manage &&
             ev.worksafe_status !== 'acknowledged'
         ) {
@@ -1025,13 +1028,18 @@ function worksafeState(ev: EventRow): WorksafeState {
     return {
         notifiable: ev.worksafe_notifiable,
         status: ev.worksafe_status,
+        decision_signed: ev.worksafe_decision_signed,
     };
 }
 
 function worksafeFlagTone(
     worksafe: WorksafeState,
 ): 'critical' | 'warning' | 'success' | 'info' | 'neutral' {
-    if (worksafe.notifiable === null) return 'warning';
+    if (
+        worksafe.notifiable === null ||
+        worksafe.decision_signed === false
+    )
+        return 'warning';
     if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
         return 'success';
     if (!worksafe.status || worksafe.status === 'pending') return 'critical';

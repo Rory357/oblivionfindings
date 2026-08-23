@@ -302,11 +302,27 @@ export type EventSource = {
 export type WorksafeState = {
     notifiable: boolean | null;
     status: string | null;
+    decision_signed?: boolean;
 };
 
 export type EventWorksafe = WorksafeState & {
     decision_reason: string | null;
     decision_source: string | null;
+    decision_signed: boolean;
+    decision_tree_version?: string | null;
+    source_effective_date?: string | null;
+    decision_support?: {
+        version: string;
+        source_effective_date: string;
+        source_reviewed_date: string;
+        next_mandatory_review_date: string;
+        source_url: string;
+        content_owner: string;
+        specified_injury_or_illness: string[];
+        specified_injury_or_illness_labels: string[];
+        dangerous_incidents: string[];
+        dangerous_incident_labels: string[];
+    };
     decided_at: string | null;
     decided_by: { id: number; name: string } | null;
     reference: string | null;
@@ -577,6 +593,8 @@ function titleCase(s: string): string {
 
 export function worksafeLabel(worksafe: WorksafeState): string {
     if (worksafe.notifiable === null) return 'Decision not recorded';
+    if (worksafe.decision_signed === false)
+        return 'Decision needs qualified sign-off';
     if (worksafe.notifiable === false)
         return 'Not notifiable — decision recorded';
     if (!worksafe.status || worksafe.status === 'pending')
@@ -589,6 +607,8 @@ export function worksafeLabel(worksafe: WorksafeState): string {
 
 function worksafeChipClass(worksafe: WorksafeState): string {
     if (worksafe.notifiable === null) return 'bg-muted text-muted-foreground';
+    if (worksafe.decision_signed === false)
+        return 'bg-status-warning-bg text-status-warning';
     if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
         return 'bg-status-success-bg text-status-success';
     if (!worksafe.status || worksafe.status === 'pending')
@@ -913,7 +933,7 @@ export function EventDetailDialog({
                     onClick={() => setPane({ kind: 'worksafe_decision' })}
                 >
                     <ShieldCheck className="mr-1.5 h-4 w-4" />{' '}
-                    {d.worksafe.notifiable === null
+                    {!d.worksafe.decision_signed
                         ? 'Record WorkSafe decision'
                         : 'Update WorkSafe decision'}
                 </Button>
@@ -1540,7 +1560,7 @@ function WorksafeDecisionPane({
     d: EventDetail;
     onDone: () => void;
 }) {
-    const revising = d.worksafe.notifiable !== null;
+    const revising = d.worksafe.decision_signed;
     const completedNotification =
         d.worksafe.status === 'notified' ||
         d.worksafe.status === 'acknowledged';
@@ -1596,7 +1616,87 @@ function WorksafeDecisionPane({
                     {d.worksafe.decided_at
                         ? ` · ${formatDateTime(d.worksafe.decided_at)}`
                         : ''}
+                    {d.worksafe.decision_tree_version
+                        ? ` · ${d.worksafe.decision_tree_version}`
+                        : ''}
+                    {d.worksafe.source_effective_date
+                        ? ` · source effective ${formatDateOnly(d.worksafe.source_effective_date)}`
+                        : ''}
                     .
+                </InfoCard>
+            ) : null}
+
+            {d.worksafe.decision_support ? (
+                <InfoCard icon={ListChecks} tone="warn">
+                    <span className="font-semibold">
+                        Preliminary decision support — qualified H&S sign-off is
+                        still required.
+                    </span>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                        <li>Confirm the event arose from the conduct of work.</li>
+                        <li>
+                            Check death, immediate in-patient admission, and every
+                            specified serious injury or illness.
+                        </li>
+                        <li>
+                            Check every listed dangerous incident and confirm it
+                            was unplanned or uncontrolled and exposed someone to
+                            serious risk from immediate or imminent exposure.
+                        </li>
+                    </ol>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <details className="rounded-md border border-border bg-background px-3">
+                            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                                {`Specified injury / illness matrix (${d.worksafe.decision_support.specified_injury_or_illness_labels.length})`}
+                            </summary>
+                            <ul className="mb-3 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                                {d.worksafe.decision_support.specified_injury_or_illness_labels.map(
+                                    (label) => (
+                                        <li key={label}>{label}</li>
+                                    ),
+                                )}
+                            </ul>
+                        </details>
+                        <details className="rounded-md border border-border bg-background px-3">
+                            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                                {`Dangerous-incident matrix (${d.worksafe.decision_support.dangerous_incident_labels.length})`}
+                            </summary>
+                            <ul className="mb-3 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                                {d.worksafe.decision_support.dangerous_incident_labels.map(
+                                    (label) => (
+                                        <li key={label}>{label}</li>
+                                    ),
+                                )}
+                            </ul>
+                        </details>
+                    </div>
+                    <p className="mt-2 text-sm">
+                        If any fact or category is uncertain, do not record a
+                        final decision; leave this event for qualified review.
+                        Generic severity alone is not a statutory classification.
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {d.worksafe.decision_support.version} · source effective{' '}
+                        {formatDateOnly(
+                            d.worksafe.decision_support.source_effective_date,
+                        )}{' '}
+                        · content owner{' '}
+                        {d.worksafe.decision_support.content_owner}{' '}
+                        · review before{' '}
+                        {formatDateOnly(
+                            d.worksafe.decision_support
+                                .next_mandatory_review_date,
+                        )}
+                    </p>
+                    <a
+                        href={d.worksafe.decision_support.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        Review the official WorkSafe criteria
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
                 </InfoCard>
             ) : null}
 
@@ -4368,7 +4468,8 @@ function WorkSafeGovernanceCard({ d }: { d: EventDetail }) {
                     <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${worksafeChipClass(worksafe)}`}
                     >
-                        {worksafe.notifiable === null ? (
+                        {worksafe.notifiable === null ||
+                        worksafe.decision_signed === false ? (
                             <Clock className="h-4 w-4" />
                         ) : worksafe.notifiable === false ||
                           worksafe.status === 'acknowledged' ? (
@@ -4393,10 +4494,11 @@ function WorkSafeGovernanceCard({ d }: { d: EventDetail }) {
                 ) : null}
             </div>
 
-            {worksafe.notifiable === null ? (
+            {worksafe.notifiable === null ||
+            worksafe.decision_signed === false ? (
                 <p className="mt-3 text-sm text-muted-foreground">
-                    Record whether this event meets the WorkSafe NZ
-                    notifiable-event threshold before closure.
+                    Complete qualified H&S sign-off against the current WorkSafe
+                    decision tree before notification or closure.
                 </p>
             ) : (
                 <>

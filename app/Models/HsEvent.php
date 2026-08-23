@@ -111,6 +111,8 @@ class HsEvent extends Model
         'worksafe_decided_by_user_id',
         'worksafe_decision_reason',
         'worksafe_decision_source',
+        'worksafe_decision_tree_version',
+        'worksafe_source_effective_date',
         'worksafe_status',
         'worksafe_reference',
         'worksafe_notified_at',
@@ -144,6 +146,7 @@ class HsEvent extends Model
         'closed_at' => 'datetime',
         'worksafe_notifiable' => 'boolean',
         'worksafe_decided_at' => 'datetime',
+        'worksafe_source_effective_date' => 'date',
         'worksafe_notified_at' => 'datetime',
         'worksafe_acknowledged_at' => 'datetime',
         'worksafe_site_preserved' => 'boolean',
@@ -152,6 +155,18 @@ class HsEvent extends Model
         'investigation_required' => 'boolean',
         'accepted_at' => 'datetime',
     ];
+
+    /** A positive/negative value alone can be a preliminary source flag. */
+    public function hasSignedWorksafeDecision(): bool
+    {
+        return $this->worksafe_notifiable !== null
+            && $this->worksafe_decided_at !== null
+            && $this->worksafe_decided_by_user_id !== null
+            && filled($this->worksafe_decision_reason)
+            && in_array($this->worksafe_decision_source, ['manual', 'incident_report', 'classifier'], true)
+            && filled($this->worksafe_decision_tree_version)
+            && $this->worksafe_source_effective_date !== null;
+    }
 
     /* ------------------------------------------------------------------ */
     /*  Relationships */

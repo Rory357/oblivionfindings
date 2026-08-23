@@ -82,8 +82,9 @@ class FirstAidObserver implements ShouldHandleEventsAfterCommit
     private function recordHsEvent(FirstAidRecord $record): void
     {
         try {
-            // Hospital admission → HSWA s.23 notifiable injury/illness; ambulance-only (assessed,
-            // not admitted) is significant enough to enter the spine but not auto-notifiable.
+            // Hospital admission raises a preliminary HSWA s.23 trigger;
+            // ambulance-only (assessed, not admitted) still needs the full tree.
+            // The observer never signs the canonical WorkSafe decision.
             $harm = $record->treatment_outcome === self::REPORTABLE_OUTCOME
                 ? NotifiableEventClassifier::HARM_HOSPITALISATION
                 : NotifiableEventClassifier::HARM_MEDICAL;

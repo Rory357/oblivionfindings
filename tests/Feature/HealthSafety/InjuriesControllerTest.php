@@ -58,6 +58,7 @@ class InjuriesControllerTest extends TestCase
         $injury = WorkplaceInjury::factory()->create(array_merge([
             'site_id' => $site->id,
             'status' => 'reported',
+            'created_by' => $this->admin->id,
         ], $overrides));
 
         app(WorkplaceInjuryJourneyService::class)->synchronize($injury);
@@ -351,6 +352,40 @@ class InjuriesControllerTest extends TestCase
         $this->assertNotNull($notifiable, 'A worksafe-notifiable injury must create a NotifiableIncident (seam 4)');
         $this->assertSame('worksafe', $notifiable->notification_authority);
         $this->assertSame('pending', $notifiable->status);
+    }
+
+    public function test_create_only_reporter_escalates_without_signing_the_canonical_worksafe_decision(): void
+    {
+        $reporter = $this->siteViewer($this->site, ['hazards.create']);
+        $worker = $this->staffAtSite($this->site);
+
+        $this->actingAs($reporter)
+            ->post('/health-safety/injuries', $this->validInjuryPayload(
+                $this->site,
+                $worker,
+                [
+                    'injury_type' => 'fracture',
+                    'severity' => 'serious',
+                    'medical_treatment_type' => 'hospitalisation',
+                    'worksafe_notifiable' => true,
+                ],
+            ))
+            ->assertSessionHasNoErrors();
+
+        $injury = WorkplaceInjury::query()->latest('id')->firstOrFail();
+        $event = HsEvent::query()
+            ->where('source_type', WorkplaceInjury::class)
+            ->where('source_id', $injury->id)
+            ->sole();
+
+        $this->assertNotNull(
+            NotifiableIncident::query()->where('workplace_injury_id', $injury->id)->first(),
+        );
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_decided_at);
+        $this->assertNull($event->worksafe_decided_by_user_id);
+        $this->assertNull($event->worksafe_decision_tree_version);
+        $this->assertNull($event->worksafe_source_effective_date);
     }
 
     public function test_store_rolls_back_injury_and_hs_event_when_required_control_room_projection_fails(): void
