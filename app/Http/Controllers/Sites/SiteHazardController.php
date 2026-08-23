@@ -11,6 +11,7 @@ use App\Models\SiteHazardAction;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\References\ReferenceNumberGenerator;
+use App\Services\Sites\SiteChecklistFailureRiskMapper;
 use App\Services\Sites\SiteHazardRiskCalculator;
 use App\Services\UserSiteAccessService;
 use App\Support\HazardComplianceSnapshot;
@@ -19,6 +20,8 @@ use App\Support\SiteRecommendedHazards;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -546,11 +549,11 @@ class SiteHazardController extends Controller
 
     public function close(Request $request, SiteHazard $hazard)
     {
-        $this->authorize('view', $hazard->site);
-
-        if ($hazard->status === 'closed') {
-            return back()->with('error', 'This hazard is already closed.');
-        }
+        abort_unless(
+            $hazard->site
+                && Gate::forUser($request->user())->allows('view', $hazard->site),
+            404,
+        );
 
         $validated = $request->validate([
             'resolution_summary' => 'required|string',
@@ -558,39 +561,92 @@ class SiteHazardController extends Controller
             'resolution_evidence.*' => 'file|max:10240',
         ]);
 
-        $evidence = $this->storeFilesWithMeta($request->file('resolution_evidence', []), $hazard->id, 'resolution');
+        $result = DB::transaction(function () use ($request, $hazard, $validated): array {
+            $lockedHazard = SiteHazard::query()
+                ->with('site')
+                ->whereKey($hazard->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        // Observer stamps closed_at / closed_by + status_changed audit on the
-        // status → closed transition.
-        $hazard->update([
-            'resolution_summary' => $validated['resolution_summary'],
-            'resolution_evidence' => $evidence ?: ($hazard->resolution_evidence ?? []),
-            'status' => 'closed',
-        ]);
+            abort_unless(
+                $lockedHazard->site
+                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
+                404,
+            );
 
-        return back()->with('success', "Hazard {$hazard->reference_number} closed.");
+            if ($lockedHazard->status === 'closed') {
+                return ['closed' => false, 'message' => 'This hazard is already closed.'];
+            }
+
+            if ($lockedHazard->actions()->where('status', '!=', 'completed')->exists()) {
+                return ['closed' => false, 'message' => 'Complete all corrective actions before closing this hazard.'];
+            }
+
+            $evidence = $this->storeFilesWithMeta(
+                $request->file('resolution_evidence', []),
+                $lockedHazard->id,
+                'resolution',
+            );
+
+            // Observer stamps closed_at / closed_by + status_changed audit on
+            // the status → closed transition.
+            $lockedHazard->update([
+                'resolution_summary' => $validated['resolution_summary'],
+                'resolution_evidence' => $evidence ?: ($lockedHazard->resolution_evidence ?? []),
+                'status' => 'closed',
+            ]);
+
+            return [
+                'closed' => true,
+                'message' => "Hazard {$lockedHazard->reference_number} closed.",
+            ];
+        }, attempts: 3);
+
+        return back()->with($result['closed'] ? 'success' : 'error', $result['message']);
     }
 
     public function storeAction(Request $request, SiteHazard $hazard)
     {
-        $this->authorize('view', $hazard->site);
+        abort_unless(
+            $hazard->site
+                && Gate::forUser($request->user())->allows('view', $hazard->site),
+            404,
+        );
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'action_type' => 'nullable|string|max:50',
+            'action_type' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::notIn([SiteChecklistFailureRiskMapper::REQUIRED_ESCALATION_ACTION]),
+            ],
             'assigned_to_user_id' => 'nullable|exists:users,id',
             'due_date' => 'nullable|date',
         ]);
 
-        $action = SiteHazardAction::create([
-            'hazard_id' => $hazard->id,
-            'reference_number' => $this->nextActionReference(),
-            'action_description' => $validated['title'],
-            'action_type' => $validated['action_type'] ?? null,
-            'status' => 'pending',
-            'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
-            'due_date' => $validated['due_date'] ?? null,
-        ]);
+        $action = DB::transaction(function () use ($request, $hazard, $validated): SiteHazardAction {
+            $lockedHazard = SiteHazard::query()
+                ->with('site')
+                ->whereKey($hazard->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                $lockedHazard->site
+                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
+                404,
+            );
+
+            return SiteHazardAction::create([
+                'hazard_id' => $lockedHazard->id,
+                'reference_number' => $this->nextActionReference(),
+                'action_description' => $validated['title'],
+                'action_type' => $validated['action_type'] ?? null,
+                'status' => 'pending',
+                'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
+                'due_date' => $validated['due_date'] ?? null,
+            ]);
+        }, attempts: 3);
 
         return back()->with('success', "Corrective action {$action->reference_number} added.");
     }
@@ -598,18 +654,55 @@ class SiteHazardController extends Controller
     public function completeAction(Request $request, SiteHazardAction $action)
     {
         $action->loadMissing('hazard.site');
-        $this->authorize('view', $action->hazard->site);
+        abort_unless(
+            $action->hazard
+                && $action->hazard->site
+                && Gate::forUser($request->user())->allows('view', $action->hazard->site),
+            404,
+        );
 
         $validated = $request->validate(['completion_notes' => 'nullable|string']);
 
-        $action->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by_user_id' => $request->user()->id,
-            'completion_notes' => $validated['completion_notes'] ?? null,
-        ]);
+        $replayed = DB::transaction(function () use ($request, $action, $validated): bool {
+            $hazardId = SiteHazardAction::query()
+                ->whereKey($action->getKey())
+                ->value('hazard_id');
+            abort_unless($hazardId, 404);
 
-        return back()->with('success', 'Corrective action completed.');
+            $lockedHazard = SiteHazard::query()
+                ->with('site')
+                ->whereKey($hazardId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless(
+                $lockedHazard->site
+                    && Gate::forUser($request->user())->allows('view', $lockedHazard->site),
+                404,
+            );
+
+            $lockedAction = SiteHazardAction::query()
+                ->whereKey($action->getKey())
+                ->where('hazard_id', $lockedHazard->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($lockedAction->status === 'completed') {
+                return true;
+            }
+
+            $lockedAction->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'completed_by_user_id' => $request->user()->id,
+                'completion_notes' => $validated['completion_notes'] ?? null,
+            ]);
+
+            return false;
+        }, attempts: 3);
+
+        return back()->with(
+            'success',
+            $replayed ? 'Corrective action already completed.' : 'Corrective action completed.',
+        );
     }
 
     public function media(Request $request, SiteHazard $hazard)

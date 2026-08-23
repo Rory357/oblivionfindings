@@ -13,6 +13,10 @@ class SiteChecklistTemplateItem extends Model
     use HasFactory;
     use WritesLegacyStorageContext;
 
+    protected $attributes = [
+        'failure_risk_level' => 'ordinary',
+    ];
+
     protected $fillable = [
         'template_id',
         'sort_order',
@@ -23,6 +27,7 @@ class SiteChecklistTemplateItem extends Model
         'guidance',
         'failure_creates_hazard',
         'failure_creates_damage',
+        'failure_risk_level',
     ];
 
     protected $casts = [

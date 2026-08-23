@@ -8,6 +8,7 @@ use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\User;
+use App\Services\Sites\SiteChecklistFailureRiskMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +50,11 @@ class ChecklistsDashboardData
             ->withCount([
                 'items',
                 'assignments as assignments_count' => fn ($q) => $q->where('is_active', true),
-                'items as hazard_items_count' => fn ($q) => $q->where('failure_creates_hazard', true),
+                'items as hazard_items_count' => fn ($q) => $q->where(
+                    fn ($items) => $items
+                        ->where('failure_creates_hazard', true)
+                        ->orWhere('failure_risk_level', SiteChecklistFailureRiskMapper::CRITICAL),
+                ),
                 'items as photo_items_count' => fn ($q) => $q->where('response_type', 'photo'),
             ])
             ->orderBy('name')
@@ -437,6 +442,7 @@ class ChecklistsDashboardData
                 'guidance' => $item->guidance,
                 'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
                 'failure_creates_damage' => (bool) $item->failure_creates_damage,
+                'failure_risk_level' => $item->failure_risk_level,
                 'has_responses' => $item->responses()->exists(),
             ])->all(),
         ];

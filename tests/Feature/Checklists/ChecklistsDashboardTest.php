@@ -5,6 +5,7 @@ namespace Tests\Feature\Checklists;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\User;
@@ -141,7 +142,7 @@ class ChecklistsDashboardTest extends TestCase
             'requires_photo' => true,
             'requires_signature' => false,
             'items' => [
-                ['question' => 'Alarms sound', 'response_type' => 'yes_no', 'is_required' => true, 'failure_creates_hazard' => true, 'response_config' => null, 'guidance' => null],
+                ['question' => 'Alarms sound', 'response_type' => 'yes_no', 'is_required' => true, 'failure_creates_hazard' => true, 'failure_risk_level' => 'critical', 'response_config' => null, 'guidance' => null],
                 ['question' => 'Fridge temp', 'response_type' => 'numeric', 'is_required' => true, 'failure_creates_hazard' => true, 'response_config' => ['min' => 2, 'max' => 8, 'unit' => '°C'], 'guidance' => 'Record the reading'],
             ],
         ];
@@ -153,8 +154,10 @@ class ChecklistsDashboardTest extends TestCase
         $this->assertTrue((bool) ($template->settings['requires_photo'] ?? false));
         $this->assertSame(2, $template->items()->count());
         $numeric = $template->items()->where('response_type', 'numeric')->firstOrFail();
+        $critical = $template->items()->where('question', 'Alarms sound')->firstOrFail();
         $this->assertSame(8.0, (float) ($numeric->response_config['max'] ?? null));
         $this->assertTrue($numeric->failure_creates_hazard);
+        $this->assertSame('critical', $critical->failure_risk_level);
     }
 
     public function test_admin_can_update_template_and_sync_items(): void
@@ -182,9 +185,98 @@ class ChecklistsDashboardTest extends TestCase
         $this->assertDatabaseHas('site_checklist_template_items', ['id' => $firstItem->id, 'question' => 'Updated question']);
     }
 
+    public function test_template_update_rejects_a_foreign_item_id_without_mutating_either_template(): void
+    {
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+        $foreignTemplate = SiteChecklistTemplate::query()
+            ->where('id', '!=', $template->id)
+            ->whereHas('items')
+            ->firstOrFail();
+        $foreignItem = $foreignTemplate->items()->firstOrFail();
+        $originalName = $template->name;
+        $originalItemCount = $template->items()->count();
+        $foreignQuestion = $foreignItem->question;
+
+        $this->actingAs($this->admin)
+            ->put('/sites/checklists/templates/'.$template->id, [
+                'name' => 'Must roll back',
+                'category' => $template->category,
+                'applicable_to_type' => $template->applicable_to_type,
+                'frequency' => $template->frequency,
+                'is_active' => true,
+                'requires_photo' => false,
+                'requires_signature' => false,
+                'items' => [[
+                    'id' => $foreignItem->id,
+                    'question' => 'Forged foreign update',
+                    'response_type' => $foreignItem->response_type,
+                    'is_required' => true,
+                    'failure_creates_hazard' => false,
+                    'failure_creates_damage' => false,
+                    'failure_risk_level' => 'ordinary',
+                    'response_config' => null,
+                    'guidance' => null,
+                ]],
+            ])
+            ->assertSessionHasErrors([
+                'items' => 'One or more checklist items do not belong to this template.',
+            ]);
+
+        $this->assertSame($originalName, $template->fresh()->name);
+        $this->assertSame($originalItemCount, $template->items()->count());
+        $this->assertSame($foreignQuestion, $foreignItem->fresh()->question);
+    }
+
+    public function test_run_detail_fails_closed_for_a_response_bound_to_a_foreign_template_item(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+        $foreignTemplate = SiteChecklistTemplate::query()
+            ->where('id', '!=', $template->id)
+            ->whereHas('items')
+            ->firstOrFail();
+        $foreignItem = $foreignTemplate->items()->firstOrFail();
+        $run = $this->makeRun($site, $template);
+
+        SiteChecklistResponse::query()->create([
+            'run_id' => $run->id,
+            'template_item_id' => $foreignItem->id,
+            'response_value' => 'foreign',
+            'notes' => 'Must not be exposed through this run.',
+            'is_failed' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/checklists?run={$run->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('runDetail', null));
+    }
+
+    public function test_run_detail_fails_closed_when_the_assignment_does_not_own_the_run_template(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+        $foreignTemplate = SiteChecklistTemplate::query()
+            ->where('id', '!=', $template->id)
+            ->firstOrFail();
+        $run = $this->makeRun($site, $template);
+
+        $run->assignment()->update(['template_id' => $foreignTemplate->id]);
+
+        $this->actingAs($this->admin)
+            ->get("/checklists?run={$run->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('runDetail', null));
+    }
+
     public function test_template_query_param_returns_template_detail(): void
     {
         $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+        $item = $template->items()->orderBy('sort_order')->firstOrFail();
+        $item->update([
+            'failure_creates_hazard' => true,
+            'failure_risk_level' => 'critical',
+        ]);
 
         $this->actingAs($this->admin)
             ->get('/checklists?template='.$template->id)
@@ -192,6 +284,7 @@ class ChecklistsDashboardTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('templateDetail.id', $template->id)
                 ->where('templateDetail.key', 'quality_home_checklist')
+                ->where('templateDetail.items.0.failure_risk_level', 'critical')
                 ->has('templateDetail.items', $template->items()->count()));
     }
 

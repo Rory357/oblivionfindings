@@ -70,6 +70,7 @@ function runDetail(signatureFlag: boolean): RunDetail {
                 guidance: null,
                 failure_creates_hazard: false,
                 failure_creates_damage: false,
+                failure_risk_level: 'ordinary',
             },
         ],
         responses: [
@@ -107,6 +108,14 @@ describe('RunModal sign-off', () => {
             const signOff = screen.getByPlaceholderText('Your name');
             expect(screen.getByText('Sign-off')).toBeVisible();
             expect(signOff).toHaveValue('');
+            expect(signOff.parentElement).toHaveClass(
+                'flex-col',
+                'sm:flex-row',
+            );
+            expect(screen.getByText('Complete run').parentElement).toHaveClass(
+                'grid',
+                'sm:flex',
+            );
             expect(
                 screen.queryByDisplayValue('Hidden Authenticated Name'),
             ).not.toBeInTheDocument();
@@ -123,4 +132,27 @@ describe('RunModal sign-off', () => {
             );
         },
     );
+
+    it('makes the required H&S hand-off visible for a critical failed item', async () => {
+        const detail = runDetail(false);
+        detail.items[0].failure_creates_damage = true;
+        detail.items[0].failure_risk_level = 'critical';
+        detail.responses[0].response_value = 'no';
+        detail.responses[0].is_failed = true;
+        mocks.props = { runDetail: detail };
+
+        render(
+            <ChecklistConfigProvider value={config}>
+                <RunModal runId={77} onClose={vi.fn()} />
+            </ChecklistConfigProvider>,
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.getByText(
+                    '1 critical failed check will require H&S escalation and a corrective action',
+                ),
+            ).toBeVisible(),
+        );
+    });
 });

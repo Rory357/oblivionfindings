@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\SiteChecklistRun;
 use App\Models\User;
+use App\Services\Sites\SiteChecklistFailureRiskMapper;
 use Illuminate\Support\Facades\Gate;
 
 class RunDetailPresenter
@@ -28,14 +29,23 @@ class RunDetailPresenter
         if (! $run
             || ! $run->site
             || ! $run->template
+            || ! $run->hasCanonicalExecutionProvenance()
             || ($user && Gate::forUser($user)->denies('view', $run))) {
             return null;
         }
 
         $items = $run->template->items->sortBy('sort_order')->values();
+        $itemIds = $items->pluck('id')->map(fn ($id): int => (int) $id);
+        if ($run->responses->contains(
+            fn ($response): bool => ! $itemIds->containsStrict((int) $response->template_item_id),
+        )) {
+            return null;
+        }
+
         $settings = $run->template->settings ?? [];
         $flags = [
-            'hazard' => $items->contains(fn ($item) => (bool) $item->failure_creates_hazard),
+            'hazard' => $items->contains(fn ($item) => (bool) $item->failure_creates_hazard
+                || $item->failure_risk_level === SiteChecklistFailureRiskMapper::CRITICAL),
             'photo' => $items->contains(fn ($item) => $item->response_type === 'photo')
                 || ! empty($settings['requires_photo']),
             'sign' => ! empty($settings['requires_signature']),
@@ -67,6 +77,7 @@ class RunDetailPresenter
                 'guidance' => $item->guidance,
                 'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
                 'failure_creates_damage' => (bool) $item->failure_creates_damage,
+                'failure_risk_level' => $item->failure_risk_level,
             ])->all(),
             'responses' => $run->responses->map(fn ($response) => [
                 'template_item_id' => $response->template_item_id,

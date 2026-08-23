@@ -5,13 +5,17 @@ namespace App\Services\Sites;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplateItem;
+use App\Models\SiteDamage;
 use App\Models\SiteHazard;
+use App\Models\SiteHazardAction;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 class SiteChecklistRunExecutionService
 {
@@ -24,6 +28,11 @@ class SiteChecklistRunExecutionService
     public const AUTHORITY_MANAGER_OVERRIDE = 'manager_override';
 
     public const MANAGER_OVERRIDE_REASON = 'Authorized using the explicit checklists.schedule manager override.';
+
+    public function __construct(
+        private readonly SiteChecklistFailureRiskMapper $failureRiskMapper,
+        private readonly ReferenceNumberGenerator $referenceNumbers,
+    ) {}
 
     public function assertVisible(SiteChecklistRun $requestedRun, User $actor): void
     {
@@ -328,32 +337,105 @@ class SiteChecklistRunExecutionService
     {
         $submittedItemIds = collect($responses)
             ->map(fn (array $response): int => (int) ($response['template_item_id'] ?? 0))
-            ->unique()
             ->values();
-        $validItemIds = SiteChecklistTemplateItem::query()
-            ->where('template_id', $run->template_id)
-            ->whereIn('id', $submittedItemIds->all())
-            ->sharedLock()
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id);
 
-        if ($submittedItemIds->diff($validItemIds)->isNotEmpty()) {
+        if ($submittedItemIds->contains(fn (int $id): bool => $id <= 0)
+            || $submittedItemIds->unique()->count() !== $submittedItemIds->count()) {
+            throw ValidationException::withMessages([
+                'responses' => 'Each checklist response must identify one distinct item from this run.',
+            ]);
+        }
+
+        $items = SiteChecklistTemplateItem::query()
+            ->where('template_id', $run->template_id)
+            ->orderBy('id')
+            ->sharedLock()
+            ->get()
+            ->keyBy(fn (SiteChecklistTemplateItem $item): int => (int) $item->id);
+
+        if ($submittedItemIds->diff($items->keys())->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'responses' => 'One or more checklist responses do not belong to this run.',
             ]);
         }
 
         foreach ($responses as $response) {
+            $item = $items->get((int) $response['template_item_id']);
+            if (! $item instanceof SiteChecklistTemplateItem) {
+                throw new LogicException('A validated checklist item could not be resolved.');
+            }
+
+            $responseValue = $response['response_value'] ?? null;
             $run->responses()->updateOrCreate(
                 ['template_item_id' => (int) $response['template_item_id']],
                 [
-                    'response_value' => $response['response_value'] ?? null,
+                    'response_value' => $responseValue,
                     'notes' => $response['notes'] ?? null,
                     'photo_path' => $response['photo_path'] ?? null,
-                    'is_failed' => (bool) ($response['is_failed'] ?? false),
+                    // Failure is a governed consequence of the locked template
+                    // item and response value. Never trust the browser flag for
+                    // hazard, damage, or escalation projection.
+                    'is_failed' => $this->canonicalFailureStatus($item, $responseValue),
                 ],
             );
         }
+    }
+
+    private function canonicalFailureStatus(SiteChecklistTemplateItem $item, mixed $value): bool
+    {
+        if ($value === null || $value === '') {
+            return false;
+        }
+
+        $value = (string) $value;
+
+        return match ($item->response_type) {
+            'yes_no' => $this->choiceFailureStatus($value, ['yes', 'no'], ['no']),
+            'yes_no_na' => $this->choiceFailureStatus($value, ['yes', 'no', 'na'], ['no']),
+            'pass_fail' => $this->choiceFailureStatus($value, ['pass', 'fail'], ['fail']),
+            'numeric' => $this->numericFailureStatus($item, $value),
+            'text', 'photo' => false,
+            default => throw new LogicException(
+                "Unsupported checklist response type [{$item->response_type}].",
+            ),
+        };
+    }
+
+    /**
+     * @param  array<int, string>  $allowed
+     * @param  array<int, string>  $failed
+     */
+    private function choiceFailureStatus(string $value, array $allowed, array $failed): bool
+    {
+        if (! in_array($value, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'responses' => 'One or more checklist responses has an invalid value.',
+            ]);
+        }
+
+        return in_array($value, $failed, true);
+    }
+
+    private function numericFailureStatus(SiteChecklistTemplateItem $item, string $value): bool
+    {
+        if (! is_numeric($value)) {
+            throw ValidationException::withMessages([
+                'responses' => 'One or more numeric checklist responses has an invalid value.',
+            ]);
+        }
+
+        $config = $item->response_config ?? [];
+        $number = (float) $value;
+        $minimum = $config['min'] ?? null;
+        $maximum = $config['max'] ?? null;
+
+        if (($minimum !== null && ! is_numeric($minimum))
+            || ($maximum !== null && ! is_numeric($maximum))) {
+            throw new LogicException('Checklist numeric response limits are invalid.');
+        }
+
+        return ($minimum !== null && $number < (float) $minimum)
+            || ($maximum !== null && $number > (float) $maximum);
     }
 
     private function assertRequiredResponsesComplete(SiteChecklistRun $run): void
@@ -361,6 +443,7 @@ class SiteChecklistRunExecutionService
         $requiredItemIds = SiteChecklistTemplateItem::query()
             ->where('template_id', $run->template_id)
             ->where('is_required', true)
+            ->orderBy('id')
             ->sharedLock()
             ->pluck('id')
             ->map(fn ($id): int => (int) $id);
@@ -388,24 +471,27 @@ class SiteChecklistRunExecutionService
     {
         $responses = $run->responses()
             ->where('is_failed', true)
-            ->where(fn ($query) => $query
-                ->whereNull('created_hazard_id')
-                ->orWhereNull('created_damage_id'))
             ->with('templateItem')
+            ->lockForUpdate()
             ->get();
 
         foreach ($responses as $response) {
             $item = $response->templateItem;
-            if (! $item) {
-                continue;
+            if (! $item || (int) $item->template_id !== (int) $run->template_id) {
+                throw new LogicException('Checklist response has invalid template-item provenance.');
             }
 
-            if ($item->failure_creates_hazard && ! $response->created_hazard_id) {
-                $hazard = SiteHazard::create([
+            $mapping = $this->failureRiskMapper->forItem($item);
+            $requiresEscalation = $mapping['requires_hs_escalation'];
+            $needsHazard = (bool) $item->failure_creates_hazard || $requiresEscalation;
+            $hazard = $this->canonicalCreatedHazard($run, $response->created_hazard_id);
+
+            if ($needsHazard && ! $hazard) {
+                $hazard = SiteHazard::query()->create([
                     'site_id' => $run->site_id,
                     'hazard_type' => 'safety',
-                    'severity' => 'medium',
-                    'likelihood' => 'possible',
+                    'severity' => $mapping['hazard_severity'],
+                    'likelihood' => $mapping['hazard_likelihood'],
                     'description' => $this->followUpDescription(
                         'Checklist check failed',
                         $item->question,
@@ -418,12 +504,25 @@ class SiteChecklistRunExecutionService
                 $response->created_hazard_id = $hazard->id;
             }
 
-            if ($item->failure_creates_damage && ! $response->created_damage_id) {
+            if ($hazard && $requiresEscalation) {
+                if ($hazard->severity !== $mapping['hazard_severity']
+                    || $hazard->likelihood !== $mapping['hazard_likelihood']) {
+                    $hazard->update([
+                        'severity' => $mapping['hazard_severity'],
+                        'likelihood' => $mapping['hazard_likelihood'],
+                    ]);
+                }
+
+                $this->ensureRequiredEscalationAction($hazard, $item->question);
+            }
+
+            $damage = $this->canonicalCreatedDamage($run, $response->created_damage_id);
+            if ($item->failure_creates_damage && ! $damage) {
                 $damage = $run->site->damages()->create([
                     'reported_by' => $userId,
                     'title' => 'Checklist issue: '.Str::limit($item->question, 200),
                     'description' => $response->notes ?: $item->question,
-                    'severity' => 'minor',
+                    'severity' => $mapping['damage_severity'],
                     'status' => 'reported',
                     'damage_date' => now()->toDateString(),
                     'discovered_date' => now()->toDateString(),
@@ -433,10 +532,64 @@ class SiteChecklistRunExecutionService
                 $response->created_damage_id = $damage->id;
             }
 
+            if ($damage && $requiresEscalation && $damage->severity !== $mapping['damage_severity']) {
+                $damage->update(['severity' => $mapping['damage_severity']]);
+            }
+
             if ($response->isDirty()) {
                 $response->save();
             }
         }
+    }
+
+    private function canonicalCreatedHazard(SiteChecklistRun $run, ?int $hazardId): ?SiteHazard
+    {
+        if (! $hazardId) {
+            return null;
+        }
+
+        return SiteHazard::query()
+            ->whereKey($hazardId)
+            ->where('site_id', $run->site_id)
+            ->where('linked_checklist_run_id', $run->id)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function canonicalCreatedDamage(SiteChecklistRun $run, ?int $damageId): ?SiteDamage
+    {
+        if (! $damageId) {
+            return null;
+        }
+
+        return SiteDamage::query()
+            ->whereKey($damageId)
+            ->where('site_id', $run->site_id)
+            ->where('checklist_run_id', $run->id)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function ensureRequiredEscalationAction(SiteHazard $hazard, string $question): void
+    {
+        $exists = SiteHazardAction::query()
+            ->where('hazard_id', $hazard->id)
+            ->where('action_type', SiteChecklistFailureRiskMapper::REQUIRED_ESCALATION_ACTION)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        SiteHazardAction::query()->create([
+            'hazard_id' => $hazard->id,
+            'reference_number' => $this->referenceNumbers->next('HZA'),
+            'action_description' => 'H&S review and control required for critical checklist failure: '.Str::limit($question, 200),
+            'action_type' => SiteChecklistFailureRiskMapper::REQUIRED_ESCALATION_ACTION,
+            'status' => 'pending',
+            'assigned_to_user_id' => $hazard->assigned_to_user_id,
+            'due_date' => $hazard->due_date ?? now()->addDay()->toDateString(),
+        ]);
     }
 
     private function followUpDescription(string $prefix, string $question, ?string $notes): string

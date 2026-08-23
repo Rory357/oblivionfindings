@@ -20,6 +20,8 @@ export type ResponseType =
     | 'text'
     | 'photo';
 
+export type FailureRiskLevel = 'ordinary' | 'critical';
+
 export interface Category {
     key: string;
     label: string;
@@ -141,6 +143,7 @@ export interface RunItemDef {
     guidance?: string | null;
     failure_creates_hazard: boolean;
     failure_creates_damage: boolean;
+    failure_risk_level: FailureRiskLevel;
 }
 
 export interface RunResponse {
@@ -173,6 +176,7 @@ export interface TemplateDetailItem {
     guidance?: string | null;
     failure_creates_hazard: boolean;
     failure_creates_damage: boolean;
+    failure_risk_level: FailureRiskLevel;
     has_responses?: boolean;
 }
 

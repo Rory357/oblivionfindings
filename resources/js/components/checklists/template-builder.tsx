@@ -41,7 +41,7 @@ import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { categoryIcon } from './icons';
-import type { ResponseType, TemplateDetail } from './types';
+import type { FailureRiskLevel, ResponseType, TemplateDetail } from './types';
 
 interface ItemDraft {
     id?: number;
@@ -52,6 +52,7 @@ interface ItemDraft {
     guidance: string;
     failure_creates_hazard: boolean;
     failure_creates_damage: boolean;
+    failure_risk_level: FailureRiskLevel;
     has_responses?: boolean;
 }
 
@@ -118,6 +119,7 @@ function blankItem(): ItemDraft {
         guidance: '',
         failure_creates_hazard: false,
         failure_creates_damage: false,
+        failure_risk_level: 'ordinary',
     };
 }
 
@@ -151,6 +153,7 @@ function detailToForm(detail: TemplateDetail): BuilderForm {
             guidance: it.guidance ?? '',
             failure_creates_hazard: it.failure_creates_hazard,
             failure_creates_damage: it.failure_creates_damage,
+            failure_risk_level: it.failure_risk_level ?? 'ordinary',
             has_responses: it.has_responses,
         })),
     };
@@ -289,6 +292,10 @@ function TemplateBuilderBody({
                 guidance: it.guidance || null,
                 failure_creates_hazard: it.failure_creates_hazard,
                 failure_creates_damage: it.failure_creates_damage,
+                failure_risk_level:
+                    it.failure_creates_hazard || it.failure_creates_damage
+                        ? it.failure_risk_level
+                        : 'ordinary',
             })),
         }));
         const opts = {
@@ -756,7 +763,15 @@ function ItemRow({
                             <Switch
                                 checked={item.failure_creates_hazard}
                                 onCheckedChange={(v) =>
-                                    onChange({ failure_creates_hazard: v })
+                                    onChange({
+                                        failure_creates_hazard: v,
+                                        ...(!v && !item.failure_creates_damage
+                                            ? {
+                                                  failure_risk_level:
+                                                      'ordinary' as const,
+                                              }
+                                            : {}),
+                                    })
                                 }
                             />
                             <span className="flex items-center gap-1">
@@ -768,7 +783,15 @@ function ItemRow({
                             <Switch
                                 checked={item.failure_creates_damage}
                                 onCheckedChange={(v) =>
-                                    onChange({ failure_creates_damage: v })
+                                    onChange({
+                                        failure_creates_damage: v,
+                                        ...(!v && !item.failure_creates_hazard
+                                            ? {
+                                                  failure_risk_level:
+                                                      'ordinary' as const,
+                                              }
+                                            : {}),
+                                    })
                                 }
                             />
                             <span className="flex items-center gap-1">
@@ -776,6 +799,41 @@ function ItemRow({
                                 Logs damage
                             </span>
                         </label>
+                        {item.failure_creates_hazard ||
+                        item.failure_creates_damage ? (
+                            <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:flex-row sm:items-center">
+                                <Label
+                                    htmlFor={`item-${index}-failure-risk`}
+                                    className="text-xs"
+                                >
+                                    Failure risk
+                                </Label>
+                                <Select
+                                    value={item.failure_risk_level}
+                                    onValueChange={(value) =>
+                                        onChange({
+                                            failure_risk_level:
+                                                value as FailureRiskLevel,
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id={`item-${index}-failure-risk`}
+                                        className="h-9 w-full sm:w-52"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ordinary">
+                                            Ordinary follow-up
+                                        </SelectItem>
+                                        <SelectItem value="critical">
+                                            Critical · H&amp;S escalation
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : null}
                     </div>
                     <Input
                         value={item.guidance}

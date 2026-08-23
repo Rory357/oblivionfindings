@@ -97,6 +97,9 @@ export function RunModal({
     ).length;
     const pct = items.length ? Math.round((answered / items.length) * 100) : 0;
     const failed = items.filter((it) => isFail(it, resp[it.id]?.value));
+    const criticalItems = failed.filter(
+        (it) => it.failure_risk_level === 'critical',
+    );
     const hazardItems = failed.filter((it) => it.failure_creates_hazard);
     const damageItems = failed.filter((it) => it.failure_creates_damage);
     const requiredItems = items.filter((it) => it.is_required);
@@ -177,7 +180,7 @@ export function RunModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6">
             <div
                 className={cn(
                     'absolute inset-0 transition-opacity duration-200',
@@ -242,11 +245,24 @@ export function RunModal({
                                     {answered}/{items.length} · {pct}%
                                 </span>
                             </div>
-                            {hazardItems.length > 0 ||
+                            {criticalItems.length > 0 ||
+                            hazardItems.length > 0 ||
                             damageItems.length > 0 ? (
                                 <div className="space-y-1 border-t border-border bg-status-critical-bg px-5 py-2 text-xs font-medium text-status-critical">
+                                    {criticalItems.length > 0 ? (
+                                        <div className="flex items-start gap-2">
+                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+                                            {criticalItems.length} critical{' '}
+                                            failed check
+                                            {criticalItems.length === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            will require H&amp;S escalation and
+                                            a corrective action
+                                        </div>
+                                    ) : null}
                                     {hazardItems.length > 0 ? (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-start gap-2">
                                             <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
                                             {hazardItems.length} failed check
                                             {hazardItems.length === 1
@@ -257,7 +273,7 @@ export function RunModal({
                                         </div>
                                     ) : null}
                                     {damageItems.length > 0 ? (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-start gap-2">
                                             <Wrench className="h-3.5 w-3.5 shrink-0" />
                                             {damageItems.length} failed check
                                             {damageItems.length === 1
@@ -290,7 +306,7 @@ export function RunModal({
                         {/* footer */}
                         <div className="shrink-0 border-t border-border bg-card p-4">
                             {readOnly ? (
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                                     <span className="text-xs text-muted-foreground">
                                         {runDetail?.status === 'completed'
                                             ? 'This run is completed.'
@@ -302,7 +318,7 @@ export function RunModal({
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                                         <span className="text-xs font-medium text-muted-foreground">
                                             Sign-off
                                         </span>
@@ -315,7 +331,7 @@ export function RunModal({
                                             className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between gap-2">
+                                    <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="text-xs text-muted-foreground">
                                             {failed.length > 0 ? (
                                                 <span className="font-medium text-status-warning">
@@ -326,10 +342,11 @@ export function RunModal({
                                             {answered} of {items.length}{' '}
                                             answered
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center">
                                             <Button
                                                 variant="outline"
                                                 onClick={save}
+                                                className="w-full sm:w-auto"
                                                 disabled={
                                                     submitting ||
                                                     payload.length === 0
@@ -339,6 +356,7 @@ export function RunModal({
                                             </Button>
                                             <Button
                                                 onClick={complete}
+                                                className="w-full sm:w-auto"
                                                 disabled={
                                                     submitting ||
                                                     !requiredDone ||

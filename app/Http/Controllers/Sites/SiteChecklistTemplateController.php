@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteChecklistTemplate;
+use App\Services\Sites\SiteChecklistFailureRiskMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Checklist templates are created/edited/deleted entirely from the in-page
@@ -47,7 +49,12 @@ class SiteChecklistTemplateController extends Controller
         $validated = $this->validateTemplate($request, $template);
 
         DB::transaction(function () use ($template, $validated) {
-            $template->update([
+            $lockedTemplate = SiteChecklistTemplate::query()
+                ->whereKey($template->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedTemplate->update([
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'category' => $validated['category'] ?? null,
@@ -57,7 +64,7 @@ class SiteChecklistTemplateController extends Controller
                 'settings' => $this->settingsPayload($validated),
             ]);
 
-            $this->persistItems($template, $validated['items'] ?? []);
+            $this->persistItems($lockedTemplate, $validated['items'] ?? []);
         });
 
         return redirect()->back()->with('success', 'Checklist template updated.');
@@ -95,7 +102,7 @@ class SiteChecklistTemplateController extends Controller
             'requires_photo' => ['boolean'],
             'requires_signature' => ['boolean'],
             'items' => ['array'],
-            'items.*.id' => ['nullable', 'integer'],
+            'items.*.id' => ['nullable', 'integer', 'distinct'],
             'items.*.question' => ['required', 'string', 'max:500'],
             'items.*.response_type' => ['required', 'in:yes_no,yes_no_na,pass_fail,numeric,text,photo'],
             'items.*.response_config' => ['nullable', 'array'],
@@ -103,6 +110,7 @@ class SiteChecklistTemplateController extends Controller
             'items.*.guidance' => ['nullable', 'string', 'max:1000'],
             'items.*.failure_creates_hazard' => ['boolean'],
             'items.*.failure_creates_damage' => ['boolean'],
+            'items.*.failure_risk_level' => ['nullable', Rule::in(SiteChecklistFailureRiskMapper::levels())],
         ]);
     }
 
@@ -121,9 +129,27 @@ class SiteChecklistTemplateController extends Controller
      */
     private function persistItems(SiteChecklistTemplate $template, array $items): void
     {
+        $existingItems = $template->items()
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy(fn ($item): int => (int) $item->id);
+        $submittedIds = collect($items)
+            ->pluck('id')
+            ->filter(fn ($id): bool => $id !== null && $id !== '')
+            ->map(fn ($id): int => (int) $id);
+
+        if ($submittedIds->diff($existingItems->keys())->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'items' => 'One or more checklist items do not belong to this template.',
+            ]);
+        }
+
         $keep = [];
 
         foreach (array_values($items) as $index => $item) {
+            $createsFollowUp = (bool) ($item['failure_creates_hazard'] ?? false)
+                || (bool) ($item['failure_creates_damage'] ?? false);
             $payload = [
                 'sort_order' => $index,
                 'question' => $item['question'],
@@ -133,10 +159,13 @@ class SiteChecklistTemplateController extends Controller
                 'guidance' => $item['guidance'] ?? null,
                 'failure_creates_hazard' => (bool) ($item['failure_creates_hazard'] ?? false),
                 'failure_creates_damage' => (bool) ($item['failure_creates_damage'] ?? false),
+                'failure_risk_level' => $createsFollowUp
+                    ? ($item['failure_risk_level'] ?? SiteChecklistFailureRiskMapper::ORDINARY)
+                    : SiteChecklistFailureRiskMapper::ORDINARY,
             ];
 
             $existing = ! empty($item['id'])
-                ? $template->items()->whereKey($item['id'])->first()
+                ? $existingItems->get((int) $item['id'])
                 : null;
 
             if ($existing) {
@@ -147,9 +176,8 @@ class SiteChecklistTemplateController extends Controller
             }
         }
 
-        $template->items()
-            ->whereNotIn('id', $keep ?: [0])
-            ->get()
+        $existingItems
+            ->reject(fn ($item): bool => in_array((int) $item->id, $keep, true))
             ->each(function ($item) {
                 if (! $item->responses()->exists()) {
                     $item->delete();
