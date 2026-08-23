@@ -28,6 +28,7 @@ use App\Support\NzRegions;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -380,42 +381,57 @@ class SiteController extends Controller
         return back()->with('success', 'Site restored.');
     }
 
-    /**
-     * Archive several sites at once from the index bulk-action bar. Each site
-     * is authorised individually so a partial selection still archives what the
-     * user is allowed to touch.
-     */
+    /** Archive one fully authorised target set from the index bulk-action bar. */
     public function bulkArchive(Request $request)
     {
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer'],
+            'ids.*' => ['integer', 'distinct'],
         ]);
 
-        $sites = Site::query()
-            ->whereIn('id', $validated['ids'])
-            ->where('archived', false)
-            ->get();
+        $user = $request->user();
+        abort_unless($user, 403);
+        $siteIds = collect($validated['ids'])
+            ->map(fn ($siteId) => (int) $siteId)
+            ->sort()
+            ->values();
 
-        $archived = 0;
-        foreach ($sites as $site) {
-            if (! $request->user()?->can('archive', $site)) {
-                continue;
+        $archived = DB::transaction(function () use ($siteIds, $user): int {
+            $sites = Site::query()
+                ->whereIn('id', $siteIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            abort_unless($sites->count() === $siteIds->count(), 404, 'Not Found');
+
+            // Preflight the complete set before the first mutation or audit.
+            foreach ($sites as $site) {
+                Gate::forUser($user)->authorize('archive', $site);
             }
 
-            $site->update([
-                'archived' => true,
-                'archived_at' => now(),
-                'is_active' => false,
-            ]);
+            $archived = 0;
+            foreach ($sites as $site) {
+                if ($site->archived) {
+                    continue;
+                }
 
-            AuditLogger::log('site.archive', $site, [
-                'site_id' => $site->id,
-                'bulk' => true,
-            ]);
+                $site->update([
+                    'archived' => true,
+                    'archived_at' => now(),
+                    'is_active' => false,
+                ]);
 
-            $archived++;
-        }
+                AuditLogger::logOrFail('site.archive', $site, [
+                    'site_id' => $site->id,
+                    'bulk' => true,
+                ]);
+
+                $archived++;
+            }
+
+            return $archived;
+        });
 
         return back()->with('success', $archived === 1 ? '1 site archived.' : "{$archived} sites archived.");
     }

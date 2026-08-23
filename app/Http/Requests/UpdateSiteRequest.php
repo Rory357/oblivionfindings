@@ -4,15 +4,24 @@ namespace App\Http\Requests;
 
 use App\Models\Site;
 use App\Models\SiteContact;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateSiteRequest extends FormRequest
 {
-    public function authorize(): bool
+    public function authorize(): bool|Response
     {
-        return $this->user()?->canDo('sites.update') ?? false;
+        $user = $this->user();
+        $site = $this->route('site');
+
+        if (! $user || ! $site instanceof Site) {
+            return false;
+        }
+
+        return Gate::forUser($user)->inspect('update', $site);
     }
 
     public function rules(): array

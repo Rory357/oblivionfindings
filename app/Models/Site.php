@@ -80,6 +80,18 @@ class Site extends Model
         'resolved_region',
     ];
 
+    /**
+     * Keep missing and inaccessible Site identifiers indistinguishable.
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $site = parent::resolveRouteBinding($value, $field);
+
+        abort_unless($site instanceof self, 404, 'Not Found');
+
+        return $site;
+    }
+
     // Relationships
     public function clients(): HasMany
     {

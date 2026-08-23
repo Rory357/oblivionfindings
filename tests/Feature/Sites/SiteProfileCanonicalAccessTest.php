@@ -2,14 +2,19 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteContact;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
@@ -83,6 +88,44 @@ function siteProfileUpdatePayload(Site $site, array $overrides = []): array
     ];
 }
 
+/**
+ * @param  list<string>  $permissionKeys
+ * @param  list<int>  $secondarySiteIds
+ */
+function siteRbacBoundaryActor(
+    array $permissionKeys,
+    ?Site $primarySite = null,
+    array $secondarySiteIds = [],
+): User {
+    $user = User::factory()->create([
+        'role' => 'team_lead',
+        'approved_at' => now(),
+    ]);
+    $role = Role::query()->create([
+        'name' => 'site_rbac_boundary_'.$user->id,
+        'label' => 'Site RBAC boundary actor',
+        'level' => 40,
+        'type' => 'custom',
+    ]);
+    $role->permissions()->sync(
+        Permission::query()->whereIn('key', $permissionKeys)->pluck('id')->all(),
+    );
+    $user->roles()->sync([$role->id]);
+
+    if ($primarySite) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $primarySite->id,
+            'secondary_site_ids' => $secondarySiteIds,
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
+
+    return $user->fresh(['roles', 'hrEmployeeProfile']);
+}
+
 test('Site browsing is fail closed while explicit application wide access remains available', function (): void {
     $scoped = siteProfileCurrentStaff('Scoped Site lead', $this->visibleSite);
     $unassigned = User::factory()->create([
@@ -91,22 +134,266 @@ test('Site browsing is fail closed while explicit application wide access remain
         'approved_at' => now(),
     ]);
     $unassigned->roles()->sync([Role::query()->where('name', 'team_lead')->firstOrFail()->id]);
+    $siteB = siteProfileCurrentStaff('Hidden Site lead', $this->hiddenSite);
+    $secondary = siteProfileCurrentStaff('Secondary Site lead', $this->visibleSite, 'team_lead', [
+        'secondary_site_ids' => [$this->hiddenSite->id],
+    ]);
     $provider = siteProfileCurrentStaff('Provider manager', $this->visibleSite, 'provider_manager');
+    $admin = User::factory()->create([
+        'name' => 'Application Site administrator',
+        'role' => 'admin',
+        'approved_at' => now(),
+    ]);
+    $admin->roles()->sync([Role::query()->where('name', 'admin')->firstOrFail()->id]);
 
     $scopedResponse = $this->actingAs($scoped)->get(route('sites.index'))->assertOk();
     expect(collect($scopedResponse->inertiaProps('sites'))->pluck('id')->all())
         ->toBe([$this->visibleSite->id]);
-    $this->actingAs($scoped)->get(route('sites.show', $this->hiddenSite))->assertForbidden();
+    $this->actingAs($scoped)->get(route('sites.show', $this->hiddenSite))->assertNotFound();
 
     $unassignedResponse = $this->actingAs($unassigned)->get(route('sites.index'))->assertOk();
     expect(collect($unassignedResponse->inertiaProps('sites')))->toBeEmpty();
-    $this->actingAs($unassigned)->get(route('sites.show', $this->visibleSite))->assertForbidden();
+    $this->actingAs($unassigned)->get(route('sites.show', $this->visibleSite))->assertNotFound();
+
+    $siteBResponse = $this->actingAs($siteB)->get(route('sites.index'))->assertOk();
+    expect(collect($siteBResponse->inertiaProps('sites'))->pluck('id')->all())
+        ->toBe([$this->hiddenSite->id]);
+    $this->actingAs($siteB)->get(route('sites.show', $this->hiddenSite))->assertOk();
+    $this->actingAs($siteB)->get(route('sites.show', $this->visibleSite))->assertNotFound();
+
+    $secondaryResponse = $this->actingAs($secondary)->get(route('sites.index'))->assertOk();
+    expect(collect($secondaryResponse->inertiaProps('sites'))->pluck('id'))
+        ->toContain($this->visibleSite->id, $this->hiddenSite->id);
+    $this->actingAs($secondary)->get(route('sites.show', $this->hiddenSite))->assertOk();
 
     expect($provider->canDo('sites.viewAll'))->toBeTrue();
     $providerResponse = $this->actingAs($provider)->get(route('sites.index'))->assertOk();
     expect(collect($providerResponse->inertiaProps('sites'))->pluck('id'))
         ->toContain($this->visibleSite->id, $this->hiddenSite->id);
     $this->actingAs($provider)->get(route('sites.show', $this->hiddenSite))->assertOk();
+
+    expect($admin->canDo('sites.viewAll'))->toBeTrue();
+    $adminResponse = $this->actingAs($admin)->get(route('sites.index'))->assertOk();
+    expect(collect($adminResponse->inertiaProps('sites'))->pluck('id'))
+        ->toContain($this->visibleSite->id, $this->hiddenSite->id);
+    $this->actingAs($admin)->get(route('sites.show', $this->hiddenSite))->assertOk();
+});
+
+test('foreign and unassigned direct Site routes are concealed before validation or mutation', function (): void {
+    config(['app.debug' => false]);
+    $permissions = ['sites.viewAny', 'sites.update', 'sites.archive'];
+    $scoped = siteRbacBoundaryActor($permissions, $this->visibleSite);
+    $unassigned = siteRbacBoundaryActor($permissions);
+    $before = $this->hiddenSite->only([
+        'name',
+        'phone',
+        'address_line_1',
+        'emergency_plan_location',
+        'is_active',
+        'archived',
+        'archived_at',
+    ]);
+    $auditCount = AuditLog::query()->where('action', 'like', 'site.%')->count();
+
+    $directResponses = [
+        $this->actingAs($scoped)->getJson(route('sites.show', $this->hiddenSite)),
+        $this->actingAs($unassigned)->getJson(route('sites.show', $this->visibleSite)),
+        $this->actingAs($scoped)->getJson(route('sites.show', ['site' => 99999999])),
+    ];
+    foreach ($directResponses as $response) {
+        $response->assertNotFound();
+    }
+    expect(collect($directResponses)->map(fn ($response) => [
+        'status' => $response->status(),
+        'body' => $response->json(),
+    ])->unique(fn (array $result) => json_encode($result, JSON_THROW_ON_ERROR))->count())->toBe(1);
+
+    $routes = [
+        ['GET', 'sites.edit', []],
+        // Deliberately invalid: object concealment must precede FormRequest validation.
+        ['PUT', 'sites.update', []],
+        ['PATCH', 'sites.contact-info.update', ['phone' => 'PRIVATE-FOREIGN-PHONE']],
+        ['PATCH', 'sites.location.update', ['address_line_1' => 'PRIVATE FOREIGN ADDRESS']],
+        ['PATCH', 'sites.safety.update', ['emergency_plan_location' => 'PRIVATE FOREIGN PLAN']],
+        ['PATCH', 'sites.active.update', ['is_active' => false]],
+        ['PATCH', 'sites.archive', []],
+        ['PATCH', 'sites.unarchive', []],
+        ['POST', 'sites.onboarding.step', [
+            'step' => 'assets',
+            'data' => ['assets' => [[
+                'name' => 'PRIVATE FOREIGN ASSET',
+                'quantity' => 1,
+            ]]],
+        ]],
+    ];
+
+    foreach ($routes as [$method, $routeName, $payload]) {
+        $this->actingAs($scoped)
+            ->json($method, route($routeName, $this->hiddenSite), $payload)
+            ->assertNotFound();
+        $this->actingAs($unassigned)
+            ->json($method, route($routeName, $this->visibleSite), $payload)
+            ->assertNotFound();
+    }
+
+    expect($this->hiddenSite->fresh()->only(array_keys($before)))->toBe($before)
+        ->and($this->visibleSite->fresh()->archived)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'like', 'site.%')->count())->toBe($auditCount);
+    $this->assertDatabaseMissing('assets', ['name' => 'PRIVATE FOREIGN ASSET']);
+});
+
+test('the exact global Site permission broadens scope but never replaces the action capability', function (): void {
+    $globalReader = siteRbacBoundaryActor([
+        'sites.viewAny',
+        'sites.viewAll',
+    ]);
+
+    $index = $this->actingAs($globalReader)->get(route('sites.index'))->assertOk();
+    expect(collect($index->inertiaProps('sites'))->pluck('id'))
+        ->toContain($this->visibleSite->id, $this->hiddenSite->id);
+    $this->actingAs($globalReader)->get(route('sites.show', $this->hiddenSite))->assertOk();
+
+    $this->actingAs($globalReader)
+        ->patchJson(route('sites.active.update', $this->hiddenSite), ['is_active' => false])
+        ->assertForbidden();
+    $this->actingAs($globalReader)
+        ->postJson(route('sites.bulk.archive'), ['ids' => [$this->hiddenSite->id]])
+        ->assertForbidden();
+    expect($this->hiddenSite->fresh()->is_active)->toBeTrue();
+});
+
+test('bulk archive preflights the complete target set before any write or audit', function (): void {
+    config(['app.debug' => false]);
+    $scoped = siteRbacBoundaryActor([
+        'sites.viewAny',
+        'sites.archive',
+    ], $this->visibleSite);
+    $unassigned = siteRbacBoundaryActor(['sites.archive']);
+    $auditCount = AuditLog::query()->where('action', 'site.archive')->count();
+
+    $foreignResponse = $this->actingAs($scoped)
+        ->postJson(route('sites.bulk.archive'), [
+            'ids' => [$this->visibleSite->id, $this->hiddenSite->id],
+        ]);
+    $foreignResponse->assertNotFound();
+    expect($this->visibleSite->fresh()->archived)->toBeFalse()
+        ->and($this->hiddenSite->fresh()->archived)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'site.archive')->count())->toBe($auditCount);
+
+    $missingResponse = $this->actingAs($scoped)
+        ->postJson(route('sites.bulk.archive'), [
+            'ids' => [$this->visibleSite->id, 99999999],
+        ]);
+    $missingResponse->assertNotFound();
+    expect($this->visibleSite->fresh()->archived)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'site.archive')->count())->toBe($auditCount);
+
+    $unassignedResponse = $this->actingAs($unassigned)
+        ->postJson(route('sites.bulk.archive'), ['ids' => [$this->visibleSite->id]]);
+    $unassignedResponse->assertNotFound();
+    expect(collect([$foreignResponse, $missingResponse, $unassignedResponse])
+        ->map(fn ($response) => [
+            'status' => $response->status(),
+            'body' => $response->json(),
+        ])
+        ->unique(fn (array $result) => json_encode($result, JSON_THROW_ON_ERROR))
+        ->count())->toBe(1)
+        ->and($this->visibleSite->fresh()->archived)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'site.archive')->count())->toBe($auditCount);
+
+    $this->actingAs($scoped)
+        ->postJson(route('sites.bulk.archive'), [
+            'ids' => [$this->visibleSite->id, $this->visibleSite->id],
+        ])
+        ->assertUnprocessable();
+    expect($this->visibleSite->fresh()->archived)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'site.archive')->count())->toBe($auditCount);
+
+    $this->actingAs($scoped)
+        ->post(route('sites.bulk.archive'), ['ids' => [$this->visibleSite->id]])
+        ->assertRedirect();
+    expect($this->visibleSite->fresh()->archived)->toBeTrue()
+        ->and(AuditLog::query()->where('action', 'site.archive')->count())->toBe($auditCount + 1);
+
+    $globalArchiver = siteRbacBoundaryActor([
+        'sites.archive',
+        'sites.viewAll',
+    ]);
+    $this->actingAs($globalArchiver)
+        ->post(route('sites.bulk.archive'), ['ids' => [$this->hiddenSite->id]])
+        ->assertRedirect();
+    expect($this->hiddenSite->fresh()->archived)->toBeTrue();
+});
+
+test('bulk archive locks the target set and rolls back every write when a later audit fails', function (): void {
+    $globalArchiver = siteRbacBoundaryActor([
+        'sites.archive',
+        'sites.viewAll',
+    ]);
+    $first = Site::factory()->create([
+        'name' => 'First rollback Site',
+        'type' => 'house',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    $second = Site::factory()->create([
+        'name' => 'Second rollback Site',
+        'type' => 'facility',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    $targetIds = [$first->id, $second->id];
+    $auditCount = AuditLog::query()
+        ->where('auditable_type', (new Site)->getMorphClass())
+        ->whereIn('auditable_id', $targetIds)
+        ->count();
+
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = strtolower(str_replace(['`', '"'], '', $query->sql));
+    });
+
+    $auditAttempts = 0;
+    $eventName = 'eloquent.creating: '.AuditLog::class;
+    Event::listen($eventName, static function (AuditLog $audit) use (&$auditAttempts): void {
+        if ($audit->action !== 'site.archive') {
+            return;
+        }
+
+        $auditAttempts++;
+        if ($auditAttempts === 2) {
+            throw new RuntimeException('Simulated second Site archive audit failure.');
+        }
+    });
+    $caught = null;
+
+    $this->withoutExceptionHandling();
+    try {
+        $this->actingAs($globalArchiver)
+            ->post(route('sites.bulk.archive'), ['ids' => [$second->id, $first->id]]);
+    } catch (RuntimeException $exception) {
+        $caught = $exception;
+    } finally {
+        $this->withExceptionHandling();
+        Event::forget($eventName);
+    }
+
+    expect($caught?->getMessage())->toBe('Simulated second Site archive audit failure.')
+        ->and($auditAttempts)->toBe(2)
+        ->and($first->fresh()->archived)->toBeFalse()
+        ->and($first->fresh()->is_active)->toBeTrue()
+        ->and($second->fresh()->archived)->toBeFalse()
+        ->and($second->fresh()->is_active)->toBeTrue()
+        ->and(AuditLog::query()
+            ->where('auditable_type', (new Site)->getMorphClass())
+            ->whereIn('auditable_id', $targetIds)
+            ->count())->toBe($auditCount)
+        ->and(collect($queries)->contains(
+            fn (string $sql): bool => str_contains($sql, 'from sites')
+                && str_contains($sql, 'for update'),
+        ))->toBeTrue();
 });
 
 test('Site Profile exposes only current visible staff and separates responsible staff from Site contacts', function (): void {

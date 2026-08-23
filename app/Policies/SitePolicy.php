@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use Illuminate\Auth\Access\Response;
 
 class SitePolicy
 {
@@ -16,14 +17,9 @@ class SitePolicy
             && ($user->hasRole('admin', 'provider_manager', 'coordinator') || ! $user->hasRole('support_worker'));
     }
 
-    public function view(User $user, Site $site): bool
+    public function view(User $user, Site $site): Response
     {
-        if (! $user->canDo('sites.viewAny')) {
-            return false;
-        }
-
-        return $this->canViewType($user, $site->type)
-            && $this->canAccessAssignedSite($user, $site);
+        return $this->objectAction($user, $site, 'sites.viewAny');
     }
 
     public function create(User $user): bool
@@ -31,12 +27,9 @@ class SitePolicy
         return $user->canDo('sites.create');
     }
 
-    public function update(User $user, Site $site): bool
+    public function update(User $user, Site $site): Response
     {
-        return ! $site->archived
-            && $user->canDo('sites.update')
-            && $this->canViewType($user, $site->type)
-            && $this->canAccessAssignedSite($user, $site);
+        return $this->objectAction($user, $site, 'sites.update', denyWhenArchived: true);
     }
 
     public function delete(User $user, Site $site): bool
@@ -46,11 +39,30 @@ class SitePolicy
             && $this->canAccessAssignedSite($user, $site);
     }
 
-    public function archive(User $user, Site $site): bool
+    public function archive(User $user, Site $site): Response
     {
-        return $user->canDo('sites.archive')
-            && $this->canViewType($user, $site->type)
-            && $this->canAccessAssignedSite($user, $site);
+        return $this->objectAction($user, $site, 'sites.archive');
+    }
+
+    private function objectAction(
+        User $user,
+        Site $site,
+        string $permission,
+        bool $denyWhenArchived = false,
+    ): Response {
+        if (! $this->canViewType($user, $site->type)
+            || ! $this->canAccessAssignedSite($user, $site)
+        ) {
+            return Response::denyAsNotFound();
+        }
+
+        if ($denyWhenArchived && $site->archived) {
+            return Response::deny();
+        }
+
+        return $user->canDo($permission)
+            ? Response::allow()
+            : Response::deny();
     }
 
     private function canViewType(User $user, ?string $type): bool

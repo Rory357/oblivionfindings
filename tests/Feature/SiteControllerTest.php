@@ -343,7 +343,7 @@ class SiteControllerTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->get("/sites/{$hiddenSite->id}")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_site_show_includes_checklist(): void
