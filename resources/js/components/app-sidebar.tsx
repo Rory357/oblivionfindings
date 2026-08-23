@@ -6,6 +6,12 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -3075,13 +3081,7 @@ export function AppSidebar({
 
 // ── Mobile sidebar (full drawer with labels) ──────────────────────────────
 
-export function AppSidebarMobile({
-    open,
-    onClose,
-}: {
-    open: boolean;
-    onClose: () => void;
-}) {
+export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const page = usePage<PageProps & Record<string, any>>();
     const { auth, labels } = page.props as any;
     const role = auth.user?.role ?? null;
@@ -3125,174 +3125,148 @@ export function AppSidebarMobile({
         onClose();
     }, [currentUrl, onClose]);
 
-    if (!open) return null;
-
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 z-40 bg-black/50 md:hidden"
-                onClick={onClose}
-            />
+        <SheetContent
+            side="left"
+            overlayClassName="bg-black/50 md:hidden"
+            closeButtonClassName="frontline-focus frontline-tap top-1.5 right-2.5 flex items-center justify-center rounded-md text-sidebar-foreground opacity-100 hover:bg-sidebar-accent hover:opacity-100 focus:ring-sidebar-ring [&_svg]:size-5"
+            closeLabel="Close menu"
+            className="border-sidebar-border bg-sidebar text-sidebar-foreground w-72 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0 sm:max-w-72 md:hidden"
+        >
+            <SheetHeader className="border-sidebar-border/50 min-h-14 justify-center border-b px-4 py-3 pr-16">
+                <SheetTitle className="text-sidebar-foreground text-sm">
+                    Menu
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                    Choose an area to navigate to.
+                </SheetDescription>
+            </SheetHeader>
 
-            {/* Drawer */}
-            <div className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto bg-sidebar text-sidebar-foreground md:hidden">
-                {/* Close button */}
-                <div className="flex items-center justify-between border-b border-sidebar-border/50 px-4 py-3">
-                    <span className="text-sm font-semibold">Menu</span>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Close menu"
-                        onClick={onClose}
-                        className="h-8 w-8 rounded-md p-1 hover:bg-sidebar-accent"
-                    >
-                        <X className="h-5 w-5" />
-                    </Button>
-                </div>
-
-                <div className="py-2">
-                    {iconNavItems.map((item) => {
-                        if (item.subPanel) {
-                            const groups = (mobileSubPanelMap as any)[
-                                item.id
-                            ] as SubPanelGroup[] | undefined;
-                            const active = isIconActive(
-                                currentUrl,
-                                item,
-                                groups,
-                            );
-                            const isExpanded = expandedId === item.id;
-                            return (
-                                <div key={item.id}>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        aria-expanded={isExpanded}
-                                        aria-current={
-                                            active ? 'page' : undefined
-                                        }
-                                        aria-label={`${item.label} menu`}
-                                        onClick={() =>
-                                            setExpandedId(
-                                                isExpanded ? null : item.id,
-                                            )
-                                        }
-                                        className={cn(
-                                            'h-auto w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
-                                            active
-                                                ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                        )}
-                                    >
-                                        <SidebarItemIcon icon={item.icon} />
-                                        <span>{item.label}</span>
-                                        <ChevronRight
-                                            className={cn(
-                                                'ml-auto h-4 w-4 transition-transform',
-                                                isExpanded && 'rotate-90',
-                                            )}
-                                        />
-                                    </Button>
-                                    {isExpanded &&
-                                        filterVisibleSidebarGroups(
-                                            groups ?? [],
-                                        ).map((group) => (
-                                            <div
-                                                key={group.label}
-                                                className="ml-4"
-                                            >
-                                                <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
-                                                    {group.label}
-                                                </div>
-                                                {(group.items ?? []).map(
-                                                    (sub) => (
-                                                        <Link
-                                                            key={resolveUrl(
-                                                                sub.href,
-                                                            )}
-                                                            href={sub.href}
-                                                            aria-current={
-                                                                isSubItemActive(
-                                                                    currentUrl,
-                                                                    sub.href,
-                                                                )
-                                                                    ? 'page'
-                                                                    : undefined
-                                                            }
-                                                            prefetch
-                                                            className={cn(
-                                                                'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
-                                                                isSubItemActive(
-                                                                    currentUrl,
-                                                                    sub.href,
-                                                                )
-                                                                    ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                                            )}
-                                                        >
-                                                            {sub.icon && (
-                                                                <SidebarItemIcon
-                                                                    icon={
-                                                                        sub.icon
-                                                                    }
-                                                                />
-                                                            )}
-                                                            <span>
-                                                                {sub.title}
-                                                            </span>
-                                                            {sub.badge !=
-                                                                null &&
-                                                                sub.badge >
-                                                                    0 && (
-                                                                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                                                        {sub.badge >
-                                                                        9
-                                                                            ? '9+'
-                                                                            : sub.badge}
-                                                                    </span>
-                                                                )}
-                                                        </Link>
-                                                    ),
-                                                )}
-                                            </div>
-                                        ))}
-                                    {item.dividerAfter && (
-                                        <div className="mx-4 my-1 border-b border-sidebar-border/30" />
-                                    )}
-                                </div>
-                            );
-                        }
-
-                        const active = item.href
-                            ? matchScore(currentUrl, item.href) > 0
-                            : false;
+            <nav
+                aria-label="Main navigation"
+                className="min-h-0 flex-1 overflow-y-auto px-0.5 py-2"
+            >
+                {iconNavItems.map((item) => {
+                    if (item.subPanel) {
+                        const groups = (mobileSubPanelMap as any)[item.id] as
+                            | SubPanelGroup[]
+                            | undefined;
+                        const active = isIconActive(currentUrl, item, groups);
+                        const isExpanded = expandedId === item.id;
                         return (
                             <div key={item.id}>
-                                <Link
-                                    href={item.href!}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    aria-expanded={isExpanded}
                                     aria-current={active ? 'page' : undefined}
-                                    prefetch
+                                    aria-label={`${item.label} menu`}
+                                    onClick={() =>
+                                        setExpandedId(
+                                            isExpanded ? null : item.id,
+                                        )
+                                    }
                                     className={cn(
-                                        'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                        'frontline-focus min-h-11 w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                         active
-                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
+                                            ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
                                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
                                     <SidebarItemIcon icon={item.icon} />
                                     <span>{item.label}</span>
-                                </Link>
+                                    <ChevronRight
+                                        className={cn(
+                                            'ml-auto h-4 w-4 transition-transform',
+                                            isExpanded && 'rotate-90',
+                                        )}
+                                    />
+                                </Button>
+                                {isExpanded &&
+                                    filterVisibleSidebarGroups(
+                                        groups ?? [],
+                                    ).map((group) => (
+                                        <div key={group.label} className="ml-4">
+                                            <div className="text-sidebar-foreground/40 px-4 py-1 text-[11px] font-medium uppercase tracking-wider">
+                                                {group.label}
+                                            </div>
+                                            {(group.items ?? []).map((sub) => (
+                                                <Link
+                                                    key={resolveUrl(sub.href)}
+                                                    href={sub.href}
+                                                    onClick={onClose}
+                                                    aria-current={
+                                                        isSubItemActive(
+                                                            currentUrl,
+                                                            sub.href,
+                                                        )
+                                                            ? 'page'
+                                                            : undefined
+                                                    }
+                                                    prefetch
+                                                    className={cn(
+                                                        'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                                        isSubItemActive(
+                                                            currentUrl,
+                                                            sub.href,
+                                                        )
+                                                            ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
+                                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                                    )}
+                                                >
+                                                    {sub.icon && (
+                                                        <SidebarItemIcon
+                                                            icon={sub.icon}
+                                                        />
+                                                    )}
+                                                    <span>{sub.title}</span>
+                                                    {sub.badge != null &&
+                                                        sub.badge > 0 && (
+                                                            <span className="bg-status-critical ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white">
+                                                                {sub.badge > 9
+                                                                    ? '9+'
+                                                                    : sub.badge}
+                                                            </span>
+                                                        )}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    ))}
                                 {item.dividerAfter && (
-                                    <div className="mx-4 my-1 border-b border-sidebar-border/30" />
+                                    <div className="border-sidebar-border/30 mx-4 my-1 border-b" />
                                 )}
                             </div>
                         );
-                    })}
-                </div>
-            </div>
-        </>
+                    }
+
+                    const active = item.href
+                        ? matchScore(currentUrl, item.href) > 0
+                        : false;
+                    return (
+                        <div key={item.id}>
+                            <Link
+                                href={item.href!}
+                                onClick={onClose}
+                                aria-current={active ? 'page' : undefined}
+                                prefetch
+                                className={cn(
+                                    'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                    active
+                                        ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
+                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                )}
+                            >
+                                <SidebarItemIcon icon={item.icon} />
+                                <span>{item.label}</span>
+                            </Link>
+                            {item.dividerAfter && (
+                                <div className="border-sidebar-border/30 mx-4 my-1 border-b" />
+                            )}
+                        </div>
+                    );
+                })}
+            </nav>
+        </SheetContent>
     );
 }
 

@@ -3,6 +3,7 @@ import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
 import { Button } from '@/components/ui/button';
+import { SheetTrigger } from '@/components/ui/sheet';
 import {
     type BreadcrumbItem as BreadcrumbItemType,
     type SharedData,
@@ -12,10 +13,10 @@ import { PanelLeftIcon, ShieldAlert } from 'lucide-react';
 
 export function AppSidebarHeader({
     breadcrumbs = [],
-    onMobileMenuToggle,
+    showMobileMenuTrigger = false,
 }: {
     breadcrumbs?: BreadcrumbItemType[];
-    onMobileMenuToggle?: () => void;
+    showMobileMenuTrigger?: boolean;
 }) {
     const { auth } = usePage<SharedData>().props;
 
@@ -26,7 +27,7 @@ export function AppSidebarHeader({
     return (
         <>
             {auth.impersonating && (
-                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-primary-foreground md:px-4">
+                <div className="bg-primary text-primary-foreground flex items-center justify-between gap-2 px-6 py-2 text-sm font-medium md:px-4">
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 shrink-0" />
                         <span>
@@ -39,26 +40,27 @@ export function AppSidebarHeader({
                     </div>
                     <Button
                         size="sm"
-                        className="shrink-0 border border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        className="border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90 shrink-0 border"
                         onClick={handleStopImpersonating}
                     >
                         Stop Impersonating
                     </Button>
                 </div>
             )}
-            <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-6 md:px-4">
+            <header className="border-border/50 flex h-16 shrink-0 items-center justify-between gap-2 border-b px-6 md:px-4">
                 <div className="flex min-w-0 items-center gap-2">
-                    {onMobileMenuToggle && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={onMobileMenuToggle}
-                            className="-ml-1 h-7 w-7 md:hidden"
-                        >
-                            <PanelLeftIcon className="h-4 w-4" />
-                            <span className="sr-only">Toggle Menu</span>
-                        </Button>
+                    {showMobileMenuTrigger && (
+                        <SheetTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="frontline-focus frontline-tap -ml-1 h-11 w-11 md:hidden"
+                            >
+                                <PanelLeftIcon className="h-4 w-4" />
+                                <span className="sr-only">Toggle Menu</span>
+                            </Button>
+                        </SheetTrigger>
                     )}
                     <Breadcrumbs breadcrumbs={breadcrumbs} />
                 </div>

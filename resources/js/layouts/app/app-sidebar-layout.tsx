@@ -1,6 +1,8 @@
 import { AppSidebar, AppSidebarMobile } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
+import { Sheet } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -8,6 +10,7 @@ import {
     type PropsWithChildren,
     type ReactNode,
     useCallback,
+    useEffect,
     useState,
 } from 'react';
 
@@ -37,43 +40,56 @@ export default function AppSidebarLayout({
 }: PropsWithChildren<AppSidebarLayoutProps>) {
     const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
+    const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
     const closeMobileSidebar = useCallback(() => setMobileOpen(false), []);
 
+    useEffect(() => {
+        if (!isMobile) {
+            closeMobileSidebar();
+        }
+    }, [closeMobileSidebar, isMobile]);
+
     return (
-        <div className="min-h-svh w-full">
-            <a
-                href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
-            >
-                Skip to main content
-            </a>
-            <AppSidebar
-                collapsed={collapsed}
-                onCollapsedChange={(nextCollapsed) =>
-                    setExpanded(!nextCollapsed)
-                }
-            />
-            <AppSidebarMobile open={mobileOpen} onClose={closeMobileSidebar} />
-            <main
-                id="main-content"
-                className={cn(
-                    'relative flex min-h-svh flex-col bg-background transition-[margin-left] duration-200 ease-in-out',
-                    collapsed ? 'md:ml-16' : 'md:ml-64',
-                )}
-            >
-                {header === undefined ? (
-                    <AppSidebarHeader
-                        breadcrumbs={breadcrumbs}
-                        onMobileMenuToggle={() => setMobileOpen(true)}
-                    />
-                ) : (
-                    header
-                )}
-                <div className={cn(contentClassName ?? DEFAULT_CONTENT_CLASS)}>
-                    {children}
-                </div>
-            </main>
-        </div>
+        <Sheet modal open={mobileOpen} onOpenChange={setMobileOpen}>
+            <div className="min-h-svh w-full">
+                <a
+                    href="#main-content"
+                    className="focus:bg-primary focus:text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:px-4 focus:py-2"
+                >
+                    Skip to main content
+                </a>
+                <AppSidebar
+                    collapsed={collapsed}
+                    onCollapsedChange={(nextCollapsed) =>
+                        setExpanded(!nextCollapsed)
+                    }
+                />
+                <AppSidebarMobile onClose={closeMobileSidebar} />
+                <main
+                    id="main-content"
+                    className={cn(
+                        'bg-background relative flex min-h-svh flex-col transition-[margin-left] duration-200 ease-in-out',
+                        collapsed ? 'md:ml-16' : 'md:ml-64',
+                    )}
+                >
+                    {header === undefined ? (
+                        <AppSidebarHeader
+                            breadcrumbs={breadcrumbs}
+                            showMobileMenuTrigger
+                        />
+                    ) : (
+                        header
+                    )}
+                    <div
+                        className={cn(
+                            contentClassName ?? DEFAULT_CONTENT_CLASS,
+                        )}
+                    >
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </Sheet>
     );
 }
