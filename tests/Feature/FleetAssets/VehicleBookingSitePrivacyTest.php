@@ -171,9 +171,25 @@ class VehicleBookingSitePrivacyTest extends TestCase
             array_replace($valid, ['client_id' => 987654321]),
             array_replace($valid, ['pickup_site_id' => $this->foreignSite->id]),
             array_replace($valid, ['return_site_id' => 987654321]),
+            array_replace($valid, ['pickup_site_id' => 0]),
         ];
 
         foreach ($attempts as $payload) {
+            $this->actingAs($driver)->post('/fleet-assets/bookings', $payload)->assertNotFound();
+            $this->assertSame($baselineBookings, FleetVehicleBooking::query()->count());
+            $this->assertSame($baselineAudits, DB::table('audit_logs')->where('action', 'fleet.booking.create')->count());
+        }
+
+        $invalidActionPayload = array_replace($valid, [
+            'purpose' => '',
+            'starts_at' => 'not-a-date',
+            'ends_at' => 'also-not-a-date',
+        ]);
+        foreach ([
+            array_replace($invalidActionPayload, ['asset_id' => $foreignVehicle->id]),
+            array_replace($invalidActionPayload, ['client_id' => $foreignClient->id]),
+            array_replace($invalidActionPayload, ['pickup_site_id' => $this->foreignSite->id]),
+        ] as $payload) {
             $this->actingAs($driver)->post('/fleet-assets/bookings', $payload)->assertNotFound();
             $this->assertSame($baselineBookings, FleetVehicleBooking::query()->count());
             $this->assertSame($baselineAudits, DB::table('audit_logs')->where('action', 'fleet.booking.create')->count());
@@ -241,7 +257,7 @@ class VehicleBookingSitePrivacyTest extends TestCase
             'cancel' => $this->booking($vehicle, $owner, 'Cancel private', 'approved'),
         ];
         $before = collect($bookings)->mapWithKeys(fn (FleetVehicleBooking $booking, string $action): array => [
-            $action => $booking->getAttributes(),
+            $action => $booking->fresh()->getAttributes(),
         ]);
         $auditCount = DB::table('audit_logs')->where('action', 'like', 'fleet.booking.%')->count();
 
@@ -294,6 +310,43 @@ class VehicleBookingSitePrivacyTest extends TestCase
 
         $this->assertSame('approved', $booking->fresh()->status);
         $this->assertSame($globalViewer->id, (int) $booking->fresh()->approved_by_user_id);
+        Notification::assertSentToTimes($owner, FleetBookingApprovedNotification::class, 1);
+    }
+
+    public function test_exact_lifecycle_action_permissions_use_canonical_site_scope_without_incidental_read_permission(): void
+    {
+        Notification::fake();
+        $owner = $this->siteUser([$this->primarySite], []);
+        $assetViewer = $this->siteUser([$this->primarySite], ['assets.viewAny']);
+        $approver = $this->siteUser([$this->primarySite], ['fleet.bookings.approve']);
+        $manager = $this->siteUser([$this->primarySite], ['fleet.manage']);
+        $localVehicle = $this->vehicle($this->primarySite, 'Action-only local van');
+        $foreignVehicle = $this->vehicle($this->foreignSite, 'Action-only foreign van');
+        $readOnly = $this->booking($localVehicle, $owner, 'Asset read permission is not an action');
+        $approval = $this->booking($localVehicle, $owner, 'Approval without read permission');
+        $cancellation = $this->booking($localVehicle, $owner, 'Cancellation without read permission', 'approved');
+        $foreign = $this->booking($foreignVehicle, $owner, 'Foreign action-only booking', 'approved');
+
+        $this->actingAs($assetViewer)
+            ->get("/fleet-assets/bookings/{$readOnly->id}")
+            ->assertOk();
+        $this->actingAs($assetViewer)
+            ->post("/fleet-assets/bookings/{$readOnly->id}/cancel")
+            ->assertForbidden();
+        $this->actingAs($approver)
+            ->post("/fleet-assets/bookings/{$approval->id}/approve")
+            ->assertRedirect();
+        $this->actingAs($manager)
+            ->post("/fleet-assets/bookings/{$cancellation->id}/cancel")
+            ->assertRedirect();
+        $this->actingAs($manager)
+            ->post("/fleet-assets/bookings/{$foreign->id}/cancel")
+            ->assertNotFound();
+
+        $this->assertSame('pending', $readOnly->fresh()->status);
+        $this->assertSame('approved', $approval->fresh()->status);
+        $this->assertSame('cancelled', $cancellation->fresh()->status);
+        $this->assertSame('approved', $foreign->fresh()->status);
         Notification::assertSentToTimes($owner, FleetBookingApprovedNotification::class, 1);
     }
 

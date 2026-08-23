@@ -156,16 +156,23 @@ class VehicleBookingController extends Controller
 
         // Calendar view: include all vehicles and week-scoped bookings
         if ($request->input('view') === 'calendar') {
+            // The week picker is a worker-local calendar date while booking
+            // timestamps are stored in UTC. Convert the complete local week
+            // to UTC before querying so Monday-morning bookings are not
+            // incorrectly treated as belonging to the previous UTC day.
+            $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
             $weekStart = $request->filled('week_start')
-                ? \Carbon\Carbon::parse($request->input('week_start'))->startOfDay()
-                : now()->startOfWeek(\Carbon\Carbon::MONDAY);
+                ? \Carbon\Carbon::parse($request->input('week_start'), $timezone)->startOfDay()
+                : \Carbon\Carbon::now($timezone)->startOfWeek(\Carbon\Carbon::MONDAY)->startOfDay();
 
             $weekEnd = $weekStart->copy()->addDays(6)->endOfDay();
+            $weekStartUtc = $weekStart->copy()->utc();
+            $weekEndUtc = $weekEnd->copy()->utc();
 
             $calendarBookings = $this->bookingAccess->accessibleBookings($actor)
                 ->with(['asset:id,name,asset_tag', 'user:id,name'])
-                ->where('starts_at', '<=', $weekEnd)
-                ->where('ends_at', '>=', $weekStart)
+                ->where('starts_at', '<=', $weekEndUtc)
+                ->where('ends_at', '>=', $weekStartUtc)
                 ->whereNotIn('status', ['cancelled', 'rejected'])
                 ->get()
                 ->map($mapBooking)
@@ -340,51 +347,64 @@ class VehicleBookingController extends Controller
     public function store(Request $request)
     {
         $actor = $this->readActor($request);
-        $data = $request->validate([
-            // Structural validation only. Canonical scoped resolution below
-            // deliberately makes missing and foreign direct IDs identical.
+
+        // Validate identifier shapes first, then resolve every supplied
+        // canonical object before validating the rest of the action payload.
+        // Numeric missing and foreign IDs therefore converge on the same 404
+        // without leaking unrelated purpose/date validation or side effects.
+        $identifiers = $request->validate([
             'asset_id' => ['required', 'integer'],
             'client_id' => ['nullable', 'integer'],
-            'purpose' => ['required', 'string', 'max:500'],
-            'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
-            'destination' => ['nullable', 'string', 'max:255'],
-            'passengers' => ['nullable', 'integer', 'min:0', 'max:50'],
             'pickup_site_id' => ['nullable', 'integer'],
             'return_site_id' => ['nullable', 'integer'],
-            'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // Site(s) -> optional Client -> Asset -> overlapping bookings. The
-        // Asset row is the serialization lock even when no prior booking row
-        // exists, closing the empty-range double-booking race.
-        $booking = DB::transaction(function () use ($data, $request, $actor) {
-            $assetPreview = $this->bookingAccess->vehicle($actor, (int) $data['asset_id']);
+        // Site(s) -> optional Client -> Asset -> payload -> overlapping
+        // bookings. The Asset row is the serialization lock even when no
+        // prior booking row exists, closing the empty-range double-booking
+        // race.
+        $booking = DB::transaction(function () use ($identifiers, $request, $actor) {
+            $assetPreview = $this->bookingAccess->vehicle($actor, (int) $identifiers['asset_id']);
             abort_unless($assetPreview, 404);
             $assetPreview->loadMissing('client:id,site_id');
 
             $client = null;
-            if (isset($data['client_id'])) {
-                $client = $this->bookingAccess->client($actor, (int) $data['client_id']);
+            if (isset($identifiers['client_id'])) {
+                $client = $this->bookingAccess->client($actor, (int) $identifiers['client_id']);
                 abort_unless($client, 404);
             }
 
             $siteIds = collect([
-                $data['pickup_site_id'] ?? null,
-                $data['return_site_id'] ?? null,
+                $identifiers['pickup_site_id'] ?? null,
+                $identifiers['return_site_id'] ?? null,
                 $assetPreview->site_id,
                 $assetPreview->site_id ? null : $assetPreview->home_site_id,
-                (!$assetPreview->site_id && !$assetPreview->home_site_id) ? $assetPreview->client?->site_id : null,
+                (! $assetPreview->site_id && ! $assetPreview->home_site_id) ? $assetPreview->client?->site_id : null,
                 $client?->site_id,
-            ])->filter()->map(fn (mixed $id): int => (int) $id)->all();
+            ])->filter(fn (mixed $id): bool => $id !== null)
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
             abort_unless($this->bookingAccess->lockSites($actor, $siteIds), 404);
 
             if ($client) {
                 abort_unless($this->bookingAccess->client($actor, (int) $client->id, true), 404);
             }
 
-            $asset = $this->bookingAccess->vehicle($actor, (int) $data['asset_id'], true);
+            $asset = $this->bookingAccess->vehicle($actor, (int) $identifiers['asset_id'], true);
             abort_unless($asset && $asset->status === 'active', 404);
+
+            $data = $request->validate([
+                'asset_id' => ['required', 'integer'],
+                'client_id' => ['nullable', 'integer'],
+                'purpose' => ['required', 'string', 'max:500'],
+                'starts_at' => ['required', 'date'],
+                'ends_at' => ['required', 'date', 'after:starts_at'],
+                'destination' => ['nullable', 'string', 'max:255'],
+                'passengers' => ['nullable', 'integer', 'min:0', 'max:50'],
+                'pickup_site_id' => ['nullable', 'integer'],
+                'return_site_id' => ['nullable', 'integer'],
+                'notes' => ['nullable', 'string', 'max:2000'],
+            ]);
 
             $eligibility = \App\Domain\Hr\Models\HrDriverEligibility::query()
                 ->where('user_id', $actor->id)

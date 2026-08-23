@@ -35,14 +35,7 @@ class VehicleBookingAccessService
     /** @return list<int> */
     public function authorizedVehicleIds(User $actor): array
     {
-        $assetIds = $this->access->authorizedAssetIds($actor);
-
-        if ($assetIds === []) {
-            return [];
-        }
-
-        return Asset::vehicles()
-            ->whereKey($assetIds)
+        return $this->access->accessibleVehiclesForFleet($actor)
             ->orderBy('id')
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -83,7 +76,12 @@ class VehicleBookingAccessService
 
     public function vehicle(User $actor, int $id, bool $lockForUpdate = false): ?Asset
     {
-        return $this->access->assignableVehicle($actor, $id, $lockForUpdate);
+        $query = $this->access->accessibleVehiclesForFleet($actor)->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
     }
 
     /** @return Collection<int, Asset> */
@@ -129,7 +127,6 @@ class VehicleBookingAccessService
     public function lockSites(User $actor, array $siteIds): bool
     {
         $ids = collect($siteIds)
-            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->sort()

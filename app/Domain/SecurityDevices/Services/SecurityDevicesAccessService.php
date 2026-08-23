@@ -250,6 +250,31 @@ class SecurityDevicesAccessService
         return $assets;
     }
 
+    /**
+     * Canonical unbounded vehicle scope for Fleet booking reads and actions.
+     *
+     * The controller still owns the exact read/approval/management decision;
+     * this query only intersects an authorised Fleet action with operational
+     * Site and Asset provenance. `assets.viewAny` is included solely because
+     * the existing booking read/store routes and readActor explicitly accept
+     * it; it cannot grant approval or management. The scope must not be
+     * derived from Device links or a bounded picker, because ordinary Fleet
+     * vehicles need neither.
+     */
+    public function accessibleVehiclesForFleet(User $user): Builder
+    {
+        $query = $this->assetCandidateQuery($user, true);
+
+        if ($user->canDo('fleet.viewAny')
+            || $user->canDo('fleet.manage')
+            || $user->canDo('fleet.bookings.approve')
+            || $user->canDo('assets.viewAny')) {
+            return $query;
+        }
+
+        return $query->whereRaw('1 = 0');
+    }
+
     public function assignableVehicle(User $user, int $id, bool $lockForUpdate = false): ?Asset
     {
         $query = $this->assetCandidateQuery($user, true)->whereKey($id);
