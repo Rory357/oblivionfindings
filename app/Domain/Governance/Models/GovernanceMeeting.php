@@ -4,6 +4,7 @@ namespace App\Domain\Governance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Governance\GovernanceMeetingFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,11 +14,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GovernanceMeeting extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Governance\GovernanceMeetingFactory::new();
+        return GovernanceMeetingFactory::new();
     }
 
     protected $fillable = [
@@ -39,6 +40,8 @@ class GovernanceMeeting extends Model
         'minutes_approved_by',
         'minutes_signed_at',
         'minutes_signed_by',
+        'locked_at',
+        'locked_by',
         'created_by',
         'recurring_schedule_id',
         'rsvp_deadline',
@@ -51,6 +54,7 @@ class GovernanceMeeting extends Model
         'pack_distributed_at' => 'datetime',
         'minutes_approved_at' => 'datetime',
         'minutes_signed_at' => 'datetime',
+        'locked_at' => 'datetime',
         'quorum_met' => 'boolean',
         'rsvp_deadline' => 'datetime',
         'preread_deadline' => 'datetime',
@@ -162,7 +166,7 @@ class GovernanceMeeting extends Model
 
     public function isEditable(): bool
     {
-        return !$this->isLocked() && in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final']);
+        return ! $this->isLocked() && in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final']);
     }
 
     public function canDistributePack(): bool
@@ -215,22 +219,23 @@ class GovernanceMeeting extends Model
 
         $allowed = $validTransitions[$this->status] ?? [];
 
-        if (!in_array($newStatus, $allowed)) {
+        if (! in_array($newStatus, $allowed)) {
             return false;
         }
 
         $this->update(['status' => $newStatus]);
+
         return true;
     }
 
     public function generateMinutesSkeleton(): array
     {
         $blocks = [];
-        $blocks[] = ['type' => 'heading', 'content' => 'Minutes: ' . $this->title];
-        $blocks[] = ['type' => 'meta', 'content' => 'Date: ' . $this->scheduled_at?->format('d M Y H:i')];
+        $blocks[] = ['type' => 'heading', 'content' => 'Minutes: '.$this->title];
+        $blocks[] = ['type' => 'meta', 'content' => 'Date: '.$this->scheduled_at?->format('d M Y H:i')];
 
         foreach ($this->agendaItems()->orderBy('order')->get() as $item) {
-            $blocks[] = ['type' => 'agenda_heading', 'content' => $item->order . '. ' . $item->title];
+            $blocks[] = ['type' => 'agenda_heading', 'content' => $item->order.'. '.$item->title];
             $blocks[] = ['type' => 'discussion', 'content' => ''];
             if ($item->item_type === 'decision') {
                 $blocks[] = ['type' => 'decision', 'content' => ''];
@@ -243,7 +248,7 @@ class GovernanceMeeting extends Model
 
     public function autoAdvanceStatus(): bool
     {
-        return match($this->status) {
+        return match ($this->status) {
             'scheduled' => $this->agendaItems()->count() > 0 ? $this->advanceStatus('agenda_draft') : false,
             'agenda_draft' => false, // Manual: secretary marks agenda final
             'agenda_final' => $this->scheduled_at?->isPast() ? $this->advanceStatus('in_progress') : false,

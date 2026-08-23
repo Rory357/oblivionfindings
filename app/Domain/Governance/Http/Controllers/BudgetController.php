@@ -2,18 +2,23 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetAdjustment;
 use App\Domain\Governance\Models\BudgetAllocation;
 use App\Domain\Governance\Models\BudgetLineItem;
 use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Services\GovernanceNestedMutationService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class BudgetController extends Controller
 {
+    public function __construct(
+        private readonly GovernanceNestedMutationService $nestedMutations,
+    ) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Budget::class);
@@ -25,6 +30,7 @@ class BudgetController extends Controller
             ->map(function ($budget) {
                 $budget->total_allocated = $budget->lineItems->sum('budget_amount');
                 $budget->total_actual = $budget->lineItems->sum('actual_amount');
+
                 return $budget;
             });
 
@@ -175,7 +181,7 @@ class BudgetController extends Controller
 
     public function storeLineItem(Request $request, Budget $budget)
     {
-        $this->authorize('update', $budget);
+        $this->nestedMutations->assertBudgetStructureMutable($request->user(), $budget);
 
         $data = $request->validate([
             'category' => ['required', 'string', 'max:50'],
@@ -187,21 +193,17 @@ class BudgetController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $data['budget_id'] = $budget->id;
         $data['forecast_amount'] = $data['forecast_amount'] ?? $data['budget_amount'];
         $data['actual_amount'] = $data['actual_amount'] ?? 0;
 
-        BudgetLineItem::create($data);
-
-        // Recalculate budget total
-        $budget->recalculateTotals();
+        $this->nestedMutations->storeBudgetLineItem($request->user(), $budget, $data);
 
         return redirect()->back()->with('success', 'Line item added.');
     }
 
     public function updateLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
     {
-        $this->authorize('update', $budget);
+        $this->nestedMutations->assertBudgetLineItemMutable($request->user(), $budget, $lineItem);
 
         $data = $request->validate([
             'category' => ['sometimes', 'string', 'max:50'],
@@ -214,22 +216,14 @@ class BudgetController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $lineItem->update($data);
-
-        // Recalculate budget total
-        $budget->recalculateTotals();
+        $this->nestedMutations->updateBudgetLineItem($request->user(), $budget, $lineItem, $data);
 
         return redirect()->back()->with('success', 'Line item updated.');
     }
 
     public function destroyLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
     {
-        $this->authorize('update', $budget);
-
-        $lineItem->delete();
-
-        // Recalculate budget total
-        $budget->recalculateTotals();
+        $this->nestedMutations->destroyBudgetLineItem($request->user(), $budget, $lineItem);
 
         return redirect()->back()->with('success', 'Line item removed.');
     }
@@ -239,6 +233,24 @@ class BudgetController extends Controller
     public function storeAllocation(Request $request, Budget $budget)
     {
         $this->authorize('update', $budget);
+
+        $lineItemId = $this->validInteger($request->input('budget_line_item_id'));
+        if ($lineItemId !== null) {
+            $this->nestedMutations->assertBudgetLineItemBound(
+                $request->user(),
+                $budget,
+                $lineItemId,
+            );
+        }
+
+        $siteId = $this->validInteger($request->input('site_id'));
+        if ($request->input('site_id') === null || $siteId !== null) {
+            $this->nestedMutations->assertBudgetAllocationSiteAccessible(
+                $request->user(),
+                $budget,
+                $siteId,
+            );
+        }
 
         $data = $request->validate([
             'budget_line_item_id' => ['nullable', 'integer', 'exists:budget_line_items,id'],
@@ -251,16 +263,7 @@ class BudgetController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $data['budget_id'] = $budget->id;
-        $data['created_by'] = $request->user()->id;
-
-        $allocation = BudgetAllocation::create($data);
-
-        GovernanceAuditService::log('budget.allocation_created', 'BudgetAllocation', $allocation->id, [
-            'budget_id' => $budget->id,
-            'period' => $data['period_year_month'],
-            'amount' => $data['allocated_amount'],
-        ]);
+        $this->nestedMutations->storeBudgetAllocation($request->user(), $budget, $data);
 
         return redirect()->back()->with('success', 'Allocation added.');
     }
@@ -269,9 +272,25 @@ class BudgetController extends Controller
     {
         $this->authorize('update', $budget);
         abort_if($allocation->budget_id !== $budget->id, 404);
+        $this->nestedMutations->assertBudgetAllocationBoundAndAccessible(
+            $request->user(),
+            $budget,
+            $allocation,
+        );
+
+        if ($request->has('site_id')) {
+            $siteId = $this->validInteger($request->input('site_id'));
+            if ($request->input('site_id') === null || $siteId !== null) {
+                $this->nestedMutations->assertBudgetAllocationSiteAccessible(
+                    $request->user(),
+                    $budget,
+                    $siteId,
+                );
+            }
+        }
 
         $data = $request->validate([
-            'site_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'category' => ['nullable', 'string', 'max:50'],
             'allocated_amount' => ['sometimes', 'numeric', 'min:0'],
             'forecast_amount' => ['nullable', 'numeric', 'min:0'],
@@ -279,7 +298,7 @@ class BudgetController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $allocation->update($data);
+        $this->nestedMutations->updateBudgetAllocation($request->user(), $budget, $allocation, $data);
 
         return redirect()->back()->with('success', 'Allocation updated.');
     }
@@ -289,7 +308,7 @@ class BudgetController extends Controller
         $this->authorize('update', $budget);
         abort_if($allocation->budget_id !== $budget->id, 404);
 
-        $allocation->delete();
+        $this->nestedMutations->destroyBudgetAllocation($request->user(), $budget, $allocation);
 
         return redirect()->back()->with('success', 'Allocation removed.');
     }
@@ -300,49 +319,54 @@ class BudgetController extends Controller
     {
         $this->authorize('update', $budget);
 
+        $lineItemId = $this->validInteger($request->input('budget_line_item_id'));
+        if ($lineItemId !== null) {
+            $this->nestedMutations->assertBudgetLineItemBound(
+                $request->user(),
+                $budget,
+                $lineItemId,
+            );
+        }
+
         $data = $request->validate([
-            'budget_line_item_id' => ['nullable', 'exists:budget_line_items,id'],
+            'budget_line_item_id' => ['nullable', 'integer', 'exists:budget_line_items,id'],
             'adjustment_type' => ['required', 'string', 'in:increase,decrease,reallocate'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $needsBoardApproval = $budget->requiresBoardApproval($data['amount']);
+        $adjustment = $this->nestedMutations->requestBudgetAdjustment(
+            $request->user(),
+            $budget,
+            $data,
+        );
 
-        $adjustment = $budget->adjustments()->create([
-            'budget_line_item_id' => $data['budget_line_item_id'] ?? null,
-            'adjustment_type' => $data['adjustment_type'],
-            'amount' => $data['amount'],
-            'reason' => $data['reason'],
-            'proposed_by' => $request->user()->id,
-            'proposed_at' => now(),
-            'status' => 'submitted',
-            'threshold_applies' => $needsBoardApproval,
-        ]);
-
-        return redirect()->back()->with('success', $needsBoardApproval
+        return redirect()->back()->with('success', $adjustment->threshold_applies
             ? 'Adjustment submitted. Board approval required (exceeds threshold).'
             : 'Adjustment submitted for review.');
     }
 
     public function approveAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
     {
-        $this->authorize('update', $budget);
-
-        $adjustment->approve($request->user()->id);
+        $this->nestedMutations->approveBudgetAdjustment($request->user(), $budget, $adjustment);
 
         return redirect()->back()->with('success', 'Adjustment approved and applied.');
     }
 
     public function rejectAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
     {
-        $this->authorize('update', $budget);
+        $this->nestedMutations->assertBudgetAdjustmentBound($request->user(), $budget, $adjustment);
 
         $data = $request->validate([
             'review_notes' => ['required', 'string', 'max:1000'],
         ]);
 
-        $adjustment->reject($request->user()->id, $data['review_notes']);
+        $this->nestedMutations->rejectBudgetAdjustment(
+            $request->user(),
+            $budget,
+            $adjustment,
+            $data['review_notes'],
+        );
 
         return redirect()->back()->with('success', 'Adjustment rejected.');
     }
@@ -353,18 +377,30 @@ class BudgetController extends Controller
     {
         $this->authorize('update', $budget);
 
+        $rawActuals = $request->input('actuals', []);
+        if (is_array($rawActuals)) {
+            $rawIds = collect($rawActuals)
+                ->filter(fn ($actual): bool => is_array($actual) && $this->validInteger($actual['id'] ?? null) !== null)
+                ->map(fn (array $actual): int => (int) $actual['id'])
+                ->all();
+            $this->nestedMutations->assertBudgetLineItemsBound($request->user(), $budget, $rawIds);
+        }
+
         $data = $request->validate([
             'actuals' => ['required', 'array'],
-            'actuals.*.id' => ['required', 'exists:budget_line_items,id'],
+            'actuals.*.id' => ['required', 'integer', 'distinct', 'exists:budget_line_items,id'],
             'actuals.*.actual_amount' => ['required', 'numeric', 'min:0'],
         ]);
 
-        foreach ($data['actuals'] as $actual) {
-            BudgetLineItem::where('id', $actual['id'])
-                ->where('budget_id', $budget->id)
-                ->update(['actual_amount' => $actual['actual_amount']]);
-        }
+        $this->nestedMutations->recordBudgetActuals($request->user(), $budget, $data['actuals']);
 
         return redirect()->back()->with('success', 'Actual spend recorded.');
+    }
+
+    private function validInteger(mixed $value): ?int
+    {
+        $validated = filter_var($value, FILTER_VALIDATE_INT);
+
+        return $validated === false ? null : $validated;
     }
 }

@@ -14,14 +14,16 @@ use App\Domain\Governance\Models\StrategicPlan;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\GovernancePermissionsSeeder;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Str;
 
 trait GovernanceTestHelpers
 {
     protected function seedGovernance(): void
     {
-        $this->seed(\Database\Seeders\RbacSeeder::class);
-        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->seed(GovernancePermissionsSeeder::class);
 
         $adminRole = Role::where('name', 'admin')->first();
         if ($adminRole) {
@@ -87,7 +89,7 @@ trait GovernanceTestHelpers
     protected function createResolution(User $proposer, array $overrides = []): Resolution
     {
         return Resolution::create(array_merge([
-            'resolution_reference' => 'RES-' . strtoupper(Str::random(6)),
+            'resolution_reference' => 'RES-'.strtoupper(Str::random(6)),
             'title' => 'Test Resolution',
             'context' => 'Test resolution context',
             'options' => [],
@@ -107,7 +109,7 @@ trait GovernanceTestHelpers
         $threshold = 12;
 
         return RiskRegisterEntry::create(array_merge([
-            'risk_reference' => 'R-' . strtoupper(Str::random(6)),
+            'risk_reference' => 'R-'.strtoupper(Str::random(6)),
             'category' => 'financial',
             'title' => 'Test Risk',
             'description' => 'Risk description',
@@ -149,7 +151,7 @@ trait GovernanceTestHelpers
     {
         return PerformanceReview::create(array_merge([
             'reviewee_id' => $reviewee->id,
-            'review_cycle' => now()->year . '-Annual',
+            'review_cycle' => now()->year.'-Annual',
             'review_type' => 'annual',
             'period_start' => now()->subYear()->toDateString(),
             'period_end' => now()->toDateString(),
@@ -175,11 +177,16 @@ trait GovernanceTestHelpers
 
     protected function createBudget(User $creator, array $overrides = []): Budget
     {
+        $fiscalYear = (string) ($overrides['fiscal_year'] ?? now()->year);
+        $versionNumber = $overrides['version_number']
+            ?? ((int) Budget::query()->where('fiscal_year', $fiscalYear)->max('version_number') + 1);
+
         return Budget::create(array_merge([
-            'fiscal_year' => (string) now()->year,
+            'fiscal_year' => $fiscalYear,
             'title' => 'Test Budget',
             'total_budget' => 100000,
             'status' => 'drafting',
+            'version_number' => $versionNumber,
             'created_by' => $creator->id,
         ], $overrides));
     }
@@ -187,7 +194,7 @@ trait GovernanceTestHelpers
     protected function createActionItem(User $creator, User $assignedTo, array $overrides = []): ActionItem
     {
         return ActionItem::create(array_merge([
-            'action_reference' => 'ACT-' . strtoupper(Str::random(6)),
+            'action_reference' => 'ACT-'.strtoupper(Str::random(6)),
             'source_type' => 'meeting',
             'source_id' => 1,
             'description' => 'Action item description',

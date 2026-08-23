@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Budget extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'fiscal_year',
@@ -105,9 +105,9 @@ class Budget extends Model
         $lineItemCount = $this->lineItems->count();
 
         $resolution = Resolution::create([
-            'title' => "Budget Approval: " . ($this->title ?: "FY{$this->fiscal_year}"),
+            'title' => 'Budget Approval: '.($this->title ?: "FY{$this->fiscal_year}"),
             'decision_type' => 'budget_approval',
-            'context' => "The " . ($this->title ?: "FY{$this->fiscal_year}") . " budget totalling \${$totalBudget} across {$lineItemCount} line items has been submitted for board approval.",
+            'context' => 'The '.($this->title ?: "FY{$this->fiscal_year}")." budget totalling \${$totalBudget} across {$lineItemCount} line items has been submitted for board approval.",
             'options' => [],
             'recommendation' => 'Approve the proposed budget as presented.',
             'cost_impact' => [
@@ -158,6 +158,7 @@ class Budget extends Model
         if ($this->getTotalAllocated() == 0) {
             return 0;
         }
+
         return ($this->getTotalVariance() / $this->getTotalAllocated()) * 100;
     }
 
@@ -168,7 +169,7 @@ class Budget extends Model
 
     public function recalculateTotals(): void
     {
-        $this->total_budget = $this->getTotalAllocated();
+        $this->total_budget = $this->lineItems()->sum('budget_amount');
         $this->save();
     }
 
@@ -182,39 +183,7 @@ class Budget extends Model
             return true;
         }
         $pct = abs($adjustmentAmount) / $this->total_budget * 100;
+
         return $pct >= $thresholdPct;
-    }
-
-    /**
-     * Create a budget adjustment and optionally trigger a resolution if threshold exceeded.
-     */
-    public function requestAdjustment(float $amount, string $reason, int $userId, float $thresholdPct = 5.0): BudgetAdjustment
-    {
-        $needsApproval = $this->requiresBoardApproval($amount, $thresholdPct);
-
-        $adjustment = $this->adjustments()->create([
-            'amount' => $amount,
-            'reason' => $reason,
-            'requested_by' => $userId,
-            'status' => $needsApproval ? 'pending_board_approval' : 'approved',
-        ]);
-
-        if ($needsApproval) {
-            // Create a resolution for board approval
-            Resolution::create([
-                'title' => "Budget Adjustment: " . number_format(abs($amount), 2) . " - {$reason}",
-                'decision_type' => 'budget_approval',
-                'context' => "A budget adjustment of \$" . number_format($amount, 2) . " has been requested for: {$reason}. This exceeds the {$thresholdPct}% threshold and requires board approval.",
-                'options' => [],
-                'recommendation' => $amount > 0 ? 'Approve the additional allocation' : 'Approve the budget reduction',
-                'cost_impact' => ['amount' => $amount, 'currency' => 'NZD', 'description' => $reason],
-                'voting_threshold' => 'simple_majority',
-                'status' => 'draft',
-                'proposed_by' => $userId,
-                'proposed_at' => now(),
-            ]);
-        }
-
-        return $adjustment;
     }
 }

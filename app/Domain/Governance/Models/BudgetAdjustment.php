@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BudgetAdjustment extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'budget_id',
@@ -104,42 +104,5 @@ class BudgetAdjustment extends Model
     public function isReallocation(): bool
     {
         return $this->adjustment_type === 'reallocate';
-    }
-
-    public function submit(): void
-    {
-        $this->update([
-            'status' => 'submitted',
-            'proposed_at' => now(),
-        ]);
-    }
-
-    public function approve(int $userId, ?int $resolutionId = null): void
-    {
-        $this->update([
-            'status' => 'approved',
-            'approved_at' => now(),
-            'approved_by' => $userId,
-            'approval_resolution_id' => $resolutionId,
-        ]);
-
-        // Apply adjustment to line item
-        $lineItem = $this->lineItem;
-        if ($this->isIncrease()) {
-            $lineItem->budget_amount += $this->amount;
-        } elseif ($this->isDecrease()) {
-            $lineItem->budget_amount -= $this->amount;
-        }
-        $lineItem->save();
-    }
-
-    public function reject(int $userId, string $reason): void
-    {
-        $this->update([
-            'status' => 'rejected',
-            'review_notes' => $reason,
-            'approved_by' => $userId,
-            'approved_at' => now(),
-        ]);
     }
 }

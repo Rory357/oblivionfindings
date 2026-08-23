@@ -10,6 +10,8 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
+use App\Domain\Governance\Models\MeetingRsvp;
+use App\Domain\Governance\Services\GovernanceNestedMutationService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
@@ -22,13 +24,14 @@ class GovernanceMeetingController extends Controller
     public function __construct(
         protected GovernanceWorkflowService $workflowService,
         protected GovernancePresenter $presenter,
+        protected GovernanceNestedMutationService $nestedMutations,
     ) {}
 
     public function create()
     {
-        $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')->get();
-        $committees = \App\Domain\Governance\Models\BoardCommittee::all();
-        
+        $boardMembers = BoardMember::with('user')->get();
+        $committees = BoardCommittee::all();
+
         return Inertia::render('Governance/Meetings/Create', [
             'boardMembers' => $boardMembers,
             'committees' => $committees,
@@ -185,7 +188,7 @@ class GovernanceMeetingController extends Controller
     public function destroy(GovernanceMeeting $meeting)
     {
         $this->authorize('delete', $meeting);
-        
+
         $meeting->delete();
 
         return redirect()->route('governance.meetings.index')
@@ -205,19 +208,14 @@ class GovernanceMeetingController extends Controller
             'is_confidential' => 'boolean',
         ]);
 
-        $maxOrder = $meeting->agendaItems()->max('order') ?? 0;
-
-        $meeting->agendaItems()->create([
-            ...$validated,
-            'order' => $maxOrder + 1,
-        ]);
+        $this->nestedMutations->addAgendaItem($request->user(), $meeting, $validated);
 
         return redirect()->back()->with('success', 'Agenda item added.');
     }
 
     public function updateAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
     {
-        $this->authorize('update', $meeting);
+        $this->nestedMutations->assertAgendaItemBound($request->user(), $meeting, $item);
 
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
@@ -227,22 +225,14 @@ class GovernanceMeetingController extends Controller
             'order' => 'sometimes|integer|min:1',
         ]);
 
-        $item->update($validated);
-
-        // Reorder if necessary
-        if (isset($validated['order'])) {
-            $this->reorderAgendaItems($meeting);
-        }
+        $this->nestedMutations->updateAgendaItem($request->user(), $meeting, $item, $validated);
 
         return redirect()->back()->with('success', 'Agenda item updated.');
     }
 
-    public function removeAgendaItem(GovernanceMeeting $meeting, MeetingAgendaItem $item)
+    public function removeAgendaItem(Request $request, GovernanceMeeting $meeting, MeetingAgendaItem $item)
     {
-        $this->authorize('update', $meeting);
-
-        $item->delete();
-        $this->reorderAgendaItems($meeting);
+        $this->nestedMutations->removeAgendaItem($request->user(), $meeting, $item);
 
         return redirect()->back()->with('success', 'Agenda item removed.');
     }
@@ -277,7 +267,7 @@ class GovernanceMeetingController extends Controller
     {
         $this->authorize('manageMinutes', $meeting);
 
-        if (!$meeting->minutes) {
+        if (! $meeting->minutes) {
             return redirect()->back()->with('error', 'Minutes have not been created for this meeting yet.');
         }
 
@@ -297,7 +287,7 @@ class GovernanceMeetingController extends Controller
     {
         $this->authorize('approveMinutes', $meeting);
 
-        if (!$meeting->minutes) {
+        if (! $meeting->minutes) {
             return redirect()->back()->with('error', 'Minutes have not been created for this meeting yet.');
         }
 
@@ -361,11 +351,11 @@ class GovernanceMeetingController extends Controller
         $this->authorize('approveMinutes', $meeting);
 
         $minutes = $meeting->minutes;
-        if (!$minutes) {
+        if (! $minutes) {
             return redirect()->back()->with('error', 'No minutes found for this meeting.');
         }
 
-        if (!$minutes->isApproved()) {
+        if (! $minutes->isApproved()) {
             return redirect()->back()->with('error', 'Minutes must be approved before signing.');
         }
 
@@ -380,11 +370,11 @@ class GovernanceMeetingController extends Controller
 
         $advanced = $meeting->autoAdvanceStatus();
 
-        if (!$advanced) {
+        if (! $advanced) {
             return redirect()->back()->with('error', 'Cannot advance meeting status. Check prerequisites.');
         }
 
-        return redirect()->back()->with('success', 'Meeting status advanced to: ' . str_replace('_', ' ', $meeting->fresh()->status));
+        return redirect()->back()->with('success', 'Meeting status advanced to: '.str_replace('_', ' ', $meeting->fresh()->status));
     }
 
     public function submitRsvp(Request $request, GovernanceMeeting $meeting)
@@ -396,11 +386,11 @@ class GovernanceMeetingController extends Controller
         ]);
 
         $boardMember = auth()->user()->boardMember;
-        if (!$boardMember) {
+        if (! $boardMember) {
             return redirect()->back()->with('error', 'You are not a board member.');
         }
 
-        \App\Domain\Governance\Models\MeetingRsvp::updateOrCreate(
+        MeetingRsvp::updateOrCreate(
             [
                 'governance_meeting_id' => $meeting->id,
                 'board_member_id' => $boardMember->id,
@@ -412,14 +402,5 @@ class GovernanceMeetingController extends Controller
         );
 
         return redirect()->back()->with('success', 'RSVP recorded.');
-    }
-
-    protected function reorderAgendaItems(GovernanceMeeting $meeting): void
-    {
-        $items = $meeting->agendaItems()->orderBy('order')->get();
-
-        foreach ($items as $index => $item) {
-            $item->update(['order' => $index + 1]);
-        }
     }
 }
