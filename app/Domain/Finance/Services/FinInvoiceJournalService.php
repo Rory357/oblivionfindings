@@ -19,6 +19,7 @@ class FinInvoiceJournalService
 
     public function __construct(
         private readonly JournalPostingService $journalPostingService,
+        private readonly GstTaxRateResolver $gstTaxRateResolver,
     ) {}
 
     public function postInvoiceJournal(FinInvoice $invoice): FinJournal
@@ -52,6 +53,13 @@ class FinInvoiceJournalService
                     continue;
                 }
 
+                $taxRate = $this->gstTaxRateResolver->resolveInvoiceRate(
+                    (int) $orgId,
+                    $invoiceLine->tax_rate_id === null ? null : (int) $invoiceLine->tax_rate_id,
+                    (string) $invoiceLine->tax_amount,
+                    "Invoice {$invoice->invoice_number} line #{$invoiceLine->id}",
+                );
+
                 $lines[] = [
                     'account_id' => $invoiceLine->account_id
                         ?: $this->findAccountByCode($orgId, '4030')->id,
@@ -61,6 +69,8 @@ class FinInvoiceJournalService
                     // Carries funder attribution into the GL, where the
                     // funding-stream summary report reads it.
                     'funding_stream_id' => $invoiceLine->funding_stream_id,
+                    'tax_rate_id' => $taxRate?->id,
+                    'tax_amount' => $invoiceLine->tax_amount,
                 ];
             }
 

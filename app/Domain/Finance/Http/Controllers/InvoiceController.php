@@ -13,6 +13,7 @@ use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Domain\Finance\Services\FinInvoiceJournalService;
+use App\Domain\Finance\Services\GstTaxRateResolver;
 use App\Domain\Finance\Services\InvoicePdfService;
 use App\Domain\Finance\Services\PaymentSettlementSiteScope;
 use App\Http\Controllers\Controller;
@@ -205,7 +206,7 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function store(StoreInvoiceRequest $request)
+    public function store(StoreInvoiceRequest $request, GstTaxRateResolver $gstTaxRateResolver)
     {
         $validated = $request->validated();
 
@@ -247,7 +248,7 @@ class InvoiceController extends Controller
             }
         }
 
-        $invoice = DB::transaction(function () use ($validated, $orgId, $request, $client, $billingEntryIds, $isOperationsPayload) {
+        $invoice = DB::transaction(function () use ($validated, $orgId, $request, $client, $billingEntryIds, $isOperationsPayload, $gstTaxRateResolver) {
             // Auto-generate invoice number if not provided
             $invoiceNumber = $validated['invoice_number'] ?? $this->generateInvoiceNumber($orgId);
 
@@ -261,17 +262,16 @@ class InvoiceController extends Controller
                 $price = (string) $lineData['unit_price'];
                 $lineSubtotal = bcmul($qty, $price, 2);
 
-                $taxRateId = $lineData['tax_rate_id'] ?? null;
+                $taxRateId = isset($lineData['tax_rate_id']) ? (int) $lineData['tax_rate_id'] : null;
                 $taxAmount = '0';
 
-                if ($taxRateId) {
-                    $taxRate = FinTaxRate::find($taxRateId);
-                    if ($taxRate) {
-                        $taxAmount = bcmul($lineSubtotal, bcdiv((string) $taxRate->rate, '100', 6), 2);
-                    }
+                if ($taxRateId !== null) {
+                    $taxRate = $gstTaxRateResolver->matchInputRate($orgId, $taxRateId, '0');
+                    $taxAmount = bcmul($lineSubtotal, (string) $taxRate->rate, 2);
                 } else {
                     // Default 15% GST for NZ
                     $taxAmount = bcmul($lineSubtotal, '0.15', 2);
+                    $taxRateId = $gstTaxRateResolver->matchInputRate($orgId, null, '15')?->id;
                 }
 
                 $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
@@ -386,8 +386,11 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function update(UpdateInvoiceRequest $request, FinInvoice $invoice)
-    {
+    public function update(
+        UpdateInvoiceRequest $request,
+        FinInvoice $invoice,
+        GstTaxRateResolver $gstTaxRateResolver,
+    ) {
         if ($invoice->status !== 'draft') {
             return redirect()->route('finance.invoices.show', $invoice)
                 ->with('error', 'Only draft invoices can be updated.');
@@ -403,7 +406,7 @@ class InvoiceController extends Controller
             ? $this->accessibleClients($request->user())->findOrFail($validated['client_id'])
             : null;
 
-        DB::transaction(function () use ($invoice, $validated, $client) {
+        DB::transaction(function () use ($invoice, $validated, $client, $orgId, $gstTaxRateResolver) {
             $lines = [];
             $subtotal = '0';
             $taxTotal = '0';
@@ -413,16 +416,15 @@ class InvoiceController extends Controller
                 $price = (string) $lineData['unit_price'];
                 $lineSubtotal = bcmul($qty, $price, 2);
 
-                $taxRateId = $lineData['tax_rate_id'] ?? null;
+                $taxRateId = isset($lineData['tax_rate_id']) ? (int) $lineData['tax_rate_id'] : null;
                 $taxAmount = '0';
 
-                if ($taxRateId) {
-                    $taxRate = FinTaxRate::find($taxRateId);
-                    if ($taxRate) {
-                        $taxAmount = bcmul($lineSubtotal, bcdiv((string) $taxRate->rate, '100', 6), 2);
-                    }
+                if ($taxRateId !== null) {
+                    $taxRate = $gstTaxRateResolver->matchInputRate($orgId, $taxRateId, '0');
+                    $taxAmount = bcmul($lineSubtotal, (string) $taxRate->rate, 2);
                 } else {
                     $taxAmount = bcmul($lineSubtotal, '0.15', 2);
+                    $taxRateId = $gstTaxRateResolver->matchInputRate($orgId, null, '15')?->id;
                 }
 
                 $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);

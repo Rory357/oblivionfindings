@@ -26,4 +26,9 @@ class FinGstReturnPolicy
     {
         return $user->canDo('finance.tax.manage');
     }
+
+    public function amend(User $user, FinGstReturn $gstReturn): bool
+    {
+        return $user->canDo('finance.tax.manage');
+    }
 }

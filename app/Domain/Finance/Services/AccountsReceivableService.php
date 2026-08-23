@@ -7,7 +7,6 @@ use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinManualReceiptIdempotency;
 use App\Domain\Finance\Models\FinPaymentAllocation;
-use App\Domain\Finance\Models\FinTaxRate;
 use App\Models\Client;
 use App\Models\User;
 use Carbon\Carbon;
@@ -25,6 +24,7 @@ class AccountsReceivableService
         private readonly JournalPostingService $journalPostingService,
         private readonly PaymentSettlementSiteScope $paymentSiteScope,
         private readonly PaymentSettlementRecorder $settlementRecorder,
+        private readonly GstTaxRateResolver $gstTaxRateResolver,
     ) {}
 
     /**
@@ -53,13 +53,23 @@ class AccountsReceivableService
                 $price = (string) $line['unit_price'];
                 $lineSubtotal = bcmul($qty, $price, 2);
 
-                $taxRateId = $line['tax_rate_id'] ?? null;
-                if ($taxRateId && ($rate = FinTaxRate::find($taxRateId))) {
-                    $taxAmount = bcmul($lineSubtotal, bcdiv((string) $rate->rate, '100', 6), 2);
+                $taxRateId = isset($line['tax_rate_id']) ? (int) $line['tax_rate_id'] : null;
+                if ($taxRateId !== null) {
+                    $rate = $this->gstTaxRateResolver->matchInputRate(
+                        (int) $orgId,
+                        $taxRateId,
+                        '0',
+                    );
+                    $taxAmount = bcmul($lineSubtotal, (string) $rate->rate, 2);
                 } elseif (array_key_exists('gst_rate', $line)) {
-                    $taxAmount = bcmul($lineSubtotal, bcdiv((string) $line['gst_rate'], '100', 6), 2);
+                    $percentage = (string) $line['gst_rate'];
+                    $taxAmount = bcmul($lineSubtotal, bcdiv($percentage, '100', 6), 2);
+                    $taxRateId = $this->gstTaxRateResolver
+                        ->matchInputRate((int) $orgId, null, $percentage)?->id;
                 } else {
                     $taxAmount = bcmul($lineSubtotal, '0.15', 2); // NZ 15% GST default
+                    $taxRateId = $this->gstTaxRateResolver
+                        ->matchInputRate((int) $orgId, null, '15')?->id;
                 }
                 $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
 

@@ -17,6 +17,7 @@ class AccountsPayableService
 {
     public function __construct(
         private JournalPostingService $journalPostingService,
+        private GstTaxRateResolver $gstTaxRateResolver,
     ) {}
 
     /**
@@ -57,16 +58,23 @@ class AccountsPayableService
                 $qty = (string) $line['quantity'];
                 $price = (string) $line['unit_price'];
                 $gstRate = (string) ($line['gst_rate'] ?? 15);
+                $taxRate = $this->gstTaxRateResolver->matchInputRate(
+                    (int) $orgId,
+                    isset($line['tax_rate_id']) ? (int) $line['tax_rate_id'] : null,
+                    $gstRate,
+                );
+                $gstFraction = $taxRate?->rate ?? bcdiv($gstRate, '100', 4);
 
                 $lineSubtotal = bcmul($qty, $price, 2);
-                $lineGst = bcmul($lineSubtotal, bcdiv($gstRate, '100', 6), 2);
+                $lineGst = bcmul($lineSubtotal, (string) $gstFraction, 2);
                 $lineTotal = bcadd($lineSubtotal, $lineGst, 2);
 
                 $bill->lines()->create([
                     'description' => $line['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
-                    'gst_rate' => bcdiv($gstRate, '100', 4),
+                    'gst_rate' => $gstFraction,
+                    'tax_rate_id' => $taxRate?->id,
                     'gst_amount' => $lineGst,
                     'line_total' => $lineTotal,
                     'account_id' => $line['account_id'],
@@ -197,16 +205,23 @@ class AccountsPayableService
                 $qty = (string) $line['quantity'];
                 $price = (string) $line['unit_price'];
                 $gstRate = (string) ($line['gst_rate'] ?? 15);
+                $taxRate = $this->gstTaxRateResolver->matchInputRate(
+                    (int) $bill->organization_id,
+                    isset($line['tax_rate_id']) ? (int) $line['tax_rate_id'] : null,
+                    $gstRate,
+                );
+                $gstFraction = $taxRate?->rate ?? bcdiv($gstRate, '100', 4);
 
                 $lineSubtotal = bcmul($qty, $price, 2);
-                $lineGst = bcmul($lineSubtotal, bcdiv($gstRate, '100', 6), 2);
+                $lineGst = bcmul($lineSubtotal, (string) $gstFraction, 2);
                 $lineTotal = bcadd($lineSubtotal, $lineGst, 2);
 
                 $bill->lines()->create([
                     'description' => $line['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
-                    'gst_rate' => bcdiv($gstRate, '100', 4),
+                    'gst_rate' => $gstFraction,
+                    'tax_rate_id' => $taxRate?->id,
                     'gst_amount' => $lineGst,
                     'line_total' => $lineTotal,
                     'account_id' => $line['account_id'],
@@ -243,21 +258,42 @@ class AccountsPayableService
         $this->assertSpendApprovalSatisfied($bill);
 
         return DB::transaction(function () use ($bill, $userId) {
-            $bill->loadMissing('lines');
+            $bill->loadMissing('lines.taxRate');
 
             $apAccount = $this->findApAccount($bill->organization_id);
 
             $journalLines = [];
 
-            // DR expense accounts for each bill line
+            // DR net expense/asset amounts. The per-source tax metadata remains
+            // on these lines; the separate 2210 line carries the recoverable GST
+            // control balance without being counted as a second GST component.
             foreach ($bill->lines as $line) {
+                $taxRate = $this->gstTaxRateResolver->resolveStoredRate(
+                    (int) $bill->organization_id,
+                    $line->tax_rate_id === null ? null : (int) $line->tax_rate_id,
+                    (string) $line->gst_rate,
+                    "Bill {$bill->bill_number} line #{$line->id}",
+                );
+                $netAmount = bcsub((string) $line->line_total, (string) $line->gst_amount, 2);
+
                 $journalLines[] = [
                     'account_id' => $line->account_id,
                     'description' => $line->description,
-                    'debit' => $line->line_total,
+                    'debit' => $netAmount,
                     'credit' => 0,
                     'cost_centre_id' => $line->cost_centre_id,
                     'funding_stream_id' => $line->funding_stream_id,
+                    'tax_rate_id' => $taxRate?->id,
+                    'tax_amount' => $line->gst_amount,
+                ];
+            }
+
+            if (bccomp((string) $bill->gst_amount, '0.00', 2) > 0) {
+                $journalLines[] = [
+                    'account_id' => $this->findAccountByCode($bill->organization_id, '2210')->id,
+                    'description' => "GST Paid - {$bill->bill_number}",
+                    'debit' => $bill->gst_amount,
+                    'credit' => 0,
                 ];
             }
 
@@ -460,16 +496,23 @@ class AccountsPayableService
                 $qty = (string) $line['quantity'];
                 $price = (string) $line['unit_price'];
                 $gstRate = (string) ($line['gst_rate'] ?? 15);
+                $taxRate = $this->gstTaxRateResolver->matchInputRate(
+                    (int) $orgId,
+                    isset($line['tax_rate_id']) ? (int) $line['tax_rate_id'] : null,
+                    $gstRate,
+                );
+                $gstFraction = $taxRate?->rate ?? bcdiv($gstRate, '100', 4);
 
                 $lineSubtotal = bcmul($qty, $price, 2);
-                $lineGst = bcmul($lineSubtotal, bcdiv($gstRate, '100', 6), 2);
+                $lineGst = bcmul($lineSubtotal, (string) $gstFraction, 2);
                 $lineTotal = bcadd($lineSubtotal, $lineGst, 2);
 
                 $creditNote->lines()->create([
                     'description' => $line['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
-                    'gst_rate' => bcdiv($gstRate, '100', 4),
+                    'gst_rate' => $gstFraction,
+                    'tax_rate_id' => $taxRate?->id,
                     'gst_amount' => $lineGst,
                     'line_total' => $lineTotal,
                     'account_id' => $line['account_id'],
@@ -501,7 +544,7 @@ class AccountsPayableService
         }
 
         return DB::transaction(function () use ($cn, $userId) {
-            $cn->loadMissing('lines');
+            $cn->loadMissing('lines.taxRate');
 
             $journalLines = [];
 
@@ -523,11 +566,19 @@ class AccountsPayableService
                 ];
 
                 foreach ($cn->lines as $line) {
+                    $taxRate = $this->gstTaxRateResolver->resolveStoredRate(
+                        (int) $cn->organization_id,
+                        $line->tax_rate_id === null ? null : (int) $line->tax_rate_id,
+                        (string) $line->gst_rate,
+                        "Credit note {$cn->credit_note_number} line #{$line->id}",
+                    );
                     $journalLines[] = [
                         'account_id' => $line->account_id,
                         'description' => $line->description,
                         'debit' => 0,
                         'credit' => bcsub((string) $line->line_total, (string) ($line->gst_amount ?? 0), 2),
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_amount' => bcsub('0.00', (string) $line->gst_amount, 2),
                     ];
                 }
 
@@ -544,11 +595,19 @@ class AccountsPayableService
                 $arAccount = $this->findAccountByCode($cn->organization_id, '1100');
 
                 foreach ($cn->lines as $line) {
+                    $taxRate = $this->gstTaxRateResolver->resolveStoredRate(
+                        (int) $cn->organization_id,
+                        $line->tax_rate_id === null ? null : (int) $line->tax_rate_id,
+                        (string) $line->gst_rate,
+                        "Credit note {$cn->credit_note_number} line #{$line->id}",
+                    );
                     $journalLines[] = [
                         'account_id' => $line->account_id,
                         'description' => $line->description,
                         'debit' => bcsub((string) $line->line_total, (string) ($line->gst_amount ?? 0), 2),
                         'credit' => 0,
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_amount' => bcsub('0.00', (string) $line->gst_amount, 2),
                     ];
                 }
 

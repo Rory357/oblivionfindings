@@ -20,11 +20,21 @@ class FinGstReturnLine extends Model
         'net_amount',
         'gst_amount',
         'tax_rate_id',
+        'side',
+        'source_type',
+        'source_id',
+        'source_line_type',
+        'source_line_id',
+        'recognition_type',
+        'recognition_id',
+        'recognition_date',
+        'source_key',
     ];
 
     protected $casts = [
         'net_amount' => 'decimal:2',
         'gst_amount' => 'decimal:2',
+        'recognition_date' => 'date',
     ];
 
     public function gstReturn(): BelongsTo

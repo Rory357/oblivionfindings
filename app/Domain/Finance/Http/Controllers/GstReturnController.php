@@ -7,7 +7,9 @@ use App\Domain\Finance\Services\GstReturnService;
 use App\Domain\Finance\Services\NzComplianceService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use InvalidArgumentException;
 
 class GstReturnController extends Controller
 {
@@ -126,7 +128,7 @@ class GstReturnController extends Controller
         $gstReturn = $this->gstReturnService->prepareReturn($orgId, $validated);
 
         return redirect()->route('finance.gst-returns.show', $gstReturn)
-            ->with('success', 'GST return prepared for period ending ' . $gstReturn->period_end->format('d M Y') . '.');
+            ->with('success', 'GST return prepared for period ending '.$gstReturn->period_end->format('d M Y').'.');
     }
 
     /**
@@ -151,7 +153,27 @@ class GstReturnController extends Controller
             'gstReturn' => $gstReturn,
             'summary' => $summary,
             'irdFormData' => $irdFormData,
+            'canManage' => $request->user()->canDo('finance.tax.manage'),
         ]);
+    }
+
+    /**
+     * Prepare a new draft revision while preserving the filed evidence.
+     */
+    public function amend(Request $request, FinGstReturn $gstReturn)
+    {
+        $this->authorize('amend', $gstReturn);
+
+        try {
+            $amendment = $this->gstReturnService->prepareAmendment($gstReturn);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'status' => $exception->getMessage(),
+            ]);
+        }
+
+        return redirect()->route('finance.gst-returns.show', $amendment)
+            ->with('success', 'A draft GST amendment has been prepared from the latest source evidence.');
     }
 
     /**
@@ -166,7 +188,13 @@ class GstReturnController extends Controller
                 ->withErrors(['status' => 'Only draft returns can be filed.']);
         }
 
-        $this->gstReturnService->fileReturn($gstReturn, $request->user()->id);
+        try {
+            $this->gstReturnService->fileReturn($gstReturn, $request->user()->id);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'status' => $exception->getMessage(),
+            ]);
+        }
 
         return redirect()->route('finance.gst-returns.show', $gstReturn)
             ->with('success', 'GST return has been marked as filed.');

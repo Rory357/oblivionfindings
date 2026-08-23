@@ -18,6 +18,7 @@ class FinBillLine extends Model
         'quantity',
         'unit_price',
         'gst_rate',
+        'tax_rate_id',
         'gst_amount',
         'line_total',
         'account_id',
@@ -41,6 +42,11 @@ class FinBillLine extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(FinAccount::class, 'account_id');
+    }
+
+    public function taxRate(): BelongsTo
+    {
+        return $this->belongsTo(FinTaxRate::class, 'tax_rate_id');
     }
 
     public function costCentre(): BelongsTo

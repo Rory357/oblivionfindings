@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle, FileText, Printer } from 'lucide-react';
+import { CheckCircle, FileText, Printer, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 
 type TaxRate = {
@@ -52,6 +52,8 @@ type GstReturn = {
     period_end: string;
     filing_frequency: string;
     basis: string;
+    revision: number;
+    supersedes_gst_return_id: number | null;
     total_sales: string;
     total_gst_collected: string;
     total_purchases: string;
@@ -116,6 +118,7 @@ type PageProps = {
     gstReturn: GstReturn;
     summary: Summary;
     irdFormData: IrdFormData;
+    canManage: boolean;
 };
 
 const formatDate = (dateStr: string) =>
@@ -189,6 +192,7 @@ export default function GstReturnShow({
     gstReturn,
     summary,
     irdFormData,
+    canManage,
 }: PageProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -200,8 +204,11 @@ export default function GstReturnShow({
     ];
 
     const isDraft = gstReturn.status === 'draft';
+    const isFiled = gstReturn.status === 'filed';
     const [fileOpen, setFileOpen] = useState(false);
     const [filing, setFiling] = useState(false);
+    const [amendOpen, setAmendOpen] = useState(false);
+    const [amending, setAmending] = useState(false);
 
     function confirmFile() {
         router.post(
@@ -217,6 +224,18 @@ export default function GstReturnShow({
 
     function handlePrint() {
         window.print();
+    }
+
+    function confirmAmendment() {
+        router.post(
+            `/finance/gst-returns/${gstReturn.id}/amend`,
+            {},
+            {
+                onStart: () => setAmending(true),
+                onFinish: () => setAmending(false),
+                onSuccess: () => setAmendOpen(false),
+            },
+        );
     }
 
     return (
@@ -243,7 +262,8 @@ export default function GstReturnShow({
                                 {
                                     frequencyLabels[gstReturn.filing_frequency]
                                 } | {basisLabels[gstReturn.basis]} Basis | IRD
-                                Period: {gstReturn.ird_period}
+                                Period: {gstReturn.ird_period} | Revision{' '}
+                                {gstReturn.revision}
                                 {gstReturn.filed_at && gstReturn.filed_by && (
                                     <span className="mt-1 block text-sm">
                                         Filed on{' '}
@@ -259,7 +279,16 @@ export default function GstReturnShow({
                                     <Printer className="mr-2 h-4 w-4" />
                                     Print
                                 </Button>
-                                {isDraft && (
+                                {canManage && isFiled && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setAmendOpen(true)}
+                                    >
+                                        <RotateCcw className="mr-2 h-4 w-4" />
+                                        Prepare amendment
+                                    </Button>
+                                )}
+                                {canManage && isDraft && (
                                     <Button onClick={() => setFileOpen(true)}>
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Mark as Filed
@@ -521,6 +550,16 @@ export default function GstReturnShow({
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={amendOpen}
+                onOpenChange={setAmendOpen}
+                title="Prepare a GST amendment?"
+                description="This creates a new draft revision from the latest source evidence. The filed return remains unchanged and auditable."
+                confirmLabel="Prepare amendment"
+                processing={amending}
+                onConfirm={confirmAmendment}
+            />
 
             <ConfirmDialog
                 open={fileOpen}

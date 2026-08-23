@@ -25,6 +25,7 @@ class StoreCreditNoteRequest extends FormRequest
             'lines.*.quantity' => 'required|numeric|min:0.01',
             'lines.*.unit_price' => 'required|numeric|min:0',
             'lines.*.gst_rate' => 'nullable|numeric',
+            'lines.*.tax_rate_id' => 'nullable|exists:fin_tax_rates,id',
             'lines.*.account_id' => 'required|exists:fin_accounts,id',
         ];
     }

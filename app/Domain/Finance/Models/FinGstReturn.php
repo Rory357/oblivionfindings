@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FinGstReturn extends Model
 {
@@ -31,6 +32,10 @@ class FinGstReturn extends Model
         'period_end',
         'filing_frequency',
         'basis',
+        'revision',
+        'supersedes_gst_return_id',
+        'source_digest',
+        'prepared_at',
         'total_sales',
         'total_gst_collected',
         'total_purchases',
@@ -47,6 +52,8 @@ class FinGstReturn extends Model
     protected $casts = [
         'period_start' => 'date',
         'period_end' => 'date',
+        'revision' => 'integer',
+        'prepared_at' => 'datetime',
         'total_sales' => 'decimal:2',
         'total_gst_collected' => 'decimal:2',
         'total_purchases' => 'decimal:2',
@@ -69,6 +76,16 @@ class FinGstReturn extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function supersedes(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_gst_return_id');
+    }
+
+    public function amendment(): HasOne
+    {
+        return $this->hasOne(self::class, 'supersedes_gst_return_id');
     }
 
     public function irdFilings(): HasMany

@@ -7,7 +7,10 @@ use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Services\FinInvoiceJournalService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\FinancePermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -70,7 +73,7 @@ it('queues FinInvoice journal posting only when send moves a draft invoice to se
 
     $accounts = createFinInvoicePostingAccounts();
     $invoice = createDraftFinInvoice($accounts['revenue_one']->id, $accounts['revenue_two']->id);
-    $user = createFinanceUserForInvoicePosting();
+    $user = createFinanceUserForInvoicePosting((int) $invoice->client->site_id);
 
     $this->actingAs($user)
         ->post(route('finance.invoices.send', $invoice))
@@ -100,7 +103,7 @@ it('reverses a posted FinInvoice journal when the invoice is cancelled', functio
 
     $invoice = createDraftFinInvoice($accounts['revenue_one']->id, $accounts['revenue_two']->id);
     $journal = app(FinInvoiceJournalService::class)->postInvoiceJournal($invoice);
-    $user = createFinanceUserForInvoicePosting();
+    $user = createFinanceUserForInvoicePosting((int) $invoice->client->site_id);
 
     $this->actingAs($user)
         ->post(route('finance.invoices.cancel', $invoice))
@@ -166,8 +169,14 @@ function createOpenFinancePeriod(): FinFiscalPeriod
 
 function createDraftFinInvoice(int $firstRevenueAccountId, int $secondRevenueAccountId): FinInvoice
 {
+    $site = Site::factory()->create(['is_active' => true]);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'status' => 'active',
+    ]);
     $invoice = FinInvoice::factory()->create([
         'organization_id' => 1,
+        'client_id' => $client->id,
         'invoice_number' => 'INV-AR-001',
         'invoice_date' => '2026-05-01',
         'due_date' => '2026-05-31',
@@ -202,7 +211,7 @@ function createDraftFinInvoice(int $firstRevenueAccountId, int $secondRevenueAcc
     return $invoice;
 }
 
-function createFinanceUserForInvoicePosting(): User
+function createFinanceUserForInvoicePosting(int $siteId): User
 {
     $user = User::factory()->create([
         'role' => 'finance',
@@ -212,6 +221,16 @@ function createFinanceUserForInvoicePosting(): User
 
     $role = Role::where('name', 'finance')->firstOrFail();
     $user->roles()->attach($role);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $siteId,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
 
     return $user;
 }

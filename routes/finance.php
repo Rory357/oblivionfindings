@@ -529,6 +529,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/gst-returns/{gstReturn}/file', [GstReturnController::class, 'file'])
         ->name('gst-returns.file')
         ->middleware('permission:finance.tax.manage');
+    Route::post('/gst-returns/{gstReturn}/amend', [GstReturnController::class, 'amend'])
+        ->name('gst-returns.amend')
+        ->middleware('permission:finance.tax.manage');
 
     // ── Fixed Assets ────────────────────────────────────────────────────
     // Create/edit are WizardShell modals on the index/show pages; the retired
