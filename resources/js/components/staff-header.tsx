@@ -58,13 +58,13 @@ type StaffHeaderProps = {
     /** Whether `titlePopover` is currently open (rotates the chevron). */
     titleOpen?: boolean;
 
-    /** Desktop-only: row of 36×36 icon links to global pages. */
+    /** Desktop-only: row of 44×44 icon links to global pages. */
     globalLinks?: StaffHeaderGlobalLink[];
     /** Desktop-only: search pill on the right of the global-links row. */
     search?: StaffHeaderSearch;
-    /** Desktop-only: small "Live · 12s" freshness chip. */
+    /** Responsive "Live · 12s" freshness chip. */
     liveIndicator?: StaffHeaderLiveIndicator;
-    /** Desktop-only: bell button with a critical-tone badge. */
+    /** Responsive bell button with a critical-tone badge. */
     notifications?: StaffHeaderNotifications;
 };
 
@@ -72,9 +72,9 @@ type StaffHeaderProps = {
  * Header for frontline / staff pages.
  *
  * Mobile callers (the original use case) pass only `title` + `subtitle` +
- * `action` and get the original compact bar. Desktop callers (the new
- * `/my-day`) opt-in to the extended layout by passing `globalLinks`,
- * `search`, `liveIndicator`, and `notifications`.
+ * `action` and get the original compact bar. Extended callers such as
+ * `/my-day` add desktop links/search and responsive live/notification
+ * controls; the action row wraps below the title on a narrow viewport.
  */
 export function StaffHeader({
     title,
@@ -101,19 +101,26 @@ export function StaffHeader({
 
     const titleInner = (
         <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-1.5 truncate text-base leading-tight font-semibold tracking-tight">
+            <h1 className="flex items-center gap-1.5 truncate text-base font-semibold leading-tight tracking-tight">
                 <span className="truncate">{title}</span>
                 {titleChevron ? (
                     <ChevronDown
                         className={cn(
-                            'h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150',
+                            'text-muted-foreground h-3 w-3 shrink-0 transition-transform duration-150',
                             titleOpen && 'rotate-180',
                         )}
                     />
                 ) : null}
             </h1>
             {subtitle ? (
-                <p className="truncate text-xs text-muted-foreground">
+                <p
+                    className={cn(
+                        'text-muted-foreground text-xs',
+                        hasDesktopChrome
+                            ? 'whitespace-normal lg:truncate'
+                            : 'truncate',
+                    )}
+                >
                     {subtitle}
                 </p>
             ) : null}
@@ -123,12 +130,12 @@ export function StaffHeader({
     return (
         <header
             className={cn(
-                'sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-border/50 bg-background/95 px-4 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80',
+                'border-border/50 bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex min-h-14 items-center gap-x-3 gap-y-2 border-b px-4 pb-2 backdrop-blur',
                 // Honour the top safe-area inset so the title clears the
                 // status bar when the app is launched in standalone/PWA
                 // mode. Resolves to pt-2 in a normal browser tab.
                 'pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]',
-                hasDesktopChrome && 'md:px-7',
+                hasDesktopChrome && 'flex-wrap md:px-7 lg:flex-nowrap',
                 className,
             )}
         >
@@ -136,20 +143,20 @@ export function StaffHeader({
                 <Link
                     href={backHref}
                     aria-label={backLabel}
-                    className="-ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="frontline-focus text-muted-foreground hover:bg-accent hover:text-foreground -ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md"
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
             ) : null}
 
-            <div className="relative">
+            <div className="relative min-w-0 flex-1">
                 {onTitleClick ? (
                     // eslint-disable-next-line no-restricted-syntax -- title acts as a popover trigger with custom typography; not a shadcn Button.
                     <button
                         type="button"
                         onClick={onTitleClick}
                         className={cn(
-                            'rounded-md px-1.5 py-0.5 text-left transition-colors',
+                            'frontline-focus min-h-11 max-w-full rounded-md px-1.5 py-0.5 text-left transition-colors',
                             titleOpen ? 'bg-muted' : 'hover:bg-muted',
                         )}
                         aria-haspopup="dialog"
@@ -181,7 +188,15 @@ export function StaffHeader({
 
             {search ? <StaffHeaderSearchInput search={search} /> : null}
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div
+                className={cn(
+                    'flex items-center gap-2 [&>a]:min-h-11 [&>a]:min-w-11 [&>button]:min-h-11 [&>button]:min-w-11',
+                    hasDesktopChrome
+                        ? 'w-full shrink-0 basis-full justify-between lg:ml-auto lg:w-auto lg:basis-auto lg:justify-start'
+                        : 'ml-auto shrink-0',
+                )}
+                data-staff-header-actions
+            >
                 {action}
                 {liveIndicator ? (
                     <StaffHeaderLiveChip indicator={liveIndicator} />
@@ -208,7 +223,7 @@ function StaffHeaderGlobalLinkButton({
                 <Link
                     href={link.href}
                     aria-label={link.label}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="frontline-focus text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors"
                 >
                     <Icon className="h-4 w-4" />
                 </Link>
@@ -222,7 +237,7 @@ function StaffHeaderSearchInput({ search }: { search: StaffHeaderSearch }) {
     const [value, setValue] = useState('');
     return (
         <form
-            className="ml-2 hidden h-9 w-[200px] items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-muted-foreground transition-colors hover:bg-muted md:flex"
+            className="border-border bg-background text-muted-foreground hover:bg-muted focus-within:border-ring focus-within:ring-ring/40 ml-2 hidden h-11 w-[200px] items-center gap-2 rounded-md border px-3 text-xs transition-colors focus-within:ring-2 md:flex"
             onSubmit={(event) => {
                 event.preventDefault();
                 search.onSubmit?.(value);
@@ -234,11 +249,11 @@ function StaffHeaderSearchInput({ search }: { search: StaffHeaderSearch }) {
                 value={value}
                 placeholder={search.placeholder ?? 'Search…'}
                 onChange={(event) => setValue(event.target.value)}
-                className="min-w-0 flex-1 border-0 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                className="text-foreground placeholder:text-muted-foreground h-full min-w-0 flex-1 border-0 bg-transparent text-xs outline-none"
                 aria-label={search.placeholder ?? 'Search'}
             />
             {search.hint ? (
-                <span className="text-[10.5px] text-text-faint">
+                <span className="text-text-faint text-[10.5px]">
                     {search.hint}
                 </span>
             ) : null}
@@ -254,10 +269,10 @@ function StaffHeaderLiveChip({
     const age = useFreshness(indicator.lastUpdatedAt);
     const label = indicator.lastUpdatedAt ? `Live · ${age}` : 'Live';
     const body = (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground">
+        <span className="border-border bg-background text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px]">
             <span
                 className={cn(
-                    'h-1.5 w-1.5 rounded-full bg-status-success',
+                    'bg-status-success h-1.5 w-1.5 rounded-full',
                     indicator.isRefreshing && 'animate-pulse',
                 )}
             />
@@ -271,7 +286,7 @@ function StaffHeaderLiveChip({
                 type="button"
                 onClick={indicator.onRefresh}
                 aria-label="Refresh now"
-                className="rounded-full focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                className="frontline-focus frontline-tap inline-flex items-center justify-center rounded-full"
             >
                 {body}
             </button>
@@ -289,11 +304,11 @@ function StaffHeaderNotificationsBell({
         <Link
             href={notifications.href}
             aria-label={`Notifications (${notifications.count})`}
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted"
+            className="frontline-focus border-border text-foreground hover:bg-muted relative inline-flex h-11 w-11 items-center justify-center rounded-md border"
         >
             <Bell className="h-4 w-4" />
             {notifications.count > 0 ? (
-                <span className="absolute top-1 right-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 border-background bg-status-critical px-1 text-[9px] font-bold text-status-critical-foreground">
+                <span className="border-background bg-status-critical text-status-critical-foreground absolute right-1 top-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 px-1 text-[9px] font-bold">
                     {notifications.count}
                 </span>
             ) : null}
