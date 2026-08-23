@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinRecurringJournal extends Model
 {
@@ -36,6 +37,11 @@ class FinRecurringJournal extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function occurrences(): HasMany
+    {
+        return $this->hasMany(FinRecurringJournalOccurrence::class, 'recurring_journal_id');
     }
 
     public function scopeForOrganization($query, ?int $orgId)

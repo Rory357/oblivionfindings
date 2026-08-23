@@ -27,9 +27,18 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { PageProps } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { BookOpen, Download, Eye, Plus, Search } from 'lucide-react';
+import {
+    AlertTriangle,
+    BookOpen,
+    CheckCircle2,
+    Download,
+    Eye,
+    Plus,
+    Search,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -70,6 +79,28 @@ interface RefItem {
     name: string;
 }
 
+interface RecurringOccurrenceAttempt {
+    outcome: 'failed' | 'posted' | 'recovered';
+    error_code: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+}
+
+interface RecurringOccurrenceHistory {
+    id: number;
+    schedule_name: string;
+    scheduled_for: string;
+    status: 'failed' | 'posted' | 'processing';
+    attempt_count: number;
+    last_attempted_at: string | null;
+    posted_at: string | null;
+    failed_at: string | null;
+    recovered_at: string | null;
+    last_error_code: string | null;
+    journal: { id: number; journal_number: string } | null;
+    attempts: RecurringOccurrenceAttempt[];
+}
+
 interface Props extends PageProps {
     journals: PaginatedJournals;
     filters: Filters;
@@ -77,6 +108,7 @@ interface Props extends PageProps {
     accounts?: RefItem[];
     costCentres?: RefItem[];
     fundingStreams?: RefItem[];
+    recurringOccurrenceHistory?: RecurringOccurrenceHistory[];
 }
 
 const statusBadge = (status: string) => {
@@ -97,6 +129,50 @@ const typeBadge = (type: string) => {
     return map[type] ?? 'bg-muted text-foreground';
 };
 
+function RecurringRunStatus({
+    occurrence,
+}: {
+    occurrence: RecurringOccurrenceHistory;
+}) {
+    const lastAttempt = occurrence.attempts[0];
+    const recoveredOnRetry =
+        occurrence.status === 'posted' && occurrence.attempt_count > 1;
+    const recoveredLegacyRun =
+        occurrence.status === 'posted' && occurrence.recovered_at !== null;
+
+    return (
+        <div className="flex items-center gap-2">
+            {occurrence.status === 'failed' ? (
+                <AlertTriangle
+                    aria-hidden="true"
+                    className="h-4 w-4 text-status-warning"
+                />
+            ) : (
+                <CheckCircle2
+                    aria-hidden="true"
+                    className="h-4 w-4 text-status-success"
+                />
+            )}
+            <div>
+                <p className="text-sm font-medium">
+                    {occurrence.status === 'failed'
+                        ? 'Retry pending'
+                        : recoveredOnRetry
+                          ? 'Recovered on retry'
+                          : recoveredLegacyRun
+                            ? 'Recovered from legacy run'
+                            : 'Posted'}
+                </p>
+                {lastAttempt?.error_code && (
+                    <p className="text-xs text-muted-foreground">
+                        {lastAttempt.error_code.replace(/_/g, ' ')}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function JournalsIndex({
     auth,
     journals,
@@ -105,6 +181,7 @@ export default function JournalsIndex({
     accounts = [],
     costCentres = [],
     fundingStreams = [],
+    recurringOccurrenceHistory = [],
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [search, setSearch] = useState(filters.search ?? '');
@@ -197,6 +274,159 @@ export default function JournalsIndex({
                     />
                 }
             >
+                {recurringOccurrenceHistory.length > 0 && (
+                    <Card className="mb-6">
+                        <CardContent className="pt-6">
+                            <div className="mb-4">
+                                <h2 className="text-base font-semibold">
+                                    Recurring journal run history
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Failed runs remain queued for the scheduled
+                                    retry. Successful retries keep their earlier
+                                    attempt history.
+                                </p>
+                            </div>
+                            <ul className="space-y-3 md:hidden">
+                                {recurringOccurrenceHistory.map(
+                                    (occurrence) => (
+                                        <li
+                                            key={occurrence.id}
+                                            className="rounded-lg border p-4"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="font-medium">
+                                                        {occurrence.schedule_name}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        Due{' '}
+                                                        {formatDateOnly(
+                                                            occurrence.scheduled_for,
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <RecurringRunStatus
+                                                    occurrence={occurrence}
+                                                />
+                                            </div>
+                                            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                                <div>
+                                                    <dt className="text-muted-foreground">
+                                                        Attempts
+                                                    </dt>
+                                                    <dd className="font-medium">
+                                                        {
+                                                            occurrence.attempt_count
+                                                        }
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-muted-foreground">
+                                                        Last attempt
+                                                    </dt>
+                                                    <dd className="font-medium">
+                                                        {formatDateTime(
+                                                            occurrence.last_attempted_at,
+                                                        )}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                            {occurrence.journal && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="mt-4 min-h-11 w-full"
+                                                    onClick={() =>
+                                                        router.visit(
+                                                            `/finance/journals/${occurrence.journal?.id}`,
+                                                        )
+                                                    }
+                                                >
+                                                    Open journal{' '}
+                                                    {
+                                                        occurrence.journal
+                                                            .journal_number
+                                                    }
+                                                </Button>
+                                            )}
+                                        </li>
+                                    ),
+                                )}
+                            </ul>
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Schedule</TableHead>
+                                            <TableHead>Due date</TableHead>
+                                            <TableHead>Attempts</TableHead>
+                                            <TableHead>Last attempt</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Journal</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {recurringOccurrenceHistory.map(
+                                            (occurrence) => (
+                                                <TableRow key={occurrence.id}>
+                                                    <TableCell className="font-medium">
+                                                        {
+                                                            occurrence.schedule_name
+                                                        }
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {formatDateOnly(
+                                                            occurrence.scheduled_for,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {
+                                                            occurrence.attempt_count
+                                                        }
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {formatDateTime(
+                                                            occurrence.last_attempted_at,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <RecurringRunStatus
+                                                            occurrence={
+                                                                occurrence
+                                                            }
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {occurrence.journal ? (
+                                                            <Button
+                                                                variant="link"
+                                                                className="h-auto p-0"
+                                                                onClick={() =>
+                                                                    router.visit(
+                                                                        `/finance/journals/${occurrence.journal?.id}`,
+                                                                    )
+                                                                }
+                                                            >
+                                                                {
+                                                                    occurrence
+                                                                        .journal
+                                                                        .journal_number
+                                                                }
+                                                            </Button>
+                                                        ) : (
+                                                            '—'
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ),
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">

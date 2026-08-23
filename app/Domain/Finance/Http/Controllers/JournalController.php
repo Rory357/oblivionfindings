@@ -8,6 +8,7 @@ use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFixedAssetDepreciation;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinRecurringJournalOccurrence;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\FixedAssetService;
 use App\Domain\Finance\Services\JournalPostingService;
@@ -67,8 +68,56 @@ class JournalController extends Controller
         // users who can actually create a journal (the modal trigger is gated too).
         $canManage = $request->user()->can('create', FinJournal::class);
 
+        $recurringOccurrenceHistory = FinRecurringJournalOccurrence::query()
+            ->whereHas(
+                'recurringJournal',
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
+            ->with([
+                'recurringJournal:id,organization_id,name',
+                'journal:id,journal_number',
+                'attempts' => fn ($query) => $query
+                    ->orderByDesc('started_at')
+                    ->orderByDesc('id'),
+            ])
+            ->where(function ($query): void {
+                $query->where('status', 'failed')
+                    ->orWhere('attempt_count', '>', 1)
+                    ->orWhereNotNull('recovered_at');
+            })
+            ->orderByDesc('last_attempted_at')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->map(fn (FinRecurringJournalOccurrence $occurrence) => [
+                'id' => $occurrence->id,
+                'schedule_name' => $occurrence->recurringJournal->name,
+                'scheduled_for' => $occurrence->scheduled_for->toDateString(),
+                'status' => $occurrence->status,
+                'attempt_count' => $occurrence->attempt_count,
+                'last_attempted_at' => $occurrence->last_attempted_at?->toIso8601String(),
+                'posted_at' => $occurrence->posted_at?->toIso8601String(),
+                'failed_at' => $occurrence->failed_at?->toIso8601String(),
+                'recovered_at' => $occurrence->recovered_at?->toIso8601String(),
+                'last_error_code' => $occurrence->last_error_code,
+                'journal' => $occurrence->journal ? [
+                    'id' => $occurrence->journal->id,
+                    'journal_number' => $occurrence->journal->journal_number,
+                ] : null,
+                'attempts' => $occurrence->attempts
+                    ->take(5)
+                    ->map(fn ($attempt) => [
+                        'outcome' => $attempt->outcome,
+                        'error_code' => $attempt->error_code,
+                        'started_at' => $attempt->started_at?->toIso8601String(),
+                        'finished_at' => $attempt->finished_at?->toIso8601String(),
+                    ])
+                    ->values(),
+            ]);
+
         return Inertia::render('finance/journals/Index', [
             'journals' => $journals,
+            'recurringOccurrenceHistory' => $recurringOccurrenceHistory,
             'filters' => $request->only(['status', 'type', 'date_from', 'date_to', 'search']),
             'canManage' => $canManage,
             'accounts' => $canManage
