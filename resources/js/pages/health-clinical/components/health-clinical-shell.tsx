@@ -24,6 +24,7 @@ import {
     HeroShell,
     HeroStatusPill,
     fmt,
+    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -67,7 +68,6 @@ export type HealthClinicalKpis = {
     clients_on_watch?: number | null;
     events_unreviewed?: number | null;
     events_pending_followup?: number | null;
-    nga_paerewa_certified?: boolean | null;
     restraint_register_current?: boolean | null;
 };
 
@@ -113,14 +113,26 @@ const CHIP_ICON: Record<ChipTone, string> = {
 function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
     const onWatch = kpis.clients_on_watch ?? null;
     const signOff = kpis.events_unreviewed ?? null;
-    const ngaCertified = kpis.nga_paerewa_certified ?? true;
-    const restraintCurrent = kpis.restraint_register_current ?? true;
+    const assurance = useNzsAssurance();
+    const ngaStatus = assurance.certification_status;
+    const restraintCurrent = kpis.restraint_register_current ?? null;
 
     const chips: { icon: LucideIcon; tone: ChipTone; label: string }[] = [
         {
-            icon: ShieldCheck,
-            tone: ngaCertified ? 'success' : 'warning',
-            label: `Ngā Paerewa · ${ngaCertified ? 'Certified' : 'Review due'}`,
+            icon: ngaStatus === 'certified' ? ShieldCheck : AlertTriangle,
+            tone:
+                ngaStatus === 'certified'
+                    ? 'success'
+                    : ngaStatus === 'action_required'
+                      ? 'warning'
+                      : 'neutral',
+            label: `Ngā Paerewa · ${
+                ngaStatus === 'certified'
+                    ? 'Certified'
+                    : ngaStatus === 'action_required'
+                      ? 'Action required'
+                      : 'Evidence unknown'
+            }`,
         },
         {
             icon: onWatch && onWatch > 0 ? AlertTriangle : HeartPulse,
@@ -132,13 +144,16 @@ function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
                       : 'success',
             label:
                 onWatch === null
-                    ? 'Deterioration watch · NEWS2'
+                    ? 'Deterioration watch · Evidence unknown'
                     : onWatch > 0
                       ? `Deterioration watch · ${onWatch} on watch`
                       : 'Deterioration watch · all stable',
         },
         {
-            icon: signOff && signOff > 0 ? AlertTriangle : CheckCircle2,
+            icon:
+                signOff === null || signOff > 0
+                    ? AlertTriangle
+                    : CheckCircle2,
             tone:
                 signOff === null
                     ? 'neutral'
@@ -147,15 +162,23 @@ function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
                       : 'success',
             label:
                 signOff === null
-                    ? 'Sign-off backlog'
+                    ? 'Sign-off · Evidence unknown'
                     : signOff > 0
                       ? `Sign-off backlog · ${signOff} due`
                       : 'Sign-off · up to date',
         },
         {
             icon: Lock,
-            tone: restraintCurrent ? 'success' : 'warning',
-            label: `Restraint register · ${restraintCurrent ? 'current' : 'review due'}`,
+            tone:
+                restraintCurrent === null
+                    ? 'neutral'
+                    : restraintCurrent
+                      ? 'success'
+                      : 'warning',
+            label:
+                restraintCurrent === null
+                    ? 'Restraint register · Evidence unknown'
+                    : `Restraint register · ${restraintCurrent ? 'current' : 'review due'}`,
         },
     ];
 
@@ -263,6 +286,8 @@ export function HealthClinicalShell({
         can.observationsRecord || can.observationsRecordClinical
     );
     const canRecordEvent = !!can.eventsRecord;
+    const clientsOnWatch = kpis.clients_on_watch ?? null;
+    const eventsUnreviewed = kpis.events_unreviewed ?? null;
     const [obsOpen, setObsOpen] = useState(false);
     const [eventOpen, setEventOpen] = useState(false);
     const [abcOpen, setAbcOpen] = useState(false);
@@ -420,23 +445,27 @@ export function HealthClinicalShell({
                             />
                             <HeroClusterTile
                                 label="On watch"
-                                value={fmt(kpis.clients_on_watch ?? null)}
+                                value={fmt(clientsOnWatch)}
                                 caption="NEWS2 ≥ medium"
                                 tone={
-                                    (kpis.clients_on_watch ?? 0) > 0
-                                        ? 'critical'
-                                        : 'success'
+                                    clientsOnWatch === null
+                                        ? 'neutral'
+                                        : clientsOnWatch > 0
+                                          ? 'critical'
+                                          : 'success'
                                 }
                             />
                             <HeroClusterTile
                                 href="/health-clinical/events"
                                 label="Sign-off due"
-                                value={fmt(kpis.events_unreviewed ?? null)}
+                                value={fmt(eventsUnreviewed)}
                                 caption="awaiting review"
                                 tone={
-                                    (kpis.events_unreviewed ?? 0) > 0
-                                        ? 'warning'
-                                        : 'success'
+                                    eventsUnreviewed === null
+                                        ? 'neutral'
+                                        : eventsUnreviewed > 0
+                                          ? 'warning'
+                                          : 'success'
                                 }
                             />
                         </HeroCluster>
