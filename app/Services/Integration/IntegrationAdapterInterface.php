@@ -26,14 +26,6 @@ interface IntegrationAdapterInterface
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult;
 
     /**
-     * Pull device health/status updates.
-     * Returns an array of health updates. Adapters should prefer canonical
-     * identifiers (for example `device_id` or a stable provider entity id)
-     * and only include `hardware_id` as a legacy fallback when required.
-     */
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array;
-
-    /**
      * Pull events from the provider since the given datetime.
      * Returns an array of normalized event data.
      */

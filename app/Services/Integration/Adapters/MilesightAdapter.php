@@ -607,11 +607,6 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         );
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
-    }
-
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         return [];

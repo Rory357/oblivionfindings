@@ -97,6 +97,7 @@ it('advances only a partial page safe cursor and records bounded provider except
 
     expect($cursor->cursor)->toBe('cursor-010')
         ->and($cursor->retry_not_before?->toIso8601String())->toBe('2026-07-23T08:02:00+00:00')
+        ->and($cursor->last_partial_at?->toIso8601String())->toBe('2026-07-23T08:00:00+00:00')
         ->and($cursor->exception_count)->toBe(1)
         ->and(ProviderCapabilityException::query()->sole()->toArray())
         ->toMatchArray([
@@ -105,6 +106,39 @@ it('advances only a partial page safe cursor and records bounded provider except
             'code' => 'item_invalid',
             'item_reference' => 'hash-010',
         ]);
+});
+
+it('records bounded provider failure evidence instead of leaving a failed health pull indistinguishable', function () {
+    $site = providerCapabilitySite();
+    registerObservationFixture(
+        new ProviderObservationPage(items: []),
+        function (IntegrationProviderConnection $_connection): void {
+            throw new RuntimeException('RAW-PROVIDER-FAILURE');
+        },
+    );
+
+    expect(fn () => (new PullProviderCapability('fixture', $site->id))
+        ->handle(app(IntegrationAdapterRegistry::class), app(MonitoringOutboxPublisher::class)))
+        ->toThrow(RuntimeException::class, 'RAW-PROVIDER-FAILURE');
+
+    $cursor = ProviderCapabilityCursor::query()->sole();
+    $failure = ProviderCapabilityException::query()->sole();
+    expect($cursor->last_started_at)->not->toBeNull()
+        ->and($cursor->last_completed_at)->toBeNull()
+        ->and($cursor->last_failed_at)->not->toBeNull()
+        ->and($cursor->exception_count)->toBe(1)
+        ->and($failure->code)->toBe('provider_collection_failed')
+        ->and($failure->item_reference)->toBeNull()
+        ->and(json_encode($failure->toArray(), JSON_THROW_ON_ERROR))->not->toContain('RAW-');
+
+    registerObservationFixture(new ProviderObservationPage(items: []));
+    (new PullProviderCapability('fixture', $site->id))
+        ->handle(app(IntegrationAdapterRegistry::class), app(MonitoringOutboxPublisher::class));
+
+    $recovered = ProviderCapabilityCursor::query()->sole();
+    expect($recovered->last_completed_at)->not->toBeNull()
+        ->and($recovered->last_failed_at)->toBeNull()
+        ->and($recovered->last_partial_at)->toBeNull();
 });
 
 it('publishes typed provider events through the signed event runtime and advances the provider cursor', function () {
@@ -214,6 +248,8 @@ it('discards an in-flight provider result when the connection is disabled before
 
     expect($adapter->requestedLimit)->toBe(25)
         ->and(ProviderCapabilityCursor::query()->sole()->cursor)->toBeNull()
+        ->and(ProviderCapabilityCursor::query()->sole()->last_failed_at)->not->toBeNull()
+        ->and(ProviderCapabilityException::query()->sole()->code)->toBe('collection_scope_unavailable')
         ->and(MonitoringOutbox::query()->count())->toBe(0);
 });
 
@@ -238,6 +274,8 @@ it('discards an in-flight provider result when its Site scope is retired before 
 
     expect($adapter->requestedLimit)->toBe(25)
         ->and(ProviderCapabilityCursor::query()->sole()->cursor)->toBeNull()
+        ->and(ProviderCapabilityCursor::query()->sole()->last_failed_at)->not->toBeNull()
+        ->and(ProviderCapabilityException::query()->sole()->code)->toBe('collection_scope_unavailable')
         ->and(MonitoringOutbox::query()->count())->toBe(0);
 });
 
@@ -420,11 +458,6 @@ final class ProviderCapabilityFixtureAdapter implements IntegrationAdapterInterf
         return new SyncResult;
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
-    }
-
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?DateTimeInterface $since = null): array
     {
         return [];
@@ -479,11 +512,6 @@ final class ProviderEventFixtureAdapter implements EventCollectionCapability, In
         return new SyncResult;
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
-    }
-
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?DateTimeInterface $since = null): array
     {
         return [];
@@ -533,11 +561,6 @@ final class ProviderSnapshotFixtureAdapter implements IntegrationAdapterInterfac
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         return new SyncResult;
-    }
-
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
     }
 
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?DateTimeInterface $since = null): array

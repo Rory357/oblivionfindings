@@ -32,12 +32,14 @@ class IntegrationsWorkspacePresenter
 
     private const STALE_SYNC_HOURS = 24;
 
+    private const HEALTH_COLLECTION_GRACE_MINUTES = 5;
+
     private const SITE_MAPPING_DISPLAY_LIMIT = 50;
 
     private const PROVIDERS = [
-        ['slug' => 'unifi', 'name' => 'UniFi', 'vendor' => 'Ubiquiti', 'summary' => 'Network, CCTV, and access infrastructure.', 'capabilities' => ['network', 'cctv', 'access_control', 'device_health', 'event_stream'], 'device_scope' => ['cameras', 'doors', 'access points', 'switches', 'gateways']],
-        ['slug' => 'queclink', 'name' => 'Queclink', 'vendor' => 'Queclink Wireless', 'summary' => 'Cellular GPS trackers for vehicles, assets, and personal safety.', 'capabilities' => ['tracking', 'telemetry', 'device_health', 'event_stream'], 'device_scope' => ['vehicle trackers', 'personal trackers', 'asset trackers']],
-        ['slug' => 'milesight', 'name' => 'Milesight', 'vendor' => 'Milesight IoT', 'summary' => 'OAuth inventory import for LoRaWAN gateways and environmental or support sensors.', 'capabilities' => ['iot', 'environmental', 'healthcare_sensors', 'device_inventory'], 'device_scope' => ['bed sensors', 'fall sensors', 'door contacts', 'environment sensors', 'gateways']],
+        ['slug' => 'unifi', 'name' => 'UniFi', 'vendor' => 'Ubiquiti', 'summary' => 'Network, CCTV, and access infrastructure.', 'device_scope' => ['cameras', 'doors', 'access points', 'switches', 'gateways']],
+        ['slug' => 'queclink', 'name' => 'Queclink', 'vendor' => 'Queclink Wireless', 'summary' => 'Cellular GPS trackers for vehicles, assets, and personal safety.', 'device_scope' => ['vehicle trackers', 'personal trackers', 'asset trackers']],
+        ['slug' => 'milesight', 'name' => 'Milesight', 'vendor' => 'Milesight IoT', 'summary' => 'OAuth inventory import for LoRaWAN gateways and environmental or support sensors.', 'device_scope' => ['bed sensors', 'fall sensors', 'door contacts', 'environment sensors', 'gateways']],
     ];
 
     public function __construct(
@@ -48,6 +50,8 @@ class IntegrationsWorkspacePresenter
     /** @return array<string, mixed> */
     public function present(User $viewer): array
     {
+        $viewer->loadMissing(['roles.permissions', 'permissionOverrides']);
+
         $canManage = $viewer->canDo('securityDevices.integrations.manage');
         $canViewDevices = $viewer->canDo('securityDevices.devices.view');
         $siteIds = $this->access->accessibleSiteIds($viewer);
@@ -88,6 +92,17 @@ class IntegrationsWorkspacePresenter
             ->groupBy('provider')
             ->get()
             ->keyBy('provider');
+        $healthScopeSiteIds = (clone $configQuery)
+            ->active()
+            ->whereNotNull('mapped_external_site_id')
+            ->where('mapped_external_site_id', '<>', '')
+            ->get(['provider', 'site_id'])
+            ->groupBy('provider')
+            ->map(fn (Collection $rows): Collection => $rows
+                ->pluck('site_id')
+                ->map(fn (mixed $siteId): int => (int) $siteId)
+                ->unique()
+                ->values());
         $configs = collect();
         if ($configStats->sum('total_count') > 0) {
             $rankedConfigs = (clone $configQuery)
@@ -135,27 +150,30 @@ class IntegrationsWorkspacePresenter
                 ? $query->whereRaw('1 = 0')
                 : $query->whereIn('site_id', $siteIds));
         $cursorRows = (clone $cursorQuery)
-            ->select(['provider', 'capability'])
+            ->select(['site_id', 'provider', 'capability'])
             ->selectRaw("'cursor' AS runtime_kind")
-            ->addSelect(['retry_not_before', 'exception_count', 'last_completed_at'])
+            ->addSelect(['retry_not_before', 'exception_count', 'last_started_at', 'last_completed_at', 'last_failed_at', 'last_partial_at'])
             ->selectRaw('NULL AS code')
             ->selectRaw('NULL AS occurred_at');
         $exceptionRows = ProviderCapabilityException::query()
             ->when(! $this->access->canViewAllSites($viewer), fn (Builder $query) => $siteIds === []
                 ? $query->whereRaw('1 = 0')
                 : $query->whereIn('site_id', $siteIds))
-            ->select(['provider', 'capability'])
+            ->select(['site_id', 'provider', 'capability'])
             ->selectRaw("'exception' AS runtime_kind")
             ->selectRaw('NULL AS retry_not_before')
             ->selectRaw('0 AS exception_count')
+            ->selectRaw('NULL AS last_started_at')
             ->selectRaw('NULL AS last_completed_at')
+            ->selectRaw('NULL AS last_failed_at')
+            ->selectRaw('NULL AS last_partial_at')
             ->addSelect(['code', 'occurred_at']);
         $runtimeRows = $cursorRows
             ->unionAll($exceptionRows)
             ->get()
             ->groupBy('provider');
 
-        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $connections, $runtimeRows, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
+        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $connections, $healthScopeSiteIds, $runtimeRows, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
             $slug = $catalog['slug'];
             $connection = $connections->get($slug);
             $siteSecretStat = $siteSecretStats->get($slug);
@@ -203,6 +221,20 @@ class IntegrationsWorkspacePresenter
             $providerRuntimeRows = $runtimeRows->get($slug, collect());
             $providerCursors = $providerRuntimeRows->where('runtime_kind', 'cursor');
             $providerRuntimeExceptions = $providerRuntimeRows->where('runtime_kind', 'exception');
+            $providerHealthSiteIds = $healthScopeSiteIds->get($slug, collect());
+            $health = $this->providerHealthSummary(
+                $runtimeCapabilities->contains('observation_collection'),
+                $providerHealthSiteIds,
+                $providerCursors
+                    ->where('capability', ObservationCollectionCapability::class)
+                    ->filter(fn (ProviderCapabilityCursor $cursor): bool => $providerHealthSiteIds
+                        ->containsStrict((int) $cursor->site_id)),
+                $providerRuntimeExceptions
+                    ->where('capability', ObservationCollectionCapability::class)
+                    ->filter(fn (ProviderCapabilityCursor $exception): bool => $providerHealthSiteIds
+                        ->containsStrict((int) $exception->site_id)),
+                $canManage ? "/security-devices/integrations/{$slug}" : null,
+            );
             $syncAt = $nativeRuntimeOnly ? null : ($sync['at'] ?? $connection?->last_synced_at);
             $syncFreshness = $syncAt === null
                 ? 'never'
@@ -234,6 +266,14 @@ class IntegrationsWorkspacePresenter
             }
             if (! $nativeRuntimeOnly && $syncFreshness === 'stale') {
                 $exceptions->push($this->exception('stale_sync', 'One or more latest sync scopes are more than 24 hours old.', 'Review sync schedule', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, (int) ($sync['stale_site_count'] ?? 0))));
+            }
+            if (in_array($health['state'], ['not_run', 'stale', 'partial', 'failed'], true)) {
+                $exceptions->push($this->exception(
+                    'health_collection_'.$health['state'],
+                    $health['summary'],
+                    $health['action'],
+                    $health['href'],
+                ));
             }
             if ($unassigned > 0) {
                 $exceptions->push($this->exception('unassigned_import', "{$unassigned} imported device has no current assignment.", 'Review imported devices', $canViewDevices ? '/security-devices/devices?view=unassigned' : null, $unassigned));
@@ -292,6 +332,7 @@ class IntegrationsWorkspacePresenter
                     'scope' => 'provider',
                     'note' => 'Monitoring support is taken from the typed provider manifest. An absent capability is not treated as healthy or silently emulated.',
                 ],
+                'health' => $health,
                 'runtime' => [
                     'version' => $manifest->version,
                     'contract_state' => $contract['state'],
@@ -480,6 +521,100 @@ class IntegrationsWorkspacePresenter
     private function exception(string $type, string $summary, string $action, ?string $href, int $count = 1): array
     {
         return compact('type', 'summary', 'action', 'href', 'count');
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @param  Collection<int, ProviderCapabilityCursor>  $cursors
+     * @param  Collection<int, ProviderCapabilityCursor>  $exceptions
+     * @return array{state: string, freshness: string, last_attempted_at: ?string, last_collected_at: ?string, summary: string, action: string, href: ?string}
+     */
+    private function providerHealthSummary(
+        bool $supported,
+        Collection $siteIds,
+        Collection $cursors,
+        Collection $exceptions,
+        ?string $href,
+    ): array {
+        if (! $supported) {
+            return [
+                'state' => 'unsupported',
+                'freshness' => 'unsupported',
+                'last_attempted_at' => null,
+                'last_collected_at' => null,
+                'summary' => 'This provider does not declare a typed health observation capability.',
+                'action' => 'Review provider support',
+                'href' => $href,
+            ];
+        }
+
+        $siteIds = $siteIds
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->unique()
+            ->values();
+        $cursorsBySite = $cursors->keyBy(fn (ProviderCapabilityCursor $cursor): int => (int) $cursor->site_id);
+        $latestExceptionBySite = $exceptions
+            ->groupBy(fn (ProviderCapabilityCursor $exception): int => (int) $exception->site_id)
+            ->map(fn (Collection $rows): ?string => $rows->max('occurred_at'));
+        $staleBefore = now()->subHours(self::STALE_SYNC_HOURS);
+        $abandonedBefore = now()->subMinutes(self::HEALTH_COLLECTION_GRACE_MINUTES);
+        $scopeStates = $siteIds->map(function (int $siteId) use ($abandonedBefore, $cursorsBySite, $latestExceptionBySite, $staleBefore): string {
+            $cursor = $cursorsBySite->get($siteId);
+            if (! $cursor) {
+                return 'not_run';
+            }
+
+            $started = $cursor->last_started_at;
+            $completed = $cursor->last_completed_at;
+            $failed = $cursor->last_failed_at;
+            $partial = $cursor->last_partial_at;
+            $latestException = filled($latestExceptionBySite->get($siteId))
+                ? Carbon::parse($latestExceptionBySite->get($siteId))
+                : null;
+            $attemptOpen = $started !== null
+                && ($completed === null || $started->gt($completed));
+
+            return match (true) {
+                $failed !== null && ($completed === null || $failed->gte($completed)) => 'failed',
+                $attemptOpen && $started->lt($abandonedBefore) => 'failed',
+                $attemptOpen => 'collecting',
+                $partial !== null && ($completed === null || $partial->gte($completed)) => 'partial',
+                $cursor->retry_not_before !== null => 'partial',
+                $latestException !== null && $completed !== null && $latestException->gte($completed) => 'partial',
+                $completed === null => 'not_run',
+                $completed->lt($staleBefore) => 'stale',
+                default => 'current',
+            };
+        });
+        $state = collect(['failed', 'partial', 'not_run', 'stale', 'collecting', 'current'])
+            ->first(fn (string $candidate): bool => $scopeStates->containsStrict($candidate))
+            ?? 'not_run';
+        $completedScopes = $siteIds->map(fn (int $siteId) => $cursorsBySite->get($siteId)?->last_completed_at);
+        $freshness = match (true) {
+            $siteIds->isEmpty() || $completedScopes->containsStrict(null) => 'never',
+            $completedScopes->contains(fn ($completed): bool => $completed->lt($staleBefore)) => 'stale',
+            default => 'current',
+        };
+        $latestStarted = $cursors->max('last_started_at');
+        $latestCompleted = $cursors->max('last_completed_at');
+        [$summary, $action] = match ($state) {
+            'not_run' => ['Health collection has not completed for every mapped Site.', 'Review integration schedule'],
+            'failed' => ['A mapped Site health collection failed or stopped before completion.', 'Review health diagnostics'],
+            'collecting' => ['Health collection is currently in progress.', 'Review health diagnostics'],
+            'partial' => ['A mapped Site health collection completed with provider or item exceptions.', 'Review health diagnostics'],
+            'stale' => ['At least one mapped Site has health evidence more than 24 hours old.', 'Review sync schedule'],
+            default => ['Health collection completed successfully for every mapped Site, including valid zero-result collections.', 'No action required'],
+        };
+
+        return [
+            'state' => $state,
+            'freshness' => $freshness,
+            'last_attempted_at' => $latestStarted?->toISOString(),
+            'last_collected_at' => $latestCompleted?->toISOString(),
+            'summary' => $summary,
+            'action' => $action,
+            'href' => $state === 'current' ? null : $href,
+        ];
     }
 
     /** @return Collection<string, array{status: ?string, at: ?Carbon, items_processed: int, items_errored: int, stale_site_count: int, affected_site_count: int, stale_scope_count: int}> */

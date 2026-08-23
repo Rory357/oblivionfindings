@@ -177,6 +177,8 @@ final class ProtocolPolicyEvidenceService
                         || ! $cursor->last_started_at->betweenIncluded($since, $now)
                         || ! $cursor->last_completed_at->betweenIncluded($since, $now)
                         || $cursor->last_completed_at->lt($cursor->last_started_at)
+                        || ($cursor->last_failed_at !== null && $cursor->last_failed_at->gte($cursor->last_completed_at))
+                        || ($cursor->last_partial_at !== null && $cursor->last_partial_at->gte($cursor->last_completed_at))
                         || $cursor->retry_not_before !== null) {
                         return false;
                     }

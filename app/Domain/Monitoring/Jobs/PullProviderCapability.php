@@ -160,7 +160,7 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
                 if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
-                    $this->recordUnavailableDuringCollection();
+                    $this->recordUnavailableDuringCollection($cursor);
 
                     return;
                 }
@@ -175,7 +175,7 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
                 if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
-                    $this->recordUnavailableDuringCollection();
+                    $this->recordUnavailableDuringCollection($cursor);
 
                     return;
                 }
@@ -190,7 +190,7 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
                 if (! $this->collectionScopeStillUsable((int) $connection->id, (int) $siteConfig->id)) {
-                    $this->recordUnavailableDuringCollection();
+                    $this->recordUnavailableDuringCollection($cursor);
 
                     return;
                 }
@@ -220,6 +220,8 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                 $locked->forceFill([
                     'cursor' => $safeCursor ?? $locked->cursor,
                     'last_completed_at' => now(),
+                    'last_failed_at' => null,
+                    'last_partial_at' => $page->partial || $page->retryAfterSeconds !== null || $exceptions !== [] ? now() : null,
                     'retry_not_before' => $page->retryAfterSeconds !== null
                         ? now()->addSeconds($page->retryAfterSeconds)
                         : null,
@@ -242,6 +244,7 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                 $this->releaseWhenQueued($page->retryAfterSeconds);
             }
         } catch (Throwable $exception) {
+            $this->recordFailedAttempt($cursor);
             Log::error('Provider capability pull failed.', SafeOperationalData::logContext([
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
@@ -250,6 +253,38 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
             ]));
 
             throw $exception;
+        }
+    }
+
+    private function recordFailedAttempt(
+        ProviderCapabilityCursor $cursor,
+        string $code = 'provider_collection_failed',
+    ): void
+    {
+        try {
+            DB::transaction(function () use ($code, $cursor): void {
+                /** @var ProviderCapabilityCursor $locked */
+                $locked = ProviderCapabilityCursor::query()->lockForUpdate()->findOrFail($cursor->id);
+                $locked->forceFill([
+                    'last_failed_at' => now(),
+                    'exception_count' => $locked->exception_count + 1,
+                ])->save();
+                ProviderCapabilityException::query()->create([
+                    'site_id' => $this->siteId,
+                    'provider' => $this->provider,
+                    'capability' => $this->capability,
+                    'code' => $code,
+                    'item_reference' => null,
+                    'occurred_at' => now(),
+                ]);
+            }, 3);
+        } catch (Throwable $recordingFailure) {
+            Log::warning('Provider capability failure evidence could not be recorded.', SafeOperationalData::logContext([
+                'provider' => $this->provider,
+                'site_id' => $this->siteId,
+                'capability' => $this->capability,
+                'error_category' => SafeOperationalData::failureCategory($recordingFailure),
+            ]));
         }
     }
 
@@ -276,13 +311,14 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
                 ->exists();
     }
 
-    private function recordUnavailableDuringCollection(): void
+    private function recordUnavailableDuringCollection(ProviderCapabilityCursor $cursor): void
     {
         Log::info('Provider capability result was discarded after its collection scope became unavailable.', [
             'provider' => $this->provider,
             'site_id' => $this->siteId,
             'capability' => $this->capability,
         ]);
+        $this->recordFailedAttempt($cursor, 'collection_scope_unavailable');
     }
 
     /**

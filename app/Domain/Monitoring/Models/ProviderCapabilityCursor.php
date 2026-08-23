@@ -17,6 +17,8 @@ final class ProviderCapabilityCursor extends Model
         'cursor',
         'last_started_at',
         'last_completed_at',
+        'last_failed_at',
+        'last_partial_at',
         'retry_not_before',
         'exception_count',
     ];
@@ -24,6 +26,8 @@ final class ProviderCapabilityCursor extends Model
     protected $casts = [
         'last_started_at' => 'immutable_datetime',
         'last_completed_at' => 'immutable_datetime',
+        'last_failed_at' => 'immutable_datetime',
+        'last_partial_at' => 'immutable_datetime',
         'retry_not_before' => 'immutable_datetime',
         'exception_count' => 'integer',
     ];

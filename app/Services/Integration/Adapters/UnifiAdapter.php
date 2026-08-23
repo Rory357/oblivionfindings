@@ -1929,11 +1929,6 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         return [MonitorState::Unknown, null, 'provider_status_unknown'];
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
-    }
-
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         $page = $this->collectEvents(

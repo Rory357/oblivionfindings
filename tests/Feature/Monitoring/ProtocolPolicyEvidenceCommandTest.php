@@ -304,6 +304,17 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
         ->where('site_id', $sites->last()->id)
         ->where('capability', ObservationCollectionCapability::class)
         ->firstOrFail();
+    $failedCursor->forceFill(['last_partial_at' => $failedCursor->last_completed_at])->save();
+    $durablePartialExecution = app(ProtocolPolicyEvidenceService::class)->report(60)['protocols']['provider_unifi'];
+
+    expect($durablePartialExecution)->toMatchArray([
+        'state' => 'not_verified',
+        'credential_tested' => 1,
+        'mapped_sites' => 2,
+        'successful_sites' => 1,
+        'fresh_sites' => 2,
+    ]);
+
     ProviderCapabilityException::query()->create([
         'site_id' => $sites->last()->id,
         'provider' => 'unifi',
@@ -312,7 +323,10 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
         'item_reference' => null,
         'occurred_at' => now()->subSeconds(30),
     ]);
-    $failedCursor->forceFill(['retry_not_before' => now()->addMinute()])->save();
+    $failedCursor->forceFill([
+        'last_partial_at' => null,
+        'retry_not_before' => now()->addMinute(),
+    ])->save();
     $partialExecution = app(ProtocolPolicyEvidenceService::class)->report(60)['protocols']['provider_unifi'];
 
     expect($partialExecution)->toMatchArray([

@@ -96,7 +96,6 @@ describe('Security & Devices integrations and settings', () => {
             name: 'UniFi',
             vendor: 'Ubiquiti',
             summary: 'Network estate',
-            capabilities: ['network'],
             device_scope: ['switches'],
             docs_href: '/security-devices/integrations/unifi',
             connection_status: 'connected',
@@ -144,6 +143,16 @@ describe('Security & Devices integrations and settings', () => {
                 scope: 'provider',
                 note: 'Provider evidence only.',
             },
+            health: {
+                state: 'stale',
+                freshness: 'stale',
+                last_attempted_at: '2026-07-18T00:00:00Z',
+                last_collected_at: '2026-07-18T00:00:00Z',
+                summary:
+                    'At least one mapped Site has health evidence more than 24 hours old.',
+                action: 'Review sync schedule',
+                href: '/security-devices/integrations/unifi',
+            },
             runtime: {
                 version: '1.0',
                 contract_state: 'topology_collection',
@@ -190,6 +199,11 @@ describe('Security & Devices integrations and settings', () => {
         expect(
             screen.getByText('1 site mapping requires attention.'),
         ).toBeInTheDocument();
+        expect(screen.getByText('Health feed')).toBeInTheDocument();
+        expect(screen.getByText('Stale')).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Review sync schedule' }),
+        ).toHaveAttribute('href', '/security-devices/integrations/unifi');
         expect(
             screen.getByRole('link', { name: 'Review site mappings' }),
         ).toHaveAttribute('href', '/security-devices/integrations/unifi');
@@ -203,6 +217,16 @@ describe('Security & Devices integrations and settings', () => {
                     name: 'Queclink',
                     connection_status: 'unavailable',
                     connected: false,
+                    health: {
+                        state: 'unsupported',
+                        freshness: 'unsupported',
+                        last_attempted_at: null,
+                        last_collected_at: null,
+                        summary:
+                            'This provider does not declare a typed health observation capability.',
+                        action: 'Review provider support',
+                        href: '/security-devices/integrations/queclink',
+                    },
                     runtime: {
                         ...provider.runtime,
                         contract_state: 'native_runtime_only',
@@ -230,7 +254,6 @@ describe('Security & Devices integrations and settings', () => {
             name: 'Milesight',
             vendor: 'Milesight IoT',
             summary: 'Sensors',
-            capabilities: ['iot', 'device_inventory'],
             device_scope: [],
             docs_href: '/security-devices/integrations/milesight',
             connection_status: 'untested',
@@ -277,6 +300,16 @@ describe('Security & Devices integrations and settings', () => {
                 state: 'capability_absent',
                 scope: 'provider',
                 note: 'Provider evidence only.',
+            },
+            health: {
+                state: 'unsupported',
+                freshness: 'unsupported',
+                last_attempted_at: null,
+                last_collected_at: null,
+                summary:
+                    'This provider does not declare a typed health observation capability.',
+                action: 'Review provider support',
+                href: '/security-devices/integrations/milesight',
             },
             runtime: {
                 version: '1.1',

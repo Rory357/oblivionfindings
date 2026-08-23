@@ -742,13 +742,6 @@ final class TopologyFixtureAdapter implements IntegrationAdapterInterface, Topol
         return new SyncResult;
     }
 
-    public function pullHealth(
-        IntegrationSiteConfig $siteConfig,
-        IntegrationProviderConnection $providerConnection,
-    ): array {
-        return [];
-    }
-
     public function pullEvents(
         IntegrationSiteConfig $siteConfig,
         IntegrationProviderConnection $providerConnection,

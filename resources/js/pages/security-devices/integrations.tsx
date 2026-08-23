@@ -29,7 +29,6 @@ export type Provider = {
     name: string;
     vendor: string;
     summary: string;
-    capabilities: string[];
     device_scope: string[];
     docs_href: string | null;
     connection_status:
@@ -91,6 +90,22 @@ export type Provider = {
         state: 'supported' | 'capability_absent';
         scope: 'provider';
         note: string;
+    };
+    health: {
+        state:
+            | 'unsupported'
+            | 'not_run'
+            | 'collecting'
+            | 'current'
+            | 'stale'
+            | 'partial'
+            | 'failed';
+        freshness: 'unsupported' | 'never' | 'current' | 'stale';
+        last_attempted_at: string | null;
+        last_collected_at: string | null;
+        summary: string;
+        action: string;
+        href: string | null;
     };
     runtime: {
         version: string;
@@ -160,6 +175,32 @@ function ConnectionBadge({ provider }: { provider: Provider }) {
             {provider.connection_status === 'not_configured'
                 ? 'Not configured'
                 : 'Disconnected'}
+        </Badge>
+    );
+}
+
+function HealthStateBadge({ provider }: { provider: Provider }) {
+    const labels: Record<Provider['health']['state'], string> = {
+        unsupported: 'Unsupported',
+        not_run: 'Not run',
+        collecting: 'Collecting',
+        current: 'Current',
+        stale: 'Stale',
+        partial: 'Partial',
+        failed: 'Failed',
+    };
+
+    return (
+        <Badge
+            variant={
+                provider.health.state === 'failed'
+                    ? 'destructive'
+                    : provider.health.state === 'current'
+                      ? 'outline'
+                      : 'secondary'
+            }
+        >
+            {labels[provider.health.state]}
         </Badge>
     );
 }
@@ -287,6 +328,34 @@ export function ProviderCard({
                         />
                     </div>
                 ) : null}
+
+                <section
+                    aria-label={`${provider.name} health feed`}
+                    className="rounded-lg border p-3 text-sm"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold">Health feed</h3>
+                        <HealthStateBadge provider={provider} />
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
+                        {provider.health.summary}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Freshness: {provider.health.freshness.replaceAll('_', ' ')}
+                        {' · '}
+                        {provider.health.last_collected_at
+                            ? `Last evidence ${formatTimeSince(provider.health.last_collected_at)}`
+                            : 'No completed collection'}
+                    </p>
+                    {provider.health.href ? (
+                        <Link
+                            className="frontline-focus mt-2 inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
+                            href={provider.health.href}
+                        >
+                            {provider.health.action}
+                        </Link>
+                    ) : null}
+                </section>
 
                 <section
                     aria-label={`${provider.name} runtime capabilities`}

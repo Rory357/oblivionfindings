@@ -220,11 +220,6 @@ final class SentinelFailureAdapter implements DeviceSyncCapability, EventCollect
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
-    {
-        return [];
-    }
-
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);

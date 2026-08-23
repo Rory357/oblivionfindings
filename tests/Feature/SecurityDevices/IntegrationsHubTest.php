@@ -3,6 +3,8 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
+use App\Domain\Monitoring\Models\ProviderCapabilityException;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -15,6 +17,9 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Integration\Adapters\UnifiAdapter;
+use App\Services\Integration\Contracts\ObservationCollectionCapability;
+use App\Services\Integration\IntegrationAdapterInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -110,6 +115,7 @@ class IntegrationsHubTest extends TestCase
 
             foreach ($providers as $provider) {
                 $this->assertArrayNotHasKey('implementation_status', $provider);
+                $this->assertArrayNotHasKey('capabilities', $provider);
             }
             $this->assertArrayNotHasKey('providers_live', $page->toArray()['props']['stats']);
 
@@ -117,6 +123,157 @@ class IntegrationsHubTest extends TestCase
             $this->assertSame('not_configured', $unifi['connection_status']);
             $this->assertFalse($unifi['connected']);
         });
+    }
+
+    public function test_health_feed_distinguishes_unsupported_never_current_stale_partial_and_failed(): void
+    {
+        $site = Site::factory()->create();
+        IntegrationSiteConfig::create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'mapped_external_site_id' => 'health-site',
+            'is_active' => true,
+        ]);
+        $payload = fn (): array => collect(app(IntegrationsWorkspacePresenter::class)
+            ->present($this->admin)['providers'])
+            ->keyBy('slug')
+            ->all();
+
+        $providers = $payload();
+        $this->assertSame('unsupported', $providers['queclink']['health']['state']);
+        $this->assertSame('unsupported', $providers['queclink']['health']['freshness']);
+        $this->assertSame('not_run', $providers['unifi']['health']['state']);
+        $this->assertSame('never', $providers['unifi']['health']['freshness']);
+
+        $cursor = ProviderCapabilityCursor::query()->create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'cursor' => 'unifi-health-v1:0',
+            'last_started_at' => now()->subMinute(),
+            'last_completed_at' => now()->subMinute(),
+            'retry_not_before' => null,
+            'exception_count' => 0,
+        ]);
+
+        $current = $payload()['unifi']['health'];
+        $this->assertSame('current', $current['state']);
+        $this->assertSame('current', $current['freshness']);
+        $this->assertStringContainsString('zero-result', $current['summary']);
+        $this->assertNotNull($current['last_collected_at']);
+
+        $cursor->forceFill([
+            'last_started_at' => now()->subHours(25),
+            'last_completed_at' => now()->subHours(25),
+        ])->save();
+        $stale = $payload()['unifi']['health'];
+        $this->assertSame('stale', $stale['state']);
+        $this->assertSame('stale', $stale['freshness']);
+        $this->assertSame('/security-devices/integrations/unifi', $stale['href']);
+
+        $cursor->forceFill([
+            'last_started_at' => now()->subMinutes(6),
+            'last_completed_at' => null,
+            'last_failed_at' => null,
+            'last_partial_at' => null,
+        ])->save();
+        $this->assertSame('failed', $payload()['unifi']['health']['state']);
+
+        $completedAt = now()->subMinute();
+        $cursor->forceFill([
+            'last_started_at' => $completedAt,
+            'last_completed_at' => $completedAt,
+            'last_partial_at' => $completedAt,
+            'retry_not_before' => now()->addMinutes(5),
+            'exception_count' => 1,
+        ])->save();
+        ProviderCapabilityException::query()->create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'code' => 'provider_rate_limited',
+            'item_reference' => null,
+            'occurred_at' => $completedAt,
+        ]);
+        $this->assertSame('partial', $payload()['unifi']['health']['state']);
+
+        $cursor->forceFill([
+            'last_partial_at' => null,
+            'retry_not_before' => null,
+        ])->save();
+        $this->assertSame('partial', $payload()['unifi']['health']['state']);
+
+        $cursor->forceFill([
+            'last_started_at' => now(),
+            'last_completed_at' => now()->subMinute(),
+            'last_failed_at' => now(),
+            'last_partial_at' => null,
+            'retry_not_before' => null,
+        ])->save();
+        ProviderCapabilityException::query()->create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'code' => 'provider_collection_failed',
+            'item_reference' => null,
+            'occurred_at' => now(),
+        ]);
+        $failed = $payload()['unifi']['health'];
+        $this->assertSame('failed', $failed['state']);
+        $this->assertStringContainsString('failed or stopped', $failed['summary']);
+    }
+
+    public function test_health_feed_uses_the_worst_visible_mapped_site_state(): void
+    {
+        $currentSite = Site::factory()->create();
+        $secondSite = Site::factory()->create();
+        foreach ([$currentSite, $secondSite] as $site) {
+            IntegrationSiteConfig::create([
+                'site_id' => $site->id,
+                'provider' => 'unifi',
+                'mapped_external_site_id' => "health-site-{$site->id}",
+                'is_active' => true,
+            ]);
+        }
+        ProviderCapabilityCursor::query()->create([
+            'site_id' => $currentSite->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'last_started_at' => now()->subMinute(),
+            'last_completed_at' => now()->subMinute(),
+        ]);
+        $payload = fn (): array => collect(app(IntegrationsWorkspacePresenter::class)
+            ->present($this->admin)['providers'])
+            ->firstWhere('slug', 'unifi');
+
+        $missing = $payload()['health'];
+        $this->assertSame('not_run', $missing['state']);
+        $this->assertSame('never', $missing['freshness']);
+
+        $secondCursor = ProviderCapabilityCursor::query()->create([
+            'site_id' => $secondSite->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'last_started_at' => now()->subHours(25),
+            'last_completed_at' => now()->subHours(25),
+        ]);
+        $stale = $payload()['health'];
+        $this->assertSame('stale', $stale['state']);
+        $this->assertSame('stale', $stale['freshness']);
+
+        $secondCursor->forceFill([
+            'last_started_at' => now(),
+            'last_completed_at' => now(),
+        ])->save();
+        $current = $payload()['health'];
+        $this->assertSame('current', $current['state']);
+        $this->assertSame('current', $current['freshness']);
+    }
+
+    public function test_empty_legacy_health_facade_is_not_part_of_the_adapter_contract(): void
+    {
+        $this->assertFalse(method_exists(IntegrationAdapterInterface::class, 'pullHealth'));
+        $this->assertFalse(method_exists(UnifiAdapter::class, 'pullHealth'));
     }
 
     public function test_volume_aggregation_is_exact_bounded_and_has_no_per_device_queries(): void
@@ -322,7 +479,7 @@ class IntegrationsHubTest extends TestCase
             $this->assertSame(2, $unifi['reconciliation']['imported_devices']);
             $this->assertSame(1, $unifi['reconciliation']['unassigned_devices']);
             $this->assertSame(1, $unifi['reconciliation']['duplicate_candidates']);
-            $this->assertSame(['duplicate_candidate', 'integration_error', 'stale_sync', 'unassigned_import', 'unmapped_site'], $types->sort()->values()->all());
+            $this->assertSame(['duplicate_candidate', 'health_collection_not_run', 'integration_error', 'stale_sync', 'unassigned_import', 'unmapped_site'], $types->sort()->values()->all());
             $links = collect($unifi['exceptions'])->keyBy('type');
             $this->assertSame('/security-devices/devices?view=unassigned', $links['unassigned_import']['href']);
             $this->assertSame('/security-devices/devices', $links['duplicate_candidate']['href']);
@@ -353,6 +510,7 @@ class IntegrationsHubTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('can.manage', false)
                 ->where('providers.0.docs_href', null)
+                ->where('providers.0.health.href', null)
                 ->missing('providers.0.credential')
             );
 
@@ -427,6 +585,28 @@ class IntegrationsHubTest extends TestCase
                 'assigned_at' => now(),
             ]);
         }
+        ProviderCapabilityCursor::query()->create([
+            'site_id' => $allowedSite->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'last_started_at' => now(),
+            'last_completed_at' => now(),
+        ]);
+        ProviderCapabilityCursor::query()->create([
+            'site_id' => $hiddenSite->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'last_started_at' => now(),
+            'last_failed_at' => now(),
+        ]);
+        ProviderCapabilityException::query()->create([
+            'site_id' => $hiddenSite->id,
+            'provider' => 'unifi',
+            'capability' => ObservationCollectionCapability::class,
+            'code' => 'provider_collection_failed',
+            'item_reference' => null,
+            'occurred_at' => now(),
+        ]);
 
         $this->actingAs($viewer)
             ->get('/security-devices/integrations')
@@ -436,6 +616,7 @@ class IntegrationsHubTest extends TestCase
                 $this->assertSame(1, $unifi['site_mapping']['total']);
                 $this->assertSame($allowedSite->id, $unifi['site_mapping']['sites'][0]['id']);
                 $this->assertSame(1, $unifi['reconciliation']['imported_devices']);
+                $this->assertSame('current', $unifi['health']['state']);
             });
     }
 
