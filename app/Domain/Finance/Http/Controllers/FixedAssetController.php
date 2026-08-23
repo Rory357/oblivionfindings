@@ -196,6 +196,7 @@ class FixedAssetController extends Controller
                 $q->orderBy('depreciation_date');
             },
             'depreciations.journal:id,journal_number',
+            'depreciations.reversalJournal:id,journal_number',
             'glAssetAccount:id,code,name',
             'glDepreciationAccount:id,code,name',
             'glExpenseAccount:id,code,name',

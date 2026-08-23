@@ -19,6 +19,7 @@ class FinFixedAssetDepreciation extends Model
         'accumulated_total',
         'book_value_after',
         'journal_id',
+        'reversal_journal_id',
     ];
 
     protected $casts = [
@@ -36,5 +37,10 @@ class FinFixedAssetDepreciation extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(FinJournal::class, 'journal_id');
+    }
+
+    public function reversalJournal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'reversal_journal_id');
     }
 }

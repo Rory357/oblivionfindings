@@ -9,6 +9,7 @@ use App\Domain\Finance\Jobs\SnapshotFinancialReportsJob;
 use App\Domain\Finance\Jobs\SyncAccountingIntegrationJob;
 use App\Domain\Finance\Jobs\SyncBankFeedsJob;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 
 function finance_schedule_event(string $jobClass): ?object
 {
@@ -37,4 +38,13 @@ test('finance operational jobs are scheduled with overlap guards', function () {
             ->and((string) $event->timezone)->toBe('Pacific/Auckland')
             ->and($event->withoutOverlapping)->toBeTrue();
     }
+});
+
+test('the depreciation job has a queue-level overlap guard in addition to durable period claims', function () {
+    $job = new RunDepreciationJob;
+
+    expect($job)->toBeInstanceOf(ShouldBeUnique::class)
+        ->and($job->uniqueId())->toBe('fixed-asset-depreciation')
+        ->and($job->tries)->toBe(3)
+        ->and($job->backoff)->toBe([60, 300]);
 });

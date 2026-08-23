@@ -5,11 +5,13 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Finance\Models\FinFixedAssetDepreciation;
+use App\Domain\Finance\Models\FinJournal;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use RuntimeException;
 
 class FixedAssetService
 {
@@ -23,6 +25,10 @@ class FixedAssetService
     public function createAsset(?int $orgId, array $data): FinFixedAsset
     {
         return DB::transaction(function () use ($orgId, $data) {
+            if (! empty($data['gl_asset_account_id'])) {
+                $this->journalPostingService->lockJournalSequence($orgId);
+            }
+
             $asset = FinFixedAsset::create([
                 'organization_id' => $orgId,
                 'asset_name' => $data['asset_name'],
@@ -88,44 +94,79 @@ class FixedAssetService
      */
     public function runDepreciation(?int $orgId, string $depreciationDate): array
     {
-        $date = Carbon::parse($depreciationDate);
+        if ($orgId === null || $orgId < 1) {
+            throw new InvalidArgumentException('An organisation is required to run fixed-asset depreciation.');
+        }
+
+        $period = Carbon::parse($depreciationDate)->startOfMonth();
         $processed = [];
 
-        $assets = FinFixedAsset::forOrganization($orgId)
-            ->active()
-            ->get();
+        $assetIds = FinFixedAsset::forOrganization($orgId)
+            ->where(function ($query) use ($period): void {
+                $query->where('status', 'active')
+                    ->orWhereHas('depreciations', fn ($depreciations) => $depreciations
+                        ->where('depreciation_date', $period->toDateString()));
+            })
+            ->orderBy('id')
+            ->pluck('id');
 
-        foreach ($assets as $asset) {
-            $depreciableAmount = (float) $asset->purchase_cost - (float) $asset->residual_value;
-            $accumulated = (float) $asset->accumulated_depreciation;
+        foreach ($assetIds as $assetId) {
+            $result = DB::transaction(function () use ($orgId, $assetId, $period): ?array {
+                $this->journalPostingService->lockJournalSequence($orgId);
 
-            // Skip if fully depreciated
-            if ($accumulated >= $depreciableAmount) {
-                continue;
-            }
+                $asset = FinFixedAsset::forOrganization($orgId)
+                    ->whereKey($assetId)
+                    ->lockForUpdate()
+                    ->first();
 
-            // Calculate monthly depreciation
-            $monthlyAmount = $this->calculateMonthlyDepreciation($asset);
+                if (! $asset) {
+                    return null;
+                }
 
-            if ($monthlyAmount <= 0) {
-                continue;
-            }
+                $existing = FinFixedAssetDepreciation::query()
+                    ->where('fixed_asset_id', $asset->id)
+                    ->where('depreciation_date', $period->toDateString())
+                    ->first();
 
-            // Cap at remaining depreciable amount
-            $remaining = $depreciableAmount - $accumulated;
-            if ($monthlyAmount > $remaining) {
-                $monthlyAmount = $remaining;
-            }
+                if ($existing) {
+                    return $this->depreciationResult($asset, $existing, true);
+                }
 
-            $monthlyAmount = round($monthlyAmount, 2);
-            $newAccumulated = round($accumulated + $monthlyAmount, 2);
-            $bookValueAfter = round((float) $asset->purchase_cost - $newAccumulated, 2);
+                if ($asset->status !== 'active') {
+                    return null;
+                }
 
-            DB::transaction(function () use ($orgId, $asset, $date, $monthlyAmount, $newAccumulated, $bookValueAfter, $depreciableAmount) {
-                // Create depreciation record
+                $depreciableAmount = (float) $asset->purchase_cost - (float) $asset->residual_value;
+                $accumulated = (float) $asset->accumulated_depreciation;
+
+                if ($accumulated >= $depreciableAmount) {
+                    return null;
+                }
+
+                $monthlyAmount = $this->calculateMonthlyDepreciation($asset);
+                if ($monthlyAmount <= 0) {
+                    return null;
+                }
+
+                $remaining = $depreciableAmount - $accumulated;
+                $monthlyAmount = round(min($monthlyAmount, $remaining), 2);
+                $newAccumulated = round($accumulated + $monthlyAmount, 2);
+                $bookValueAfter = round((float) $asset->purchase_cost - $newAccumulated, 2);
+
+                // This row is the durable asset-period claim. The asset lock
+                // serializes compliant workers and the database unique key is
+                // the final defence against any non-compliant writer.
+                $depreciation = FinFixedAssetDepreciation::create([
+                    'fixed_asset_id' => $asset->id,
+                    'depreciation_date' => $period->toDateString(),
+                    'amount' => $monthlyAmount,
+                    'accumulated_total' => $newAccumulated,
+                    'book_value_after' => $bookValueAfter,
+                    'journal_id' => null,
+                ]);
+
                 $journalId = null;
 
-                // Post GL journal
                 if ($asset->gl_expense_account_id || $asset->gl_depreciation_account_id) {
                     $expenseAccountId = $asset->gl_expense_account_id
                         ?? $this->getDefaultAccountId($orgId, '8000');
@@ -134,12 +175,12 @@ class FixedAssetService
 
                     if ($expenseAccountId && $accumAccountId) {
                         $journal = $this->journalPostingService->createAndPost($orgId, [
-                            'journal_date' => $date->toDateString(),
+                            'journal_date' => $period->toDateString(),
                             'type' => 'standard',
-                            'reference' => "DEP-{$asset->asset_tag}-{$date->format('Y-m')}",
-                            'description' => "Monthly depreciation: {$asset->asset_name} ({$date->format('M Y')})",
-                            'source_type' => FinFixedAsset::class,
-                            'source_id' => $asset->id,
+                            'reference' => "DEP-{$asset->asset_tag}-{$period->format('Y-m')}",
+                            'description' => "Monthly depreciation: {$asset->asset_name} ({$period->format('M Y')})",
+                            'source_type' => FinFixedAssetDepreciation::class,
+                            'source_id' => $depreciation->id,
                             'lines' => [
                                 [
                                     'account_id' => $expenseAccountId,
@@ -159,16 +200,10 @@ class FixedAssetService
                     }
                 }
 
-                FinFixedAssetDepreciation::create([
-                    'fixed_asset_id' => $asset->id,
-                    'depreciation_date' => $date->toDateString(),
-                    'amount' => $monthlyAmount,
-                    'accumulated_total' => $newAccumulated,
-                    'book_value_after' => $bookValueAfter,
-                    'journal_id' => $journalId,
-                ]);
+                if ($journalId !== null) {
+                    $depreciation->update(['journal_id' => $journalId]);
+                }
 
-                // Update asset
                 $updateData = ['accumulated_depreciation' => $newAccumulated];
 
                 if ($newAccumulated >= $depreciableAmount) {
@@ -176,19 +211,133 @@ class FixedAssetService
                 }
 
                 $asset->update($updateData);
+
+                return $this->depreciationResult($asset, $depreciation->refresh(), false);
             });
 
-            $processed[] = [
-                'asset_id' => $asset->id,
-                'asset_name' => $asset->asset_name,
-                'amount' => $monthlyAmount,
-                'new_accumulated' => $newAccumulated,
-                'book_value' => $bookValueAfter,
-                'status' => $newAccumulated >= $depreciableAmount ? 'fully_depreciated' : 'active',
-            ];
+            if ($result !== null) {
+                $processed[] = $result;
+            }
         }
 
         return $processed;
+    }
+
+    /**
+     * Reverse one posted depreciation without erasing its execution record.
+     */
+    public function reverseDepreciation(
+        FinFixedAssetDepreciation $depreciation,
+        ?string $reason = null,
+    ): FinJournal {
+        return DB::transaction(function () use ($depreciation, $reason): FinJournal {
+            $locator = FinFixedAssetDepreciation::query()
+                ->join('fin_fixed_assets', 'fin_fixed_assets.id', '=', 'fin_fixed_asset_depreciations.fixed_asset_id')
+                ->where('fin_fixed_asset_depreciations.id', $depreciation->id)
+                ->select([
+                    'fin_fixed_asset_depreciations.fixed_asset_id',
+                    'fin_fixed_assets.organization_id',
+                ])
+                ->first();
+
+            if (! $locator) {
+                throw new RuntimeException('The fixed-asset depreciation execution no longer exists.');
+            }
+
+            $this->journalPostingService->lockJournalSequence((int) $locator->organization_id);
+
+            $asset = FinFixedAsset::withTrashed()
+                ->whereKey($locator->fixed_asset_id)
+                ->where('organization_id', $locator->organization_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $depreciation = FinFixedAssetDepreciation::query()
+                ->whereKey($depreciation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $depreciation->fixed_asset_id !== (int) $asset->id) {
+                throw new RuntimeException('The depreciation execution has conflicting fixed-asset ownership.');
+            }
+            if ($depreciation->journal_id === null) {
+                throw new InvalidArgumentException('This depreciation execution has no posted journal to reverse.');
+            }
+
+            $journal = FinJournal::query()->findOrFail($depreciation->journal_id);
+            $this->assertDepreciationJournalLineage($depreciation, $journal);
+
+            if ($depreciation->reversal_journal_id !== null) {
+                $reversal = FinJournal::query()->findOrFail($depreciation->reversal_journal_id);
+                if ((int) $journal->reversed_by_journal_id !== (int) $reversal->id
+                    || (int) $reversal->reversal_of_journal_id !== (int) $journal->id) {
+                    throw new RuntimeException('The depreciation execution has conflicting reversal lineage.');
+                }
+                $this->assertDepreciationJournalLineage($depreciation, $reversal);
+
+                return $reversal;
+            }
+
+            if ($journal->reversed_by_journal_id !== null) {
+                throw new RuntimeException('The depreciation journal was reversed without updating its execution record.');
+            }
+            if (bccomp((string) $asset->accumulated_depreciation, (string) $depreciation->amount, 2) < 0) {
+                throw new RuntimeException('The fixed-asset balance is lower than the depreciation being reversed.');
+            }
+
+            $reversal = $this->journalPostingService->reverse($journal, $reason, [
+                'source_type' => FinFixedAssetDepreciation::class,
+                'source_id' => $depreciation->id,
+            ]);
+
+            $newAccumulated = bcsub(
+                (string) $asset->accumulated_depreciation,
+                (string) $depreciation->amount,
+                2,
+            );
+            $assetUpdate = ['accumulated_depreciation' => $newAccumulated];
+            if ($asset->status === 'fully_depreciated') {
+                $assetUpdate['status'] = 'active';
+            }
+
+            $asset->update($assetUpdate);
+            $depreciation->update(['reversal_journal_id' => $reversal->id]);
+
+            return $reversal;
+        });
+    }
+
+    private function depreciationResult(
+        FinFixedAsset $asset,
+        FinFixedAssetDepreciation $depreciation,
+        bool $replayed,
+    ): array {
+        $depreciableAmount = (float) $asset->purchase_cost - (float) $asset->residual_value;
+
+        return [
+            'asset_id' => $asset->id,
+            'asset_name' => $asset->asset_name,
+            'depreciation_id' => $depreciation->id,
+            'journal_id' => $depreciation->journal_id,
+            'period' => $depreciation->depreciation_date->format('Y-m'),
+            'amount' => (float) $depreciation->amount,
+            'new_accumulated' => (float) $depreciation->accumulated_total,
+            'book_value' => (float) $depreciation->book_value_after,
+            'status' => (float) $depreciation->accumulated_total >= $depreciableAmount
+                ? 'fully_depreciated'
+                : 'active',
+            'replayed' => $replayed,
+            'reversed' => $depreciation->reversal_journal_id !== null,
+        ];
+    }
+
+    private function assertDepreciationJournalLineage(
+        FinFixedAssetDepreciation $depreciation,
+        FinJournal $journal,
+    ): void {
+        if ($journal->source_type !== FinFixedAssetDepreciation::class
+            || (int) $journal->source_id !== (int) $depreciation->id) {
+            throw new RuntimeException('The depreciation journal has conflicting execution lineage.');
+        }
     }
 
     /**
@@ -196,12 +345,20 @@ class FixedAssetService
      */
     public function disposeAsset(FinFixedAsset $asset, array $data): FinFixedAsset
     {
-        return DB::transaction(function () use ($asset, $data) {
+        $assetId = $asset->getKey();
+        $orgId = $asset->organization_id;
+
+        return DB::transaction(function () use ($assetId, $orgId, $data) {
+            $this->journalPostingService->lockJournalSequence($orgId);
+
+            $asset = FinFixedAsset::forOrganization($orgId)
+                ->whereKey($assetId)
+                ->lockForUpdate()
+                ->firstOrFail();
             $disposedDate = $data['disposed_date'];
             $proceeds = (float) $data['disposal_proceeds'];
             $bookValue = $asset->getBookValue();
             $gainLoss = round($proceeds - $bookValue, 2);
-            $orgId = $asset->organization_id;
             $accumulated = (float) $asset->accumulated_depreciation;
             $purchaseCost = (float) $asset->purchase_cost;
 
@@ -252,7 +409,7 @@ class FixedAssetService
                     $gainLossCode = config('finance.fixed_asset.gain_loss_account', '8400');
                     $gainLossAccountId = $this->getDefaultAccountId($orgId, $gainLossCode);
                     if (! $gainLossAccountId) {
-                        throw new \InvalidArgumentException(
+                        throw new InvalidArgumentException(
                             "Gain/Loss on Asset Disposal account ({$gainLossCode}) is not configured for this organisation — "
                             .'cannot post a balanced disposal journal for a gain or loss. Add the account to the chart, then retry.'
                         );
@@ -395,6 +552,7 @@ class FixedAssetService
 
         if ($asset->depreciation_method === 'diminishing_value') {
             $bookValue = (float) $asset->purchase_cost - $accumulated;
+
             return $bookValue * (2 / $asset->useful_life_months);
         }
 
@@ -410,21 +568,33 @@ class FixedAssetService
      */
     public function capitaliseAsset(FinFixedAsset $asset): FinFixedAsset
     {
-        if ($asset->acquisition_journal_id) {
-            throw new InvalidArgumentException('The acquisition journal for this asset has already been posted.');
-        }
+        $assetId = $asset->getKey();
+        $orgId = $asset->organization_id;
 
-        if (! $asset->gl_asset_account_id) {
-            throw new InvalidArgumentException('Assign a GL asset account before posting the acquisition.');
-        }
+        return DB::transaction(function () use ($assetId, $orgId): FinFixedAsset {
+            $this->journalPostingService->lockJournalSequence($orgId);
 
-        if (! $this->getDefaultAccountId($asset->organization_id, '1000')) {
-            throw new InvalidArgumentException("Bank account '1000' not found for this organisation — cannot post the acquisition.");
-        }
+            $asset = FinFixedAsset::forOrganization($orgId)
+                ->whereKey($assetId)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $this->postAcquisitionJournal($asset->organization_id, $asset);
+            if ($asset->acquisition_journal_id) {
+                throw new InvalidArgumentException('The acquisition journal for this asset has already been posted.');
+            }
 
-        return $asset->refresh();
+            if (! $asset->gl_asset_account_id) {
+                throw new InvalidArgumentException('Assign a GL asset account before posting the acquisition.');
+            }
+
+            if (! $this->getDefaultAccountId($asset->organization_id, '1000')) {
+                throw new InvalidArgumentException("Bank account '1000' not found for this organisation — cannot post the acquisition.");
+            }
+
+            $this->postAcquisitionJournal($asset->organization_id, $asset);
+
+            return $asset->refresh();
+        });
     }
 
     /**

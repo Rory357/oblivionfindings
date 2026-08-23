@@ -377,7 +377,11 @@ class AuditExportService
             $q->where('organization_id', $orgId);
         })
             ->whereBetween('depreciation_date', [$from, $to])
-            ->with(['fixedAsset:id,asset_tag,asset_name', 'journal:id,journal_number'])
+            ->with([
+                'fixedAsset:id,asset_tag,asset_name',
+                'journal:id,journal_number',
+                'reversalJournal:id,journal_number',
+            ])
             ->orderBy('depreciation_date')
             ->get()
             ->map(fn ($d) => [
@@ -388,6 +392,10 @@ class AuditExportService
                 'Accumulated Total' => $d->accumulated_total,
                 'Book Value After' => $d->book_value_after,
                 'Journal Number' => $d->journal->journal_number ?? '',
+                'Execution Status' => $d->reversal_journal_id !== null
+                    ? 'Reversed'
+                    : ($d->journal_id !== null ? 'Posted' : 'Recorded (no GL journal)'),
+                'Reversal Journal Number' => $d->reversalJournal->journal_number ?? '',
             ])
             ->toArray();
     }

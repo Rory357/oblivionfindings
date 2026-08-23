@@ -156,68 +156,102 @@ class JournalPostingService
             );
         }
 
-        return DB::transaction(function () use ($journal, $reason, $attributes): FinJournal {
-            $journal = FinJournal::query()
-                ->lockForUpdate()
-                ->findOrFail($journal->getKey());
+        $journalId = $journal->getKey();
 
-            if ($journal->status !== 'posted') {
-                throw new InvalidArgumentException(
-                    "Journal {$journal->journal_number} cannot be reversed: status is '{$journal->status}', expected 'posted'."
-                );
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $locator = FinJournal::query()
+                ->select(['id', 'organization_id'])
+                ->findOrFail($journalId);
+            $organizationId = (int) $locator->organization_id;
+            $organizationChanged = false;
+
+            try {
+                return DB::transaction(function () use (
+                    $journalId,
+                    $organizationId,
+                    $reason,
+                    $attributes,
+                    &$organizationChanged,
+                ): FinJournal {
+                    $this->lockJournalSequence($organizationId);
+
+                    $journal = FinJournal::query()
+                        ->lockForUpdate()
+                        ->findOrFail($journalId);
+
+                    if ((int) $journal->organization_id !== $organizationId) {
+                        $organizationChanged = true;
+
+                        throw new RuntimeException('The journal organisation changed while acquiring its sequence mutex.');
+                    }
+
+                    if ($journal->status !== 'posted') {
+                        throw new InvalidArgumentException(
+                            "Journal {$journal->journal_number} cannot be reversed: status is '{$journal->status}', expected 'posted'."
+                        );
+                    }
+
+                    $journal->setRelation('lines', $journal->lines()->lockForUpdate()->get());
+
+                    if ($existing = $this->resolveExistingReversal($journal)) {
+                        return $existing;
+                    }
+
+                    $description = "Reversal of {$journal->journal_number}";
+                    if ($reason) {
+                        $description .= " — {$reason}";
+                    }
+
+                    $reversalData = [
+                        'journal_date' => $attributes['journal_date'] ?? now()->toDateString(),
+                        'type' => 'adjustment',
+                        'reference' => $attributes['reference'] ?? "REV-{$journal->journal_number}",
+                        'description' => $attributes['description'] ?? $description,
+                        'source_type' => array_key_exists('source_type', $attributes)
+                            ? $attributes['source_type']
+                            : $journal->source_type,
+                        'source_id' => array_key_exists('source_id', $attributes)
+                            ? $attributes['source_id']
+                            : $journal->source_id,
+                        'actor_id' => $attributes['actor_id'] ?? Auth::id(),
+                        'lines' => $journal->lines->map(fn ($line) => [
+                            'account_id' => $line->account_id,
+                            'description' => $line->description,
+                            'debit' => $line->credit,
+                            'credit' => $line->debit,
+                            'cost_centre_id' => $line->cost_centre_id,
+                            'funding_stream_id' => $line->funding_stream_id,
+                            'client_id' => $line->client_id,
+                            'client_fund_id' => $line->client_fund_id,
+                            'site_id' => $line->site_id,
+                            'tax_rate_id' => $line->tax_rate_id,
+                            'tax_amount' => bcsub('0', (string) $line->tax_amount, 2),
+                        ])->all(),
+                    ];
+
+                    $reversingJournal = $this->createDraftJournalRecord(
+                        $journal->organization_id,
+                        $reversalData,
+                        $journal->id,
+                    );
+                    $reversingJournal = $this->post($reversingJournal);
+
+                    $this->assertReversalLineage($journal, $reversingJournal);
+
+                    $journal->forceFill(['reversed_by_journal_id' => $reversingJournal->id])->save();
+
+                    return $reversingJournal->load('lines');
+                });
+            } catch (RuntimeException $exception) {
+                if ($organizationChanged && $attempt === 0) {
+                    continue;
+                }
+
+                throw $exception;
             }
+        }
 
-            $journal->setRelation('lines', $journal->lines()->lockForUpdate()->get());
-
-            if ($existing = $this->resolveExistingReversal($journal)) {
-                return $existing;
-            }
-
-            $description = "Reversal of {$journal->journal_number}";
-            if ($reason) {
-                $description .= " — {$reason}";
-            }
-
-            $reversalData = [
-                'journal_date' => $attributes['journal_date'] ?? now()->toDateString(),
-                'type' => 'adjustment',
-                'reference' => $attributes['reference'] ?? "REV-{$journal->journal_number}",
-                'description' => $attributes['description'] ?? $description,
-                'source_type' => array_key_exists('source_type', $attributes)
-                    ? $attributes['source_type']
-                    : $journal->source_type,
-                'source_id' => array_key_exists('source_id', $attributes)
-                    ? $attributes['source_id']
-                    : $journal->source_id,
-                'actor_id' => $attributes['actor_id'] ?? Auth::id(),
-                'lines' => $journal->lines->map(fn ($line) => [
-                    'account_id' => $line->account_id,
-                    'description' => $line->description,
-                    'debit' => $line->credit,
-                    'credit' => $line->debit,
-                    'cost_centre_id' => $line->cost_centre_id,
-                    'funding_stream_id' => $line->funding_stream_id,
-                    'client_id' => $line->client_id,
-                    'client_fund_id' => $line->client_fund_id,
-                    'site_id' => $line->site_id,
-                    'tax_rate_id' => $line->tax_rate_id,
-                    'tax_amount' => bcsub('0', (string) $line->tax_amount, 2),
-                ])->all(),
-            ];
-
-            $reversingJournal = $this->createDraftJournalRecord(
-                $journal->organization_id,
-                $reversalData,
-                $journal->id,
-            );
-            $reversingJournal = $this->post($reversingJournal);
-
-            $this->assertReversalLineage($journal, $reversingJournal);
-
-            $journal->forceFill(['reversed_by_journal_id' => $reversingJournal->id])->save();
-
-            return $reversingJournal->load('lines');
-        });
+        throw new RuntimeException('The journal organisation changed repeatedly while acquiring its sequence mutex.');
     }
 
     /**
@@ -237,13 +271,73 @@ class JournalPostingService
      */
     public function generateJournalNumber(?int $orgId): string
     {
-        $maxNumber = FinJournal::where('organization_id', $orgId)
-            ->selectRaw('MAX(CAST(SUBSTRING(journal_number, 5) AS UNSIGNED)) as max_num')
-            ->value('max_num');
+        return DB::transaction(function () use ($orgId): string {
+            $this->lockJournalSequence($orgId);
 
-        $next = ($maxNumber ?? 0) + 1;
+            $next = (int) DB::table('fin_journal_sequences')
+                ->where('organization_id', $orgId)
+                ->value('next_number');
 
-        return 'JNL-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+            if ($next < 1) {
+                throw new RuntimeException('The journal sequence is invalid and requires finance review.');
+            }
+
+            DB::table('fin_journal_sequences')
+                ->where('organization_id', $orgId)
+                ->update([
+                    'next_number' => $next + 1,
+                    'updated_at' => now(),
+                ]);
+
+            return 'JNL-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        });
+    }
+
+    /**
+     * Acquire the guaranteed organisation journal-sequence mutex.
+     *
+     * Source services that also lock a business aggregate must call this from
+     * their transaction before acquiring that aggregate. Re-entry from
+     * createAndPost() is safe and retains the same row lock until the caller's
+     * outer transaction commits.
+     */
+    public function lockJournalSequence(?int $organizationId): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new RuntimeException('The journal sequence mutex must be acquired inside a database transaction.');
+        }
+        if ($organizationId === null || $organizationId < 1) {
+            throw new InvalidArgumentException('An organisation is required to allocate a journal number.');
+        }
+
+        $inserted = DB::table('fin_journal_sequences')->insertOrIgnore([
+            'organization_id' => $organizationId,
+            'next_number' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $locked = DB::table('fin_journal_sequences')
+            ->where('organization_id', $organizationId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $locked) {
+            throw new RuntimeException('The journal sequence mutex could not be established.');
+        }
+
+        // Migration backfill covers existing organisations. For an organisation
+        // first used after rollout, reconcile its newly-created row exactly
+        // once while holding the same mutex; ordinary postings avoid a ledger
+        // scan on every number allocation.
+        if ($inserted === 1) {
+            DB::table('fin_journal_sequences')
+                ->where('organization_id', $organizationId)
+                ->update([
+                    'next_number' => $this->nextJournalNumberFromLedger($organizationId),
+                    'updated_at' => now(),
+                ]);
+        }
     }
 
     private function createDraftJournalRecord(
@@ -251,15 +345,6 @@ class JournalPostingService
         array $data,
         ?int $reversalOfJournalId = null,
     ): FinJournal {
-        // Journal numbers are organisation-wide. Serialize number allocation
-        // on a stable chart row so concurrent source services cannot derive
-        // and insert the same next number.
-        FinAccount::query()
-            ->where('organization_id', $orgId)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->first();
-
         $journal = FinJournal::create([
             'organization_id' => $orgId,
             'journal_number' => $this->generateJournalNumber($orgId),
@@ -298,6 +383,22 @@ class JournalPostingService
         $journal->update(['total_amount' => $totalDebits]);
 
         return $journal->load('lines');
+    }
+
+    private function nextJournalNumberFromLedger(int $organizationId): int
+    {
+        $highest = FinJournal::query()
+            ->where('organization_id', $organizationId)
+            ->pluck('journal_number')
+            ->reduce(function (int $highest, string $journalNumber): int {
+                if (preg_match('/^JNL-(\d+)$/', $journalNumber, $matches) !== 1) {
+                    return $highest;
+                }
+
+                return max($highest, (int) $matches[1]);
+            }, 0);
+
+        return $highest + 1;
     }
 
     private function resolveExistingReversal(FinJournal $journal): ?FinJournal

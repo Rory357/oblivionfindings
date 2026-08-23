@@ -5,9 +5,11 @@ namespace App\Domain\Finance\Http\Controllers;
 use App\Domain\Finance\Http\Requests\StoreJournalRequest;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinCostCentre;
+use App\Domain\Finance\Models\FinFixedAssetDepreciation;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinTaxRate;
+use App\Domain\Finance\Services\FixedAssetService;
 use App\Domain\Finance\Services\JournalPostingService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ class JournalController extends Controller
 {
     public function __construct(
         protected JournalPostingService $postingService,
+        protected FixedAssetService $fixedAssetService,
     ) {}
 
     /**
@@ -242,7 +245,18 @@ class JournalController extends Controller
         ]);
 
         try {
-            $reversingJournal = $this->postingService->reverse($journal, $request->input('reason'));
+            if ($journal->source_type === FinFixedAssetDepreciation::class && $journal->source_id !== null) {
+                $depreciation = FinFixedAssetDepreciation::query()->findOrFail($journal->source_id);
+                if ((int) $depreciation->journal_id !== (int) $journal->id) {
+                    throw new \InvalidArgumentException('The depreciation journal has conflicting execution lineage.');
+                }
+                $reversingJournal = $this->fixedAssetService->reverseDepreciation(
+                    $depreciation,
+                    $request->input('reason'),
+                );
+            } else {
+                $reversingJournal = $this->postingService->reverse($journal, $request->input('reason'));
+            }
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()->withErrors(['posting' => $e->getMessage()]);
         }

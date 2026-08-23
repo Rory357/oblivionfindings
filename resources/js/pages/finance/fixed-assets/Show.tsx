@@ -47,6 +47,7 @@ interface Depreciation {
     accumulated_total: string;
     book_value_after: string;
     journal: Journal | null;
+    reversal_journal: Journal | null;
 }
 
 interface FixedAsset {
@@ -447,6 +448,7 @@ export default function FixedAssetShow({
                                             Book Value After
                                         </TableHead>
                                         <TableHead>Journal</TableHead>
+                                        <TableHead>Correction</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -485,6 +487,37 @@ export default function FixedAssetShow({
                                                     <span className="text-sm text-muted-foreground">
                                                         -
                                                     </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {dep.reversal_journal ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <StatusBadge
+                                                            status="reversed"
+                                                            size="sm"
+                                                        />
+                                                        <Link
+                                                            href={`/finance/journals/${dep.reversal_journal.id}`}
+                                                            className="font-mono text-sm text-primary hover:underline"
+                                                        >
+                                                            {
+                                                                dep
+                                                                    .reversal_journal
+                                                                    .journal_number
+                                                            }
+                                                        </Link>
+                                                    </div>
+                                                ) : dep.journal ? (
+                                                    <StatusBadge
+                                                        status="posted"
+                                                        size="sm"
+                                                    />
+                                                ) : (
+                                                    <StatusBadge
+                                                        status="recorded"
+                                                        label="Recorded (no GL)"
+                                                        size="sm"
+                                                    />
                                                 )}
                                             </TableCell>
                                         </TableRow>
