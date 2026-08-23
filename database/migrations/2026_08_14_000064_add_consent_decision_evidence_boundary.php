@@ -58,10 +58,13 @@ return new class extends Migration
         }
 
         Schema::table('client_consents', function (Blueprint $table): void {
+            $table->dropForeign(['consent_request_id']);
             $table->dropUnique('client_consents_request_uq');
             $table->dropIndex('client_consents_evidence_digest_idx');
-            $table->dropConstrainedForeignId('consent_request_id');
-            $table->dropColumn('decision_evidence_digest');
+            $table->dropColumn([
+                'consent_request_id',
+                'decision_evidence_digest',
+            ]);
         });
 
         Schema::table('consent_requests', function (Blueprint $table): void {

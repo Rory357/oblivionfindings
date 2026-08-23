@@ -450,6 +450,7 @@ class RbacSeeder extends Seeder
             ['key' => 'safeguarding.investigate', 'description' => 'Conduct safeguarding investigations', 'group' => 'safeguarding', 'module' => 'Compliance'],
             ['key' => 'safeguarding.report.external', 'description' => 'Report to external authorities', 'group' => 'safeguarding', 'module' => 'Compliance'],
             ['key' => 'safeguarding.viewSensitive', 'description' => 'View sensitive allegations', 'group' => 'safeguarding', 'module' => 'Compliance'],
+            ['key' => 'safeguarding.declassification.approve', 'description' => 'Independently approve safeguarding declassification', 'group' => 'safeguarding', 'module' => 'Compliance'],
 
             // Consent Management
             ['key' => 'consents.viewAny', 'description' => 'View consent records', 'group' => 'consents', 'module' => 'Compliance'],
@@ -575,18 +576,18 @@ class RbacSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        // H&S closure authority is assigned by the explicit product policy
-        // below. A generic administrator role must not inherit it merely from
-        // the broad all-permissions baseline.
-        $restrictedHsClosureAuthority = [
+        // Independent safety/privacy decisions are assigned by the explicit
+        // product policy below. Broad administrator access does not imply them.
+        $restrictedIndependentAuthority = [
             'healthSafety.events.close',
             'healthSafety.events.closeAny',
             'healthSafety.closureExceptions.request',
             'healthSafety.closureExceptions.approve',
+            'safeguarding.declassification.approve',
         ];
         $admin?->permissions()->sync(
             Permission::query()
-                ->whereNotIn('key', $restrictedHsClosureAuthority)
+                ->whereNotIn('key', $restrictedIndependentAuthority)
                 ->pluck('id'),
         );
 
@@ -888,9 +889,8 @@ class RbacSeeder extends Seeder
             'vendors.view', 'credentials.view', 'reports.sites.view',
         ]);
 
-        // Explicit product policy: Compliance Lead is the independent,
-        // application-wide decision authority. Broad admin/global access alone
-        // never implies this permission.
+        // Explicit product policy: Compliance Lead holds independent decision
+        // authority. Canonical Site access still controls each Site-owned row.
         if ($complianceLead) {
             $complianceLead->permissions()->syncWithoutDetaching(
                 Permission::query()
@@ -898,6 +898,9 @@ class RbacSeeder extends Seeder
                         'hazards.view',
                         'healthSafety.viewAllSites',
                         'healthSafety.closureExceptions.approve',
+                        'safeguarding.viewAny',
+                        'safeguarding.viewSensitive',
+                        'safeguarding.declassification.approve',
                     ])
                     ->pluck('id'),
             );

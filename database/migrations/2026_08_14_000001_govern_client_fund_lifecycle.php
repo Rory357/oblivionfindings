@@ -110,25 +110,29 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('fin_journal_lines', function (Blueprint $table): void {
+            $table->dropForeign(['client_id']);
             $table->dropIndex('fin_journal_lines_client_fund_dimension_index');
             $table->dropConstrainedForeignId('site_id');
             $table->dropConstrainedForeignId('client_fund_id');
-            $table->dropConstrainedForeignId('client_id');
+            $table->dropColumn('client_id');
         });
 
         Schema::table('client_fund_transactions', function (Blueprint $table): void {
+            $table->dropForeign(['client_id']);
+            $table->dropForeign(['site_id']);
+            $table->dropForeign(['reversal_of_id']);
             $table->dropIndex('client_fund_transactions_status_journal_index');
             $table->dropIndex('client_fund_transactions_site_status_index');
             $table->dropIndex('client_fund_transactions_client_status_index');
             $table->dropUnique('client_fund_transactions_reversal_once_unique');
-            $table->dropConstrainedForeignId('reversal_of_id');
             $table->dropConstrainedForeignId('counterpart_transaction_id');
             $table->dropConstrainedForeignId('destination_fund_id');
-            $table->dropConstrainedForeignId('site_id');
-            $table->dropConstrainedForeignId('client_id');
             $table->dropConstrainedForeignId('approved_by');
             $table->dropConstrainedForeignId('rejected_by');
             $table->dropColumn([
+                'client_id',
+                'site_id',
+                'reversal_of_id',
                 'status',
                 'currency_code',
                 'source_type',

@@ -170,15 +170,16 @@ return new class extends Migration
 
         Schema::table('client_consents', function (Blueprint $table): void {
             $table->dropForeign('client_consent_source_request_fk');
+            $table->dropForeign(['authority_scope_id']);
             $table->dropUnique('client_consent_source_request_uq');
             $table->dropIndex('client_consent_consumability_idx');
             $table->dropIndex('client_consent_authority_current_idx');
             $table->dropConstrainedForeignId('site_id');
             $table->dropConstrainedForeignId('decision_client_id');
             $table->dropConstrainedForeignId('decision_actor_user_id');
-            $table->dropConstrainedForeignId('authority_scope_id');
             $table->dropConstrainedForeignId('capacity_evidence_consent_id');
             $table->dropColumn([
+                'authority_scope_id',
                 'source_consent_request_id',
                 'decision_state',
                 'decision_basis',

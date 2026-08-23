@@ -120,8 +120,8 @@ class SafeguardingRemediationTest extends TestCase
         ]);
     }
 
-    /** The detail toggle flips the restriction both ways. */
-    public function test_set_sensitivity_toggles_the_restriction(): void
+    /** Ordinary update authority can add restriction but cannot remove it directly. */
+    public function test_set_sensitivity_adds_the_restriction_but_declassification_is_governed(): void
     {
         $user = $this->makeSafeguardingUser(['safeguarding.update']);
         $concern = SafeguardingConcern::factory()->create(['is_sensitive' => false]);
@@ -133,8 +133,8 @@ class SafeguardingRemediationTest extends TestCase
 
         $this->actingAs($user)
             ->post("/safeguarding/{$concern->id}/sensitivity", ['is_sensitive' => false])
-            ->assertRedirect();
-        $this->assertFalse((bool) $concern->fresh()->is_sensitive);
+            ->assertSessionHasErrors('is_sensitive');
+        $this->assertTrue((bool) $concern->fresh()->is_sensitive);
     }
 
     /** The rebuilt right-click menu reads can-flags + a real subject href off each row. */

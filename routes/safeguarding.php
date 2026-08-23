@@ -54,6 +54,14 @@ Route::middleware(['auth'])->group(function () {
         ->name('safeguarding.markSubjectInformed');
     Route::post('/safeguarding/{concern}/sensitivity', [SafeguardingConcernController::class, 'setSensitivity'])
         ->name('safeguarding.setSensitivity');
+    Route::post('/safeguarding/{concern}/declassification-requests', [SafeguardingConcernController::class, 'requestDeclassification'])
+        ->name('safeguarding.declassification.request');
+    Route::post('/safeguarding/{concern}/declassification-reviews/{declassificationReview}/approve', [SafeguardingConcernController::class, 'approveDeclassification'])
+        ->scopeBindings()
+        ->name('safeguarding.declassification.approve');
+    Route::post('/safeguarding/{concern}/declassification-reviews/{declassificationReview}/reject', [SafeguardingConcernController::class, 'rejectDeclassification'])
+        ->scopeBindings()
+        ->name('safeguarding.declassification.reject');
 
     // Investigations (require investigate permission)
     Route::middleware('permission:safeguarding.investigate')->group(function () {

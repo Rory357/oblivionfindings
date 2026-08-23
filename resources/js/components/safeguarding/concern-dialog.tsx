@@ -71,6 +71,33 @@ export type ConcernDetail = {
     subject_informed?: boolean;
     subject_informed_at?: string | null;
     is_sensitive?: boolean;
+    sensitivity_version?: number;
+    declassification?: {
+        audience_preview?: {
+            version: number;
+            site_id: number | null;
+            scope_label: string;
+            newly_visible_staff_count: number;
+            audience_rule: string;
+            hash: string;
+        } | null;
+        pending_request?: {
+            id: number;
+            reason: string;
+            requested_by: { id: number; name: string } | null;
+            requested_at: string | null;
+            audience_snapshot: {
+                version: number;
+                site_id: number | null;
+                scope_label: string;
+                newly_visible_staff_count: number;
+                audience_rule: string;
+            };
+            can_approve: boolean;
+        } | null;
+        request_replay_key: string;
+        decision_replay_key: string;
+    };
     requires_external_referral?: boolean;
     current_risk_level?: string | null;
     triage?: {
@@ -163,7 +190,13 @@ export type ConcernDetail = {
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
     access_log?: { by: string; at: string | null }[];
-    can?: { update: boolean; investigate: boolean; report_external: boolean };
+    can?: {
+        update: boolean;
+        investigate: boolean;
+        report_external: boolean;
+        request_declassification?: boolean;
+        approve_declassification?: boolean;
+    };
     assignable_staff?: Array<{ id: number; name: string }>;
 };
 
@@ -174,7 +207,9 @@ export type ActionKey =
     | 'report'
     | 'risk'
     | 'action'
-    | 'close';
+    | 'close'
+    | 'declassification'
+    | 'declassification_review';
 
 export type SectionKey =
     | 'overview'
@@ -378,6 +413,8 @@ export function SafeguardingConcernDialog({
         update: false,
         investigate: false,
         report_external: false,
+        request_declassification: false,
+        approve_declassification: false,
     };
     const triageFirst = 'Triage the concern first.';
 
@@ -449,19 +486,48 @@ export function SafeguardingConcernDialog({
                     onClick={markInformed}
                 />
             ) : null}
-            {can.update && !terminal ? (
+            {can.update && !terminal && !d.is_sensitive ? (
                 <OptionBtn
                     icon={Lock}
-                    label={
-                        d.is_sensitive ? 'Remove restriction' : 'Mark sensitive'
-                    }
+                    label="Mark sensitive"
                     onClick={() =>
                         router.post(
                             `/safeguarding/${d.id}/sensitivity`,
-                            { is_sensitive: !d.is_sensitive },
+                            { is_sensitive: true },
                             { preserveScroll: true },
                         )
                     }
+                />
+            ) : null}
+            {can.request_declassification &&
+            !terminal &&
+            d.is_sensitive &&
+            !d.declassification?.pending_request ? (
+                <OptionBtn
+                    icon={Lock}
+                    label="Remove restriction"
+                    onClick={() => setAction('declassification')}
+                />
+            ) : null}
+            {!terminal &&
+            d.is_sensitive &&
+            d.declassification?.pending_request?.can_approve ? (
+                <OptionBtn
+                    icon={Shield}
+                    label="Review declassification"
+                    onClick={() => setAction('declassification_review')}
+                />
+            ) : null}
+            {!terminal &&
+            d.is_sensitive &&
+            d.declassification?.pending_request &&
+            !d.declassification.pending_request.can_approve ? (
+                <OptionBtn
+                    icon={Clock}
+                    label="Declassification pending"
+                    onClick={() => {}}
+                    disabled
+                    reason="Awaiting independent review."
                 />
             ) : null}
             {can.update && d.status === 'action_plan' ? (
@@ -519,6 +585,16 @@ export function SafeguardingConcernDialog({
                 <RiskPane d={d} onDone={() => setAction(null)} />
             ) : action === 'action' ? (
                 <ActionItemPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'declassification' ? (
+                <DeclassificationRequestPane
+                    d={d}
+                    onDone={() => setAction(null)}
+                />
+            ) : action === 'declassification_review' ? (
+                <DeclassificationReviewPane
+                    d={d}
+                    onDone={() => setAction(null)}
+                />
             ) : (
                 <>
                     {section === 'overview' ? (
@@ -612,6 +688,214 @@ function PaneShell({
                 </Button>
             </div>
         </form>
+    );
+}
+
+function DeclassificationRequestPane({
+    d,
+    onDone,
+}: {
+    d: ConcernDetail;
+    onDone: () => void;
+}) {
+    const preview = d.declassification?.audience_preview;
+    const form = useForm<{
+        reason: string;
+        audience_acknowledged: boolean;
+        audience_preview_hash: string;
+        expected_sensitivity_version: number;
+        idempotency_key: string;
+    }>({
+        reason: '',
+        audience_acknowledged: false,
+        audience_preview_hash: preview?.hash ?? '',
+        expected_sensitivity_version: d.sensitivity_version ?? 0,
+        idempotency_key: d.declassification?.request_replay_key ?? '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (form.data.reason.trim().length < 20) {
+            form.setError(
+                'reason',
+                'Record at least 20 characters explaining why wider access is appropriate.',
+            );
+            return;
+        }
+        if (!form.data.audience_acknowledged) {
+            form.setError(
+                'audience_acknowledged',
+                'Confirm that you reviewed the expanded audience.',
+            );
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/declassification-requests`, {
+            preserveScroll: true,
+            onSuccess: onSuccessGuard(onDone),
+        });
+    };
+
+    return (
+        <>
+            <StepHead
+                icon={Lock}
+                title="Remove need-to-know restriction"
+                blurb="Record why the allegation may be shared more widely. A different safeguarding or privacy lead must approve the request."
+            />
+            <PaneShell
+                onCancel={onDone}
+                onSubmit={submit}
+                cta="Send for review"
+                processing={form.processing}
+            >
+                <InfoCard icon={Users} tone="warn">
+                    <b>Expanded audience preview.</b>{' '}
+                    {preview
+                        ? `${preview.newly_visible_staff_count} additional staff with safeguarding access for ${preview.scope_label} will be able to view the full allegation.`
+                        : 'The audience preview is unavailable. Reload before continuing.'}
+                </InfoCard>
+                <Field
+                    label="Reason for removing the restriction"
+                    required
+                    error={form.errors.reason}
+                >
+                    <Textarea
+                        rows={4}
+                        value={form.data.reason}
+                        onChange={(e) => form.setData('reason', e.target.value)}
+                        placeholder="Why is wider access necessary and proportionate?"
+                    />
+                </Field>
+                <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm text-foreground">
+                    <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 rounded border-border"
+                        checked={form.data.audience_acknowledged}
+                        onChange={(e) =>
+                            form.setData(
+                                'audience_acknowledged',
+                                e.target.checked,
+                            )
+                        }
+                    />
+                    <span>
+                        I reviewed the expanded audience and confirm this
+                        request is necessary and proportionate.
+                    </span>
+                </label>
+                {form.errors.audience_acknowledged ? (
+                    <p className="text-xs text-destructive">
+                        {form.errors.audience_acknowledged}
+                    </p>
+                ) : null}
+            </PaneShell>
+        </>
+    );
+}
+
+function DeclassificationReviewPane({
+    d,
+    onDone,
+}: {
+    d: ConcernDetail;
+    onDone: () => void;
+}) {
+    const pending = d.declassification?.pending_request;
+    const form = useForm<{
+        decision_reason: string;
+        idempotency_key: string;
+    }>({
+        decision_reason: '',
+        idempotency_key: d.declassification?.decision_replay_key ?? '',
+    });
+
+    if (!pending) return null;
+
+    const decide = (decision: 'approve' | 'reject') => {
+        if (form.data.decision_reason.trim().length < 10) {
+            form.setError(
+                'decision_reason',
+                'Record at least 10 characters explaining the decision.',
+            );
+            return;
+        }
+        form.post(
+            `/safeguarding/${d.id}/declassification-reviews/${pending.id}/${decision}`,
+            {
+                preserveScroll: true,
+                onSuccess: onSuccessGuard(onDone),
+            },
+        );
+    };
+
+    return (
+        <>
+            <StepHead
+                icon={Shield}
+                title="Review declassification"
+                blurb="Independently decide whether the need-to-know restriction may be removed."
+            />
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    decide('approve');
+                }}
+                className="flex flex-col gap-4"
+            >
+                <InfoCard icon={Users} tone="warn">
+                    <b>Expanded audience preview.</b>{' '}
+                    {pending.audience_snapshot.newly_visible_staff_count}{' '}
+                    additional staff with safeguarding access for{' '}
+                    {pending.audience_snapshot.scope_label} will be able to view
+                    the full allegation.
+                </InfoCard>
+                <ReviewCard icon={FileText} title="Request">
+                    <ReviewRow
+                        label="Requested by"
+                        value={pending.requested_by?.name}
+                    />
+                    <ReviewRow
+                        label="Requested"
+                        value={
+                            pending.requested_at
+                                ? formatDateTime(pending.requested_at)
+                                : undefined
+                        }
+                    />
+                    <ReviewRow label="Reason" value={pending.reason} />
+                </ReviewCard>
+                <Field
+                    label="Decision reason"
+                    required
+                    error={form.errors.decision_reason}
+                >
+                    <Textarea
+                        rows={3}
+                        value={form.data.decision_reason}
+                        onChange={(e) =>
+                            form.setData('decision_reason', e.target.value)
+                        }
+                        placeholder="Why is this decision safe and proportionate?"
+                    />
+                </Field>
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={onDone}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={form.processing}
+                        onClick={() => decide('reject')}
+                    >
+                        Decline
+                    </Button>
+                    <Button type="submit" disabled={form.processing}>
+                        Approve removal
+                    </Button>
+                </div>
+            </form>
+        </>
     );
 }
 

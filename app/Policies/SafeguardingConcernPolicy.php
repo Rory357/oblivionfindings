@@ -109,6 +109,19 @@ class SafeguardingConcernPolicy
         return $user->canDo('safeguarding.viewSensitive');
     }
 
+    public function requestDeclassification(User $user, SafeguardingConcern $concern): bool
+    {
+        return $concern->is_sensitive && $this->update($user, $concern);
+    }
+
+    public function approveDeclassification(User $user, SafeguardingConcern $concern): bool
+    {
+        return $user->canDo('safeguarding.declassification.approve')
+            && $this->canUseDeclassificationAuthorityAtConcernSite($user, $concern)
+            && $this->canAccessConcernSite($user, $concern)
+            && $this->canAccessSensitiveConcern($user, $concern);
+    }
+
     /**
      * Canonical SQL counterpart to view(): Site-less organisation records and
      * the explicit reports permission remain global; every Site-owned concern
@@ -147,7 +160,24 @@ class SafeguardingConcernPolicy
     {
         return ! $concern->is_sensitive
             || $user->canDo('safeguarding.viewSensitive')
+            || $this->canUseDeclassificationAuthorityAtConcernSite($user, $concern)
             || (int) $concern->assigned_to_user_id === (int) $user->id
             || (int) $concern->reported_by_user_id === (int) $user->id;
+    }
+
+    private function canUseDeclassificationAuthorityAtConcernSite(
+        User $user,
+        SafeguardingConcern $concern,
+    ): bool {
+        if (! $user->canDo('safeguarding.declassification.approve')) {
+            return false;
+        }
+
+        $siteId = is_numeric($concern->site_id) && (int) $concern->site_id > 0
+            ? (int) $concern->site_id
+            : null;
+
+        return $siteId !== null
+            || $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
     }
 }

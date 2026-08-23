@@ -75,6 +75,7 @@ class SafeguardingConcern extends Model
         'subject_informed' => 'boolean',
         'requires_external_referral' => 'boolean',
         'is_sensitive' => 'boolean',
+        'sensitivity_version' => 'integer',
     ];
 
     /**
@@ -84,6 +85,7 @@ class SafeguardingConcern extends Model
     {
         return match ($childType) {
             'report' => 'externalReports',
+            'declassificationReview' => 'declassificationReviews',
             default => parent::childRouteBindingRelationshipName($childType),
         };
     }
@@ -101,6 +103,47 @@ class SafeguardingConcern extends Model
             }
             if (empty($concern->reported_at)) {
                 $concern->reported_at = now();
+            }
+            $concern->sensitivity_version = $concern->is_sensitive ? 1 : 0;
+        });
+
+        static::updating(function ($concern): void {
+            if (! $concern->getOriginal('is_sensitive')) {
+                return;
+            }
+
+            if (! $concern->is_sensitive) {
+                $approved = SafeguardingDeclassificationReview::query()
+                    ->where('safeguarding_concern_id', $concern->id)
+                    ->where('site_id', $concern->getOriginal('site_id'))
+                    ->where('concern_sensitivity_version', $concern->getOriginal('sensitivity_version'))
+                    ->where('concern_updated_at', $concern->getRawOriginal('updated_at'))
+                    ->where('status', SafeguardingDeclassificationReview::STATUS_APPROVED)
+                    ->whereNull('active_concern_id')
+                    ->where('reviewed_by_user_id', $concern->updated_by)
+                    ->exists();
+                if (! $approved
+                    || (int) $concern->sensitivity_version
+                        !== (int) $concern->getOriginal('sensitivity_version') + 1) {
+                    throw new \LogicException(
+                        'Safeguarding declassification requires its matching governed approval.',
+                    );
+                }
+
+                return;
+            }
+
+            $materialChanges = array_diff(
+                array_keys($concern->getDirty()),
+                ['updated_at', 'sensitivity_version'],
+            );
+            if ($materialChanges !== []) {
+                $concern->sensitivity_version = max(
+                    (int) $concern->getOriginal('sensitivity_version'),
+                    1,
+                ) + 1;
+            } elseif ($concern->isDirty('sensitivity_version')) {
+                $concern->sensitivity_version = (int) $concern->getOriginal('sensitivity_version');
             }
         });
     }
@@ -239,6 +282,14 @@ class SafeguardingConcern extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(SafeguardingAttachment::class);
+    }
+
+    /**
+     * Governed requests to remove this concern's need-to-know restriction.
+     */
+    public function declassificationReviews(): HasMany
+    {
+        return $this->hasMany(SafeguardingDeclassificationReview::class);
     }
 
     public function terminalTransition(): HasOne

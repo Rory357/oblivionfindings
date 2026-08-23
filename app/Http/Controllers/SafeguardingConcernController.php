@@ -8,23 +8,33 @@ use App\Models\HsEvent;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingAttachment;
 use App\Models\SafeguardingConcern;
+use App\Models\SafeguardingDeclassificationReview;
 use App\Models\SafeguardingExternalReport;
 use App\Models\SafeguardingInvestigation;
 use App\Models\Site;
 use App\Models\User;
+use App\Policies\SafeguardingConcernPolicy;
 use App\Services\Safeguarding\SafeguardingLifecycle;
+use App\Services\Safeguarding\SafeguardingSensitivityService;
 use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SafeguardingConcernController extends Controller
 {
+    public function __construct(
+        private readonly SafeguardingSensitivityService $sensitivity,
+        private readonly SafeguardingConcernPolicy $concernPolicy,
+    ) {}
+
     /**
      * Display a listing of safeguarding concerns.
      */
@@ -505,25 +515,97 @@ class SafeguardingConcernController extends Controller
         return back()->with('success', 'Subject marked as informed.');
     }
 
-    /**
-     * Toggle need-to-know restriction on a concern. Marking it sensitive redacts
-     * the subject/category/evidence to everyone but the lead, the reporter and
-     * viewSensitive-cleared staff; lifting it restores normal visibility.
-     */
+    /** Mark a concern need-to-know. Removal uses the governed review workflow. */
     public function setSensitivity(Request $request, SafeguardingConcern $concern): RedirectResponse
     {
+        $this->concealForeignConcern($request->user(), $concern);
         $this->authorize('update', $concern);
 
         $validated = $request->validate(['is_sensitive' => 'required|boolean']);
+        if (! $validated['is_sensitive']) {
+            throw ValidationException::withMessages([
+                'is_sensitive' => ['Removing need-to-know requires a recorded declassification request and independent approval.'],
+            ]);
+        }
 
-        $concern->update([
-            'is_sensitive' => $validated['is_sensitive'],
-            'updated_by' => auth()->id(),
+        $this->sensitivity->markSensitive($concern, $request->user());
+
+        return back()->with('success', 'Concern restricted to need-to-know.');
+    }
+
+    public function requestDeclassification(Request $request, SafeguardingConcern $concern): RedirectResponse
+    {
+        $this->concealForeignConcern($request->user(), $concern);
+        $this->authorize('requestDeclassification', $concern);
+
+        $validated = $request->validate([
+            'reason' => 'required|string|min:20|max:2000',
+            'audience_acknowledged' => 'accepted',
+            'audience_preview_hash' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            'expected_sensitivity_version' => 'required|integer|min:0',
+            'idempotency_key' => 'required|uuid',
         ]);
 
-        return back()->with('success', $validated['is_sensitive']
-            ? 'Concern restricted to need-to-know.'
-            : 'Need-to-know restriction removed.');
+        $this->sensitivity->requestDeclassification(
+            $concern,
+            $request->user(),
+            $validated['reason'],
+            $validated['audience_preview_hash'],
+            (int) $validated['expected_sensitivity_version'],
+            $validated['idempotency_key'],
+        );
+
+        return back()->with('success', 'Declassification request sent for independent review.');
+    }
+
+    public function approveDeclassification(
+        Request $request,
+        SafeguardingConcern $concern,
+        string $declassificationReview,
+    ): RedirectResponse {
+        $this->concealForeignConcern($request->user(), $concern);
+        $this->authorize('approveDeclassification', $concern);
+        $review = $this->nestedDeclassificationReview($concern, $declassificationReview);
+
+        $validated = $request->validate([
+            'decision_reason' => 'required|string|min:10|max:2000',
+            'idempotency_key' => 'required|uuid',
+        ]);
+
+        $this->sensitivity->approve(
+            $concern,
+            $review,
+            $request->user(),
+            $validated['decision_reason'],
+            $validated['idempotency_key'],
+        );
+
+        return back()->with('success', 'Need-to-know restriction removed after independent review.');
+    }
+
+    public function rejectDeclassification(
+        Request $request,
+        SafeguardingConcern $concern,
+        string $declassificationReview,
+    ): RedirectResponse {
+        $this->concealForeignConcern($request->user(), $concern);
+        $this->authorize('approveDeclassification', $concern);
+        $review = $this->nestedDeclassificationReview($concern, $declassificationReview);
+
+        $validated = $request->validate([
+            'decision_reason' => 'required|string|min:10|max:2000',
+            'idempotency_key' => 'required|uuid',
+        ]);
+
+        $this->sensitivity->reject(
+            $concern,
+            $review,
+            $request->user(),
+            $validated['decision_reason'],
+            $validated['idempotency_key'],
+        );
+
+        return back()->with('success', 'Declassification request declined.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -536,7 +618,9 @@ class SafeguardingConcernController extends Controller
      */
     private function isConcernRestricted(SafeguardingConcern $concern, User $user, bool $canSensitive): bool
     {
-        if (! $concern->is_sensitive || $canSensitive) {
+        if (! $concern->is_sensitive
+            || $canSensitive
+            || $user->can('approveDeclassification', $concern)) {
             return false;
         }
 
@@ -787,6 +871,33 @@ class SafeguardingConcernController extends Controller
             'relatedIncident:id,reference_number',
         ]);
 
+        $pendingDeclassification = null;
+        $audiencePreview = null;
+        if ($concern->is_sensitive) {
+            $audiencePreview = $this->sensitivity->audiencePreview($concern);
+            $pending = $concern->declassificationReviews()
+                ->where('status', SafeguardingDeclassificationReview::STATUS_PENDING)
+                ->with('requester:id,name')
+                ->first();
+            if ($pending) {
+                $pendingDeclassification = [
+                    'id' => $pending->id,
+                    'reason' => $pending->reason,
+                    'requested_by' => $pending->requester ? [
+                        'id' => $pending->requester->id,
+                        'name' => $pending->requester->name,
+                    ] : null,
+                    'requested_at' => $pending->requested_at?->toISOString(),
+                    'audience_snapshot' => Arr::except(
+                        $pending->audience_snapshot,
+                        ['audience_fingerprint'],
+                    ),
+                    'can_approve' => $user->can('approveDeclassification', $concern)
+                        && (int) $pending->requested_by_user_id !== (int) $user->id,
+                ];
+            }
+        }
+
         // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
         // The same event carries the Control Room alert id, so we surface both from one lookup.
         $hsEvent = null;
@@ -812,6 +923,13 @@ class SafeguardingConcernController extends Controller
             'subject_informed' => (bool) $concern->subject_informed,
             'subject_informed_at' => $concern->subject_informed_at?->toISOString(),
             'is_sensitive' => (bool) $concern->is_sensitive,
+            'sensitivity_version' => (int) $concern->sensitivity_version,
+            'declassification' => [
+                'audience_preview' => $audiencePreview,
+                'pending_request' => $pendingDeclassification,
+                'request_replay_key' => (string) Str::uuid(),
+                'decision_replay_key' => (string) Str::uuid(),
+            ],
             'requires_external_referral' => (bool) $concern->requires_external_referral,
             'current_risk_level' => $concern->current_risk_level,
             'triage' => $concern->triaged_at ? [
@@ -915,10 +1033,32 @@ class SafeguardingConcernController extends Controller
                 'update' => $user->can('update', $concern),
                 'investigate' => $user->can('investigate', $concern),
                 'report_external' => $user->can('reportExternal', $concern),
+                'request_declassification' => $user->can('requestDeclassification', $concern),
+                'approve_declassification' => $user->can('approveDeclassification', $concern),
             ],
             'assignable_staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values()->all(),
         ];
+    }
+
+    private function concealForeignConcern(User $user, SafeguardingConcern $concern): void
+    {
+        abort_unless(
+            $this->concernPolicy->applyVisibleScope(
+                SafeguardingConcern::query()->whereKey($concern->id),
+                $user,
+            )->exists(),
+            404,
+        );
+    }
+
+    private function nestedDeclassificationReview(
+        SafeguardingConcern $concern,
+        string $reviewId,
+    ): SafeguardingDeclassificationReview {
+        return $concern->declassificationReviews()
+            ->whereKey($reviewId)
+            ->firstOrFail();
     }
 
     private function subjectPerson(SafeguardingConcern $concern): ?array
