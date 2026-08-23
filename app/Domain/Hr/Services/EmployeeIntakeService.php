@@ -43,6 +43,7 @@ class EmployeeIntakeService
         private readonly PeopleMutationLockService $mutationLocks,
         private readonly EmployeeRoleAssignmentService $roleAssignments,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly WorkforceAvailabilityCoverageService $coverage,
     ) {}
 
     /**
@@ -334,12 +335,19 @@ class EmployeeIntakeService
             //    this rehire is about to restore.
             HrOffboardingChecklist::query()
                 ->where('employee_profile_id', $profile->id)
-                ->whereIn('status', ['pending', 'in_progress'])
+                ->orderBy('id')
+                ->lockForUpdate()
                 ->get()
-                ->each(fn ($checklist) => $checklist->update([
-                    'status' => 'cancelled',
-                    'completed_at' => null,
-                ]));
+                ->each(function (HrOffboardingChecklist $checklist) use ($actor): void {
+                    $this->coverage->cancelOffboarding($checklist, $actor);
+
+                    if (in_array($checklist->status, ['pending', 'in_progress'], true)) {
+                        $checklist->update([
+                            'status' => 'cancelled',
+                            'completed_at' => null,
+                        ]);
+                    }
+                });
 
             // 1. Archive the outgoing stint (append-only history).
             $history = $profile->employment_history ?? [];

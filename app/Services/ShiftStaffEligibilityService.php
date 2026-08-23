@@ -110,7 +110,7 @@ class ShiftStaffEligibilityService
                 'staffAvailability',
                 'staffTimeOff',
                 'hrLeaveRequests' => fn ($query) => $query->where('status', 'approved'),
-                'hrEmployeeProfile',
+                'hrEmployeeProfile' => fn ($query) => $query->withTrashed(),
                 'hrComplianceStatuses.requirement:id,code,name,hard_stop,is_active',
                 'hrDriverEligibility',
                 'medicationCompetencyAssessments',
@@ -164,13 +164,33 @@ class ShiftStaffEligibilityService
     {
         $shift->loadMissing('client:id,site_id');
         $siteId = $shift->site_id ?: $shift->client?->site_id;
+        $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+        $shiftStartsOn = $shift->starts_at?->copy()->setTimezone($timezone)->toDateString();
+        $shiftEndsOn = $shift->ends_at?->copy()->setTimezone($timezone)->toDateString();
 
         return User::staff()
             ->when($shift->organization_id, fn ($query) => $query->where('organization_id', $shift->organization_id))
-            ->where(function (Builder $query) use ($siteId): void {
-                $query->whereDoesntHave('hrEmployeeProfile')
-                    ->orWhereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+            ->where(function (Builder $query) use ($shiftEndsOn, $shiftStartsOn, $siteId): void {
+                $query->whereDoesntHave(
+                    'hrEmployeeProfile',
+                    fn (Builder $profileQuery) => $profileQuery->withTrashed(),
+                )
+                    ->orWhereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($shiftEndsOn, $shiftStartsOn, $siteId): void {
                         $profileQuery->where('is_active', true);
+
+                        if ($shiftStartsOn) {
+                            $profileQuery->where(function (Builder $dateQuery) use ($shiftStartsOn): void {
+                                $dateQuery->whereNull('start_date')
+                                    ->orWhere('start_date', '<=', $shiftStartsOn);
+                            });
+                        }
+
+                        if ($shiftEndsOn) {
+                            $profileQuery->where(function (Builder $dateQuery) use ($shiftEndsOn): void {
+                                $dateQuery->whereNull('end_date')
+                                    ->orWhere('end_date', '>=', $shiftEndsOn);
+                            });
+                        }
 
                         if ($siteId) {
                             $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
@@ -180,6 +200,16 @@ class ShiftStaffEligibilityService
                         }
                     });
             })
+            ->when(
+                $shift->starts_at && $shift->ends_at,
+                fn (Builder $query) => $query->whereDoesntHave(
+                    'hrLeaveRequests',
+                    fn (Builder $leaveQuery) => $leaveQuery
+                        ->where('status', 'approved')
+                        ->where('starts_at', '<', $shift->ends_at)
+                        ->where('ends_at', '>', $shift->starts_at),
+                ),
+            )
             ->whereDoesntHave('hrComplianceStatuses', function (Builder $query): void {
                 $query->whereIn('status', ['expired', 'not_started'])
                     ->whereHas('requirement', function (Builder $requirementQuery): void {

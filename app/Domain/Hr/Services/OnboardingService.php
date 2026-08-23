@@ -38,6 +38,8 @@ class OnboardingService
     public function __construct(
         private readonly HrCurrentStaffService $currentStaff,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly WorkforceAvailabilityCoverageService $coverage,
+        private readonly PeopleMutationLockService $mutationLocks,
     ) {}
 
     /**
@@ -858,11 +860,37 @@ class OnboardingService
     public function completeOffboardingTask(HrOffboardingTask $task, int $completedBy, array $data = []): HrOffboardingTask
     {
         return DB::transaction(function () use ($task, $completedBy, $data): HrOffboardingTask {
-            $lockedTask = HrOffboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $taskIdentity = HrOffboardingTask::query()
+                ->select(['id', 'offboarding_checklist_id'])
+                ->findOrFail($task->getKey());
+            $checklistIdentity = HrOffboardingChecklist::query()
+                ->select(['id', 'employee_profile_id'])
+                ->findOrFail($taskIdentity->offboarding_checklist_id);
+            $profileIdentity = HrEmployeeProfile::query()
+                ->withTrashed()
+                ->select(['id', 'user_id'])
+                ->findOrFail($checklistIdentity->employee_profile_id);
+            $locks = $this->mutationLocks->lock(
+                [
+                    $completedBy,
+                    $profileIdentity->user_id,
+                    $data['signed_off_by'] ?? null,
+                ],
+                [$profileIdentity->id],
+            );
+            $profile = $locks['profiles']->get($profileIdentity->id);
+            abort_unless($profile, 404);
+            abort_unless($locks['users']->has((int) $profile->user_id), 404);
+            $profile->setRelation('user', $locks['users']->get((int) $profile->user_id));
             $checklist = HrOffboardingChecklist::query()
-                ->with('employeeProfile')
+                ->where('employee_profile_id', $profile->id)
                 ->lockForUpdate()
-                ->findOrFail($lockedTask->offboarding_checklist_id);
+                ->findOrFail($checklistIdentity->id);
+            $lockedTask = HrOffboardingTask::query()
+                ->where('offboarding_checklist_id', $checklist->id)
+                ->lockForUpdate()
+                ->findOrFail($taskIdentity->id);
+            $checklist->setRelation('employeeProfile', $profile);
 
             if ($lockedTask->status === 'completed') {
                 throw new \LogicException("Task '{$lockedTask->title}' is already completed.");
@@ -882,6 +910,7 @@ class OnboardingService
                     ->where('offboarding_checklist_id', $checklist->id)
                     ->whereIn('id', $dependencyTaskIds)
                     ->where('status', 'completed')
+                    ->orderBy('id')
                     ->lockForUpdate()
                     ->pluck('id')
                     ->count();
@@ -937,7 +966,10 @@ class OnboardingService
                 throw new \LogicException('An active offboarding checklist already exists for this employee.');
             }
 
-            $endDate = $options['end_date'] ?? $profile->end_date ?? now()->addWeeks(2);
+            $endDate = Carbon::parse(
+                $options['end_date'] ?? $profile->end_date ?? now()->addWeeks(2),
+            )->toDateString();
+            $previousEmployeeEndDate = $profile->end_date?->toDateString();
             $offboardingTemplate = HrOnboardingTemplate::query()
                 ->active()
                 ->where('role', 'offboarding:'.$profile->position_role)
@@ -972,6 +1004,7 @@ class OnboardingService
                 'status' => 'pending',
                 'started_at' => now(),
                 'due_date' => $endDate,
+                'previous_employee_end_date' => $previousEmployeeEndDate,
                 'created_by' => $createdBy,
             ]);
 
@@ -1081,32 +1114,43 @@ class OnboardingService
                     ->tryLaunchFromOffboarding($checklist, $createdBy);
             }
 
+            $this->coverage->syncOffboarding(
+                $checklist,
+                User::query()->findOrFail($createdBy),
+            );
+
+            // Persist the staffing constraint after coverage has resolved the
+            // worker's currently assigned shifts. Both writes remain atomic.
+            $profile->update(['end_date' => $endDate]);
+
             return $checklist;
         });
 
         // Notify assignees after commit (onboarding notifies too; without this,
         // offboarding tasks sat silently until someone opened the hub —
         // dangerous when the tasks gate access revocation + asset recovery).
-        foreach ($result->tasks as $task) {
-            if (! $task->assigned_to_user_id) {
-                continue;
-            }
+        DB::afterCommit(function () use ($result): void {
+            foreach ($result->tasks as $task) {
+                if (! $task->assigned_to_user_id) {
+                    continue;
+                }
 
-            $assignee = User::find($task->assigned_to_user_id);
-            if (! $assignee) {
-                continue;
-            }
+                $assignee = User::find($task->assigned_to_user_id);
+                if (! $assignee) {
+                    continue;
+                }
 
-            try {
-                $assignee->notify(new OffboardingTaskAssignedNotification($task));
-            } catch (\Throwable $exception) {
-                Log::warning('Failed to notify offboarding task assignee', [
-                    'task_id' => $task->id,
-                    'assignee_id' => $assignee->id,
-                    'error' => $exception->getMessage(),
-                ]);
+                try {
+                    $assignee->notify(new OffboardingTaskAssignedNotification($task));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify offboarding task assignee', [
+                        'task_id' => $task->id,
+                        'assignee_id' => $assignee->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
-        }
+        });
 
         return $result;
     }
@@ -1198,10 +1242,24 @@ class OnboardingService
     public function uncompleteOffboardingTask(HrOffboardingTask $task): HrOffboardingTask
     {
         return DB::transaction(function () use ($task): HrOffboardingTask {
-            $lockedTask = HrOffboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
-            $checklist = HrOffboardingChecklist::query()
+            $taskIdentity = HrOffboardingTask::query()
+                ->select(['id', 'offboarding_checklist_id'])
+                ->findOrFail($task->getKey());
+            $checklistIdentity = HrOffboardingChecklist::query()
+                ->select(['id', 'employee_profile_id'])
+                ->findOrFail($taskIdentity->offboarding_checklist_id);
+            $profile = HrEmployeeProfile::query()
+                ->withTrashed()
                 ->lockForUpdate()
-                ->findOrFail($lockedTask->offboarding_checklist_id);
+                ->findOrFail($checklistIdentity->employee_profile_id);
+            $checklist = HrOffboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->lockForUpdate()
+                ->findOrFail($checklistIdentity->id);
+            $lockedTask = HrOffboardingTask::query()
+                ->where('offboarding_checklist_id', $checklist->id)
+                ->lockForUpdate()
+                ->findOrFail($taskIdentity->id);
 
             if ($lockedTask->status !== 'completed') {
                 return $lockedTask;
@@ -1228,12 +1286,115 @@ class OnboardingService
      * retracted resignation (append-only history, mirrors the onboarding
      * status setter).
      */
-    public function setOffboardingChecklistStatus(HrOffboardingChecklist $checklist, string $status): HrOffboardingChecklist
-    {
-        return DB::transaction(function () use ($checklist, $status): HrOffboardingChecklist {
-            $lockedChecklist = HrOffboardingChecklist::query()
-                ->lockForUpdate()
+    public function setOffboardingChecklistStatus(
+        HrOffboardingChecklist $checklist,
+        string $status,
+        User $actor,
+        ?string $effectiveEndDate = null,
+    ): HrOffboardingChecklist {
+        return DB::transaction(function () use ($actor, $checklist, $effectiveEndDate, $status): HrOffboardingChecklist {
+            $identity = HrOffboardingChecklist::query()
+                ->select(['id', 'employee_profile_id'])
                 ->findOrFail($checklist->getKey());
+            $profile = HrEmployeeProfile::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($identity->employee_profile_id);
+            $lockedChecklist = HrOffboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->lockForUpdate()
+                ->findOrFail($identity->id);
+
+            if ($status === 'cancelled'
+                && ! in_array($lockedChecklist->status, ['pending', 'in_progress', 'cancelled'], true)
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => "A '{$lockedChecklist->status}' offboarding cannot be cancelled.",
+                ]);
+            }
+
+            if ($status === 'archived'
+                && ! in_array($lockedChecklist->status, ['pending', 'in_progress', 'cancelled', 'archived'], true)
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => "A '{$lockedChecklist->status}' offboarding cannot be archived.",
+                ]);
+            }
+
+            if ($status === 'in_progress'
+                && ! in_array($lockedChecklist->status, ['pending', 'in_progress', 'cancelled'], true)
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => "A '{$lockedChecklist->status}' offboarding cannot be resumed.",
+                ]);
+            }
+
+            if (in_array($status, ['cancelled', 'archived'], true)) {
+                $this->coverage->cancelOffboarding($lockedChecklist, $actor);
+
+                if ($profile->end_date?->toDateString() === $lockedChecklist->due_date?->toDateString()) {
+                    $profile->update([
+                        'end_date' => $lockedChecklist->previous_employee_end_date?->toDateString(),
+                    ]);
+                }
+
+                $lockedChecklist->update([
+                    'status' => $status,
+                    'completed_at' => $lockedChecklist->completed_at,
+                ]);
+
+                return $lockedChecklist->fresh();
+            }
+
+            if ($status === 'in_progress') {
+                $otherActiveChecklist = HrOffboardingChecklist::query()
+                    ->where('employee_profile_id', $profile->id)
+                    ->whereKeyNot($lockedChecklist->id)
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->lockForUpdate()
+                    ->exists();
+                if ($otherActiveChecklist) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Another active offboarding checklist already exists for this employee.',
+                    ]);
+                }
+
+                if (! $effectiveEndDate && ! $lockedChecklist->due_date) {
+                    throw ValidationException::withMessages([
+                        'end_date' => 'A last working day is required to resume offboarding.',
+                    ]);
+                }
+
+                $newEndDate = Carbon::parse(
+                    $effectiveEndDate ?: $lockedChecklist->due_date,
+                )->toDateString();
+                $oldEndDate = $lockedChecklist->due_date?->copy();
+
+                if ($oldEndDate && $oldEndDate->toDateString() !== $newEndDate) {
+                    $dayDelta = $oldEndDate->diffInDays(Carbon::parse($newEndDate), false);
+                    $lockedChecklist->tasks()
+                        ->whereIn('status', ['pending', 'in_progress'])
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get()
+                        ->each(function (HrOffboardingTask $task) use ($dayDelta): void {
+                            if ($task->due_date) {
+                                $task->update(['due_date' => $task->due_date->copy()->addDays($dayDelta)]);
+                            }
+                        });
+                }
+
+                $lockedChecklist->update([
+                    'status' => 'in_progress',
+                    'due_date' => $newEndDate,
+                    'completed_at' => null,
+                ]);
+                $profile->update(['end_date' => $newEndDate]);
+                $this->coverage->syncOffboarding($lockedChecklist->fresh(), $actor);
+
+                return $lockedChecklist->fresh();
+            }
+
             $lockedChecklist->update([
                 'status' => $status,
                 'completed_at' => $status === 'completed'

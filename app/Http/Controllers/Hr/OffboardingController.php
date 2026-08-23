@@ -306,18 +306,17 @@ class OffboardingController extends Controller
 
         try {
             DB::transaction(function () use ($user, $task, $validated): void {
-                $lockedTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task, true);
-                if ($lockedTask->sign_off_required && empty($validated['signed_off_by'])) {
+                $canonicalTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task);
+                if ($canonicalTask->sign_off_required && empty($validated['signed_off_by'])) {
                     throw new \LogicException('This task requires sign-off. Please specify the sign-off user.');
                 }
                 if (! empty($validated['signed_off_by'])) {
                     $this->lifecycleAccess->currentUser(
                         $user,
                         (int) $validated['signed_off_by'],
-                        true,
                     );
                 }
-                $this->onboardingService->completeOffboardingTask($lockedTask, $user->id, $validated);
+                $this->onboardingService->completeOffboardingTask($canonicalTask, $user->id, $validated);
             });
         } catch (\LogicException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
@@ -335,8 +334,8 @@ class OffboardingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
         DB::transaction(function () use ($user, $task): void {
-            $lockedTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task, true);
-            $this->onboardingService->uncompleteOffboardingTask($lockedTask);
+            $canonicalTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task);
+            $this->onboardingService->uncompleteOffboardingTask($canonicalTask);
         });
 
         return redirect()->back()->with('success', 'Task reopened.');
@@ -354,11 +353,17 @@ class OffboardingController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:in_progress,cancelled,archived'],
+            'end_date' => ['nullable', 'date', 'prohibited_unless:status,in_progress'],
         ]);
 
         DB::transaction(function () use ($user, $checklist, $validated): void {
-            $lockedChecklist = $this->lifecycleAccess->visibleOffboardingChecklist($user, $checklist, true);
-            $this->onboardingService->setOffboardingChecklistStatus($lockedChecklist, $validated['status']);
+            $canonicalChecklist = $this->lifecycleAccess->visibleOffboardingChecklist($user, $checklist);
+            $this->onboardingService->setOffboardingChecklistStatus(
+                $canonicalChecklist,
+                $validated['status'],
+                $user,
+                $validated['end_date'] ?? null,
+            );
         });
 
         return redirect()->back()->with('success', 'Offboarding updated.');

@@ -56,6 +56,7 @@ class LeaveService
         private readonly PublicHolidayCalendar $holidays,
         private readonly HrLeaveAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly WorkforceAvailabilityCoverageService $coverage,
     ) {}
 
     /**
@@ -321,8 +322,13 @@ class LeaveService
                 notes: $reviewNotes,
             );
 
-            app(HrNotificationService::class)->notifyLeaveApproved(
-                $request->fresh(['reviewer', 'user']),
+            $this->coverage->syncApprovedLeave($request, $reviewer);
+
+            $requestId = (int) $request->id;
+            DB::afterCommit(
+                fn () => app(HrNotificationService::class)->notifyLeaveApproved(
+                    HrLeaveRequest::query()->with(['reviewer', 'user'])->findOrFail($requestId),
+                ),
             );
 
             return $request->fresh();
@@ -592,15 +598,22 @@ class LeaveService
                 notes: 'Leave request cancelled.',
             );
 
+            $this->coverage->cancelLeave($request, $cancelledBy);
+
             return ['request' => $request->fresh(), 'was_approved' => $wasApproved];
         });
 
         // Tell whoever was waiting on the request (best-effort, after commit —
         // mirrors the submit path's approver notification).
-        app(HrNotificationService::class)->notifyLeaveCancelled(
-            $result['request'],
-            $result['was_approved'],
-            $cancelledBy->id,
+        $requestId = (int) $result['request']->id;
+        $wasApproved = (bool) $result['was_approved'];
+        $cancelledById = (int) $cancelledBy->id;
+        DB::afterCommit(
+            fn () => app(HrNotificationService::class)->notifyLeaveCancelled(
+                HrLeaveRequest::query()->findOrFail($requestId),
+                $wasApproved,
+                $cancelledById,
+            ),
         );
 
         return $result['request'];
@@ -637,24 +650,40 @@ class LeaveService
      */
     public function syncApprovedProjection(HrLeaveRequest $request): void
     {
-        if ($request->status !== 'approved' || ! $request->time_off_id) {
-            return;
-        }
+        DB::transaction(function () use ($request): void {
+            $lockedRequest = HrLeaveRequest::query()
+                ->lockForUpdate()
+                ->findOrFail($request->getKey());
+            if ($lockedRequest->status !== 'approved') {
+                return;
+            }
 
-        // Load-modify-save (not a mass update) so AuditableChanges logs the
-        // projection's own state change alongside the HrLeaveRequest edit.
-        $timeOff = StaffTimeOff::find($request->time_off_id);
-        if (! $timeOff) {
-            return;
-        }
+            if (! $lockedRequest->time_off_id) {
+                throw new \LogicException('Approved leave is missing its canonical roster projection.');
+            }
 
-        $timeOff->fill([
-            'type' => $request->leave_type,
-            'starts_at' => $request->starts_at,
-            'ends_at' => $request->ends_at,
-            'period' => $request->period ?: 'full_day',
-            'label' => ucfirst(str_replace('_', ' ', (string) $request->leave_type)),
-        ])->save();
+            $actor = User::query()->find($lockedRequest->reviewed_by ?: $lockedRequest->created_by);
+            if (! $actor) {
+                throw new \LogicException('Approved leave is missing its canonical projection owner.');
+            }
+
+            // Load-modify-save (not a mass update) so AuditableChanges logs the
+            // projection's own state change alongside the HrLeaveRequest edit.
+            $timeOff = StaffTimeOff::query()
+                ->where('hr_leave_request_id', $lockedRequest->id)
+                ->where('user_id', $lockedRequest->user_id)
+                ->lockForUpdate()
+                ->findOrFail($lockedRequest->time_off_id);
+            $timeOff->fill([
+                'type' => $lockedRequest->leave_type,
+                'starts_at' => $lockedRequest->starts_at,
+                'ends_at' => $lockedRequest->ends_at,
+                'period' => $lockedRequest->period ?: 'full_day',
+                'label' => ucfirst(str_replace('_', ' ', (string) $lockedRequest->leave_type)),
+            ])->save();
+
+            $this->coverage->syncApprovedLeave($lockedRequest, $actor);
+        });
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Services\Eligibility\Rules;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Shift;
 use App\Models\StaffAvailability;
@@ -10,12 +11,13 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 /**
- * Checks two conditions:
+ * Checks three conditions:
  *
- * 1. Staff declared availability (StaffAvailability) covers the shift window.
- * 2. No approved HR leave request overlaps the shift window.
+ * 1. The shift sits inside the employee's effective employment window.
+ * 2. Staff declared availability (StaffAvailability) covers the shift window.
+ * 3. No approved HR leave request overlaps the shift window.
  *
- * Returns up to two results (one per sub-check) via evaluateAll().
+ * Returns one result per sub-check via evaluateAll().
  * The single evaluate() method returns the first failing result or a pass.
  */
 class AvailabilityRule implements EligibilityRuleInterface
@@ -46,9 +48,51 @@ class AvailabilityRule implements EligibilityRuleInterface
     public function evaluateAll(Shift $shift, User $user): array
     {
         return [
+            $this->checkEmploymentWindow($shift, $user),
             $this->checkDeclaredAvailability($shift, $user),
             $this->checkApprovedLeave($shift, $user),
         ];
+    }
+
+    protected function checkEmploymentWindow(Shift $shift, User $user): array
+    {
+        $startsAt = $this->resolveCarbon($shift->starts_at);
+        $endsAt = $this->resolveCarbon($shift->ends_at);
+        if (! $startsAt || ! $endsAt) {
+            return self::pass('availability_employment');
+        }
+
+        /** @var HrEmployeeProfile|null $profile */
+        $profile = $user->relationLoaded('hrEmployeeProfile')
+            ? $user->hrEmployeeProfile
+            : null;
+        $profile ??= $user->hrEmployeeProfile()->withTrashed()->first();
+        if (! $profile) {
+            return self::pass('availability_employment');
+        }
+
+        $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+        $employmentStartsAt = $profile->start_date
+            ? Carbon::parse($profile->start_date->toDateString(), $timezone)->startOfDay()->utc()
+            : null;
+        $employmentEndsAt = $profile->end_date
+            ? Carbon::parse($profile->end_date->toDateString(), $timezone)->endOfDay()->utc()
+            : null;
+
+        if (! $profile->is_active
+            || ($employmentStartsAt && $startsAt->lt($employmentStartsAt))
+            || ($employmentEndsAt && $endsAt->gt($employmentEndsAt))
+        ) {
+            return [
+                'rule' => 'availability_employment',
+                'passed' => false,
+                'severity' => 'block',
+                'overrideable' => false,
+                'message' => 'This shift falls outside the staff member\'s active employment dates.',
+            ];
+        }
+
+        return self::pass('availability_employment');
     }
 
     /**

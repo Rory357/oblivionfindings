@@ -24,6 +24,7 @@ class HrOffboardingChecklist extends Model
         'started_at',
         'completed_at',
         'due_date',
+        'previous_employee_end_date',
         'created_by',
     ];
 
@@ -31,6 +32,7 @@ class HrOffboardingChecklist extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'due_date' => 'date',
+        'previous_employee_end_date' => 'date',
     ];
 
     /* ------------------------------------------------------------------ */
