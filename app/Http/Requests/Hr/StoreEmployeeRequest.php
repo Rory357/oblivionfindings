@@ -59,9 +59,10 @@ class StoreEmployeeRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            // NOT unique: an existing account (e.g. a candidate-created user) is
-            // linked/updated by EmployeeIntakeService rather than rejected. The
-            // controller gates silent overwrite behind `link_existing`.
+            // NOT unique: an active employee profile can be explicitly updated,
+            // while a profileless candidate account requires accepted, signed,
+            // two-person recruitment evidence. Every other account kind is
+            // rejected by EmployeeIdentityLinkPolicy without mutation.
             'email' => ['required', 'email', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'role' => ['required', 'string', Rule::in($assignableRoleNames)],

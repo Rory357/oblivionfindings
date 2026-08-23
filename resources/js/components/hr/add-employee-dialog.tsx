@@ -803,12 +803,12 @@ export function AddEmployeeDialog({
                         {linkConflict ? (
                             <InfoCard icon={Link2} tone="warn">
                                 <div className="font-semibold text-foreground">
-                                    This email already belongs to a staff
-                                    member.
+                                    This email already belongs to an account.
                                 </div>
                                 <p className="mt-0.5">
-                                    Link to and update their existing record
-                                    instead of creating a duplicate.
+                                    Link only when this is the same active staff
+                                    record or the accepted recruitment evidence
+                                    has been independently approved.
                                 </p>
                                 <label className="mt-2 flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold">
                                     <Switch

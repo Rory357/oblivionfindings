@@ -756,42 +756,48 @@ class EmployeeProfileController extends Controller
         return $managerQuery->exists() ? $manager : null;
     }
 
-    private function hasLockedAccessibleAcceptedOffer(
+    private function lockedAccessibleAcceptedOfferId(
         string $email,
         int $requestedSiteId,
         array $accessibleSiteIds,
-    ): bool {
+    ): ?int {
         if ($accessibleSiteIds === []) {
-            return false;
+            return null;
         }
 
-        $candidate = HrCandidate::query()
-            ->where('personal_email', $email)
+        $candidateIds = HrCandidate::query()
+            ->whereRaw('LOWER(personal_email) = ?', [Str::lower(trim($email))])
+            ->whereIn('status', ['offer_accepted', 'onboarding', 'hired'])
+            ->orderBy('id')
             ->lockForUpdate()
-            ->first();
-        if (! $candidate) {
-            return false;
+            ->pluck('id');
+        if ($candidateIds->isEmpty()) {
+            return null;
         }
 
-        $application = HrApplication::query()
-            ->where('candidate_id', $candidate->id)
+        $applications = HrApplication::query()
+            ->whereIn('candidate_id', $candidateIds)
             ->where('target_site_id', $requestedSiteId)
             ->whereIn('target_site_id', $accessibleSiteIds)
             ->whereIn('status', ['offer_accepted', 'onboarding', 'hired'])
+            ->orderBy('id')
             ->lockForUpdate()
-            ->first();
-        if (! $application) {
-            return false;
+            ->get(['id', 'candidate_id']);
+        if ($applications->isEmpty()) {
+            return null;
         }
 
-        return HrOffer::query()
-            ->where('application_id', $application->id)
+        $offerIds = HrOffer::query()
+            ->whereIn('application_id', $applications->pluck('id'))
             ->where('approval_status', 'approved')
             ->where('response', 'accepted')
             ->where('primary_site_id', $requestedSiteId)
             ->whereIn('primary_site_id', $accessibleSiteIds)
+            ->orderBy('id')
             ->lockForUpdate()
-            ->first() !== null;
+            ->pluck('id');
+
+        return $offerIds->count() === 1 ? (int) $offerIds->first() : null;
     }
 
     /* ------------------------------------------------------------------ */
@@ -850,9 +856,9 @@ class EmployeeProfileController extends Controller
         $data = $request->validated();
         $actorId = (int) $request->user()->id;
         $managerUserId = isset($data['manager_user_id']) ? (int) $data['manager_user_id'] : null;
-        $existingUserId = User::query()->where('email', $data['email'])->value('id');
 
         try {
+            $existingUserId = $intake->existingUserIdForEmail($data['email']);
             $profile = DB::transaction(function () use ($actorId, $data, $existingUserId, $intake, $managerUserId, $request): HrEmployeeProfile {
                 $intake->acquireIntakeLock('email:'.$data['email']);
                 $locks = $this->lockPeopleMutationGraph([$actorId, $existingUserId, $managerUserId]);
@@ -873,24 +879,37 @@ class EmployeeProfileController extends Controller
                         fn (HrEmployeeProfile $lockedProfile) => (int) $lockedProfile->user_id === (int) $existingUser->id,
                     )
                     : null;
+                $identityLinkOfferId = null;
 
                 if ($existingProfile) {
                     abort_if($existingProfile->trashed(), 404);
                     $this->assertProfileMutationAccess($actor, $existingProfile, $siteAccess);
+                    if (! $existingProfile->is_active) {
+                        throw ValidationException::withMessages([
+                            'email' => 'This former employee must be re-hired through their existing profile.',
+                        ]);
+                    }
                     if (! $request->boolean('link_existing')) {
                         throw ValidationException::withMessages([
                             'email' => 'A staff member already uses this email. Enable “Link to existing record” to update their profile.',
                         ]);
                     }
-                } elseif ($existingUser
-                    && ! $this->hasLockedAccessibleAcceptedOffer(
+                } elseif ($existingUser) {
+                    if (! $request->boolean('link_existing')) {
+                        throw ValidationException::withMessages([
+                            'email' => 'An existing account uses this email. Enable “Link to existing record” only after verifying the accepted recruitment evidence.',
+                        ]);
+                    }
+                    $identityLinkOfferId = $this->lockedAccessibleAcceptedOfferId(
                         $data['email'],
                         (int) $data['primary_site_id'],
                         $accessibleSiteIds,
-                    )) {
-                    throw ValidationException::withMessages([
-                        'email' => 'This existing email cannot be linked through employee intake.',
-                    ]);
+                    );
+                    if (! $identityLinkOfferId) {
+                        throw ValidationException::withMessages([
+                            'email' => 'This existing email cannot be linked through employee intake.',
+                        ]);
+                    }
                 }
 
                 if ($managerUserId
@@ -977,6 +996,7 @@ class EmployeeProfileController extends Controller
                     sendInvite: $request->boolean('send_invite', false),
                     source: 'manual',
                     authorizedExistingUserId: $existingUser?->id,
+                    identityLinkOfferId: $identityLinkOfferId,
                 );
             }, attempts: 3);
         } catch (\InvalidArgumentException $e) {

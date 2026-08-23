@@ -11,7 +11,6 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\Site;
-use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -295,23 +294,27 @@ class RecruitmentService
             $candidate->loadMissing('documents');
             $workEmail = $offer->work_email ?: $candidate->personal_email;
             $roleName = $offer->position_role ?: 'support_worker';
-            $existingUserId = User::query()->where('email', $workEmail)->value('id');
+            $intake = app(EmployeeIntakeService::class);
+            $existingUserId = $intake->existingUserIdForEmail($workEmail);
 
-            // Guard: never hijack a profile already linked to a *different* candidate.
-            $existingProfile = HrEmployeeProfile::query()
-                ->whereHas('user', fn ($q) => $q->where('email', $workEmail))
-                ->first();
+            // Guard: never attach this candidate/offer lineage to an existing
+            // profile unless that profile already owns the exact pair.
+            $existingProfile = $existingUserId
+                ? HrEmployeeProfile::query()->where('user_id', $existingUserId)->first()
+                : null;
             if (
                 $existingProfile
-                && $existingProfile->candidate_id
-                && (int) $existingProfile->candidate_id !== (int) $candidate->id
+                && (
+                    (int) $existingProfile->candidate_id !== (int) $candidate->id
+                    || (int) $existingProfile->offer_id !== (int) $offer->id
+                )
             ) {
                 throw new \LogicException('This email is already linked to another converted candidate.');
             }
 
             // Single source of truth for the User + profile write (+ role,
             // onboarding, invite, event). Recruitment is just one door into it.
-            $profile = app(EmployeeIntakeService::class)->intake(
+            $profile = $intake->intake(
                 name: $candidate->full_name,
                 email: $workEmail,
                 roleName: $roleName,
@@ -336,6 +339,7 @@ class RecruitmentService
                 sendInvite: true,
                 source: 'recruitment',
                 authorizedExistingUserId: $existingUserId ? (int) $existingUserId : null,
+                identityLinkOfferId: $existingUserId ? (int) $offer->id : null,
             );
 
             // Recruitment-specific follow-through (candidate lifecycle + docs).

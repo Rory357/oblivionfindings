@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrDepartment;
@@ -7,11 +8,16 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Domain\Hr\Services\RecruitmentService;
+use App\Models\AuditLog;
+use App\Models\Client;
+use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Notification;
 
 function peopleDirectLegacyPartitionKey(): string
@@ -74,6 +80,51 @@ function peopleDirectUser(string $name, ?Site $site, array $profileOverrides = [
     peopleDirectProfile($user, $site, $profileOverrides);
 
     return $user;
+}
+
+function peopleDirectAcceptedIdentityOffer(
+    User $account,
+    Site $site,
+    User $requestedBy,
+    User $approvedBy,
+    array $offerOverrides = [],
+): HrOffer {
+    $nameParts = preg_split('/\s+/u', trim($account->name), 2);
+    $approvedAt = now()->subDays(2);
+    $sentAt = now()->subDay();
+    $respondedAt = now();
+    $candidate = HrCandidate::factory()->create([
+        'first_name' => $nameParts[0] ?? 'Accepted',
+        'last_name' => $nameParts[1] ?? 'Candidate',
+        'personal_email' => $account->email,
+        'status' => 'offer_accepted',
+    ]);
+    $application = HrApplication::factory()->create([
+        'candidate_id' => $candidate->id,
+        'position_role' => 'support_worker',
+        'target_site_id' => $site->id,
+        'status' => 'offer_accepted',
+    ]);
+
+    return HrOffer::query()->create([
+        'application_id' => $application->id,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeek()->toDateString(),
+        'employment_type' => 'full_time',
+        'primary_site_id' => $site->id,
+        'approval_status' => 'approved',
+        'approved_by' => $approvedBy->id,
+        'approved_at' => $approvedAt,
+        'sent_at' => $sentAt,
+        'response' => 'accepted',
+        'response_at' => $respondedAt,
+        'signed_full_name' => $candidate->full_name,
+        'signed_at' => $respondedAt,
+        'created_by' => $requestedBy->id,
+        'updated_by' => $approvedBy->id,
+        ...$offerOverrides,
+    ]);
 }
 
 test('allowed Site former profiles remain directly readable while hidden and missing provenance profiles are concealed', function () {
@@ -266,6 +317,7 @@ test('employee intake cannot link or overwrite an existing hidden Site profile b
     );
     $profile = $hidden->hrEmployeeProfile;
     $originalTitle = $profile->position_title;
+    $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
 
     $this->actingAs($this->manager)
         ->post('/hr/people', [
@@ -278,8 +330,26 @@ test('employee intake cannot link or overwrite an existing hidden Site profile b
         ])
         ->assertNotFound();
 
+    expect(fn () => app(EmployeeIntakeService::class)->intake(
+        name: $hidden->name,
+        email: $hidden->email,
+        roleName: 'support_worker',
+        profileAttributes: [
+            'position_title' => 'Direct Hidden Overwrite Attempt',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'primary_site_id' => $this->allowedSite->id,
+            'start_date' => now()->toDateString(),
+        ],
+        actorId: $this->manager->id,
+        startOnboarding: false,
+        sendInvite: false,
+        authorizedExistingUserId: $hidden->id,
+    ))->toThrow(InvalidArgumentException::class, 'cannot be linked');
+
     expect($profile->fresh()->position_title)->toBe($originalTitle)
-        ->and($profile->fresh()->primary_site_id)->toBe($this->hiddenSite->id);
+        ->and($profile->fresh()->primary_site_id)->toBe($this->hiddenSite->id)
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
 });
 
 test('employee intake rejects profileless privileged external and unproven existing accounts', function () {
@@ -318,82 +388,19 @@ test('employee intake rejects profileless privileged external and unproven exist
 });
 
 test('employee intake can link a profileless account only through an accepted offer at an accessible Site', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
     $account = User::factory()->create([
         'name' => 'Accepted Candidate Existing Account',
         'email' => 'accepted-candidate-existing@example.test',
         'role' => null,
         'approved_at' => null,
     ]);
-    $candidate = HrCandidate::factory()->create([
-        'personal_email' => $account->email,
-        'status' => 'offer_accepted',
-    ]);
-    $application = HrApplication::factory()->create([
-        'candidate_id' => $candidate->id,
-        'target_site_id' => $this->allowedSite->id,
-        'status' => 'offer_accepted',
-    ]);
-    HrOffer::query()->create([
-        'application_id' => $application->id,
-        'position_title' => 'Support Worker',
-        'position_role' => 'support_worker',
-        'proposed_start_date' => now()->addWeek()->toDateString(),
-        'employment_type' => 'full_time',
-        'primary_site_id' => $this->allowedSite->id,
-        'approval_status' => 'approved',
-        'response' => 'accepted',
-        'response_at' => now(),
-        'created_by' => $this->manager->id,
-        'updated_by' => $this->manager->id,
-    ]);
-
-    $this->actingAs($this->manager)
-        ->post('/hr/people', [
-            'name' => $account->name,
-            'email' => $account->email,
-            'role' => 'support_worker',
-            'primary_site_id' => $this->allowedSite->id,
-        ])
-        ->assertRedirect();
-
-    expect(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeTrue()
-        ->and($account->fresh()->approved_at)->not->toBeNull()
-        ->and($account->fresh()->role)->toBe('support_worker');
-});
-
-test('employee intake rejects an accepted-offer account with a direct permission override', function () {
-    $account = User::factory()->create([
-        'name' => 'Privileged Accepted Candidate',
-        'email' => 'privileged-accepted-candidate@example.test',
-        'role' => null,
-        'approved_at' => null,
-    ]);
-    $account->permissionOverrides()->attach(
-        Permission::query()->where('key', 'settings.access.manage')->firstOrFail()->id,
-        ['allowed' => true],
+    $offer = peopleDirectAcceptedIdentityOffer(
+        $account,
+        $this->allowedSite,
+        $this->manager,
+        $approver,
     );
-    $candidate = HrCandidate::factory()->create([
-        'personal_email' => $account->email,
-        'status' => 'offer_accepted',
-    ]);
-    $application = HrApplication::factory()->create([
-        'candidate_id' => $candidate->id,
-        'target_site_id' => $this->allowedSite->id,
-        'status' => 'offer_accepted',
-    ]);
-    HrOffer::query()->create([
-        'application_id' => $application->id,
-        'position_title' => 'Support Worker',
-        'position_role' => 'support_worker',
-        'proposed_start_date' => now()->addWeek()->toDateString(),
-        'employment_type' => 'full_time',
-        'primary_site_id' => $this->allowedSite->id,
-        'approval_status' => 'approved',
-        'response' => 'accepted',
-        'response_at' => now(),
-        'created_by' => $this->manager->id,
-        'updated_by' => $this->manager->id,
-    ]);
 
     $this->actingAs($this->manager)
         ->post('/hr/people', [
@@ -404,9 +411,391 @@ test('employee intake rejects an accepted-offer account with a direct permission
         ])
         ->assertInvalid('email');
 
+    expect(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeFalse()
+        ->and($account->fresh()->approved_at)->toBeNull();
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $account->name,
+            'email' => $account->email,
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertRedirect();
+
+    $audit = AuditLog::query()
+        ->where('action', 'user.employee_intake')
+        ->where('auditable_type', $account->getMorphClass())
+        ->where('auditable_id', $account->id)
+        ->sole();
+    $profile = HrEmployeeProfile::query()->where('user_id', $account->id)->sole();
+    expect($profile->offer_id)->toBe($offer->id)
+        ->and($profile->candidate_id)->toBe($offer->application->candidate_id)
+        ->and($account->fresh()->approved_at)->not->toBeNull()
+        ->and($account->fresh()->role)->toBe('support_worker')
+        ->and($audit->meta['identity_link_policy'])->toBe('accepted_candidate_two_person_evidence')
+        ->and($audit->meta['identity_link_offer_id'])->toBe($offer->id)
+        ->and($audit->meta['identity_link_candidate_id'])->toBe($offer->application->candidate_id)
+        ->and($audit->meta['identity_link_requested_by'])->toBe($this->manager->id)
+        ->and($audit->meta['identity_link_approved_by'])->toBe($approver->id);
+});
+
+test('accepted recruitment evidence can belong to only one employee profile', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $account = User::factory()->create([
+        'name' => 'One Use Candidate Account',
+        'email' => 'one-use-candidate-account@example.test',
+        'role' => null,
+        'approved_at' => null,
+    ]);
+    $offer = peopleDirectAcceptedIdentityOffer(
+        $account,
+        $this->allowedSite,
+        $this->manager,
+        $approver,
+    );
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $account->name,
+            'email' => $account->email,
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertRedirect();
+
+    $otherAccount = User::factory()->create();
+    expect(fn () => peopleDirectProfile($otherAccount, $this->allowedSite, [
+        'offer_id' => $offer->id,
+        'candidate_id' => $offer->application->candidate_id,
+    ]))->toThrow(QueryException::class);
+
+    expect(HrEmployeeProfile::query()->where('offer_id', $offer->id)->count())->toBe(1)
+        ->and(HrEmployeeProfile::query()->where('candidate_id', $offer->application->candidate_id)->count())->toBe(1);
+});
+
+test('recruitment conversion cannot attach accepted evidence to an unrelated active staff profile', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $staff = peopleDirectUser('Existing Active Recruitment Collision', $this->allowedSite);
+    $offer = peopleDirectAcceptedIdentityOffer(
+        $staff,
+        $this->allowedSite,
+        $this->manager,
+        $approver,
+    );
+    $candidate = $offer->application->candidate;
+    $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+    expect(fn () => app(RecruitmentService::class)->convertToEmployee(
+        $candidate->fresh(),
+        $offer->fresh(),
+        $this->manager->id,
+    ))->toThrow(LogicException::class, 'already linked to another converted candidate');
+
+    $profile = $staff->hrEmployeeProfile->fresh();
+    expect($profile->offer_id)->toBeNull()
+        ->and($profile->candidate_id)->toBeNull()
+        ->and($candidate->fresh()->status)->toBe('offer_accepted')
+        ->and($offer->fresh()->work_email_provisioned)->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+});
+
+test('employee intake cannot rewrite an established profile identity lineage', function () {
+    $staff = peopleDirectUser('Immutable Identity Lineage Staff', $this->allowedSite);
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $offer = peopleDirectAcceptedIdentityOffer(
+        User::factory()->create([
+            'name' => 'Different Accepted Candidate',
+            'email' => 'different-accepted-candidate@example.test',
+            'role' => null,
+            'approved_at' => null,
+        ]),
+        $this->allowedSite,
+        $this->manager,
+        $approver,
+    );
+    $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+    expect(fn () => app(EmployeeIntakeService::class)->intake(
+        name: $staff->name,
+        email: $staff->email,
+        roleName: 'support_worker',
+        profileAttributes: [
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'primary_site_id' => $this->allowedSite->id,
+            'start_date' => now()->toDateString(),
+            'offer_id' => $offer->id,
+            'candidate_id' => $offer->application->candidate_id,
+        ],
+        actorId: $this->manager->id,
+        startOnboarding: false,
+        sendInvite: false,
+        authorizedExistingUserId: $staff->id,
+    ))->toThrow(InvalidArgumentException::class, 'identity lineage cannot be changed');
+
+    $profile = $staff->hrEmployeeProfile->fresh();
+    expect($profile->offer_id)->toBeNull()
+        ->and($profile->candidate_id)->toBeNull()
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+});
+
+test('employee intake rejects an accepted-offer account with a direct permission override', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $account = User::factory()->create([
+        'name' => 'Privileged Accepted Candidate',
+        'email' => 'privileged-accepted-candidate@example.test',
+        'role' => null,
+        'approved_at' => null,
+    ]);
+    $account->permissionOverrides()->attach(
+        Permission::query()->where('key', 'settings.access.manage')->firstOrFail()->id,
+        ['allowed' => true],
+    );
+    peopleDirectAcceptedIdentityOffer(
+        $account,
+        $this->allowedSite,
+        $this->manager,
+        $approver,
+    );
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $account->name,
+            'email' => $account->email,
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertInvalid('email');
+
     expect($account->fresh()->approved_at)->toBeNull()
         ->and(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeFalse()
         ->and($account->fresh()->canDo('settings.access.manage'))->toBeTrue();
+});
+
+test('employee intake rejects every incompatible linked account kind without mutation', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $bindAccountKind = [
+        'client' => function (User $account): void {
+            Client::factory()->create([
+                'user_id' => $account->id,
+                'site_id' => $this->allowedSite->id,
+            ]);
+        },
+        'portal' => function (User $account): void {
+            $client = Client::factory()->create(['site_id' => $this->allowedSite->id]);
+            $account->portalClients()->attach($client->id, ['relation' => 'client']);
+        },
+        'family' => function (User $account): void {
+            $client = Client::factory()->create(['site_id' => $this->allowedSite->id]);
+            NextOfKin::query()->create([
+                'user_id' => $account->id,
+                'client_id' => $client->id,
+                'relationship' => 'sibling',
+            ]);
+        },
+        'board' => function (User $account): void {
+            BoardMember::query()->create([
+                'user_id' => $account->id,
+                'board_role' => 'member',
+                'term_start' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+            ]);
+        },
+    ];
+
+    foreach ($bindAccountKind as $kind => $bind) {
+        $account = User::factory()->create([
+            'name' => ucfirst($kind).' Identity Collision',
+            'email' => $kind.'-identity-collision@example.test',
+            'role' => null,
+            'approved_at' => null,
+        ]);
+        $bind($account);
+        $offer = peopleDirectAcceptedIdentityOffer(
+            $account,
+            $this->allowedSite,
+            $this->manager,
+            $approver,
+        );
+        $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+        expect(fn () => app(EmployeeIntakeService::class)->intake(
+            name: $account->name,
+            email: $account->email,
+            roleName: 'support_worker',
+            profileAttributes: [
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'primary_site_id' => $this->allowedSite->id,
+                'start_date' => now()->toDateString(),
+            ],
+            actorId: $this->manager->id,
+            startOnboarding: false,
+            sendInvite: false,
+            authorizedExistingUserId: $account->id,
+            identityLinkOfferId: $offer->id,
+        ))->toThrow(InvalidArgumentException::class, 'cannot be linked');
+
+        expect($account->fresh()->approved_at)->toBeNull()
+            ->and($account->fresh()->role)->toBeNull()
+            ->and($account->roles()->exists())->toBeFalse()
+            ->and(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeFalse()
+            ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+    }
+});
+
+test('employee intake requires independent approval and candidate signature before merging an accepted candidate account', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $cases = [
+        'self-approved' => [$this->manager, []],
+        'unsigned' => [$approver, ['signed_full_name' => null, 'signed_at' => null]],
+    ];
+
+    foreach ($cases as $case => [$caseApprover, $offerOverrides]) {
+        $account = User::factory()->create([
+            'name' => ucfirst($case).' Candidate Account',
+            'email' => $case.'-candidate-account@example.test',
+            'role' => null,
+            'approved_at' => null,
+        ]);
+        peopleDirectAcceptedIdentityOffer(
+            $account,
+            $this->allowedSite,
+            $this->manager,
+            $caseApprover,
+            $offerOverrides,
+        );
+        $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+        $this->actingAs($this->manager)
+            ->post('/hr/people', [
+                'name' => $account->name,
+                'email' => $account->email,
+                'role' => 'support_worker',
+                'primary_site_id' => $this->allowedSite->id,
+                'link_existing' => true,
+            ])
+            ->assertInvalid('email');
+
+        expect($account->fresh()->approved_at)->toBeNull()
+            ->and($account->fresh()->role)->toBeNull()
+            ->and(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeFalse()
+            ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+    }
+});
+
+test('employee intake rejects ambiguous accepted recruitment identities without mutation', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $account = User::factory()->create([
+        'name' => 'Ambiguous Candidate Account',
+        'email' => 'ambiguous-candidate-account@example.test',
+        'role' => null,
+        'approved_at' => null,
+    ]);
+    peopleDirectAcceptedIdentityOffer($account, $this->allowedSite, $this->manager, $approver);
+    peopleDirectAcceptedIdentityOffer($account, $this->allowedSite, $this->manager, $approver);
+    $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $account->name,
+            'email' => $account->email,
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertInvalid('email');
+
+    expect($account->fresh()->approved_at)->toBeNull()
+        ->and($account->fresh()->role)->toBeNull()
+        ->and(HrEmployeeProfile::query()->where('user_id', $account->id)->exists())->toBeFalse()
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+});
+
+test('employee intake never reactivates a former employee through the create path', function () {
+    $former = peopleDirectUser('Former Intake Collision', $this->allowedSite, [
+        'position_title' => 'Former Role',
+        'is_active' => false,
+        'end_date' => now()->subMonth()->toDateString(),
+    ]);
+    $auditCount = AuditLog::query()->where('action', 'user.employee_intake')->count();
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $former->name,
+            'email' => $former->email,
+            'role' => 'support_worker',
+            'position_title' => 'Silent Reactivation Attempt',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertInvalid('email');
+
+    expect($former->hrEmployeeProfile->fresh()->is_active)->toBeFalse()
+        ->and($former->hrEmployeeProfile->fresh()->position_title)->toBe('Former Role')
+        ->and(AuditLog::query()->where('action', 'user.employee_intake')->count())->toBe($auditCount);
+});
+
+test('employee intake normalizes case but never treats a distinct email alias as merge authority', function () {
+    $approver = User::factory()->create(['approved_at' => now()]);
+    $caseAccount = User::factory()->create([
+        'name' => 'Case Normalized Candidate',
+        'email' => 'Case.Normalized@Example.Test',
+        'role' => null,
+        'approved_at' => null,
+    ]);
+    peopleDirectAcceptedIdentityOffer(
+        $caseAccount,
+        $this->allowedSite,
+        $this->manager,
+        $approver,
+    );
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => $caseAccount->name,
+            'email' => 'case.normalized@example.test',
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+            'link_existing' => true,
+        ])
+        ->assertRedirect();
+
+    $caseAudit = AuditLog::query()
+        ->where('action', 'user.employee_intake')
+        ->where('auditable_id', $caseAccount->id)
+        ->sole();
+    expect(HrEmployeeProfile::query()->where('user_id', $caseAccount->id)->exists())->toBeTrue()
+        ->and($caseAccount->fresh()->email)->toBe('case.normalized@example.test')
+        ->and($caseAudit->meta['email_case_normalized'])->toBeTrue()
+        ->and(User::query()->whereRaw('LOWER(email) = ?', ['case.normalized@example.test'])->count())->toBe(1);
+
+    $aliasAccount = User::factory()->create([
+        'name' => 'Alias Portal Identity',
+        'email' => 'alias.identity@example.test',
+        'role' => 'client',
+        'approved_at' => now(),
+    ]);
+    $this->actingAs($this->manager)
+        ->post('/hr/people', [
+            'name' => 'Alias Staff Identity',
+            'email' => 'alias.identity+staff@example.test',
+            'role' => 'support_worker',
+            'primary_site_id' => $this->allowedSite->id,
+        ])
+        ->assertRedirect();
+
+    $newStaff = User::query()->where('email', 'alias.identity+staff@example.test')->sole();
+    expect($newStaff->id)->not->toBe($aliasAccount->id)
+        ->and($newStaff->hrEmployeeProfile)->not->toBeNull()
+        ->and($aliasAccount->fresh()->role)->toBe('client')
+        ->and(HrEmployeeProfile::query()->where('user_id', $aliasAccount->id)->exists())->toBeFalse();
 });
 
 test('employee intake rejects every unrelated existing RBAC role even when the legacy role matches', function () {
@@ -487,6 +876,7 @@ test('an accepted offer cannot be replayed into a different accessible Site', fu
             'email' => $account->email,
             'role' => 'support_worker',
             'primary_site_id' => $otherAllowedSite->id,
+            'link_existing' => true,
         ])
         ->assertInvalid('email');
 

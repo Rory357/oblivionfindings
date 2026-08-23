@@ -6,7 +6,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Http\Controllers\Hr\EmployeeProfileController;
-use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -29,14 +28,6 @@ use Illuminate\Support\Str;
  */
 class EmployeeIntakeService
 {
-    /**
-     * External portal personas — never assignable through employee intake
-     * (they are not staff; their accounts are provisioned by the portal flows).
-     */
-    private const EXTERNAL_PERSONA_ROLES = ['client', 'next_of_kin'];
-
-    private const ADMIN_LEVEL_THRESHOLD = 100;
-
     public function __construct(
         private readonly OnboardingService $onboarding,
         private readonly HrWebhookService $webhooks,
@@ -44,40 +35,23 @@ class EmployeeIntakeService
         private readonly EmployeeRoleAssignmentService $roleAssignments,
         private readonly UserSiteAccessService $siteAccess,
         private readonly WorkforceAvailabilityCoverageService $coverage,
+        private readonly EmployeeIdentityLinkPolicy $identityLinks,
     ) {}
 
-    /**
-     * Existing logins may only be linked after the caller has proved their
-     * canonical profile or recruitment provenance. Privileged and external
-     * personas are never repurposed through employee intake.
-     */
-    private function assertExistingAccountCompatible(User $user, string $roleName): void
+    public function existingUserIdForEmail(string $email): ?int
     {
-        if ($user->permissionOverrides()->exists()) {
-            throw new \InvalidArgumentException('This existing login cannot be linked through employee intake.');
+        $normalizedEmail = Str::lower(trim($email));
+        $matchingIds = User::query()
+            ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+            ->orderBy('id')
+            ->limit(2)
+            ->pluck('id');
+
+        if ($matchingIds->count() > 1) {
+            throw new \InvalidArgumentException('This existing email cannot be linked through employee intake.');
         }
 
-        $roleNames = collect([$user->role, ...$user->roles()->pluck('roles.name')->all()])
-            ->filter()
-            ->unique();
-
-        if ($roleNames->intersect(self::EXTERNAL_PERSONA_ROLES)->isNotEmpty()) {
-            throw new \InvalidArgumentException('This existing login cannot be linked through employee intake.');
-        }
-
-        $hasAdminGradeRole = Role::query()
-            ->whereIn('name', $roleNames)
-            ->where(function ($query): void {
-                $query->where('name', 'admin')
-                    ->orWhere('level', '>=', self::ADMIN_LEVEL_THRESHOLD);
-            })
-            ->exists();
-
-        $unexpectedRoles = $roleNames->reject(fn (string $existingRole) => $existingRole === $roleName);
-
-        if ($hasAdminGradeRole || $unexpectedRoles->isNotEmpty()) {
-            throw new \InvalidArgumentException('This existing login cannot be linked through employee intake.');
-        }
+        return $matchingIds->isEmpty() ? null : (int) $matchingIds->first();
     }
 
     /**
@@ -88,10 +62,10 @@ class EmployeeIntakeService
      * each best-effort: a failing checklist template, mail outage, or webhook
      * must never roll back or block a hire.
      *
-     * Resolves the user by email — so a person who already exists (e.g. a
-     * candidate-created account) is linked and updated rather than duplicated or
-     * rejected. `hr_employee_profiles.user_id` is UNIQUE, so the profile is a
-     * true upsert keyed on the user.
+     * Resolves an exact case-normalized email. Existing active staff profiles
+     * can be explicitly updated; a profileless login can only be merged through
+     * the accepted-candidate evidence policy. Other collisions fail without
+     * approving the account, assigning a role, or creating a profile.
      *
      * @param  array<string, mixed>  $profileAttributes  resolved hr_employee_profiles columns
      */
@@ -105,6 +79,7 @@ class EmployeeIntakeService
         bool $sendInvite = false,
         string $source = 'manual',
         ?int $authorizedExistingUserId = null,
+        ?int $identityLinkOfferId = null,
     ): HrEmployeeProfile {
         $email = Str::lower(trim($email));
         $profileAttributes = $this->normalizeSiteAssignment($profileAttributes);
@@ -117,13 +92,14 @@ class EmployeeIntakeService
             $profileAttributes,
             $actorId,
             $authorizedExistingUserId,
+            $identityLinkOfferId,
             $sendInvite,
             $source,
         ) {
             // The hashed replay key is the first lock for intake. It serializes
             // same-email requests even when no User row exists yet.
             $this->acquireIntakeLock('email:'.$email);
-            $resolvedExistingUserId = User::query()->where('email', $email)->value('id');
+            $resolvedExistingUserId = $this->existingUserIdForEmail($email);
             $locks = $this->mutationLocks->lock(
                 [$actorId, $authorizedExistingUserId, $resolvedExistingUserId],
             );
@@ -132,8 +108,8 @@ class EmployeeIntakeService
             $role = $this->roleAssignments->assertAssignable($roleName, $actor);
             $this->assertSiteAssignmentIsAvailable($actor, $profileAttributes);
 
-            // 1. Resolve the user by email — link an existing account instead of
-            //    erroring/duplicating; create one otherwise.
+            // 1. Resolve the normalized email. Any existing account must pass
+            //    the compatible-link policy before identity state is changed.
             $user = $resolvedExistingUserId
                 ? $locks['users']->get((int) $resolvedExistingUserId)
                 : null;
@@ -141,12 +117,52 @@ class EmployeeIntakeService
                 throw new \InvalidArgumentException('This existing email cannot be linked through employee intake.');
             }
             $linkedExisting = $user !== null;
+            $emailCaseNormalized = $user !== null && $user->email !== $email;
+            $existing = null;
+            $identityLinkEvidence = [
+                'identity_link_policy' => 'new_staff_account',
+                'identity_link_profile_id' => null,
+                'identity_link_offer_id' => null,
+                'identity_link_candidate_id' => null,
+                'identity_link_requested_by' => null,
+                'identity_link_approved_by' => null,
+                'identity_link_approved_at' => null,
+                'identity_link_candidate_signed_at' => null,
+            ];
 
             if ($user) {
                 if ((int) $user->id !== (int) $authorizedExistingUserId) {
                     throw new \InvalidArgumentException('This existing email cannot be linked through employee intake.');
                 }
-                $this->assertExistingAccountCompatible($user, $roleName);
+                $existing = $locks['profiles']->first(
+                    fn (HrEmployeeProfile $lockedProfile) => (int) $lockedProfile->user_id === (int) $user->id,
+                );
+                if ($existing) {
+                    $this->assertExistingProfileLinkIsAvailable($actor, $existing);
+                }
+                $identityLinkEvidence = $this->identityLinks->authorize(
+                    $user,
+                    $existing,
+                    $roleName,
+                    $identityLinkOfferId,
+                    (int) ($profileAttributes['primary_site_id'] ?? 0),
+                );
+                if ($identityLinkEvidence['identity_link_policy'] === 'accepted_candidate_two_person_evidence') {
+                    $profileAttributes['offer_id'] = $identityLinkEvidence['identity_link_offer_id'];
+                    $profileAttributes['candidate_id'] = $identityLinkEvidence['identity_link_candidate_id'];
+                }
+                if ($existing) {
+                    foreach (['offer_id', 'candidate_id'] as $lineageAttribute) {
+                        if (
+                            array_key_exists($lineageAttribute, $profileAttributes)
+                            && (int) ($profileAttributes[$lineageAttribute] ?? 0) !== (int) ($existing->{$lineageAttribute} ?? 0)
+                        ) {
+                            throw new \InvalidArgumentException('Existing employee identity lineage cannot be changed through intake.');
+                        }
+
+                        $profileAttributes[$lineageAttribute] = $existing->{$lineageAttribute};
+                    }
+                }
             } else {
                 $user = User::query()->create([
                     'name' => $name,
@@ -160,6 +176,9 @@ class EmployeeIntakeService
 
             // Back-fill role/approval on a pre-existing account.
             $updates = [];
+            if ($emailCaseNormalized) {
+                $updates['email'] = $email;
+            }
             if (! $user->role) {
                 $updates['role'] = $roleName;
             }
@@ -175,10 +194,6 @@ class EmployeeIntakeService
 
             // 2. Upsert the single profile per user (user_id is UNIQUE). Only
             //    stamp employee_number / created_by on first creation.
-            $existing = $locks['profiles']->first(
-                fn (HrEmployeeProfile $lockedProfile) => (int) $lockedProfile->user_id === (int) $user->id,
-            );
-
             $values = array_merge($profileAttributes, [
                 'work_email' => $profileAttributes['work_email'] ?? $email,
                 'is_active' => true,
@@ -207,11 +222,13 @@ class EmployeeIntakeService
                 'employee_profile_id' => $profile->id,
                 'source' => $source,
                 'linked_existing_user' => $linkedExisting,
+                'email_case_normalized' => $emailCaseNormalized,
                 'role' => $roleName,
                 'primary_site_id' => $profile->primary_site_id,
                 'secondary_site_ids' => $profile->secondary_site_ids ?? [],
                 'approved' => (bool) $user->approved_at,
                 'invite_requested' => $sendInvite,
+                ...$identityLinkEvidence,
             ]);
 
             return ['user' => $user, 'profile' => $profile, 'linkedExisting' => $linkedExisting];
@@ -572,6 +589,26 @@ class EmployeeIntakeService
 
         if ($matchedSiteCount !== $requestedSiteIds->count()) {
             throw new \InvalidArgumentException('The selected employee Site assignment is unavailable.');
+        }
+    }
+
+    private function assertExistingProfileLinkIsAvailable(User $actor, HrEmployeeProfile $profile): void
+    {
+        $assignedSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn ($siteId) => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn ($siteId) => (int) $siteId)
+            ->unique()
+            ->values();
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $actor,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+
+        if ($assignedSiteIds->isEmpty() || $assignedSiteIds->diff($accessibleSiteIds)->isNotEmpty()) {
+            throw new \InvalidArgumentException('This existing login cannot be linked through employee intake.');
         }
     }
 
