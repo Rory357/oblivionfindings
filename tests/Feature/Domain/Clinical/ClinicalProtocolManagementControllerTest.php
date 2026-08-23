@@ -14,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -137,6 +138,7 @@ class ClinicalProtocolManagementControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/health-clinical/protocols', [
+                'idempotency_key' => (string) Str::uuid(),
                 'client_id' => $client->id,
                 'name' => 'Twice daily pain monitoring',
                 'observation_type' => ObservationType::Pain->value,
@@ -195,6 +197,7 @@ class ClinicalProtocolManagementControllerTest extends TestCase
         $this->actingAs($user)
             ->from("/health-clinical/protocols/{$protocol->id}/edit")
             ->put("/health-clinical/protocols/{$protocol->id}", [
+                'idempotency_key' => (string) Str::uuid(),
                 'name' => 'Updated protocol',
                 'observation_type' => ObservationType::Vitals->value,
                 'frequency' => ProtocolFrequency::Weekly->value,
@@ -229,6 +232,7 @@ class ClinicalProtocolManagementControllerTest extends TestCase
 
         $this->actingAs($user)
             ->put("/health-clinical/protocols/{$protocol->id}", [
+                'idempotency_key' => (string) Str::uuid(),
                 'name' => 'Daily weight management',
                 'instructions' => 'Record before breakfast and before fluid rounds.',
                 'alert_if_missed_hours' => 36,
@@ -257,7 +261,10 @@ class ClinicalProtocolManagementControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->patch("/health-clinical/protocols/{$protocol->id}/toggle-active")
+            ->patch("/health-clinical/protocols/{$protocol->id}/toggle-active", [
+                'idempotency_key' => (string) Str::uuid(),
+                'is_active' => false,
+            ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('clinical_protocols', [

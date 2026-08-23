@@ -179,7 +179,10 @@ export default function Protocols({
 
         router.patch(
             `/health-clinical/protocols/${protocol.id}/toggle-active`,
-            {},
+            {
+                is_active: !protocol.is_active,
+                idempotency_key: crypto.randomUUID(),
+            },
             { preserveScroll: true },
         );
     };

@@ -6,6 +6,7 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
+use App\Domain\Clinical\Services\ClinicalProtocolService;
 use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -21,6 +22,7 @@ class HealthClinicalProtocolController extends Controller
     public function __construct(
         private readonly ClinicalDashboardService $dashboardService,
         private readonly ClinicalSiteAccessService $siteAccess,
+        private readonly ClinicalProtocolService $protocolService,
     ) {}
 
     public function index(Request $request): Response
@@ -28,17 +30,17 @@ class HealthClinicalProtocolController extends Controller
         $this->authorize('viewAny', ClinicalProtocol::class);
 
         $filters = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id' => ['nullable', 'integer'],
             'observation_type' => ['nullable', 'string', Rule::in($this->observationTypeValues())],
             'frequency' => ['nullable', 'string', Rule::in($this->frequencyValues())],
             'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
         if (! empty($filters['client_id'])) {
-            $this->siteAccess->assertCanAccessClient(
+            $this->siteAccess->applyClientScope(
+                Client::query()->whereKey((int) $filters['client_id']),
                 $request->user(),
-                Client::query()->findOrFail((int) $filters['client_id']),
-            );
+            )->firstOrFail();
         }
 
         $protocols = $this->dashboardService
@@ -71,16 +73,15 @@ class HealthClinicalProtocolController extends Controller
     {
         $this->authorize('create', ClinicalProtocol::class);
 
-        $data = $this->validatedProtocolData($request);
-        // Per-client assignment guard (mirrors storeObservation/storeEvent) — without
-        // it a client_id swap would attach a protocol to a client outside the actor's
-        // remit, altering that client's observation schedule + missed-obs alerts.
-        $this->authorize('view', Client::findOrFail($data['client_id']));
-
-        $protocol = ClinicalProtocol::create([
-            ...$data,
-            'created_by' => $request->user()->id,
+        $command = $request->validate([
+            'idempotency_key' => ['required', 'uuid'],
         ]);
+        $data = $this->validatedProtocolData($request);
+        $protocol = $this->protocolService->createProtocol(
+            $request->user(),
+            $data,
+            $command['idempotency_key'],
+        );
 
         return redirect()
             ->route('health-clinical.protocols.index')
@@ -89,6 +90,7 @@ class HealthClinicalProtocolController extends Controller
 
     public function edit(Request $request, ClinicalProtocol $protocol): Response
     {
+        $protocol = $this->visibleProtocol($request->user(), (int) $protocol->id);
         $this->authorize('update', $protocol);
 
         $protocol->load(['client:id,first_name,last_name', 'creator:id,name'])
@@ -112,10 +114,18 @@ class HealthClinicalProtocolController extends Controller
 
     public function update(Request $request, ClinicalProtocol $protocol): RedirectResponse
     {
+        $protocol = $this->visibleProtocol($request->user(), (int) $protocol->id);
         $this->authorize('update', $protocol);
-        $this->authorize('view', $protocol->loadMissing('client')->client);
 
-        $protocol->update($this->validatedProtocolData($request, $protocol));
+        $command = $request->validate([
+            'idempotency_key' => ['required', 'uuid'],
+        ]);
+        $protocol = $this->protocolService->updateProtocol(
+            $request->user(),
+            (int) $protocol->id,
+            $this->validatedProtocolData($request, $protocol),
+            $command['idempotency_key'],
+        );
 
         return redirect()
             ->route('health-clinical.protocols.index')
@@ -124,12 +134,19 @@ class HealthClinicalProtocolController extends Controller
 
     public function toggleActive(Request $request, ClinicalProtocol $protocol): RedirectResponse
     {
+        $protocol = $this->visibleProtocol($request->user(), (int) $protocol->id);
         $this->authorize('update', $protocol);
-        $this->authorize('view', $protocol->loadMissing('client')->client);
 
-        $protocol->update([
-            'is_active' => ! $protocol->is_active,
+        $command = $request->validate([
+            'idempotency_key' => ['required', 'uuid'],
+            'is_active' => ['required', 'boolean'],
         ]);
+        $protocol = $this->protocolService->setActive(
+            $request->user(),
+            (int) $protocol->id,
+            (bool) $command['is_active'],
+            $command['idempotency_key'],
+        );
 
         return back()->with(
             'success',
@@ -180,6 +197,14 @@ class HealthClinicalProtocolController extends Controller
         ];
     }
 
+    private function visibleProtocol(User $user, int $protocolId): ClinicalProtocol
+    {
+        return $this->siteAccess->applyProtocolScope(
+            ClinicalProtocol::query()->whereKey($protocolId),
+            $user,
+        )->firstOrFail();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -196,7 +221,10 @@ class HealthClinicalProtocolController extends Controller
 
         if (! $protocol) {
             $validated = $request->validate([
-                'client_id' => ['required', 'integer', 'exists:clients,id'],
+                // Existence and Site ownership are resolved together inside
+                // the locked command service so foreign and missing Clients
+                // cannot be distinguished before authorization.
+                'client_id' => ['required', 'integer'],
                 'observation_type' => ['required', 'string', Rule::in($this->observationTypeValues())],
                 'frequency' => ['required', 'string', Rule::in($this->frequencyValues())],
                 'custom_frequency_hours' => [
@@ -216,9 +244,19 @@ class HealthClinicalProtocolController extends Controller
 
         $structuralRules = $hasScheduleHistory
             ? [
-                'observation_type' => ['prohibited'],
-                'frequency' => ['prohibited'],
-                'custom_frequency_hours' => ['prohibited'],
+                // The edit form retains these locked values in its payload.
+                // Validate them, then let the locked service reject any
+                // attempted change while accepting an unchanged definition.
+                'observation_type' => ['sometimes', 'string', Rule::in($this->observationTypeValues())],
+                'frequency' => ['sometimes', 'string', Rule::in($this->frequencyValues())],
+                'custom_frequency_hours' => [
+                    'sometimes',
+                    'nullable',
+                    'integer',
+                    'min:1',
+                    'max:8760',
+                    Rule::requiredIf($request->input('frequency') === ProtocolFrequency::Custom->value),
+                ],
             ]
             : [
                 'observation_type' => ['required', 'string', Rule::in($this->observationTypeValues())],

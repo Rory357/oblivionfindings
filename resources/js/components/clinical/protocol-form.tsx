@@ -71,6 +71,7 @@ export default function ProtocolForm({
     canEditStructure = true,
 }: Props) {
     const { data, setData, post, put, processing, errors } = useForm({
+        idempotency_key: crypto.randomUUID(),
         client_id: protocol ? String(protocol.client_id) : '',
         name: protocol?.name ?? '',
         observation_type: protocol?.observation_type ?? '',

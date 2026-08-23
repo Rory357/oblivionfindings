@@ -185,7 +185,7 @@ class HealthClinicalDashboardTest extends TestCase
             ->component('health-clinical/index')
             ->where('kpis.protocols_active', 0)
             ->where('kpis.observations_today', 0)
-            ->where('kpis.compliance_rate_30d', 100)
+            ->where('kpis.compliance_rate_30d', 0)
             ->has('overdue_items', 0)
             ->has('recent_events', 0)
             ->has('recent_observations', 0)

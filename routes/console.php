@@ -440,6 +440,15 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:35');
 
+// Keep active time-based protocol definitions materialized through the same
+// bounded rolling horizon used by their create and update lifecycle.
+app(Schedule::class)
+    ->command('clinical:reconcile-protocol-schedules')
+    ->timezone('UTC')
+    ->dailyAt('00:10')
+    ->onOneServer()
+    ->withoutOverlapping();
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)

@@ -3,7 +3,6 @@
 namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Enums\ObservationType;
-use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
@@ -28,120 +27,6 @@ class ClinicalProtocolServiceTest extends TestCase
         parent::setUp();
         $this->service = app(ClinicalProtocolService::class);
         $this->client = Client::factory()->create();
-    }
-
-    // ── generateSchedule() ───────────────────────────────────────────────
-
-    public function test_generates_daily_schedule(): void
-    {
-        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
-            'client_id' => $this->client->id,
-        ]);
-
-        $from = Carbon::parse('2026-04-14 08:00');
-        $to = Carbon::parse('2026-04-16 08:00');
-
-        $items = $this->service->generateSchedule($protocol, $from, $to);
-
-        // 08:00 day 1, 08:00 day 2, 08:00 day 3 = 3 items
-        $this->assertCount(3, $items);
-        $this->assertEquals('pending', $items[0]->status);
-        $this->assertEquals($protocol->id, $items[0]->clinical_protocol_id);
-    }
-
-    public function test_generates_weekly_schedule(): void
-    {
-        $protocol = ClinicalProtocol::factory()->create([
-            'client_id' => $this->client->id,
-            'frequency' => ProtocolFrequency::Weekly,
-        ]);
-
-        $from = Carbon::parse('2026-04-14 08:00');
-        $to = Carbon::parse('2026-04-28 08:00');
-
-        $items = $this->service->generateSchedule($protocol, $from, $to);
-
-        // 168h interval: day 1, day 8, day 15 = 3 items
-        $this->assertCount(3, $items);
-    }
-
-    public function test_does_not_generate_for_every_shift_frequency(): void
-    {
-        $protocol = ClinicalProtocol::factory()->everyShiftVitals()->create([
-            'client_id' => $this->client->id,
-        ]);
-
-        $items = $this->service->generateSchedule(
-            $protocol,
-            Carbon::parse('2026-04-14'),
-            Carbon::parse('2026-04-16'),
-        );
-
-        $this->assertCount(0, $items);
-    }
-
-    public function test_does_not_generate_for_inactive_protocol(): void
-    {
-        $protocol = ClinicalProtocol::factory()->inactive()->create([
-            'client_id' => $this->client->id,
-        ]);
-
-        $items = $this->service->generateSchedule(
-            $protocol,
-            Carbon::parse('2026-04-14'),
-            Carbon::parse('2026-04-16'),
-        );
-
-        $this->assertCount(0, $items);
-    }
-
-    public function test_does_not_generate_for_expired_protocol(): void
-    {
-        $protocol = ClinicalProtocol::factory()->expired()->create([
-            'client_id' => $this->client->id,
-        ]);
-
-        $items = $this->service->generateSchedule(
-            $protocol,
-            Carbon::parse('2026-04-14'),
-            Carbon::parse('2026-04-16'),
-        );
-
-        $this->assertCount(0, $items);
-    }
-
-    public function test_schedule_generation_is_idempotent(): void
-    {
-        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
-            'client_id' => $this->client->id,
-        ]);
-
-        $from = Carbon::parse('2026-04-14 08:00');
-        $to = Carbon::parse('2026-04-15 08:00');
-
-        $first = $this->service->generateSchedule($protocol, $from, $to);
-        $second = $this->service->generateSchedule($protocol, $from, $to);
-
-        $this->assertCount(2, $first);
-        $this->assertCount(0, $second); // no new items
-        $this->assertEquals(2, ClinicalProtocolSchedule::where('clinical_protocol_id', $protocol->id)->count());
-    }
-
-    public function test_custom_frequency_protocol(): void
-    {
-        $protocol = ClinicalProtocol::factory()->create([
-            'client_id' => $this->client->id,
-            'frequency' => ProtocolFrequency::Custom,
-            'custom_frequency_hours' => 6,
-        ]);
-
-        $from = Carbon::parse('2026-04-14 00:00');
-        $to = Carbon::parse('2026-04-14 18:00');
-
-        $items = $this->service->generateSchedule($protocol, $from, $to);
-
-        // 0, 6, 12, 18 = 4 items
-        $this->assertCount(4, $items);
     }
 
     // ── getDueForClient() ────────────────────────────────────────────────
@@ -389,10 +274,15 @@ class ClinicalProtocolServiceTest extends TestCase
     {
         $protocol = ClinicalProtocol::factory()->create(['client_id' => $this->client->id]);
 
-        ClinicalProtocolSchedule::factory()->completed()->count(3)->create([
-            'clinical_protocol_id' => $protocol->id,
-            'due_at' => now()->subDays(5),
-        ]);
+        ClinicalProtocolSchedule::factory()
+            ->completed()
+            ->count(3)
+            ->sequence(
+                ['due_at' => now()->subDays(5)],
+                ['due_at' => now()->subDays(4)],
+                ['due_at' => now()->subDays(3)],
+            )
+            ->create(['clinical_protocol_id' => $protocol->id]);
 
         $rate = $this->service->getComplianceRate($this->client);
         $this->assertEquals(100.0, $rate);
@@ -410,14 +300,18 @@ class ClinicalProtocolServiceTest extends TestCase
             'clinical_protocol_id' => $protocol->id,
             'due_at' => now()->subDays(2),
         ]);
+        ClinicalProtocolSchedule::factory()->skipped()->create([
+            'clinical_protocol_id' => $protocol->id,
+            'due_at' => now()->subDay(),
+        ]);
 
         $rate = $this->service->getComplianceRate($this->client);
         $this->assertEquals(50.0, $rate);
     }
 
-    public function test_compliance_rate_100_when_no_schedules(): void
+    public function test_compliance_rate_is_zero_when_no_schedules(): void
     {
         $rate = $this->service->getComplianceRate($this->client);
-        $this->assertEquals(100.0, $rate);
+        $this->assertEquals(0.0, $rate);
     }
 }

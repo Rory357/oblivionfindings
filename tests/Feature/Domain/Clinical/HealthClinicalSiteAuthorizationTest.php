@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -368,7 +369,7 @@ class HealthClinicalSiteAuthorizationTest extends TestCase
             ->assertForbidden();
         $this->actingAs($this->clinicalUser)
             ->get("/health-clinical/protocols?client_id={$this->outsideClient->id}")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->clinicalUser)
             ->get("/shifts/{$outsideShift->id}/clinical/observations/due")
             ->assertForbidden();
@@ -387,13 +388,14 @@ class HealthClinicalSiteAuthorizationTest extends TestCase
             ->assertForbidden();
         $this->actingAs($this->clinicalUser)
             ->post('/health-clinical/protocols', [
+                'idempotency_key' => (string) Str::uuid(),
                 'client_id' => $this->outsideClient->id,
                 'name' => 'Site B weight protocol',
                 'observation_type' => ObservationType::Weight->value,
                 'frequency' => ProtocolFrequency::Daily->value,
                 'alert_if_missed_hours' => 2,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->clinicalUser)
             ->postJson("/shifts/{$outsideShift->id}/clinical/observations", [
                 'observation_type' => ObservationType::Weight->value,
@@ -508,7 +510,7 @@ class HealthClinicalSiteAuthorizationTest extends TestCase
 
         $this->actingAs($this->clinicalUser)
             ->get("/health-clinical/protocols/{$outsideProtocol->id}/edit")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->clinicalUser)
             ->put("/health-clinical/protocols/{$outsideProtocol->id}", [
                 'name' => 'Attempted mutation',
@@ -516,10 +518,10 @@ class HealthClinicalSiteAuthorizationTest extends TestCase
                 'frequency' => $outsideProtocol->frequency->value,
                 'alert_if_missed_hours' => 4,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($this->clinicalUser)
             ->patch("/health-clinical/protocols/{$outsideProtocol->id}/toggle-active")
-            ->assertForbidden();
+            ->assertNotFound();
 
         $outsideEvent->refresh();
         $this->assertNull($outsideEvent->reviewed_at);

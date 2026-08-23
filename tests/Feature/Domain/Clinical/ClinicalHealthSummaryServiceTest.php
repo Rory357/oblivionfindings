@@ -187,11 +187,11 @@ class ClinicalHealthSummaryServiceTest extends TestCase
         $this->assertEquals(1, $compliance['overdue_count']);
     }
 
-    public function test_returns_100_percent_when_no_protocols(): void
+    public function test_returns_zero_percent_when_no_protocol_schedules_exist(): void
     {
         $compliance = $this->service->getProtocolCompliance($this->client);
 
-        $this->assertEquals(100.0, $compliance['rate']);
+        $this->assertEquals(0.0, $compliance['rate']);
         $this->assertEquals(0, $compliance['due_count']);
         $this->assertEquals(0, $compliance['overdue_count']);
     }

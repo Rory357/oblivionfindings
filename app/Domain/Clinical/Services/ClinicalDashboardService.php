@@ -937,14 +937,16 @@ class ClinicalDashboardService
     protected function calculateComplianceRate(User $user, Carbon $from, Carbon $to): float
     {
         $total = $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user)
+            ->whereIn('status', ['completed', 'missed', 'pending'])
             ->whereBetween('due_at', [$from, $to])
             ->count();
 
         if ($total === 0) {
-            return 100.0;
+            return 0.0;
         }
 
         $completed = $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user)
+            ->whereIn('status', ['completed', 'missed', 'pending'])
             ->whereBetween('due_at', [$from, $to])
             ->where('status', 'completed')
             ->count();

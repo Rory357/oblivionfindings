@@ -5,9 +5,11 @@ namespace App\Domain\Clinical\Models;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\ShiftTask;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class ClinicalProtocolSchedule extends Model
 {
@@ -22,6 +24,8 @@ class ClinicalProtocolSchedule extends Model
 
     protected $fillable = [
         'clinical_protocol_id',
+        'schedule_version',
+        'occurrence_key',
         'due_at',
         'status',
         'skip_reason',
@@ -34,7 +38,39 @@ class ClinicalProtocolSchedule extends Model
     protected $casts = [
         'due_at' => 'datetime',
         'completed_at' => 'datetime',
+        'schedule_version' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (ClinicalProtocolSchedule $schedule): void {
+            $schedule->schedule_version = (int) ($schedule->schedule_version ?: 1);
+            $schedule->occurrence_key = self::buildOccurrenceKey(
+                (int) $schedule->clinical_protocol_id,
+                $schedule->schedule_version,
+                CarbonImmutable::instance($schedule->due_at)->utc()->startOfSecond(),
+            );
+        });
+
+        static::updating(function (ClinicalProtocolSchedule $schedule): void {
+            if ($schedule->isDirty(['clinical_protocol_id', 'schedule_version', 'occurrence_key', 'due_at'])) {
+                throw new LogicException('Clinical protocol schedule occurrence identity is immutable.');
+            }
+        });
+    }
+
+    public static function buildOccurrenceKey(
+        int $protocolId,
+        int $scheduleVersion,
+        CarbonImmutable $dueAt,
+    ): string {
+        return hash('sha256', implode('|', [
+            'clinical-protocol-occurrence-v1',
+            (string) $protocolId,
+            (string) $scheduleVersion,
+            $dueAt->utc()->startOfSecond()->format('Y-m-d\TH:i:s\Z'),
+        ]));
+    }
 
     // ── Relationships ────────────────────────────────────────────────────
 

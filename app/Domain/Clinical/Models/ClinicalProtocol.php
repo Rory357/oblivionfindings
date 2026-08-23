@@ -36,6 +36,8 @@ class ClinicalProtocol extends Model
         'is_active',
         'starts_at',
         'ends_at',
+        'schedule_anchor_at',
+        'schedule_version',
     ];
 
     protected $casts = [
@@ -45,6 +47,8 @@ class ClinicalProtocol extends Model
         'is_active' => 'boolean',
         'starts_at' => 'date',
         'ends_at' => 'date',
+        'schedule_anchor_at' => 'immutable_datetime',
+        'schedule_version' => 'integer',
     ];
 
     // ── Relationships ────────────────────────────────────────────────────
