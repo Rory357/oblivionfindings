@@ -35,9 +35,9 @@ import {
     HeroSummaryMetric,
     HeroSummaryStrip,
     ngaPaerewaBadge,
+    useNzsAssurance,
     type HeroComplianceBadge,
     type Tone,
-    useNzsAssurance,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {

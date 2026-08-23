@@ -211,8 +211,7 @@ class InvoiceController extends Controller
         StoreInvoiceRequest $request,
         GstTaxRateResolver $gstTaxRateResolver,
         BillingService $billing,
-    )
-    {
+    ) {
         $validated = $request->validated();
 
         $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;

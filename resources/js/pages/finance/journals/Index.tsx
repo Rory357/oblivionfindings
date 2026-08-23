@@ -297,7 +297,9 @@ export default function JournalsIndex({
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
                                                     <p className="font-medium">
-                                                        {occurrence.schedule_name}
+                                                        {
+                                                            occurrence.schedule_name
+                                                        }
                                                     </p>
                                                     <p className="mt-1 text-sm text-muted-foreground">
                                                         Due{' '}

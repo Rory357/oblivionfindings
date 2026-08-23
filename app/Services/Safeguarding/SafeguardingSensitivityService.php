@@ -348,6 +348,7 @@ class SafeguardingSensitivityService
                     409,
                     'The concern Site and linked-person provenance must be reconciled before declassification.',
                 );
+
                 continue;
             }
 

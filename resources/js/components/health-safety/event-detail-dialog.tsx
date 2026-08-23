@@ -1633,10 +1633,12 @@ function WorksafeDecisionPane({
                         still required.
                     </span>
                     <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-                        <li>Confirm the event arose from the conduct of work.</li>
                         <li>
-                            Check death, immediate in-patient admission, and every
-                            specified serious injury or illness.
+                            Confirm the event arose from the conduct of work.
+                        </li>
+                        <li>
+                            Check death, immediate in-patient admission, and
+                            every specified serious injury or illness.
                         </li>
                         <li>
                             Check every listed dangerous incident and confirm it
@@ -1673,7 +1675,8 @@ function WorksafeDecisionPane({
                     <p className="mt-2 text-sm">
                         If any fact or category is uncertain, do not record a
                         final decision; leave this event for qualified review.
-                        Generic severity alone is not a statutory classification.
+                        Generic severity alone is not a statutory
+                        classification.
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
                         {d.worksafe.decision_support.version} · source effective{' '}
@@ -1681,8 +1684,8 @@ function WorksafeDecisionPane({
                             d.worksafe.decision_support.source_effective_date,
                         )}{' '}
                         · content owner{' '}
-                        {d.worksafe.decision_support.content_owner}{' '}
-                        · review before{' '}
+                        {d.worksafe.decision_support.content_owner} · review
+                        before{' '}
                         {formatDateOnly(
                             d.worksafe.decision_support
                                 .next_mandatory_review_date,
@@ -1695,7 +1698,10 @@ function WorksafeDecisionPane({
                         className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                         Review the official WorkSafe criteria
-                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                        <ExternalLink
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                        />
                     </a>
                 </InfoCard>
             ) : null}
@@ -2753,9 +2759,7 @@ function InvestigationControls({
             'findings_recorded',
             'under_review',
             'reviewed',
-        ].includes(
-            inv.status,
-        )
+        ].includes(inv.status)
     )
         return null;
 

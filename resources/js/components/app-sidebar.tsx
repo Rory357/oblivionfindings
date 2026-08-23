@@ -3130,10 +3130,10 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
             overlayClassName="bg-black/50 md:hidden"
             closeButtonClassName="frontline-focus frontline-tap top-1.5 right-2.5 flex items-center justify-center rounded-md text-sidebar-foreground opacity-100 hover:bg-sidebar-accent hover:opacity-100 focus:ring-sidebar-ring [&_svg]:size-5"
             closeLabel="Close menu"
-            className="border-sidebar-border bg-sidebar text-sidebar-foreground w-72 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0 sm:max-w-72 md:hidden"
+            className="w-72 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden border-sidebar-border bg-sidebar p-0 text-sidebar-foreground sm:max-w-72 md:hidden"
         >
-            <SheetHeader className="border-sidebar-border/50 min-h-14 justify-center border-b px-4 py-3 pr-16">
-                <SheetTitle className="text-sidebar-foreground text-sm">
+            <SheetHeader className="min-h-14 justify-center border-b border-sidebar-border/50 px-4 py-3 pr-16">
+                <SheetTitle className="text-sm text-sidebar-foreground">
                     Menu
                 </SheetTitle>
                 <SheetDescription className="sr-only">
@@ -3168,7 +3168,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                     className={cn(
                                         'frontline-focus min-h-11 w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                         active
-                                            ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
+                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
                                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
@@ -3186,7 +3186,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                         groups ?? [],
                                     ).map((group) => (
                                         <div key={group.label} className="ml-4">
-                                            <div className="text-sidebar-foreground/40 px-4 py-1 text-[11px] font-medium uppercase tracking-wider">
+                                            <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
                                                 {group.label}
                                             </div>
                                             {(group.items ?? []).map((sub) => (
@@ -3209,7 +3209,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                                             currentUrl,
                                                             sub.href,
                                                         )
-                                                            ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
+                                                            ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
                                                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                                     )}
                                                 >
@@ -3221,7 +3221,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                                     <span>{sub.title}</span>
                                                     {sub.badge != null &&
                                                         sub.badge > 0 && (
-                                                            <span className="bg-status-critical ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white">
+                                                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
                                                                 {sub.badge > 9
                                                                     ? '9+'
                                                                     : sub.badge}
@@ -3232,7 +3232,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                         </div>
                                     ))}
                                 {item.dividerAfter && (
-                                    <div className="border-sidebar-border/30 mx-4 my-1 border-b" />
+                                    <div className="mx-4 my-1 border-b border-sidebar-border/30" />
                                 )}
                             </div>
                         );
@@ -3251,7 +3251,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                 className={cn(
                                     'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
                                     active
-                                        ? 'bg-sidebar-primary/10 text-foreground dark:text-foreground font-medium'
+                                        ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
                                         : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                 )}
                             >
@@ -3259,7 +3259,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                 <span>{item.label}</span>
                             </Link>
                             {item.dividerAfter && (
-                                <div className="border-sidebar-border/30 mx-4 my-1 border-b" />
+                                <div className="mx-4 my-1 border-b border-sidebar-border/30" />
                             )}
                         </div>
                     );

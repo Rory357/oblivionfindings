@@ -11,6 +11,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 /*
  * Manager force-close for stuck open sessions ("End session" on the
@@ -20,7 +21,7 @@ use App\Models\User;
  */
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->site = Site::factory()->create();
 

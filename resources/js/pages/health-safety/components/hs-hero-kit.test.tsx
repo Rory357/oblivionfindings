@@ -49,7 +49,9 @@ describe('HeroComplianceBadges — canonical NZ labels', () => {
             screen.getByText('Hazardous substances · SDS current'),
         ).toBeInTheDocument();
         expect(screen.getByText('Fire · Drills current')).toBeInTheDocument();
-        expect(screen.getByText('First aid · Cover unknown')).toBeInTheDocument();
+        expect(
+            screen.getByText('First aid · Cover unknown'),
+        ).toBeInTheDocument();
     });
 
     it('retains green claims only for explicit resolver-backed positive states', () => {

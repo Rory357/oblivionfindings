@@ -615,38 +615,38 @@ export function IncidentReportDialog({
     };
 
     const draftStatus = !draftRecovery.loaded ? (
-        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
             Checking for a saved draft…
         </span>
     ) : draftRecovery.status === 'saving' ? (
-        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
             Saving securely…
         </span>
     ) : draftRecovery.status === 'saved' && draftRecovery.savedAt ? (
-        <span className="text-status-success flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-status-success">
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             Saved securely at {formatTime(draftRecovery.savedAt)}
         </span>
     ) : draftRecovery.resumeAvailable ? (
-        <span className="text-status-warning flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-status-warning">
             <Clock3 className="h-4 w-4" aria-hidden="true" />
             Saved report found
         </span>
     ) : draftRecovery.recoveryBlocked ? (
-        <span className="text-status-warning flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-status-warning">
             <CloudOff className="h-4 w-4" aria-hidden="true" />
             Recovery paused
         </span>
     ) : draftRecovery.status === 'error' ||
       draftRecovery.status === 'session_expired' ? (
-        <span className="text-status-critical flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-status-critical">
             <CloudOff className="h-4 w-4" aria-hidden="true" />
             Not saved yet
         </span>
     ) : draftRecovery.status === 'dirty' ? (
-        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock3 className="h-4 w-4" aria-hidden="true" />
             Waiting to save…
         </span>
@@ -695,7 +695,7 @@ export function IncidentReportDialog({
                             {result.incident_reference ? (
                                 <>
                                     Reference{' '}
-                                    <span className="text-foreground font-semibold">
+                                    <span className="font-semibold text-foreground">
                                         {result.incident_reference}
                                     </span>
                                     .{' '}
@@ -709,7 +709,7 @@ export function IncidentReportDialog({
                                 {result.incident_reference ? (
                                     <>
                                         Incident{' '}
-                                        <span className="text-foreground font-semibold">
+                                        <span className="font-semibold text-foreground">
                                             {result.incident_reference}
                                         </span>
                                     </>
@@ -721,7 +721,7 @@ export function IncidentReportDialog({
                                     <>
                                         {' '}
                                         H&amp;S reference{' '}
-                                        <span className="text-foreground font-semibold">
+                                        <span className="font-semibold text-foreground">
                                             {result.hs_reference}
                                         </span>
                                         .
@@ -729,7 +729,7 @@ export function IncidentReportDialog({
                                 ) : null}
                             </span>
                             {isAwaitingHsAcceptance ? (
-                                <span className="bg-status-warning-bg text-status-warning inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-status-warning-bg px-3 py-1 font-semibold text-status-warning">
                                     <Clock3
                                         className="h-4 w-4"
                                         aria-hidden="true"
@@ -993,7 +993,7 @@ export function IncidentReportDialog({
                                 permanently.
                             </span>
                             {draftRecovery.message ? (
-                                <span className="text-status-critical mt-2 block font-medium">
+                                <span className="mt-2 block font-medium text-status-critical">
                                     {draftRecovery.message}
                                 </span>
                             ) : null}
@@ -1043,14 +1043,14 @@ function ValidationSummary({ messages }: { messages: string[] }) {
     return (
         <div
             role="alert"
-            className="border-status-critical/35 bg-status-critical-bg text-foreground flex gap-2.5 rounded-lg border p-3 text-sm"
+            className="flex gap-2.5 rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-sm text-foreground"
         >
             <AlertTriangle
-                className="text-status-critical mt-0.5 h-4 w-4 shrink-0"
+                className="mt-0.5 h-4 w-4 shrink-0 text-status-critical"
                 aria-hidden="true"
             />
             <div>
-                <p className="text-status-critical font-semibold">
+                <p className="font-semibold text-status-critical">
                     Some details need attention
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-4">
@@ -1465,7 +1465,7 @@ function NotifiableStep({
                     </>
                 )}
             </InfoCard>
-            <label className="border-border flex items-center gap-2.5 rounded-lg border p-3 text-sm">
+            <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-sm">
                 <input
                     type="checkbox"
                     aria-label="Potentially notifiable"
@@ -1479,9 +1479,9 @@ function NotifiableStep({
                             setData('worksafe_notification_status', 'pending');
                         }
                     }}
-                    className="border-border h-4 w-4 rounded"
+                    className="h-4 w-4 rounded border-border"
                 />
-                <span className="text-foreground font-medium">
+                <span className="font-medium text-foreground">
                     This may be WorkSafe NZ–notifiable — flag it for H&amp;S to
                     confirm.
                 </span>
@@ -1514,7 +1514,7 @@ function NotifiableStep({
                     </Field>
                 </div>
             ) : null}
-            <label className="border-border flex items-center gap-2.5 rounded-lg border p-3 text-sm">
+            <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-sm">
                 <input
                     type="checkbox"
                     aria-label="Site preserved"
@@ -1522,9 +1522,9 @@ function NotifiableStep({
                     onChange={(event) =>
                         setData('site_preserved', event.target.checked)
                     }
-                    className="border-border h-4 w-4 rounded"
+                    className="h-4 w-4 rounded border-border"
                 />
-                <span className="text-foreground font-medium">
+                <span className="font-medium text-foreground">
                     The incident site has been preserved pending H&amp;S
                     direction.
                 </span>
@@ -1571,7 +1571,7 @@ function FollowupsStep({
                 return (
                     <div
                         key={i}
-                        className="border-border flex flex-col gap-2 rounded-xl border p-3"
+                        className="flex flex-col gap-2 rounded-xl border border-border p-3"
                     >
                         <Field label={`Task ${i + 1}`} error={notesError}>
                             <Textarea
@@ -1619,7 +1619,7 @@ function FollowupsStep({
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="text-status-critical hover:text-status-critical self-end"
+                            className="self-end text-status-critical hover:text-status-critical"
                             onClick={() => onRemove(i)}
                         >
                             <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove

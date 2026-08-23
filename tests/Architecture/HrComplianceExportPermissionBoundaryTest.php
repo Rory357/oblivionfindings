@@ -40,7 +40,7 @@ it('keeps route admission and response authorization on the dataset policy', fun
     expect($routes)
         ->toContain("->middleware('permission:'.ComplianceExportDataset::routePermissionEnvelope())")
         ->and($controller)
-        ->toContain("Rule::enum(ComplianceExportDataset::class)")
+        ->toContain('Rule::enum(ComplianceExportDataset::class)')
         ->toContain('ComplianceExportDataset::from($validated[\'dataset\'])')
         ->and($exportRoute)->not->toBeFalse()
         ->and($complianceGroup)->not->toBeFalse()

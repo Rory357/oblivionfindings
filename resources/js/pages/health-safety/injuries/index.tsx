@@ -48,8 +48,8 @@ import {
     HeroStatusPill,
     fmt,
     ngaPaerewaBadge,
-    type HeroComplianceBadge,
     useNzsAssurance,
+    type HeroComplianceBadge,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,

@@ -566,7 +566,7 @@ function SignalRuleDialog({
                             <p
                                 id="rule-conditions-error"
                                 role="alert"
-                                className="text-status-critical text-sm"
+                                className="text-sm text-status-critical"
                             >
                                 {conditionsError}
                             </p>
@@ -624,7 +624,7 @@ function SignalRuleDialog({
                         </div>
                     </div>
 
-                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
+                    <DialogFooter className="sticky bottom-0 -mx-6 border-t bg-background px-6 pt-3 pb-1">
                         <Button
                             type="button"
                             variant="outline"
@@ -953,7 +953,7 @@ function TriageQueueDialog({
                         </Label>
                     </div>
 
-                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
+                    <DialogFooter className="sticky bottom-0 -mx-6 border-t bg-background px-6 pt-3 pb-1">
                         <Button
                             type="button"
                             variant="outline"
@@ -1181,7 +1181,7 @@ function MaintenanceWindowDialog({
                         </div>
                     </div>
 
-                    <DialogFooter className="bg-background sticky bottom-0 -mx-6 border-t px-6 pb-1 pt-3">
+                    <DialogFooter className="sticky bottom-0 -mx-6 border-t bg-background px-6 pt-3 pb-1">
                         <Button
                             type="button"
                             variant="outline"
@@ -1507,7 +1507,7 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {signalRules.length === 0 ? (
-                                        <p className="text-muted-foreground py-8 text-center text-sm">
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
                                             No signal rules configured yet.
                                             Create one to get started.
                                         </p>
@@ -1515,26 +1515,26 @@ export default function ControlRoomSettings({
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="text-muted-foreground border-b text-left">
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Signal Type
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Source
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Priority
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Severity
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Dedup
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Active
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1551,11 +1551,11 @@ export default function ControlRoomSettings({
                                                             <td className="py-2.5 pr-4 font-medium">
                                                                 {rule.name}
                                                             </td>
-                                                            <td className="text-muted-foreground py-2.5 pr-4">
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
                                                                 {rule.signal_type_name ??
                                                                     'Any'}
                                                             </td>
-                                                            <td className="text-muted-foreground py-2.5 pr-4">
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
                                                                 {rule.signal_source_name ??
                                                                     'Any'}
                                                             </td>
@@ -1629,7 +1629,7 @@ export default function ControlRoomSettings({
                                                                             )
                                                                         }
                                                                     >
-                                                                        <Trash2 className="text-status-critical h-3.5 w-3.5" />
+                                                                        <Trash2 className="h-3.5 w-3.5 text-status-critical" />
                                                                     </Button>
                                                                 </div>
                                                             </td>
@@ -1664,39 +1664,39 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {triageQueues.length === 0 ? (
-                                        <p className="text-muted-foreground py-8 text-center text-sm">
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
                                             No triage queues configured yet.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="text-muted-foreground border-b text-left">
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Code
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Tier
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Severities
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Sources
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Auto-Escalate
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Next Queue
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Open
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Active
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -1714,7 +1714,7 @@ export default function ControlRoomSettings({
                                                                 <td className="py-2.5 pr-4 font-medium">
                                                                     {queue.name}
                                                                 </td>
-                                                                <td className="text-muted-foreground py-2.5 pr-4 font-mono text-xs">
+                                                                <td className="py-2.5 pr-4 font-mono text-xs text-muted-foreground">
                                                                     {queue.code}
                                                                 </td>
                                                                 <td className="py-2.5 pr-4">
@@ -1786,7 +1786,7 @@ export default function ControlRoomSettings({
                                                                         ? `${queue.auto_escalate_after_minutes}m`
                                                                         : '-'}
                                                                 </td>
-                                                                <td className="text-muted-foreground py-2.5 pr-4">
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
                                                                     {queue.escalate_to_queue_name ??
                                                                         '-'}
                                                                 </td>
@@ -1857,7 +1857,7 @@ export default function ControlRoomSettings({
                         <TabsContent value="sources" className="mt-4">
                             {signalSources.length === 0 ? (
                                 <Card>
-                                    <CardContent className="text-muted-foreground py-8 text-center text-sm">
+                                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
                                         No signal sources configured.
                                     </CardContent>
                                 </Card>
@@ -1872,7 +1872,7 @@ export default function ControlRoomSettings({
                                                             {source.name}
                                                         </CardTitle>
                                                         {source.vendor && (
-                                                            <p className="text-muted-foreground mt-0.5 text-xs">
+                                                            <p className="mt-0.5 text-xs text-muted-foreground">
                                                                 {source.vendor}
                                                             </p>
                                                         )}
@@ -1892,7 +1892,7 @@ export default function ControlRoomSettings({
                                             <CardContent className="space-y-3">
                                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                                     <div>
-                                                        <p className="text-muted-foreground text-xs">
+                                                        <p className="text-xs text-muted-foreground">
                                                             Last Heartbeat
                                                         </p>
                                                         <p
@@ -1904,7 +1904,7 @@ export default function ControlRoomSettings({
                                                         </p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-muted-foreground text-xs">
+                                                        <p className="text-xs text-muted-foreground">
                                                             Last Signal
                                                         </p>
                                                         <p className="font-medium">
@@ -1915,7 +1915,7 @@ export default function ControlRoomSettings({
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <p className="text-muted-foreground text-xs">
+                                                    <p className="text-xs text-muted-foreground">
                                                         24h Signal Count
                                                     </p>
                                                     <p className="text-lg font-semibold">
@@ -1925,7 +1925,7 @@ export default function ControlRoomSettings({
                                                 {source.capabilities.length >
                                                     0 && (
                                                     <div>
-                                                        <p className="text-muted-foreground mb-1 text-xs">
+                                                        <p className="mb-1 text-xs text-muted-foreground">
                                                             Capabilities
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
@@ -1962,27 +1962,27 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {signalOutbox.length === 0 ? (
-                                        <p className="text-muted-foreground py-8 text-center text-sm">
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
                                             No failed signal deliveries.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="text-muted-foreground border-b text-left">
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Signal
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Status
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Attempts
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Last Attempt
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Error
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -2002,7 +2002,7 @@ export default function ControlRoomSettings({
                                                                         ?.signal_type ??
                                                                         `Outbox #${row.id}`}
                                                                 </div>
-                                                                <div className="text-muted-foreground text-xs">
+                                                                <div className="text-xs text-muted-foreground">
                                                                     {row.signal
                                                                         ? `Signal #${row.signal.id} - Asset #${row.signal.asset_id}`
                                                                         : 'Missing source signal'}
@@ -2024,12 +2024,12 @@ export default function ControlRoomSettings({
                                                             <td className="py-2.5 pr-4">
                                                                 {row.attempts}
                                                             </td>
-                                                            <td className="text-muted-foreground py-2.5 pr-4">
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
                                                                 {formatDateTime(
                                                                     row.last_attempt_at,
                                                                 )}
                                                             </td>
-                                                            <td className="text-muted-foreground max-w-[280px] truncate py-2.5 pr-4">
+                                                            <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
                                                                 {row.last_error ??
                                                                     '-'}
                                                             </td>
@@ -2083,30 +2083,30 @@ export default function ControlRoomSettings({
                                 </CardHeader>
                                 <CardContent>
                                     {maintenanceWindows.length === 0 ? (
-                                        <p className="text-muted-foreground py-8 text-center text-sm">
+                                        <p className="py-8 text-center text-sm text-muted-foreground">
                                             No maintenance windows scheduled.
                                         </p>
                                     ) : (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
                                                 <thead>
-                                                    <tr className="text-muted-foreground border-b text-left">
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                    <tr className="border-b text-left text-muted-foreground">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Name
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Source / Site
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Starts At
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Ends At
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Status
                                                         </th>
-                                                        <th className="pb-2 pr-4 font-medium">
+                                                        <th className="pr-4 pb-2 font-medium">
                                                             Created By
                                                         </th>
                                                         <th className="pb-2 font-medium">
@@ -2124,7 +2124,7 @@ export default function ControlRoomSettings({
                                                                 <td className="py-2.5 pr-4 font-medium">
                                                                     {mw.name}
                                                                 </td>
-                                                                <td className="text-muted-foreground py-2.5 pr-4">
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
                                                                     {mw.signal_source_name ??
                                                                         'All sources'}
                                                                 </td>
@@ -2154,7 +2154,7 @@ export default function ControlRoomSettings({
                                                                         }
                                                                     </Badge>
                                                                 </td>
-                                                                <td className="text-muted-foreground py-2.5 pr-4">
+                                                                <td className="py-2.5 pr-4 text-muted-foreground">
                                                                     {mw.created_by_name ??
                                                                         '-'}
                                                                 </td>
@@ -2192,7 +2192,7 @@ export default function ControlRoomSettings({
                                                                                         )
                                                                                     }
                                                                                 >
-                                                                                    <X className="text-status-critical h-3.5 w-3.5" />
+                                                                                    <X className="h-3.5 w-3.5 text-status-critical" />
                                                                                 </Button>
                                                                             </>
                                                                         )}
@@ -2251,7 +2251,7 @@ export default function ControlRoomSettings({
                                         </CardHeader>
                                         <CardContent>
                                             {items.length === 0 ? (
-                                                <p className="text-muted-foreground py-4 text-center text-sm">
+                                                <p className="py-4 text-center text-sm text-muted-foreground">
                                                     No options configured. Click
                                                     Add to create one.
                                                 </p>
@@ -2273,12 +2273,12 @@ export default function ControlRoomSettings({
                                                                     />
                                                                 )}
                                                                 <div className="min-w-0">
-                                                                    <span className="break-words text-sm font-medium">
+                                                                    <span className="text-sm font-medium break-words">
                                                                         {
                                                                             opt.label
                                                                         }
                                                                     </span>
-                                                                    <span className="text-muted-foreground ml-2 break-all text-xs">
+                                                                    <span className="ml-2 text-xs break-all text-muted-foreground">
                                                                         (
                                                                         {
                                                                             opt.value
@@ -2286,7 +2286,7 @@ export default function ControlRoomSettings({
                                                                         )
                                                                     </span>
                                                                     {opt.description && (
-                                                                        <p className="text-muted-foreground text-xs">
+                                                                        <p className="text-xs text-muted-foreground">
                                                                             {
                                                                                 opt.description
                                                                             }

@@ -4,6 +4,4 @@ namespace App\Domain\Hr\Exceptions;
 
 use RuntimeException;
 
-final class UnsafeWebhookDestination extends RuntimeException
-{
-}
+final class UnsafeWebhookDestination extends RuntimeException {}

@@ -498,16 +498,14 @@ export default function HsEventsIndex({
         const needsSignedWorksafeDecision = !ev.worksafe_decision_signed;
         if (canDecideWorksafe) {
             items.push({
-                icon:
-                    needsSignedWorksafeDecision ? (
-                        <ShieldAlert className="h-3.5 w-3.5" />
-                    ) : (
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                    ),
-                label:
-                    needsSignedWorksafeDecision
-                        ? 'Record WorkSafe decision'
-                        : 'Update WorkSafe decision',
+                icon: needsSignedWorksafeDecision ? (
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                ) : (
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                ),
+                label: needsSignedWorksafeDecision
+                    ? 'Record WorkSafe decision'
+                    : 'Update WorkSafe decision',
                 sub: worksafeLabel(worksafe),
                 tone: needsSignedWorksafeDecision ? 'critical' : undefined,
                 onClick: () =>
@@ -1035,10 +1033,7 @@ function worksafeState(ev: EventRow): WorksafeState {
 function worksafeFlagTone(
     worksafe: WorksafeState,
 ): 'critical' | 'warning' | 'success' | 'info' | 'neutral' {
-    if (
-        worksafe.notifiable === null ||
-        worksafe.decision_signed === false
-    )
+    if (worksafe.notifiable === null || worksafe.decision_signed === false)
         return 'warning';
     if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
         return 'success';

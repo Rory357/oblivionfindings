@@ -25,7 +25,7 @@ class RecurringJournalService
      * Find all active recurring journals due for an organisation, create and post them,
      * then advance each recurring journal's next_run_date.
      *
-     * @return array<\App\Domain\Finance\Models\FinJournal> Created journals.
+     * @return array<FinJournal> Created journals.
      */
     public function processDueRecurringJournals(int $orgId): array
     {
@@ -245,7 +245,7 @@ class RecurringJournalService
             'monthly' => $date->addMonth()->toDateString(),
             'quarterly' => $date->addMonths(3)->toDateString(),
             'annually' => $date->addYear()->toDateString(),
-            default => throw new \InvalidArgumentException("Unknown recurring journal frequency: {$frequency}"),
+            default => throw new InvalidArgumentException("Unknown recurring journal frequency: {$frequency}"),
         };
     }
 

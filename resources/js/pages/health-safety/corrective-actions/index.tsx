@@ -583,7 +583,7 @@ export default function CorrectiveActionsIndex({
         >
             <Head title="Corrective actions" />
 
-            <div className="flex w-full min-w-0 max-w-full flex-col gap-6 p-6">
+            <div className="flex w-full max-w-full min-w-0 flex-col gap-6 p-6">
                 {/* ---- Hero ---- */}
                 <HeroShell
                     footer={
@@ -783,7 +783,7 @@ export default function CorrectiveActionsIndex({
                 />
 
                 {/* ---- Table ---- */}
-                <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <section className="max-w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                     <RegisterTableHeader
                         icon={Wrench}
                         title={tableTitle}
@@ -857,15 +857,14 @@ function ActionCard({
         !action.assigned_to_name &&
         action.status !== 'verified' &&
         action.status !== 'closed';
-    const resolved =
-        action.status === 'verified' || action.status === 'closed';
+    const resolved = action.status === 'verified' || action.status === 'closed';
 
     const title = (
         <span className="min-w-0">
             <span className="block text-xs font-bold text-foreground">
                 {action.reference_number}
             </span>
-            <span className="block [overflow-wrap:anywhere] text-sm font-semibold whitespace-normal text-foreground">
+            <span className="block text-sm font-semibold [overflow-wrap:anywhere] whitespace-normal text-foreground">
                 {action.title}
             </span>
         </span>
@@ -977,7 +976,7 @@ function ActionCard({
                         <dt className="font-medium text-muted-foreground">
                             Owner
                         </dt>
-                        <dd className="mt-1 [overflow-wrap:anywhere] font-semibold text-foreground">
+                        <dd className="mt-1 font-semibold [overflow-wrap:anywhere] text-foreground">
                             {action.assigned_to_name ?? 'Unassigned'}
                         </dd>
                     </div>
@@ -1024,8 +1023,7 @@ function ActionCard({
                                 Overdue
                             </FlagBadge>
                         ) : null}
-                        {awaiting &&
-                        action.evidence.load_state === 'loaded' ? (
+                        {awaiting && action.evidence.load_state === 'loaded' ? (
                             <FlagBadge
                                 icon={ShieldCheck}
                                 tone="info"
@@ -1076,22 +1074,23 @@ function ActionCard({
                 </div>
 
                 {action.recommendation ? (
-                    <p className="mt-3 [overflow-wrap:anywhere] text-xs text-muted-foreground">
+                    <p className="mt-3 text-xs [overflow-wrap:anywhere] text-muted-foreground">
                         Recommendation: {action.recommendation}
                     </p>
                 ) : null}
                 {action.source.type === 'control_room_task' ? (
-                    <p className="mt-1 [overflow-wrap:anywhere] text-xs text-muted-foreground">
-                        Transferred from Control Room task: {action.source.title}
+                    <p className="mt-1 text-xs [overflow-wrap:anywhere] text-muted-foreground">
+                        Transferred from Control Room task:{' '}
+                        {action.source.title}
                     </p>
                 ) : action.source.type === 'new_responsibility' ? (
-                    <p className="mt-1 [overflow-wrap:anywhere] text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs [overflow-wrap:anywhere] text-muted-foreground">
                         New responsibility:{' '}
                         {action.source.reason ?? 'Reason not recorded'}
                     </p>
                 ) : null}
                 {action.rework.latest_reason ? (
-                    <p className="mt-1 [overflow-wrap:anywhere] text-xs text-status-warning">
+                    <p className="mt-1 text-xs [overflow-wrap:anywhere] text-status-warning">
                         Returned for rework: {action.rework.latest_reason}
                     </p>
                 ) : null}
@@ -1174,348 +1173,357 @@ export function ActionTable({
                 className="relative hidden max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:block"
                 data-test="corrective-action-table-scroll"
             >
-            <table className="w-full min-w-[1080px] text-sm">
-                <thead className="bg-muted/70">
-                    <tr className="border-b border-border text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-3">Due</th>
-                        <th className="px-4 py-3">Action</th>
-                        <th className="px-4 py-3">Priority</th>
-                        <th className="px-4 py-3">Owner</th>
-                        <th className="px-4 py-3">Parent event</th>
-                        <th className="px-4 py-3">Stage</th>
-                        <th className="px-4 py-3">Flags</th>
-                        <th className="px-4 py-3">
-                            <span className="sr-only">Actions</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {rows.map((action) => {
-                        const priority = PRI[action.priority] ?? PRI.medium;
-                        const stage =
-                            ACTION_STAGE[action.status] ?? ACTION_STAGE.open;
-                        const StageIcon = stage.icon;
-                        const eventStage = action.event
-                            ? (EVENT_STAGE[action.event.status] ??
-                              EVENT_STAGE.open)
-                            : null;
-                        const CatIcon = action.event
-                            ? (CATEGORY_ICON[action.event.event_category] ??
-                              Shield)
-                            : Link2;
-                        const awaiting = action.status === 'completed';
-                        const unassigned =
-                            !action.assigned_to_name &&
-                            action.status !== 'verified' &&
-                            action.status !== 'closed';
-                        const resolved =
-                            action.status === 'verified' ||
-                            action.status === 'closed';
+                <table className="w-full min-w-[1080px] text-sm">
+                    <thead className="bg-muted/70">
+                        <tr className="border-b border-border text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <th className="px-4 py-3">Due</th>
+                            <th className="px-4 py-3">Action</th>
+                            <th className="px-4 py-3">Priority</th>
+                            <th className="px-4 py-3">Owner</th>
+                            <th className="px-4 py-3">Parent event</th>
+                            <th className="px-4 py-3">Stage</th>
+                            <th className="px-4 py-3">Flags</th>
+                            <th className="px-4 py-3">
+                                <span className="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                        {rows.map((action) => {
+                            const priority = PRI[action.priority] ?? PRI.medium;
+                            const stage =
+                                ACTION_STAGE[action.status] ??
+                                ACTION_STAGE.open;
+                            const StageIcon = stage.icon;
+                            const eventStage = action.event
+                                ? (EVENT_STAGE[action.event.status] ??
+                                  EVENT_STAGE.open)
+                                : null;
+                            const CatIcon = action.event
+                                ? (CATEGORY_ICON[action.event.event_category] ??
+                                  Shield)
+                                : Link2;
+                            const awaiting = action.status === 'completed';
+                            const unassigned =
+                                !action.assigned_to_name &&
+                                action.status !== 'verified' &&
+                                action.status !== 'closed';
+                            const resolved =
+                                action.status === 'verified' ||
+                                action.status === 'closed';
 
-                        const open = () => {
-                            if (action.event)
-                                onOpen(action.event.id, { section: 'actions' });
-                        };
+                            const open = () => {
+                                if (action.event)
+                                    onOpen(action.event.id, {
+                                        section: 'actions',
+                                    });
+                            };
 
-                        return (
-                            <tr
-                                key={action.id}
-                                onClick={open}
-                                onContextMenu={(e: ReactMouseEvent) => {
-                                    e.preventDefault();
-                                    onMenu(action, e.clientX, e.clientY);
-                                }}
-                                tabIndex={action.event ? 0 : -1}
-                                aria-label={
-                                    action.event
-                                        ? `Open parent event for action ${action.reference_number}`
-                                        : undefined
-                                }
-                                onKeyDown={(e) => {
-                                    if (
-                                        action.event &&
-                                        (e.key === 'Enter' || e.key === ' ')
-                                    ) {
+                            return (
+                                <tr
+                                    key={action.id}
+                                    onClick={open}
+                                    onContextMenu={(e: ReactMouseEvent) => {
                                         e.preventDefault();
-                                        open();
+                                        onMenu(action, e.clientX, e.clientY);
+                                    }}
+                                    tabIndex={action.event ? 0 : -1}
+                                    aria-label={
+                                        action.event
+                                            ? `Open parent event for action ${action.reference_number}`
+                                            : undefined
                                     }
-                                }}
-                                className={cn(
-                                    action.event
-                                        ? 'cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
-                                        : '',
-                                    action.is_overdue
-                                        ? 'bg-status-critical-bg/40'
-                                        : '',
-                                )}
-                            >
-                                {/* Due */}
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div
-                                        className={cn(
-                                            'flex items-center gap-1 text-xs font-bold',
-                                            action.is_overdue
-                                                ? 'text-status-critical'
-                                                : 'text-foreground',
-                                        )}
-                                    >
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatDateOnly(action.due_date)}
-                                    </div>
-                                    <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                                        {action.is_overdue
-                                            ? 'Overdue'
-                                            : action.reference_number}
-                                    </div>
-                                </td>
-
-                                {/* Action */}
-                                <td className="max-w-[300px] px-4 py-3 align-top">
-                                    <div className="flex items-start gap-2">
-                                        <span
-                                            className={cn(
-                                                'mt-1 h-2 w-2 shrink-0 rounded-full',
-                                                TONE_DOT[priority.tone],
-                                            )}
-                                        />
-                                        <span className="min-w-0">
-                                            <span className="block text-xs font-bold text-foreground">
-                                                {action.reference_number}
-                                            </span>
-                                            <span className="block max-w-[24rem] truncate text-[11px] text-muted-foreground">
-                                                {action.title}
-                                            </span>
-                                            {action.recommendation ? (
-                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
-                                                    Recommendation:{' '}
-                                                    {action.recommendation}
-                                                </span>
-                                            ) : null}
-                                            {action.source.type ===
-                                            'control_room_task' ? (
-                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
-                                                    Transferred from Control
-                                                    Room task:{' '}
-                                                    {action.source.title}
-                                                </span>
-                                            ) : action.source.type ===
-                                              'new_responsibility' ? (
-                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
-                                                    New responsibility:{' '}
-                                                    {action.source.reason ??
-                                                        'Reason not recorded'}
-                                                </span>
-                                            ) : null}
-                                            {action.rework.latest_reason ? (
-                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-status-warning">
-                                                    Returned for rework:{' '}
-                                                    {
-                                                        action.rework
-                                                            .latest_reason
-                                                    }
-                                                </span>
-                                            ) : null}
-                                            <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                {titleCase(action.action_type)}
-                                            </span>
-                                        </span>
-                                    </div>
-                                </td>
-
-                                {/* Priority */}
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={cn(
-                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                            TONE_BG[priority.tone],
-                                        )}
-                                    >
-                                        {priority.label}
-                                    </span>
-                                </td>
-
-                                {/* Owner */}
-                                <td className="px-4 py-3 align-top">
-                                    {action.assigned_to_name ? (
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className={cn(
-                                                    'grid h-7 w-7 shrink-0 place-items-center rounded-md text-[10px] font-bold',
-                                                    entityTone(action.id),
-                                                )}
-                                            >
-                                                {initials(
-                                                    action.assigned_to_name,
-                                                )}
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block truncate text-xs font-bold text-foreground">
-                                                    {action.assigned_to_name}
-                                                </span>
-                                                <span className="block text-[11px] text-muted-foreground">
-                                                    Owner
-                                                </span>
-                                            </span>
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 rounded-md bg-status-warning-bg px-2 py-1 text-[11px] font-bold text-status-warning">
-                                            <UserRound className="h-3 w-3" />{' '}
-                                            Unassigned
-                                        </span>
+                                    onKeyDown={(e) => {
+                                        if (
+                                            action.event &&
+                                            (e.key === 'Enter' || e.key === ' ')
+                                        ) {
+                                            e.preventDefault();
+                                            open();
+                                        }
+                                    }}
+                                    className={cn(
+                                        action.event
+                                            ? 'cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
+                                            : '',
+                                        action.is_overdue
+                                            ? 'bg-status-critical-bg/40'
+                                            : '',
                                     )}
-                                </td>
+                                >
+                                    {/* Due */}
+                                    <td className="px-4 py-3 align-top whitespace-nowrap">
+                                        <div
+                                            className={cn(
+                                                'flex items-center gap-1 text-xs font-bold',
+                                                action.is_overdue
+                                                    ? 'text-status-critical'
+                                                    : 'text-foreground',
+                                            )}
+                                        >
+                                            <Clock className="h-3.5 w-3.5" />
+                                            {formatDateOnly(action.due_date)}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+                                            {action.is_overdue
+                                                ? 'Overdue'
+                                                : action.reference_number}
+                                        </div>
+                                    </td>
 
-                                {/* Parent event */}
-                                <td className="px-4 py-3 align-top">
-                                    {action.event ? (
-                                        <div className="flex items-center gap-2">
+                                    {/* Action */}
+                                    <td className="max-w-[300px] px-4 py-3 align-top">
+                                        <div className="flex items-start gap-2">
                                             <span
                                                 className={cn(
-                                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                                                    CATEGORY_CHIP[
-                                                        action.event
-                                                            .event_category
-                                                    ] ??
-                                                        'bg-muted text-muted-foreground',
+                                                    'mt-1 h-2 w-2 shrink-0 rounded-full',
+                                                    TONE_DOT[priority.tone],
                                                 )}
-                                            >
-                                                <CatIcon className="h-3.5 w-3.5" />
-                                            </span>
+                                            />
                                             <span className="min-w-0">
                                                 <span className="block text-xs font-bold text-foreground">
-                                                    {
-                                                        action.event
-                                                            .reference_number
-                                                    }
+                                                    {action.reference_number}
                                                 </span>
-                                                <span className="block truncate text-[11px] font-medium text-muted-foreground">
-                                                    {EVENT_CATEGORY_LABELS[
-                                                        action.event
-                                                            .event_category
-                                                    ] ??
-                                                        titleCase(
-                                                            action.event
-                                                                .event_category,
-                                                        )}
-                                                    {action.event.site_name
-                                                        ? ` · ${action.event.site_name}`
-                                                        : ''}
+                                                <span className="block max-w-[24rem] truncate text-[11px] text-muted-foreground">
+                                                    {action.title}
+                                                </span>
+                                                {action.recommendation ? (
+                                                    <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                        Recommendation:{' '}
+                                                        {action.recommendation}
+                                                    </span>
+                                                ) : null}
+                                                {action.source.type ===
+                                                'control_room_task' ? (
+                                                    <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                        Transferred from Control
+                                                        Room task:{' '}
+                                                        {action.source.title}
+                                                    </span>
+                                                ) : action.source.type ===
+                                                  'new_responsibility' ? (
+                                                    <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                        New responsibility:{' '}
+                                                        {action.source.reason ??
+                                                            'Reason not recorded'}
+                                                    </span>
+                                                ) : null}
+                                                {action.rework.latest_reason ? (
+                                                    <span className="mt-1 block max-w-[24rem] text-[11px] text-status-warning">
+                                                        Returned for rework:{' '}
+                                                        {
+                                                            action.rework
+                                                                .latest_reason
+                                                        }
+                                                    </span>
+                                                ) : null}
+                                                <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                    {titleCase(
+                                                        action.action_type,
+                                                    )}
                                                 </span>
                                             </span>
                                         </div>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                                            <Link2 className="h-3 w-3" /> No
-                                            parent event
-                                        </span>
-                                    )}
-                                </td>
+                                    </td>
 
-                                {/* Action stage */}
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={cn(
-                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                            stage.cls,
-                                        )}
-                                    >
-                                        <StageIcon className="h-3 w-3" />
-                                        {stage.label}
-                                    </span>
-                                </td>
-
-                                {/* Flags */}
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        {action.is_overdue ? (
-                                            <FlagBadge
-                                                icon={Clock}
-                                                tone="critical"
-                                                title="Past its due date"
-                                            >
-                                                Overdue
-                                            </FlagBadge>
-                                        ) : null}
-                                        {awaiting &&
-                                        action.evidence.load_state ===
-                                            'loaded' ? (
-                                            <FlagBadge
-                                                icon={ShieldCheck}
-                                                tone="info"
-                                                title="Completed — needs a different person to verify"
-                                            >
-                                                Verify
-                                            </FlagBadge>
-                                        ) : awaiting ? (
-                                            <FlagBadge
-                                                icon={ShieldAlert}
-                                                tone="warning"
-                                                title="Completion evidence could not be loaded; verification is unavailable"
-                                            >
-                                                Evidence unavailable
-                                            </FlagBadge>
-                                        ) : null}
-                                        {unassigned ? (
-                                            <FlagBadge
-                                                icon={UserRound}
-                                                tone="warning"
-                                                title="No owner assigned"
-                                            >
-                                                No owner
-                                            </FlagBadge>
-                                        ) : null}
-                                        {eventStage ? (
-                                            <FlagBadge
-                                                icon={eventStage.icon}
-                                                tone={
-                                                    action.event?.monitoring
-                                                        ? 'success'
-                                                        : 'neutral'
-                                                }
-                                                title={`Parent event: ${eventStage.label}`}
-                                            >
-                                                {eventStage.label}
-                                            </FlagBadge>
-                                        ) : null}
-                                        {!action.is_overdue &&
-                                        !awaiting &&
-                                        !unassigned &&
-                                        !eventStage ? (
-                                            <span className="text-xs text-muted-foreground">
-                                                {resolved ? 'Resolved' : '—'}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </td>
-
-                                {/* Kebab — same payload as right-click (a11y / discoverability) */}
-                                <td className="px-2 py-3 text-right align-top">
-                                    {action.event ? (
-                                        // eslint-disable-next-line no-restricted-syntax -- icon-only row affordance; opens the shared ShiftContextMenu
-                                        <button
-                                            type="button"
-                                            aria-label={`Lifecycle actions for ${action.reference_number}`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const r =
-                                                    e.currentTarget.getBoundingClientRect();
-                                                onMenu(
-                                                    action,
-                                                    r.left,
-                                                    r.bottom,
-                                                );
-                                            }}
-                                            className="inline-grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                    {/* Priority */}
+                                    <td className="px-4 py-3 align-top">
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                TONE_BG[priority.tone],
+                                            )}
                                         >
-                                            <MoreVertical className="h-4 w-4" />
-                                        </button>
-                                    ) : null}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                                            {priority.label}
+                                        </span>
+                                    </td>
+
+                                    {/* Owner */}
+                                    <td className="px-4 py-3 align-top">
+                                        {action.assigned_to_name ? (
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className={cn(
+                                                        'grid h-7 w-7 shrink-0 place-items-center rounded-md text-[10px] font-bold',
+                                                        entityTone(action.id),
+                                                    )}
+                                                >
+                                                    {initials(
+                                                        action.assigned_to_name,
+                                                    )}
+                                                </span>
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-xs font-bold text-foreground">
+                                                        {
+                                                            action.assigned_to_name
+                                                        }
+                                                    </span>
+                                                    <span className="block text-[11px] text-muted-foreground">
+                                                        Owner
+                                                    </span>
+                                                </span>
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 rounded-md bg-status-warning-bg px-2 py-1 text-[11px] font-bold text-status-warning">
+                                                <UserRound className="h-3 w-3" />{' '}
+                                                Unassigned
+                                            </span>
+                                        )}
+                                    </td>
+
+                                    {/* Parent event */}
+                                    <td className="px-4 py-3 align-top">
+                                        {action.event ? (
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className={cn(
+                                                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                                                        CATEGORY_CHIP[
+                                                            action.event
+                                                                .event_category
+                                                        ] ??
+                                                            'bg-muted text-muted-foreground',
+                                                    )}
+                                                >
+                                                    <CatIcon className="h-3.5 w-3.5" />
+                                                </span>
+                                                <span className="min-w-0">
+                                                    <span className="block text-xs font-bold text-foreground">
+                                                        {
+                                                            action.event
+                                                                .reference_number
+                                                        }
+                                                    </span>
+                                                    <span className="block truncate text-[11px] font-medium text-muted-foreground">
+                                                        {EVENT_CATEGORY_LABELS[
+                                                            action.event
+                                                                .event_category
+                                                        ] ??
+                                                            titleCase(
+                                                                action.event
+                                                                    .event_category,
+                                                            )}
+                                                        {action.event.site_name
+                                                            ? ` · ${action.event.site_name}`
+                                                            : ''}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                                <Link2 className="h-3 w-3" /> No
+                                                parent event
+                                            </span>
+                                        )}
+                                    </td>
+
+                                    {/* Action stage */}
+                                    <td className="px-4 py-3 align-top">
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                stage.cls,
+                                            )}
+                                        >
+                                            <StageIcon className="h-3 w-3" />
+                                            {stage.label}
+                                        </span>
+                                    </td>
+
+                                    {/* Flags */}
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {action.is_overdue ? (
+                                                <FlagBadge
+                                                    icon={Clock}
+                                                    tone="critical"
+                                                    title="Past its due date"
+                                                >
+                                                    Overdue
+                                                </FlagBadge>
+                                            ) : null}
+                                            {awaiting &&
+                                            action.evidence.load_state ===
+                                                'loaded' ? (
+                                                <FlagBadge
+                                                    icon={ShieldCheck}
+                                                    tone="info"
+                                                    title="Completed — needs a different person to verify"
+                                                >
+                                                    Verify
+                                                </FlagBadge>
+                                            ) : awaiting ? (
+                                                <FlagBadge
+                                                    icon={ShieldAlert}
+                                                    tone="warning"
+                                                    title="Completion evidence could not be loaded; verification is unavailable"
+                                                >
+                                                    Evidence unavailable
+                                                </FlagBadge>
+                                            ) : null}
+                                            {unassigned ? (
+                                                <FlagBadge
+                                                    icon={UserRound}
+                                                    tone="warning"
+                                                    title="No owner assigned"
+                                                >
+                                                    No owner
+                                                </FlagBadge>
+                                            ) : null}
+                                            {eventStage ? (
+                                                <FlagBadge
+                                                    icon={eventStage.icon}
+                                                    tone={
+                                                        action.event?.monitoring
+                                                            ? 'success'
+                                                            : 'neutral'
+                                                    }
+                                                    title={`Parent event: ${eventStage.label}`}
+                                                >
+                                                    {eventStage.label}
+                                                </FlagBadge>
+                                            ) : null}
+                                            {!action.is_overdue &&
+                                            !awaiting &&
+                                            !unassigned &&
+                                            !eventStage ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {resolved
+                                                        ? 'Resolved'
+                                                        : '—'}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </td>
+
+                                    {/* Kebab — same payload as right-click (a11y / discoverability) */}
+                                    <td className="px-2 py-3 text-right align-top">
+                                        {action.event ? (
+                                            // eslint-disable-next-line no-restricted-syntax -- icon-only row affordance; opens the shared ShiftContextMenu
+                                            <button
+                                                type="button"
+                                                aria-label={`Lifecycle actions for ${action.reference_number}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const r =
+                                                        e.currentTarget.getBoundingClientRect();
+                                                    onMenu(
+                                                        action,
+                                                        r.left,
+                                                        r.bottom,
+                                                    );
+                                                }}
+                                                className="inline-grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                            >
+                                                <MoreVertical className="h-4 w-4" />
+                                            </button>
+                                        ) : null}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
         </>
     );

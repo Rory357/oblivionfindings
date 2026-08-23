@@ -341,7 +341,8 @@ export function ProviderCard({
                         {provider.health.summary}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
-                        Freshness: {provider.health.freshness.replaceAll('_', ' ')}
+                        Freshness:{' '}
+                        {provider.health.freshness.replaceAll('_', ' ')}
                         {' · '}
                         {provider.health.last_collected_at
                             ? `Last evidence ${formatTimeSince(provider.health.last_collected_at)}`

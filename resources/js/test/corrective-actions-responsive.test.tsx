@@ -34,8 +34,7 @@ const action: ActionRow = {
         latest_reason:
             'Whakaratohia he taunakitanga taipitopito mō te whakatikatika.',
     },
-    recommendation:
-        'Arotakengia ngā tukanga me ngā taputapu i mua i te kati.',
+    recommendation: 'Arotakengia ngā tukanga me ngā taputapu i mua i te kati.',
     source: {
         type: 'control_room_task',
         id: 91,

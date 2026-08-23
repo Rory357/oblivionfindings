@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Operations\OperationsDashboardScopeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -150,10 +152,10 @@ class DashboardController extends Controller
             ->limit(6)
             ->get()
             ->map(fn ($s) => [
-                'id' => 'shift-' . $s->id,
+                'id' => 'shift-'.$s->id,
                 'type' => 'shift',
                 'status' => $s->status,
-                'client' => $s->client ? trim($s->client->first_name . ' ' . $s->client->last_name) : null,
+                'client' => $s->client ? trim($s->client->first_name.' '.$s->client->last_name) : null,
                 'staff' => $s->staff?->name,
                 'starts_at' => $s->starts_at?->toISOString(),
                 'ends_at' => $s->ends_at?->toISOString(),
@@ -167,10 +169,10 @@ class DashboardController extends Controller
             ->limit(4)
             ->get()
             ->map(fn ($ts) => [
-                'id' => 'ts-' . $ts->id,
+                'id' => 'ts-'.$ts->id,
                 'type' => 'timesheet',
                 'status' => $ts->status,
-                'client' => $ts->client ? trim($ts->client->first_name . ' ' . $ts->client->last_name) : null,
+                'client' => $ts->client ? trim($ts->client->first_name.' '.$ts->client->last_name) : null,
                 'staff' => $ts->staff?->name,
                 'work_date' => $ts->work_date?->toDateString(),
                 'updated_at' => $ts->updated_at?->toISOString(),
@@ -183,11 +185,11 @@ class DashboardController extends Controller
             ->limit(3)
             ->get()
             ->map(fn ($i) => [
-                'id' => 'inc-' . $i->id,
+                'id' => 'inc-'.$i->id,
                 'type' => 'incident',
                 'status' => $i->status,
                 'severity' => $i->severity,
-                'client' => $i->client ? trim($i->client->first_name . ' ' . $i->client->last_name) : null,
+                'client' => $i->client ? trim($i->client->first_name.' '.$i->client->last_name) : null,
                 'incident_type' => $i->type,
                 'updated_at' => $i->updated_at?->toISOString(),
             ]);
@@ -251,6 +253,7 @@ class DashboardController extends Controller
                     ->whereHas('client', fn ($q) => $q->where('site_id', $site->id))
                     ->get()
                     ->sum(fn ($ts) => $this->timesheetHours($ts));
+
                 return [
                     'id' => $site->id,
                     'slug' => str($site->name)->slug()->toString(),
@@ -448,6 +451,7 @@ class DashboardController extends Controller
             return 0.0;
         }
         $hours = $ts->starts_at->diffInMinutes($ts->ends_at) / 60;
+
         return (float) max(0, $hours - ($ts->break_minutes ?? 0) / 60);
     }
 
@@ -462,12 +466,13 @@ class DashboardController extends Controller
             ->havingRaw('COUNT(*) > 1')
             ->get()
             ->count();
+
         return $duplicates;
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int,\App\Models\Shift>  $todayShifts
-     * @param  \Illuminate\Support\Collection<int,\App\Models\Site>   $sites
+     * @param  Collection<int,Shift>  $todayShifts
+     * @param  Collection<int,Site>  $sites
      */
     private function buildTimeline($todayShifts, $sites, Carbon $now, User $actor): array
     {
@@ -487,13 +492,14 @@ class DashboardController extends Controller
             $left = ($startSec - $dayStart->getTimestamp()) / 86400 * 100;
             $width = max(2, ($endSec - $startSec) / 86400 * 100);
             $type = $this->classifyShiftType($start, $end);
+
             return [
                 'left' => round($left, 2),
                 'width' => round($width, 2),
                 'label' => $label ?? ($shift->staff?->name ? explode(' ', $shift->staff->name)[0] : 'Shift'),
                 'type' => $type,
                 'unassigned' => $shift->user_id === null,
-                'time_label' => $start->format('H:i') . '–' . $end->format('H:i'),
+                'time_label' => $start->format('H:i').'–'.$end->format('H:i'),
             ];
         };
 
@@ -502,13 +508,14 @@ class DashboardController extends Controller
             $siteShifts = $todayShifts->filter(fn ($s) => $s->client?->site_id === $site->id);
             $bars = $siteShifts->map(fn ($s) => $bar($s))->filter()->values()->all();
             $clientCount = $this->scope->clients($actor)->where('site_id', $site->id)->count();
+
             return [
-                'key' => 'site-' . $site->id,
+                'key' => 'site-'.$site->id,
                 'label' => $site->name,
-                'sublabel' => trim(($site->resolved_region ?? '') . ' · ' . $clientCount . ' clients', ' ·'),
+                'sublabel' => trim(($site->resolved_region ?? '').' · '.$clientCount.' clients', ' ·'),
                 'icon' => 'building-2',
                 'bars' => $bars,
-                'href' => '/sites/' . $site->id,
+                'href' => '/sites/'.$site->id,
             ];
         })->values()->all();
 
@@ -522,10 +529,11 @@ class DashboardController extends Controller
             $hours = $group->sum(fn ($s) => $s->starts_at && $s->ends_at ? $s->starts_at->diffInMinutes($s->ends_at) / 60 : 0);
             $siteName = $group->first()->client?->site?->name ?? '';
             $initials = collect(explode(' ', $name))->map(fn ($p) => strtoupper(substr($p, 0, 1)))->take(2)->implode('');
+
             return [
-                'key' => 'staff-' . ($staff?->id ?? rand()),
+                'key' => 'staff-'.($staff?->id ?? rand()),
                 'label' => $this->shortStaffName($name),
-                'sublabel' => trim($siteName . ' · ' . round($hours, 1) . 'h', ' ·'),
+                'sublabel' => trim($siteName.' · '.round($hours, 1).'h', ' ·'),
                 'avatar' => $initials,
                 'bars' => $group->map(fn ($s) => $bar($s))->filter()->values()->all(),
             ];
@@ -536,7 +544,7 @@ class DashboardController extends Controller
         if ($openShifts->count() > 0) {
             $byStaff[] = [
                 'key' => 'staff-open',
-                'label' => 'Open (' . $openShifts->count() . ')',
+                'label' => 'Open ('.$openShifts->count().')',
                 'sublabel' => 'Need cover',
                 'avatar' => null,
                 'is_open' => true,
@@ -546,6 +554,7 @@ class DashboardController extends Controller
                         $b['type'] = 'open';
                         $b['unassigned'] = true;
                     }
+
                     return $b;
                 })->filter()->values()->all(),
             ];
@@ -556,8 +565,9 @@ class DashboardController extends Controller
             $shifts = $todayShifts->filter(fn ($s) => $s->starts_at && $s->ends_at && $this->classifyShiftType($s->starts_at, $s->ends_at) === $type);
             $staffCount = $shifts->pluck('user_id')->filter()->unique()->count();
             $siteCount = $shifts->pluck('client.site_id')->filter()->unique()->count();
+
             return [
-                'key' => 'type-' . $type,
+                'key' => 'type-'.$type,
                 'label' => ucfirst($type === 'community' ? 'Community visits' : $type),
                 'sublabel' => "$siteCount sites · $staffCount staff",
                 'icon' => match ($type) {
@@ -583,8 +593,11 @@ class DashboardController extends Controller
     private function shortStaffName(string $name): string
     {
         $parts = explode(' ', trim($name));
-        if (count($parts) === 1) return $parts[0];
-        return strtoupper(substr($parts[0], 0, 1)) . '. ' . end($parts);
+        if (count($parts) === 1) {
+            return $parts[0];
+        }
+
+        return strtoupper(substr($parts[0], 0, 1)).'. '.end($parts);
     }
 
     private function classifyShiftType(Carbon $start, Carbon $end): string
@@ -602,6 +615,7 @@ class DashboardController extends Controller
         if ($startHour >= 14) {
             return 'evening';
         }
+
         return 'day';
     }
 
@@ -629,13 +643,14 @@ class DashboardController extends Controller
                 $duration = $s->starts_at && $s->ends_at
                     ? round($s->starts_at->diffInMinutes($s->ends_at) / 60, 1)
                     : null;
+
                 return [
                     'time' => $s->starts_at?->isToday()
-                        ? 'Today ' . $s->starts_at->format('H:i')
+                        ? 'Today '.$s->starts_at->format('H:i')
                         : $s->starts_at?->format('D H:i'),
                     'site' => $s->client?->site?->name ?? 'Unassigned site',
-                    'detail' => trim(($s->type ?? 'Cover') . ($s->client ? ' · ' . $s->client->first_name : '')),
-                    'tag' => $duration ? ['text' => $duration . 'h', 'cls' => 'critical'] : null,
+                    'detail' => trim(($s->type ?? 'Cover').($s->client ? ' · '.$s->client->first_name : '')),
+                    'tag' => $duration ? ['text' => $duration.'h', 'cls' => 'critical'] : null,
                 ];
             })->values()->all();
 
@@ -648,10 +663,11 @@ class DashboardController extends Controller
             ->map(function ($ts) {
                 $hours = $this->timesheetHours($ts);
                 $overdue = $ts->submitted_at && $ts->submitted_at->lt(now()->subDays(3));
+
                 return [
-                    'time' => 'Wk ' . optional($ts->work_date)->isoWeek(),
+                    'time' => 'Wk '.optional($ts->work_date)->isoWeek(),
                     'site' => $this->shortStaffName($ts->staff?->name ?? 'Unknown'),
-                    'detail' => round($hours, 1) . 'h · ' . ($ts->client?->site?->name ?? 'Site'),
+                    'detail' => round($hours, 1).'h · '.($ts->client?->site?->name ?? 'Site'),
                     'tag' => $overdue ? ['text' => 'Overdue', 'cls' => 'critical'] : ['text' => 'New', 'cls' => 'warning'],
                 ];
             })->values()->all();
@@ -674,10 +690,11 @@ class DashboardController extends Controller
                     'medium' => 'Amber',
                     default => 'Green',
                 };
+
                 return [
-                    'time' => $i->updated_at?->diffForHumans(null, true) . ' ago',
+                    'time' => $i->updated_at?->diffForHumans(null, true).' ago',
                     'site' => $i->client?->site?->name ?? 'Unknown site',
-                    'detail' => ucfirst($i->type ?? 'Incident') . ' · ' . ($i->client?->first_name ?? ''),
+                    'detail' => ucfirst($i->type ?? 'Incident').' · '.($i->client?->first_name ?? ''),
                     'tag' => ['text' => $tagText, 'cls' => $tone],
                 ];
             })->values()->all();
@@ -687,7 +704,7 @@ class DashboardController extends Controller
                 'count' => $unassigned,
                 'urgent' => $urgent,
                 'context' => count($unassignedRows) > 0
-                    ? 'Earliest ' . $unassignedRows[0]['time']
+                    ? 'Earliest '.$unassignedRows[0]['time']
                     : 'All shifts covered',
                 'tag' => $urgent > 0 ? 'Urgent' : 'OK',
                 'tag_tone' => $urgent > 0 ? 'critical' : 'success',
@@ -696,7 +713,7 @@ class DashboardController extends Controller
                     'icon' => 'alert-triangle',
                     'tone' => 'critical',
                     'title' => 'Unassigned shifts · next 48h',
-                    'sub' => $unassigned . ' open',
+                    'sub' => $unassigned.' open',
                     'rows' => $unassignedRows,
                     'cta' => 'Open rostering · find coverage',
                     'href' => '/operations/rostering?filter=open',
@@ -705,15 +722,15 @@ class DashboardController extends Controller
             'timesheets' => [
                 'count' => $timesheetsPending,
                 'overdue' => $timesheetsOverdue,
-                'context' => 'Pay run closes Fri 5pm · ' . round($hoursThisWeek, 1) . 'h',
-                'tag' => $timesheetsOverdue > 0 ? $timesheetsOverdue . ' overdue' : 'On track',
+                'context' => 'Pay run closes Fri 5pm · '.round($hoursThisWeek, 1).'h',
+                'tag' => $timesheetsOverdue > 0 ? $timesheetsOverdue.' overdue' : 'On track',
                 'tag_tone' => $timesheetsOverdue > 0 ? 'warning' : 'success',
                 'tone' => 'warning',
                 'popover' => [
                     'icon' => 'clipboard-check',
                     'tone' => 'warning',
                     'title' => 'Timesheets awaiting approval',
-                    'sub' => $timesheetsPending . ' pending',
+                    'sub' => $timesheetsPending.' pending',
                     'rows' => $pendingRows,
                     'cta' => 'Open approval queue',
                     'href' => '/operations/timesheets/approvals',
@@ -729,7 +746,7 @@ class DashboardController extends Controller
                     'icon' => 'git-branch',
                     'tone' => 'warning',
                     'title' => 'Roster conflicts · this week',
-                    'sub' => $conflicts . ' to resolve',
+                    'sub' => $conflicts.' to resolve',
                     'rows' => $conflicts > 0
                         ? [
                             ['time' => 'This week', 'site' => 'Multiple staff', 'detail' => 'Same-day overlapping shifts', 'tag' => ['text' => 'Overlap', 'cls' => 'critical']],
@@ -749,7 +766,7 @@ class DashboardController extends Controller
                     'icon' => 'shield-alert',
                     'tone' => 'info',
                     'title' => 'Open incidents · last 48h',
-                    'sub' => $incidents . ' open',
+                    'sub' => $incidents.' open',
                     'rows' => $incidentRows,
                     'cta' => 'Open incidents board',
                     'href' => '/incidents?status=open',

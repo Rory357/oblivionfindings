@@ -66,9 +66,7 @@ export function assuranceTone(status: AssuranceStatus): BadgeTone {
           : 'neutral';
 }
 
-export function ngaPaerewaBadge(
-    status: AssuranceStatus,
-): HeroComplianceBadge {
+export function ngaPaerewaBadge(status: AssuranceStatus): HeroComplianceBadge {
     return {
         icon: status === 'certified' ? ShieldCheck : AlertTriangle,
         tone: assuranceTone(status),

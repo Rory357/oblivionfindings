@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
@@ -12,7 +13,9 @@ use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -33,6 +36,7 @@ class VehicleBookingController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->latest();
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Reference', 'Vehicle', 'User', 'Purpose', 'Start', 'End', 'Status']);
@@ -76,8 +80,12 @@ class VehicleBookingController extends Controller
         $allowedSorts = ['starts_at', 'status', 'created_at'];
         $sort = $request->input('sort', 'created_at');
         $direction = $request->input('direction', 'desc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'created_at';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'desc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'created_at';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
         $query->reorder()->orderBy($sort, $direction);
 
         $bookings = $query->paginate(25)->withQueryString();
@@ -98,9 +106,9 @@ class VehicleBookingController extends Controller
         $now = now();
         $heroRow = $this->bookingAccess->accessibleBookings($actor)
             ->selectRaw(
-                "SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending, " .
-                "SUM(CASE WHEN status = 'approved' AND starts_at >= ? THEN 1 ELSE 0 END) as approved_upcoming, " .
-                "SUM(CASE WHEN status = 'checked_out' THEN 1 ELSE 0 END) as checked_out, " .
+                "SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending, ".
+                "SUM(CASE WHEN status = 'approved' AND starts_at >= ? THEN 1 ELSE 0 END) as approved_upcoming, ".
+                "SUM(CASE WHEN status = 'checked_out' THEN 1 ELSE 0 END) as checked_out, ".
                 "SUM(CASE WHEN status = 'checked_out' AND ends_at < ? THEN 1 ELSE 0 END) as overdue",
                 [$now->toDateTimeString(), $now->toDateTimeString()]
             )
@@ -162,8 +170,8 @@ class VehicleBookingController extends Controller
             // incorrectly treated as belonging to the previous UTC day.
             $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
             $weekStart = $request->filled('week_start')
-                ? \Carbon\Carbon::parse($request->input('week_start'), $timezone)->startOfDay()
-                : \Carbon\Carbon::now($timezone)->startOfWeek(\Carbon\Carbon::MONDAY)->startOfDay();
+                ? Carbon::parse($request->input('week_start'), $timezone)->startOfDay()
+                : Carbon::now($timezone)->startOfWeek(Carbon::MONDAY)->startOfDay();
 
             $weekEnd = $weekStart->copy()->addDays(6)->endOfDay();
             $weekStartUtc = $weekStart->copy()->utc();
@@ -202,7 +210,7 @@ class VehicleBookingController extends Controller
     {
         // Preserve the caller's query (dashboard per-vehicle "Book" passes
         // asset_id) so the wizard can pre-select the vehicle.
-        return redirect()->to('/fleet-assets/bookings?' . http_build_query(
+        return redirect()->to('/fleet-assets/bookings?'.http_build_query(
             array_merge($request->query(), ['new' => 1]),
         ));
     }
@@ -215,8 +223,8 @@ class VehicleBookingController extends Controller
      */
     private function bookingWizardOptions(User $actor): array
     {
-        $hasFleetFields = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'home_site_id');
-        $hasAccessibility = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'has_wheelchair_ramp');
+        $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
+        $hasAccessibility = Schema::hasColumn('assets', 'has_wheelchair_ramp');
 
         $vehicles = $this->bookingAccess->activeVehicles($actor);
         if ($hasFleetFields) {
@@ -224,12 +232,12 @@ class VehicleBookingController extends Controller
         }
 
         $clients = [];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('clients', 'transport_needs')) {
+        if (Schema::hasColumn('clients', 'transport_needs')) {
             $clients = $this->bookingAccess->clients($actor)
                 ->sortBy([['first_name', 'asc'], ['last_name', 'asc'], ['id', 'asc']])
                 ->map(fn ($c) => [
                     'id' => $c->id,
-                    'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                    'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                     'transport_needs' => $c->transport_needs,
                 ])->values();
         }
@@ -261,11 +269,11 @@ class VehicleBookingController extends Controller
      * Overlapping-booking conflicts for the wizard's selected vehicle + range.
      * Query semantics identical to the retired create-page check.
      *
-     * @return array<int, array<string, mixed>>|\Illuminate\Support\Collection
+     * @return array<int, array<string, mixed>>|Collection
      */
     private function bookingConflicts(Request $request)
     {
-        if (!$request->filled('check_asset_id') || !$request->filled('check_starts_at') || !$request->filled('check_ends_at')) {
+        if (! $request->filled('check_asset_id') || ! $request->filled('check_starts_at') || ! $request->filled('check_ends_at')) {
             return [];
         }
 
@@ -294,7 +302,7 @@ class VehicleBookingController extends Controller
     /** Status of the wizard's selected vehicle (maintenance warning etc.). */
     private function checkedVehicleStatus(Request $request): ?string
     {
-        if (!$request->filled('check_asset_id')) {
+        if (! $request->filled('check_asset_id')) {
             return null;
         }
 
@@ -311,11 +319,11 @@ class VehicleBookingController extends Controller
      * All bookings for the selected vehicle in a 3-month window — feeds the
      * wizard's availability mini-calendar.
      *
-     * @return array<int, array<string, mixed>>|\Illuminate\Support\Collection
+     * @return array<int, array<string, mixed>>|Collection
      */
     private function checkedVehicleBookings(Request $request)
     {
-        if (!$request->filled('check_asset_id')) {
+        if (! $request->filled('check_asset_id')) {
             return [];
         }
 
@@ -406,13 +414,13 @@ class VehicleBookingController extends Controller
                 'notes' => ['nullable', 'string', 'max:2000'],
             ]);
 
-            $eligibility = \App\Domain\Hr\Models\HrDriverEligibility::query()
+            $eligibility = HrDriverEligibility::query()
                 ->where('user_id', $actor->id)
                 ->where('status', 'eligible')
                 ->where('licence_expires_at', '>', now())
                 ->first();
 
-            if (!$eligibility) {
+            if (! $eligibility) {
                 return false;
             }
 
@@ -451,7 +459,7 @@ class VehicleBookingController extends Controller
             ]);
         }
 
-        if (!$booking) {
+        if (! $booking) {
             return back()->withErrors([
                 'asset_id' => 'This vehicle is already booked for the selected time period.',
             ]);

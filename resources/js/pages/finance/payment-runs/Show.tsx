@@ -117,10 +117,11 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         if (!reference || !confirmationDigest) return;
 
         router.post(`/finance/payment-runs/${paymentRun.id}/accept`, {
-            idempotency_key: `accept:${paymentRun.id}:${reference}:${confirmationDigest}`.slice(
-                0,
-                128,
-            ),
+            idempotency_key:
+                `accept:${paymentRun.id}:${reference}:${confirmationDigest}`.slice(
+                    0,
+                    128,
+                ),
             reference,
             evidence: { confirmation_digest: confirmationDigest },
         });
@@ -143,10 +144,11 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         if (!reference || !reason || !evidenceReference) return;
 
         router.post(`/finance/payment-runs/${paymentRun.id}/reject`, {
-            idempotency_key: `reject:${paymentRun.id}:${reference}:${evidenceReference}`.slice(
-                0,
-                128,
-            ),
+            idempotency_key:
+                `reject:${paymentRun.id}:${reference}:${evidenceReference}`.slice(
+                    0,
+                    128,
+                ),
             reference,
             reason,
             evidence: { rejection_digest: evidenceReference },

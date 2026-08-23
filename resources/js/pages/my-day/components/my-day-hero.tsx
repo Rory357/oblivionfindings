@@ -198,7 +198,7 @@ export function MyDayHero({
             <a
                 href={site.href}
                 className={
-                    'border-primary-foreground/40 hover:border-primary-foreground hover:bg-primary-foreground/10 rounded-sm border-b-2 px-0.5 transition-colors'
+                    'rounded-sm border-b-2 border-primary-foreground/40 px-0.5 transition-colors hover:border-primary-foreground hover:bg-primary-foreground/10'
                 }
             >
                 {site.name}

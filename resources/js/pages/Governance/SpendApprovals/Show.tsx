@@ -180,7 +180,7 @@ export default function ShowSpendApproval({
                             <CardContent className="space-y-3 text-sm">
                                 {approval.description && (
                                     <div>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Description
                                         </p>
                                         <p className="mt-1 whitespace-pre-wrap">
@@ -190,7 +190,7 @@ export default function ShowSpendApproval({
                                 )}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Requested by
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -198,7 +198,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Submitted at
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -207,7 +207,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Valid until
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -215,7 +215,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Currency
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -248,12 +248,12 @@ export default function ShowSpendApproval({
                                         </span>
                                     </div>
                                     {approval.decision_notes && (
-                                        <p className="whitespace-pre-wrap text-sm">
+                                        <p className="text-sm whitespace-pre-wrap">
                                             {approval.decision_notes}
                                         </p>
                                     )}
                                     {approval.resolution && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             Linked resolution:{' '}
                                             {approval.resolution.title} (
                                             {approval.resolution.outcome})
@@ -385,7 +385,7 @@ export default function ShowSpendApproval({
                                         </>
                                     )}
                                 {!isDraft && !isSubmitted && !isDecided && (
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-xs text-muted-foreground">
                                         No actions available.
                                     </p>
                                 )}
@@ -403,7 +403,7 @@ export default function ShowSpendApproval({
                                     <p className="font-medium">
                                         {approval.budget.title}
                                     </p>
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-xs text-muted-foreground">
                                         FY {approval.budget.fiscal_year}
                                     </p>
                                 </CardContent>
@@ -417,11 +417,11 @@ export default function ShowSpendApproval({
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Paperclip className="h-5 w-5" />
                             Supporting documents
-                            <span className="text-muted-foreground ml-1 text-sm font-normal">
+                            <span className="ml-1 text-sm font-normal text-muted-foreground">
                                 ({attachments.length})
                             </span>
                         </CardTitle>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Quotes, contracts, invoices, vendor due diligence —
                             the documentary trail behind the spend decision.
                         </p>

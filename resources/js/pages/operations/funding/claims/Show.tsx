@@ -157,15 +157,15 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                             >
                                 {claim.status}
                             </Badge>
-                            <p className="text-status-success dark:text-status-success mt-2 text-sm font-semibold">
+                            <p className="mt-2 text-sm font-semibold text-status-success dark:text-status-success">
                                 {nzd.format(claim.total_amount ?? 0)}
                             </p>
-                            <p className="text-muted-foreground mt-2 text-xs">
+                            <p className="mt-2 text-xs text-muted-foreground">
                                 General Ledger:{' '}
                                 {claim.gl_posting_status.replaceAll('_', ' ')}
                             </p>
                             {claim.gl_posting_status === 'failed' && (
-                                <p className="text-destructive mt-1 text-xs">
+                                <p className="mt-1 text-xs text-destructive">
                                     Posting failed. Retry when the finance
                                     service is available.
                                 </p>
@@ -177,7 +177,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                 <Card className="mt-4">
                     <CardContent className="grid gap-3 p-4 md:grid-cols-4">
                         <div>
-                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
                                 Claim Window
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -186,7 +186,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
                                 Submitted
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -194,7 +194,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
                                 Approved
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -202,7 +202,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
                                 Raised By
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -226,7 +226,7 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                                     <p className="text-sm font-semibold">
                                         {item.description}
                                     </p>
-                                    <p className="text-muted-foreground mt-1 text-xs">
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                         <span className="inline-flex items-center gap-1">
                                             <CalendarDays className="h-3 w-3" />
                                             {formatDate(item.service_date)}
@@ -242,13 +242,13 @@ export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
                                         )}
                                     </p>
                                 </div>
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-sm text-muted-foreground">
                                     Qty {item.quantity}
                                 </p>
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-sm text-muted-foreground">
                                     {nzd.format(item.unit_price)}
                                 </p>
-                                <p className="text-status-success dark:text-status-success text-sm font-semibold">
+                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
                                     {nzd.format(item.total_amount)}
                                 </p>
                             </div>

@@ -245,8 +245,7 @@ class PayrollJournalService
         HrPayrollRun $payrollRun,
         FinExternalSettlement $settlement,
         User $actor,
-    ): FinJournal
-    {
+    ): FinJournal {
         if (DB::transactionLevel() < 1) {
             throw new RuntimeException('Accepted net pay must be posted inside the external-settlement transaction.');
         }

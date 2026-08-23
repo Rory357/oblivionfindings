@@ -259,8 +259,7 @@ final class PullProviderCapability implements ShouldBeUnique, ShouldQueue
     private function recordFailedAttempt(
         ProviderCapabilityCursor $cursor,
         string $code = 'provider_collection_failed',
-    ): void
-    {
+    ): void {
         try {
             DB::transaction(function () use ($code, $cursor): void {
                 /** @var ProviderCapabilityCursor $locked */

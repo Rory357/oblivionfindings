@@ -101,12 +101,12 @@ export function StaffHeader({
 
     const titleInner = (
         <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-1.5 truncate text-base font-semibold leading-tight tracking-tight">
+            <h1 className="flex items-center gap-1.5 truncate text-base leading-tight font-semibold tracking-tight">
                 <span className="truncate">{title}</span>
                 {titleChevron ? (
                     <ChevronDown
                         className={cn(
-                            'text-muted-foreground h-3 w-3 shrink-0 transition-transform duration-150',
+                            'h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-150',
                             titleOpen && 'rotate-180',
                         )}
                     />
@@ -115,7 +115,7 @@ export function StaffHeader({
             {subtitle ? (
                 <p
                     className={cn(
-                        'text-muted-foreground text-xs',
+                        'text-xs text-muted-foreground',
                         hasDesktopChrome
                             ? 'whitespace-normal lg:truncate'
                             : 'truncate',
@@ -130,7 +130,7 @@ export function StaffHeader({
     return (
         <header
             className={cn(
-                'border-border/50 bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex min-h-14 items-center gap-x-3 gap-y-2 border-b px-4 pb-2 backdrop-blur',
+                'sticky top-0 z-30 flex min-h-14 items-center gap-x-3 gap-y-2 border-b border-border/50 bg-background/95 px-4 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80',
                 // Honour the top safe-area inset so the title clears the
                 // status bar when the app is launched in standalone/PWA
                 // mode. Resolves to pt-2 in a normal browser tab.
@@ -143,7 +143,7 @@ export function StaffHeader({
                 <Link
                     href={backHref}
                     aria-label={backLabel}
-                    className="frontline-focus text-muted-foreground hover:bg-accent hover:text-foreground -ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md"
+                    className="frontline-focus -ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
@@ -223,7 +223,7 @@ function StaffHeaderGlobalLinkButton({
                 <Link
                     href={link.href}
                     aria-label={link.label}
-                    className="frontline-focus text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors"
+                    className="frontline-focus inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <Icon className="h-4 w-4" />
                 </Link>
@@ -237,7 +237,7 @@ function StaffHeaderSearchInput({ search }: { search: StaffHeaderSearch }) {
     const [value, setValue] = useState('');
     return (
         <form
-            className="border-border bg-background text-muted-foreground hover:bg-muted focus-within:border-ring focus-within:ring-ring/40 ml-2 hidden h-11 w-[200px] items-center gap-2 rounded-md border px-3 text-xs transition-colors focus-within:ring-2 md:flex"
+            className="ml-2 hidden h-11 w-[200px] items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-muted-foreground transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40 hover:bg-muted md:flex"
             onSubmit={(event) => {
                 event.preventDefault();
                 search.onSubmit?.(value);
@@ -249,11 +249,11 @@ function StaffHeaderSearchInput({ search }: { search: StaffHeaderSearch }) {
                 value={value}
                 placeholder={search.placeholder ?? 'Search…'}
                 onChange={(event) => setValue(event.target.value)}
-                className="text-foreground placeholder:text-muted-foreground h-full min-w-0 flex-1 border-0 bg-transparent text-xs outline-none"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
                 aria-label={search.placeholder ?? 'Search'}
             />
             {search.hint ? (
-                <span className="text-text-faint text-[10.5px]">
+                <span className="text-[10.5px] text-text-faint">
                     {search.hint}
                 </span>
             ) : null}
@@ -269,10 +269,10 @@ function StaffHeaderLiveChip({
     const age = useFreshness(indicator.lastUpdatedAt);
     const label = indicator.lastUpdatedAt ? `Live · ${age}` : 'Live';
     const body = (
-        <span className="border-border bg-background text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px]">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11.5px] text-muted-foreground">
             <span
                 className={cn(
-                    'bg-status-success h-1.5 w-1.5 rounded-full',
+                    'h-1.5 w-1.5 rounded-full bg-status-success',
                     indicator.isRefreshing && 'animate-pulse',
                 )}
             />
@@ -304,11 +304,11 @@ function StaffHeaderNotificationsBell({
         <Link
             href={notifications.href}
             aria-label={`Notifications (${notifications.count})`}
-            className="frontline-focus border-border text-foreground hover:bg-muted relative inline-flex h-11 w-11 items-center justify-center rounded-md border"
+            className="frontline-focus relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted"
         >
             <Bell className="h-4 w-4" />
             {notifications.count > 0 ? (
-                <span className="border-background bg-status-critical text-status-critical-foreground absolute right-1 top-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 px-1 text-[9px] font-bold">
+                <span className="absolute top-1 right-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 border-background bg-status-critical px-1 text-[9px] font-bold text-status-critical-foreground">
                     {notifications.count}
                 </span>
             ) : null}

@@ -5,16 +5,19 @@ namespace App\Services;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientIncident;
+use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Models\ClientInrRecord;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationReview;
 use App\Models\MedicationSyringeDriver;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MedicationReportingService
 {
@@ -144,7 +147,7 @@ class MedicationReportingService
             $first = $group->first();
             $count = $group->count();
             $maxPerDay = (int) filter_var($first->medication?->max_per_day, FILTER_SANITIZE_NUMBER_INT);
-            
+
             return [
                 'client_id' => $first->client_id,
                 'client_name' => $first->client ? trim("{$first->client->first_name} {$first->client->last_name}") : 'Unknown',
@@ -163,6 +166,7 @@ class MedicationReportingService
                         $a->administered_at->copy()->startOfDay(),
                         $a->administered_at->copy()->endOfDay(),
                     ])->count();
+
                     return $dayCount > $maxPerDay;
                 })->count() : 0,
             ];
@@ -427,12 +431,12 @@ class MedicationReportingService
                 'high_risk' => $m->medication?->high_risk ?? false,
                 'reason' => $m->reason,
                 'notes' => $m->notes,
-                'severity' => $m->medication?->controlled_drug ? 'critical' : 
+                'severity' => $m->medication?->controlled_drug ? 'critical' :
                     ($m->medication?->high_risk ? 'high' : 'medium'),
             ])->toArray(),
             'summary_by_client' => $missed->groupBy('client_id')
                 ->map(fn ($group) => [
-                    'client_name' => $group->first()->client ? 
+                    'client_name' => $group->first()->client ?
                         trim("{$group->first()->client->first_name} {$group->first()->client->last_name}") : 'Unknown',
                     'count' => $group->count(),
                     'controlled_missed' => $group->where('medication.controlled_drug', true)->count(),
@@ -533,9 +537,9 @@ class MedicationReportingService
     /**
      * Get stock status
      */
-    private function getStockStatus(?\App\Models\ClientMedicationStock $stock): string
+    private function getStockStatus(?ClientMedicationStock $stock): string
     {
-        if (!$stock || $stock->on_hand === null) {
+        if (! $stock || $stock->on_hand === null) {
             return 'unknown';
         }
         if ($stock->on_hand === 0) {
@@ -544,6 +548,7 @@ class MedicationReportingService
         if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
             return 'low_stock';
         }
+
         return 'ok';
     }
 
@@ -664,7 +669,7 @@ class MedicationReportingService
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
 
-        $query = \App\Models\ClientIncident::query()
+        $query = ClientIncident::query()
             ->whereBetween('occurred_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['client:id,first_name,last_name']);
 
@@ -825,7 +830,7 @@ class MedicationReportingService
      */
     private function getSafetyAlerts(?int $clientId, Carbon $dateFrom, Carbon $dateTo): array
     {
-        $query = \App\Models\MedicationDashboardAlert::whereBetween('created_at', [
+        $query = MedicationDashboardAlert::whereBetween('created_at', [
             $dateFrom->startOfDay(),
             $dateTo->endOfDay(),
         ]);
@@ -909,7 +914,7 @@ class MedicationReportingService
     /**
      * Export to CSV format
      */
-    public function exportToCsv(array $data, string $filename): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportToCsv(array $data, string $filename): StreamedResponse
     {
         return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'w');
@@ -917,6 +922,7 @@ class MedicationReportingService
             if (empty($data['records'] ?? [])) {
                 fputcsv($out, ['No data available']);
                 fclose($out);
+
                 return;
             }
 
@@ -930,6 +936,7 @@ class MedicationReportingService
                     if (is_array($value)) {
                         return json_encode($value);
                     }
+
                     return $value;
                 }, $record));
             }

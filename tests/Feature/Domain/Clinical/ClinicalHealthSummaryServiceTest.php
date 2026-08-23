@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
@@ -19,6 +18,7 @@ class ClinicalHealthSummaryServiceTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalHealthSummaryService $service;
+
     protected Client $client;
 
     protected function setUp(): void

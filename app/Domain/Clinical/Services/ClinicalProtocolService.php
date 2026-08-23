@@ -19,9 +19,9 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
 use DateTimeZone;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Ramsey\Uuid\Uuid;
@@ -621,7 +621,7 @@ class ClinicalProtocolService
      * Lock order for every existing aggregate mutation is:
      * User -> HR profile -> Site -> Client -> protocol -> command -> schedules.
      *
-     * @param array{client_id:int,site_id:int} $snapshot
+     * @param  array{client_id:int,site_id:int}  $snapshot
      * @return array{0:User,1:ClinicalProtocol}
      */
     private function lockProtocolGraph(
@@ -1033,6 +1033,6 @@ class ClinicalProtocolService
      */
     protected function buildTaskLabel(ClinicalProtocol $protocol): string
     {
-        return '📋 ' . $protocol->observation_type->label() . ': ' . $protocol->name;
+        return '📋 '.$protocol->observation_type->label().': '.$protocol->name;
     }
 }

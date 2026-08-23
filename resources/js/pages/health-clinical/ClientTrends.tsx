@@ -201,11 +201,11 @@ export default function ClientTrends({
                 {!has_chartable_data ? (
                     <Card>
                         <CardContent className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
-                            <Activity className="text-muted-foreground h-8 w-8" />
+                            <Activity className="h-8 w-8 text-muted-foreground" />
                             <h2 className="text-lg font-semibold">
                                 No chartable observations in this range
                             </h2>
-                            <p className="text-muted-foreground max-w-lg text-sm">
+                            <p className="max-w-lg text-sm text-muted-foreground">
                                 Try a wider date range or review the observation
                                 register for non-chartable entries such as
                                 general notes or sleep logs.
@@ -222,7 +222,7 @@ export default function ClientTrends({
                             <p className="text-sm font-medium">
                                 Chartable observations in range
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-xs text-muted-foreground">
                                 {chartable_observation_count} entries across
                                 weight, pain, vitals, and fluid intake.
                             </p>

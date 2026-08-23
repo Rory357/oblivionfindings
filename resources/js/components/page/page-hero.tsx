@@ -193,7 +193,7 @@ function HeroVariant(props: PageHeroProps) {
             data-page-hero-variant="hero"
             style={style}
             className={cn(
-                '@container text-primary-foreground relative rounded-2xl',
+                '@container relative rounded-2xl text-primary-foreground',
                 gradientClass,
                 className,
             )}
@@ -201,39 +201,39 @@ function HeroVariant(props: PageHeroProps) {
             {/* INNER ORB CLIP — purely visual; clipped to the rounded shape so the
                 three decorative circles don't bleed past the banner. */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="bg-primary-foreground/5 absolute -right-16 -top-16 h-64 w-64 rounded-full" />
-                <div className="bg-primary-foreground/5 absolute -bottom-20 -left-20 h-48 w-48 rounded-full" />
-                <div className="bg-primary-foreground/5 absolute right-1/3 top-1/4 h-24 w-24 rounded-full" />
+                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
             </div>
 
             <div className="relative p-6 md:p-8">
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="frontline-focus frontline-tap text-primary-foreground/60 hover:text-primary-foreground/90 -ml-2 mb-1 inline-flex items-center gap-1.5 rounded-md px-2 text-xs transition-colors"
+                        className="frontline-focus frontline-tap mb-1 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 text-xs text-primary-foreground/60 transition-colors hover:text-primary-foreground/90"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
                         {backLabel}
                     </Link>
                 ) : null}
 
-                <div className="@5xl:flex-row @5xl:items-start flex flex-col items-center gap-6">
+                <div className="flex flex-col items-center gap-6 @5xl:flex-row @5xl:items-start">
                     {avatarStack && avatarStack.length > 0 ? (
                         <PageHeroAvatarStack residents={avatarStack} />
                     ) : avatar ? (
                         <HeroSingleAvatar avatar={avatar} />
                     ) : renderedIcon ? (
-                        <div className="border-primary-foreground/20 bg-primary-foreground/10 flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 shadow-xl md:h-28 md:w-28">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
                             {renderedIcon}
                         </div>
                     ) : null}
 
-                    <div className="@5xl:text-left min-w-0 flex-1 text-center">
-                        <h1 className="break-words text-2xl font-bold tracking-tight md:text-3xl">
+                    <div className="min-w-0 flex-1 text-center @5xl:text-left">
+                        <h1 className="text-2xl font-bold tracking-tight break-words md:text-3xl">
                             {title}
                         </h1>
                         {supportingText ? (
-                            <p className="text-primary-foreground/70 mt-1 text-sm">
+                            <p className="mt-1 text-sm text-primary-foreground/70">
                                 {supportingText}
                             </p>
                         ) : null}
@@ -251,7 +251,7 @@ function HeroVariant(props: PageHeroProps) {
                     {(actions ||
                         (stats && stats.length > 0) ||
                         (quickActions && quickActions.length > 0)) && (
-                        <div className="@5xl:w-auto @5xl:items-end flex w-full flex-col items-center gap-3">
+                        <div className="flex w-full flex-col items-center gap-3 @5xl:w-auto @5xl:items-end">
                             {actions ? (
                                 <PageHeroActions className="[&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:min-w-11">
                                     {actions}
@@ -272,7 +272,7 @@ function HeroVariant(props: PageHeroProps) {
             </div>
 
             {footer ? (
-                <div className="border-primary-foreground/20 relative overflow-hidden rounded-b-2xl border-t px-4">
+                <div className="relative overflow-hidden rounded-b-2xl border-t border-primary-foreground/20 px-4">
                     {footer}
                 </div>
             ) : null}
@@ -293,7 +293,7 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
     const avatarEl = (
         <Avatar
             className={cn(
-                'border-primary-foreground/20 h-24 w-24 shrink-0 border-4 shadow-xl md:h-28 md:w-28',
+                'h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28',
                 avatar.popover &&
                     'cursor-pointer transition-shadow duration-200',
                 avatar.popover &&
@@ -304,7 +304,7 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
             {avatar.src ? (
                 <AvatarImage src={avatar.src} alt={avatar.fallback} />
             ) : null}
-            <AvatarFallback className="bg-primary-foreground/10 text-primary-foreground text-2xl font-semibold">
+            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
                 {avatar.fallback}
             </AvatarFallback>
         </Avatar>
@@ -359,17 +359,17 @@ function CompactVariant(props: PageHeroProps) {
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="frontline-focus frontline-tap text-muted-foreground hover:text-foreground -ml-2 inline-flex items-center gap-2 rounded-md px-2 text-sm"
+                        className="frontline-focus frontline-tap -ml-2 inline-flex items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:text-foreground"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         {backLabel}
                     </Link>
                 ) : null}
-                <h1 className="mt-1 break-words text-xl font-semibold tracking-tight md:text-2xl">
+                <h1 className="mt-1 text-xl font-semibold tracking-tight break-words md:text-2xl">
                     {title}
                 </h1>
                 {supportingText ? (
-                    <p className="text-muted-foreground mt-2 max-w-2xl break-words text-sm leading-relaxed">
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed break-words text-muted-foreground">
                         {supportingText}
                     </p>
                 ) : null}
@@ -400,7 +400,7 @@ function InlineVariant(props: PageHeroProps) {
                     {title}
                 </h1>
                 {supportingText ? (
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         {supportingText}
                     </p>
                 ) : null}

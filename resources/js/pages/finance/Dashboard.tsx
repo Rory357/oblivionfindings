@@ -237,8 +237,8 @@ function computeTrend(data: MonthlyData[]): { percent: number } | null {
 function PulseDot() {
     return (
         <span className="relative inline-flex h-2 w-2">
-            <span className="bg-primary-foreground/60 absolute inline-flex h-full w-full animate-ping rounded-full" />
-            <span className="bg-primary-foreground relative inline-flex h-2 w-2 rounded-full" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground/60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-foreground" />
         </span>
     );
 }
@@ -259,9 +259,9 @@ function KpiCard({
     sub?: string;
 }) {
     return (
-        <div className="border-border bg-card rounded-[15px] border p-4">
+        <div className="rounded-[15px] border border-border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground text-xs font-semibold">
+                <span className="text-xs font-semibold text-muted-foreground">
                     {label}
                 </span>
                 <span
@@ -273,7 +273,7 @@ function KpiCard({
                     <Icon className="h-4 w-4" />
                 </span>
             </div>
-            <div className="mt-2 text-2xl font-bold tabular-nums tracking-tight">
+            <div className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
                 {value}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11.5px]">
@@ -657,7 +657,7 @@ export default function FinanceDashboard({
                         icon={LayoutDashboard}
                         title={
                             <span>
-                                <span className="text-primary-foreground/85 mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider md:justify-start">
+                                <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/85 uppercase md:justify-start">
                                     <PulseDot />
                                     Live ledger ·{' '}
                                     {periodLabel ?? PERIOD_LABEL[period]}
@@ -668,16 +668,16 @@ export default function FinanceDashboard({
                         description={
                             <span>
                                 Live general ledger for{' '}
-                                <span className="text-primary-foreground font-semibold">
+                                <span className="font-semibold text-primary-foreground">
                                     {orgName}
                                 </span>{' '}
                                 across{' '}
-                                <span className="text-primary-foreground font-semibold">
+                                <span className="font-semibold text-primary-foreground">
                                     {siteCount ?? 0}{' '}
                                     {siteCount === 1 ? 'site' : 'sites'}
                                 </span>{' '}
                                 and{' '}
-                                <span className="text-primary-foreground font-semibold">
+                                <span className="font-semibold text-primary-foreground">
                                     {fundingStreams.length} funding{' '}
                                     {fundingStreams.length === 1
                                         ? 'stream'
@@ -766,7 +766,7 @@ export default function FinanceDashboard({
                                     <div
                                         role="group"
                                         aria-label="Reporting period"
-                                        className="bg-primary-foreground/15 inline-flex w-fit rounded-[10px] p-[3px]"
+                                        className="inline-flex w-fit rounded-[10px] bg-primary-foreground/15 p-[3px]"
                                     >
                                         {PERIODS.map((p) => (
                                             // eslint-disable-next-line no-restricted-syntax -- segmented-control pill, not a shadcn Button
@@ -992,7 +992,7 @@ export default function FinanceDashboard({
                                     <CardTitle className="text-base">
                                         Net profit trend
                                     </CardTitle>
-                                    <p className="text-muted-foreground mt-0.5 text-[11.8px]">
+                                    <p className="mt-0.5 text-[11.8px] text-muted-foreground">
                                         Rolling 6 periods · NZD
                                     </p>
                                 </div>
@@ -1110,7 +1110,7 @@ export default function FinanceDashboard({
                                 <CardTitle className="text-base">
                                     Revenue vs expenses
                                 </CardTitle>
-                                <p className="text-muted-foreground mt-0.5 text-[11.8px]">
+                                <p className="mt-0.5 text-[11.8px] text-muted-foreground">
                                     Last 6 periods
                                 </p>
                             </CardHeader>
@@ -1206,7 +1206,7 @@ export default function FinanceDashboard({
                             </CardHeader>
                             <CardContent>
                                 {upcomingBillsDue.length === 0 ? (
-                                    <p className="text-muted-foreground text-sm">
+                                    <p className="text-sm text-muted-foreground">
                                         No bills due in the next 7 days.
                                     </p>
                                 ) : (
@@ -1227,7 +1227,7 @@ export default function FinanceDashboard({
                                                     <TableCell>
                                                         <Link
                                                             href={`/finance/bills/${bill.id}`}
-                                                            className="text-primary font-semibold hover:underline"
+                                                            className="font-semibold text-primary hover:underline"
                                                         >
                                                             {bill.bill_number}
                                                         </Link>
@@ -1257,7 +1257,7 @@ export default function FinanceDashboard({
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     Funding claims
-                                    <span className="bg-status-warning-bg text-status-warning rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide">
+                                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-status-warning uppercase">
                                         supported living
                                     </span>
                                 </CardTitle>
@@ -1270,7 +1270,7 @@ export default function FinanceDashboard({
                             </CardHeader>
                             <CardContent>
                                 {fundingClaims.length === 0 ? (
-                                    <p className="text-muted-foreground text-sm">
+                                    <p className="text-sm text-muted-foreground">
                                         No funding claims yet.
                                     </p>
                                 ) : (
@@ -1290,14 +1290,14 @@ export default function FinanceDashboard({
                                         <TableBody>
                                             {fundingClaims.map((claim) => (
                                                 <TableRow key={claim.reference}>
-                                                    <TableCell className="text-primary font-semibold">
+                                                    <TableCell className="font-semibold text-primary">
                                                         {claim.reference}
                                                     </TableCell>
                                                     <TableCell>
                                                         <span className="block">
                                                             {claim.funder}
                                                         </span>
-                                                        <span className="text-muted-foreground block text-[11px]">
+                                                        <span className="block text-[11px] text-muted-foreground">
                                                             {claim.period}
                                                         </span>
                                                     </TableCell>
@@ -1340,7 +1340,7 @@ export default function FinanceDashboard({
                         </CardHeader>
                         <CardContent>
                             {recentJournals.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-sm text-muted-foreground">
                                     No journal entries yet.
                                 </p>
                             ) : (
@@ -1362,7 +1362,7 @@ export default function FinanceDashboard({
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/journals/${journal.id}`}
-                                                        className="text-primary font-semibold hover:underline"
+                                                        className="font-semibold text-primary hover:underline"
                                                     >
                                                         {journal.journal_number}
                                                     </Link>
@@ -1376,7 +1376,7 @@ export default function FinanceDashboard({
                                                     {journal.description ?? '—'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <span className="bg-accent text-primary rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize">
+                                                    <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-primary capitalize">
                                                         {journal.type}
                                                     </span>
                                                 </TableCell>

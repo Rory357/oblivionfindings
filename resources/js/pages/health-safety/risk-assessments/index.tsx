@@ -37,8 +37,8 @@ import {
     HeroShell,
     HeroStatusPill,
     ngaPaerewaBadge,
-    type HeroComplianceBadge,
     useNzsAssurance,
+    type HeroComplianceBadge,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';

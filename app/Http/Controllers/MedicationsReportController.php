@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MedicationsReportController extends Controller
@@ -26,10 +27,10 @@ class MedicationsReportController extends Controller
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? \Carbon\Carbon::parse($filters['date_from'])->startOfDay()
+            ? Carbon::parse($filters['date_from'])->startOfDay()
             : now()->subDays(14)->startOfDay();
         $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? \Carbon\Carbon::parse($filters['date_to'])->endOfDay()
+            ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
         $admins = ClientMedicationAdministration::query()
@@ -41,13 +42,13 @@ class MedicationsReportController extends Controller
             ])
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
 
-        if (!empty($filters['client_id'])) {
+        if (! empty($filters['client_id'])) {
             $admins->where('client_id', (int) $filters['client_id']);
         }
-        if (!empty($filters['service_context_id'])) {
+        if (! empty($filters['service_context_id'])) {
             $admins->where('service_context_id', (int) $filters['service_context_id']);
         }
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $admins->where('status', $filters['status']);
         }
 
@@ -94,13 +95,13 @@ class MedicationsReportController extends Controller
             ])
             ->whereBetween('reported_at', [$dateFrom, $dateTo]);
 
-        if (!empty($filters['client_id'])) {
+        if (! empty($filters['client_id'])) {
             $discQ->where('client_id', (int) $filters['client_id']);
         }
-        if (!empty($filters['service_context_id'])) {
+        if (! empty($filters['service_context_id'])) {
             $discQ->where('service_context_id', (int) $filters['service_context_id']);
         }
-        if (!empty($filters['discrepancy_status'])) {
+        if (! empty($filters['discrepancy_status'])) {
             $discQ->where('status', $filters['discrepancy_status']);
         }
 
@@ -185,10 +186,10 @@ class MedicationsReportController extends Controller
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? \Carbon\Carbon::parse($filters['date_from'])->startOfDay()
+            ? Carbon::parse($filters['date_from'])->startOfDay()
             : now()->subDays(14)->startOfDay();
         $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? \Carbon\Carbon::parse($filters['date_to'])->endOfDay()
+            ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
         $q = ClientMedicationAdministration::query()
@@ -200,17 +201,17 @@ class MedicationsReportController extends Controller
             ])
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
 
-        if (!empty($filters['client_id'])) {
+        if (! empty($filters['client_id'])) {
             $q->where('client_id', (int) $filters['client_id']);
         }
-        if (!empty($filters['service_context_id'])) {
+        if (! empty($filters['service_context_id'])) {
             $q->where('service_context_id', (int) $filters['service_context_id']);
         }
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $q->where('status', $filters['status']);
         }
 
-        $filename = 'mar_export_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'mar_export_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
@@ -229,7 +230,7 @@ class MedicationsReportController extends Controller
 
             $q->orderBy('administered_at')->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
-                    $clientName = trim(($a->client?->first_name ?? '') . ' ' . ($a->client?->last_name ?? ''));
+                    $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     $contextName = $a->serviceContext?->name ?? '';
                     $this->putCsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
@@ -262,10 +263,10 @@ class MedicationsReportController extends Controller
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? \Carbon\Carbon::parse($filters['date_from'])->startOfDay()
+            ? Carbon::parse($filters['date_from'])->startOfDay()
             : now()->subDays(14)->startOfDay();
         $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? \Carbon\Carbon::parse($filters['date_to'])->endOfDay()
+            ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
         $q = ClientControlledDrugDiscrepancy::query()
@@ -279,17 +280,17 @@ class MedicationsReportController extends Controller
             ])
             ->whereBetween('reported_at', [$dateFrom, $dateTo]);
 
-        if (!empty($filters['client_id'])) {
+        if (! empty($filters['client_id'])) {
             $q->where('client_id', (int) $filters['client_id']);
         }
-        if (!empty($filters['service_context_id'])) {
+        if (! empty($filters['service_context_id'])) {
             $q->where('service_context_id', (int) $filters['service_context_id']);
         }
-        if (!empty($filters['discrepancy_status'])) {
+        if (! empty($filters['discrepancy_status'])) {
             $q->where('status', $filters['discrepancy_status']);
         }
 
-        $filename = 'controlled_discrepancies_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'controlled_discrepancies_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
@@ -313,7 +314,7 @@ class MedicationsReportController extends Controller
 
             $q->orderBy('reported_at')->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $d) {
-                    $clientName = trim(($d->client?->first_name ?? '') . ' ' . ($d->client?->last_name ?? ''));
+                    $clientName = trim(($d->client?->first_name ?? '').' '.($d->client?->last_name ?? ''));
                     $this->putCsv($out, [
                         optional($d->reported_at)->toDateTimeString(),
                         $d->status,

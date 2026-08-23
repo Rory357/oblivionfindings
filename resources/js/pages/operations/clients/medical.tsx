@@ -89,8 +89,7 @@ export default function ClientMedical({
 }: Props) {
     const { labels, auth } = usePage().props as any;
     const canDiscontinue = Boolean(
-        auth?.can?.medications?.view &&
-            auth?.can?.medications?.ordersManage,
+        auth?.can?.medications?.view && auth?.can?.medications?.ordersManage,
     );
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();

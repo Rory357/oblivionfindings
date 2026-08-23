@@ -561,7 +561,7 @@ class EmarReportController extends Controller
 
     private function exportAdministrations($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Reason Code', 'Administered By', 'Witness', 'BSL', 'Pulse', 'Blood Pressure', 'Notes']);
+        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Reason Code', 'Administered By', 'Witness', 'BSL', 'Pulse', 'Blood Pressure', 'Notes']);
 
         ClientMedicationAdministration::query()
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
@@ -572,7 +572,7 @@ class EmarReportController extends Controller
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
                     $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
-                    $this->putCsv($out,[
+                    $this->putCsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
@@ -593,7 +593,7 @@ class EmarReportController extends Controller
 
     private function exportPrn($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Dose', 'Reason', 'Administered By']);
+        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Dose', 'Reason', 'Administered By']);
 
         ClientMedicationAdministration::query()
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,is_prn,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name'])
@@ -605,7 +605,7 @@ class EmarReportController extends Controller
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
                     $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
-                    $this->putCsv($out,[
+                    $this->putCsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
@@ -621,7 +621,7 @@ class EmarReportController extends Controller
 
     private function exportControlled($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        $this->putCsv($out,['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Dose', 'Administered By', 'Witness']);
+        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Dose', 'Administered By', 'Witness']);
 
         ClientMedicationAdministration::query()
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,controlled_drug,pharmac_therapeutic_group,deleted_at', 'administeredBy:id,name', 'witnessedBy:id,name'])
@@ -633,7 +633,7 @@ class EmarReportController extends Controller
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
                     $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
-                    $this->putCsv($out,[
+                    $this->putCsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
                         $a->client?->care_level,
@@ -650,14 +650,14 @@ class EmarReportController extends Controller
 
     private function exportRounds($out, Carbon $dateFrom, Carbon $dateTo): void
     {
-        $this->putCsv($out,['Date', 'Name', 'Status', 'Scheduled Time', 'Started At', 'Completed At', 'Total Meds', 'Administered', 'Refused', 'Missed']);
+        $this->putCsv($out, ['Date', 'Name', 'Status', 'Scheduled Time', 'Started At', 'Completed At', 'Total Meds', 'Administered', 'Refused', 'Missed']);
 
         MedicationRound::query()
             ->whereBetween('round_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
             ->orderBy('round_date')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    $this->putCsv($out,[
+                    $this->putCsv($out, [
                         $r->round_date?->toDateString(),
                         $r->name,
                         $r->status,
@@ -675,7 +675,7 @@ class EmarReportController extends Controller
 
     private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        $this->putCsv($out,['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Description']);
+        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Description']);
 
         MedicationError::query()
             ->with(['client:id,first_name,last_name,care_level'])
@@ -686,7 +686,7 @@ class EmarReportController extends Controller
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $e) {
                     $clientName = trim(($e->client?->first_name ?? '').' '.($e->client?->last_name ?? ''));
-                    $this->putCsv($out,[
+                    $this->putCsv($out, [
                         optional($e->reported_at)->toDateTimeString(),
                         $clientName,
                         $e->client?->care_level,
@@ -703,16 +703,16 @@ class EmarReportController extends Controller
     {
         $records = $report['records'] ?? [];
         if (empty($records)) {
-            $this->putCsv($out,['No data available']);
+            $this->putCsv($out, ['No data available']);
 
             return;
         }
 
         $headers = array_keys($records[0]);
-        $this->putCsv($out,$headers);
+        $this->putCsv($out, $headers);
 
         foreach ($records as $record) {
-            $this->putCsv($out,array_map(function ($value) {
+            $this->putCsv($out, array_map(function ($value) {
                 return is_array($value) ? json_encode($value) : $value;
             }, $record));
         }

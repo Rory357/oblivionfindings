@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
@@ -10,7 +9,6 @@ use App\Domain\Clinical\Services\ClinicalProtocolService;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftTask;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,6 +18,7 @@ class ClinicalProtocolServiceTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalProtocolService $service;
+
     protected Client $client;
 
     protected function setUp(): void

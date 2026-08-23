@@ -186,7 +186,7 @@ export default function FundingClaimCreate({ agreements, deliveries }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.service_agreement_id && (
-                                    <p className="text-destructive text-xs">
+                                    <p className="text-xs text-destructive">
                                         {errors.service_agreement_id}
                                     </p>
                                 )}
@@ -219,7 +219,7 @@ export default function FundingClaimCreate({ agreements, deliveries }: Props) {
                                     }
                                 />
                                 {errors.period_start && (
-                                    <p className="text-destructive text-xs">
+                                    <p className="text-xs text-destructive">
                                         {errors.period_start}
                                     </p>
                                 )}
@@ -238,15 +238,15 @@ export default function FundingClaimCreate({ agreements, deliveries }: Props) {
                                     }
                                 />
                                 {errors.period_end && (
-                                    <p className="text-destructive text-xs">
+                                    <p className="text-xs text-destructive">
                                         {errors.period_end}
                                     </p>
                                 )}
                             </div>
 
-                            <div className="bg-muted/30 text-muted-foreground rounded-lg border p-3 text-sm md:col-span-2">
+                            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground md:col-span-2">
                                 Claiming for{' '}
-                                <span className="text-foreground font-medium">
+                                <span className="font-medium text-foreground">
                                     {selectedAgreement?.client
                                         ? `${selectedAgreement.client.first_name} ${selectedAgreement.client.last_name}`
                                         : 'No client selected yet'}
@@ -342,7 +342,7 @@ export default function FundingClaimCreate({ agreements, deliveries }: Props) {
                                         {fieldErrors[
                                             `items.${index}.billing_entry_id`
                                         ] && (
-                                            <p className="text-destructive text-sm">
+                                            <p className="text-sm text-destructive">
                                                 {
                                                     fieldErrors[
                                                         `items.${index}.billing_entry_id`
@@ -401,12 +401,12 @@ export default function FundingClaimCreate({ agreements, deliveries }: Props) {
                             ))}
 
                             {errors.items && (
-                                <p className="text-destructive text-xs">
+                                <p className="text-xs text-destructive">
                                     {errors.items}
                                 </p>
                             )}
 
-                            <div className="bg-muted/30 rounded-lg border px-4 py-3 text-sm">
+                            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
                                 Draft total:{' '}
                                 <span className="font-semibold">
                                     {new Intl.NumberFormat('en-NZ', {

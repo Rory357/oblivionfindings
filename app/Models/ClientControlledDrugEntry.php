@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ClientControlledDrugEntry extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'client_id',

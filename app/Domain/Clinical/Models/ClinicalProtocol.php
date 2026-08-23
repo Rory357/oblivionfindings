@@ -7,6 +7,7 @@ use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Clinical\ClinicalProtocolFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,11 +15,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ClinicalProtocol extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Clinical\ClinicalProtocolFactory::new();
+        return ClinicalProtocolFactory::new();
     }
 
     protected $table = 'clinical_protocols';

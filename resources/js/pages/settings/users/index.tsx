@@ -343,7 +343,7 @@ export default function UsersIndex({
                         <Button
                             variant="outline"
                             onClick={handleExportCsv}
-                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground backdrop-blur-sm"
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                         >
                             <Download className="mr-2 h-4 w-4" />
                             Export CSV
@@ -386,7 +386,7 @@ export default function UsersIndex({
                         className="flex flex-col gap-3 sm:flex-row sm:items-end"
                     >
                         <div className="relative flex-1">
-                            <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search users by name or email..."
                                 value={search}
@@ -483,8 +483,8 @@ export default function UsersIndex({
 
             {/* Bulk Actions */}
             {selectedIds.length > 0 && (
-                <div className="border-primary bg-primary/10 flex items-center gap-3 rounded-lg border px-4 py-2">
-                    <span className="text-primary text-sm font-medium">
+                <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 px-4 py-2">
+                    <span className="text-sm font-medium text-primary">
                         {selectedIds.length} user
                         {selectedIds.length !== 1 ? 's' : ''} selected
                     </span>
@@ -521,13 +521,13 @@ export default function UsersIndex({
                 <CardContent className="p-0">
                     {allData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <div className="bg-primary/10 mb-4 rounded-full p-4">
-                                <Users className="text-primary h-8 w-8" />
+                            <div className="mb-4 rounded-full bg-primary/10 p-4">
+                                <Users className="h-8 w-8 text-primary" />
                             </div>
                             <h3 className="text-lg font-semibold">
                                 No users found
                             </h3>
-                            <p className="text-muted-foreground mt-1 text-sm">
+                            <p className="mt-1 text-sm text-muted-foreground">
                                 Try adjusting your search or filters, or invite
                                 a new user.
                             </p>
@@ -570,7 +570,7 @@ export default function UsersIndex({
                                 {allData.map((user) => (
                                     <TableRow
                                         key={user.id}
-                                        className="hover:bg-muted/50 cursor-pointer"
+                                        className="cursor-pointer hover:bg-muted/50"
                                     >
                                         <TableCell
                                             onClick={(e) => e.stopPropagation()}
@@ -599,7 +599,7 @@ export default function UsersIndex({
                                                             src={user.avatar}
                                                         />
                                                     )}
-                                                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                                    <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                                         {getInitials(user.name)}
                                                     </AvatarFallback>
                                                 </Avatar>
@@ -607,7 +607,7 @@ export default function UsersIndex({
                                                     <p className="font-medium">
                                                         {user.name}
                                                     </p>
-                                                    <p className="text-muted-foreground text-xs">
+                                                    <p className="text-xs text-muted-foreground">
                                                         {user.email}
                                                     </p>
                                                 </div>
@@ -629,7 +629,7 @@ export default function UsersIndex({
                                                 {(!user.roles ||
                                                     user.roles.length ===
                                                         0) && (
-                                                    <span className="text-muted-foreground text-xs">
+                                                    <span className="text-xs text-muted-foreground">
                                                         No role
                                                     </span>
                                                 )}
@@ -642,13 +642,13 @@ export default function UsersIndex({
                                             {statusBadge(user)}
                                         </TableCell>
                                         <TableCell>
-                                            <span className="text-muted-foreground text-sm">
+                                            <span className="text-sm text-muted-foreground">
                                                 {relativeTime(user.created_at)}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span
-                                                className="text-muted-foreground text-sm"
+                                                className="text-sm text-muted-foreground"
                                                 title={
                                                     user.last_login_at
                                                         ? new Date(
@@ -674,9 +674,9 @@ export default function UsersIndex({
                                         </TableCell>
                                         <TableCell>
                                             {user.two_factor_confirmed_at ? (
-                                                <ShieldCheck className="text-status-success h-4 w-4" />
+                                                <ShieldCheck className="h-4 w-4 text-status-success" />
                                             ) : (
-                                                <ShieldAlert className="text-muted-foreground/30 h-4 w-4" />
+                                                <ShieldAlert className="h-4 w-4 text-muted-foreground/30" />
                                             )}
                                         </TableCell>
                                         <TableCell
@@ -768,7 +768,7 @@ export default function UsersIndex({
             {/* Pagination */}
             {(users?.links ?? []).length > 3 && (
                 <div className="flex items-center justify-between">
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                         Showing {allData.length} of {users.total} users
                     </p>
                     <div className="flex gap-1">

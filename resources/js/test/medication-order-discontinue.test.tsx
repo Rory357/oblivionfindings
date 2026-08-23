@@ -78,9 +78,7 @@ describe('medication order discontinuation', () => {
             expect(source).toContain("m.state !== 'ceased'");
             expect(source).toContain('!m.ceased_at');
             expect(source).toContain('auth?.can?.medications?.view');
-            expect(source).toContain(
-                'auth?.can?.medications?.ordersManage',
-            );
+            expect(source).toContain('auth?.can?.medications?.ordersManage');
             expect(source).toContain('canDiscontinue &&');
             expect(source).not.toMatch(/medForm\.delete\(/);
             expect(source).not.toMatch(/medications\/\$\{m\.id\}`/);

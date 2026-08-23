@@ -388,6 +388,7 @@ final class DeviceFieldOwnershipService
                     if ($isNew || blank($this->normalise($locked->{$field}))) {
                         $projection[$field] = $normalised;
                     }
+
                     continue;
                 }
 
@@ -400,6 +401,7 @@ final class DeviceFieldOwnershipService
                     if ($activeOverride === null) {
                         $projection[$field] = $normalised;
                     }
+
                     continue;
                 }
 

@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -299,7 +300,7 @@ class MedicationOrderLifecycleTest extends TestCase
                 $this->client->id,
             );
             $this->fail('A scope-only actor discontinued a medication order.');
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+        } catch (HttpExceptionInterface $exception) {
             $this->assertSame(403, $exception->getStatusCode());
         }
 

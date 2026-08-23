@@ -1026,8 +1026,7 @@ final class ExternalSettlementService
         Model $source,
         FinExternalSettlement $settlement,
         User $actor,
-    ): void
-    {
+    ): void {
         $creatorId = $source->getAttribute('created_by');
         if ($creatorId === null) {
             throw new InvalidArgumentException('The settlement source is missing immutable maker evidence.');
@@ -1171,8 +1170,7 @@ final class ExternalSettlementService
         Model $source,
         string $purpose,
         FinExternalSettlement $settlement,
-    ): string
-    {
+    ): string {
         [$expectedDisk, $expectedPath] = $this->expectedArtifactLocation(
             $source,
             $purpose,

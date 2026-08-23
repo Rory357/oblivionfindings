@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Enums\AssuranceStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ServiceContext;
@@ -11,7 +12,6 @@ use App\Models\SiteComplianceCheck;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteFeedback;
 use App\Models\SiteStaffRequirement;
-use App\Enums\AssuranceStatus;
 use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Assurance\SiteCertificationService;
 use Illuminate\Database\Eloquent\Model;
@@ -41,8 +41,7 @@ class SiteComplianceController extends Controller
 
         $certsByStatus = $certifications->groupBy('status');
         $nzsStatus = $this->assurance->certificationForSite($site->id);
-        $substantiated = fn (SiteCertification $certification): bool =>
-            $certification->certification_type !== NzsAssuranceResolver::CERTIFICATION_TYPE
+        $substantiated = fn (SiteCertification $certification): bool => $certification->certification_type !== NzsAssuranceResolver::CERTIFICATION_TYPE
             || $nzsStatus === AssuranceStatus::CERTIFIED;
 
         // Upcoming compliance checks (next 30 days)

@@ -32,7 +32,7 @@ class ActivityFeedController extends Controller
                 ->limit(50)
                 ->get()
                 ->map(fn ($s) => [
-                    'id' => 'shift-' . $s->id,
+                    'id' => 'shift-'.$s->id,
                     'type' => 'shift',
                     'action' => match ($s->status) {
                         'completed' => 'completed',
@@ -40,11 +40,11 @@ class ActivityFeedController extends Controller
                         'cancelled' => 'cancelled',
                         default => 'updated',
                     },
-                    'title' => 'Shift ' . $s->status,
-                    'description' => ($s->staff?->name ?? 'Unassigned') . ' — ' .
-                        ($s->client ? $s->client->first_name . ' ' . $s->client->last_name : 'No client'),
+                    'title' => 'Shift '.$s->status,
+                    'description' => ($s->staff?->name ?? 'Unassigned').' — '.
+                        ($s->client ? $s->client->first_name.' '.$s->client->last_name : 'No client'),
                     'timestamp' => $s->updated_at?->toISOString(),
-                    'link' => '/operations/shifts/' . $s->id,
+                    'link' => '/operations/shifts/'.$s->id,
                 ]);
             $activities = $activities->concat($shifts);
         }
@@ -59,14 +59,14 @@ class ActivityFeedController extends Controller
                 ->limit(50)
                 ->get()
                 ->map(fn ($ts) => [
-                    'id' => 'timesheet-' . $ts->id,
+                    'id' => 'timesheet-'.$ts->id,
                     'type' => 'timesheet',
                     'action' => $ts->status,
-                    'title' => 'Timesheet ' . $ts->status,
-                    'description' => ($ts->staff?->name ?? 'Unknown') . ' — ' .
+                    'title' => 'Timesheet '.$ts->status,
+                    'description' => ($ts->staff?->name ?? 'Unknown').' — '.
                         ($ts->work_date?->format('d M Y') ?? ''),
                     'timestamp' => $ts->updated_at?->toISOString(),
-                    'link' => '/operations/timesheets/' . $ts->id,
+                    'link' => '/operations/timesheets/'.$ts->id,
                 ]);
             $activities = $activities->concat($timesheets);
         }
@@ -79,13 +79,13 @@ class ActivityFeedController extends Controller
                 ->limit(20)
                 ->get()
                 ->map(fn ($c) => [
-                    'id' => 'client-' . $c->id,
+                    'id' => 'client-'.$c->id,
                     'type' => 'client',
                     'action' => 'created',
                     'title' => 'New client added',
-                    'description' => $c->first_name . ' ' . $c->last_name,
+                    'description' => $c->first_name.' '.$c->last_name,
                     'timestamp' => $c->created_at?->toISOString(),
-                    'link' => '/operations/clients/' . $c->id,
+                    'link' => '/operations/clients/'.$c->id,
                 ]);
             $activities = $activities->concat($newClients);
         }

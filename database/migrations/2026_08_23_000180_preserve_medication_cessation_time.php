@@ -34,7 +34,7 @@ return new class extends Migration
             ->exists());
 
         if ($blockingTables->isNotEmpty()) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Cannot reduce medication cessation timestamps to dates while non-midnight evidence exists in: '
                 .$blockingTables->implode(', ').'.',
             );

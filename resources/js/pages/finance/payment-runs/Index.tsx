@@ -115,7 +115,10 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         stats={[
                             { label: 'Total', value: paymentRuns.total },
                             { label: 'Settled', value: settledCount },
-                            { label: 'Awaiting bank', value: awaitingBankCount },
+                            {
+                                label: 'Awaiting bank',
+                                value: awaitingBankCount,
+                            },
                             { label: 'Drafts', value: draftCount },
                         ]}
                         actions={

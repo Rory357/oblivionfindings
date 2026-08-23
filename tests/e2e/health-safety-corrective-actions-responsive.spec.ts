@@ -31,9 +31,7 @@ test.describe('corrective actions responsive register', () => {
         ).toBeVisible();
 
         const cards = page.getByTestId('corrective-action-cards');
-        const tableRegion = page.getByTestId(
-            'corrective-action-table-scroll',
-        );
+        const tableRegion = page.getByTestId('corrective-action-table-scroll');
 
         for (const viewport of VIEWPORTS) {
             await page.setViewportSize(viewport);
@@ -66,8 +64,7 @@ test.describe('corrective actions responsive register', () => {
                 await expect(tableRegion).toBeVisible();
                 expect(
                     await tableRegion.evaluate(
-                        (element) =>
-                            element.scrollWidth >= element.clientWidth,
+                        (element) => element.scrollWidth >= element.clientWidth,
                     ),
                 ).toBe(true);
             }

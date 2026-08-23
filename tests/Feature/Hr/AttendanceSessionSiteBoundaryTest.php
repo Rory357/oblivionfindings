@@ -51,8 +51,7 @@ function attendanceBoundarySession(
     Site $site,
     bool $withShift = true,
     bool $captureSite = true,
-): HrAttendanceSession
-{
+): HrAttendanceSession {
     $shift = null;
     if ($withShift) {
         $client = Client::factory()->create(['site_id' => $site->id]);

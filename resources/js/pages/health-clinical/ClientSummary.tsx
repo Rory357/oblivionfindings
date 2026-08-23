@@ -121,13 +121,13 @@ export default function ClientSummary({
                     <>
                         {summary.medical_profile.allergies &&
                             summary.medical_profile.allergies.length > 0 && (
-                                <div className="border-status-critical/30 bg-status-critical-bg flex items-center gap-3 rounded-xl border-2 p-4">
-                                    <ShieldAlert className="text-status-critical h-6 w-6 shrink-0" />
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                    <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
                                     <div>
-                                        <p className="text-status-critical text-sm font-bold">
+                                        <p className="text-sm font-bold text-status-critical">
                                             Allergies
                                         </p>
-                                        <p className="text-status-critical text-sm">
+                                        <p className="text-sm text-status-critical">
                                             {summary.medical_profile.allergies.join(
                                                 ', ',
                                             )}
@@ -138,14 +138,14 @@ export default function ClientSummary({
                         {summary.medical_profile.gp_name && (
                             <Card className="border-status-success/30 bg-status-success-bg">
                                 <CardContent className="p-4">
-                                    <p className="text-status-success text-xs font-semibold uppercase tracking-wider">
+                                    <p className="text-xs font-semibold tracking-wider text-status-success uppercase">
                                         GP / Primary Care
                                     </p>
                                     <p className="mt-1 text-sm font-medium">
                                         {summary.medical_profile.gp_name}
                                     </p>
                                     {summary.medical_profile.gp_practice && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-xs text-muted-foreground">
                                             {
                                                 summary.medical_profile
                                                     .gp_practice
@@ -169,7 +169,7 @@ export default function ClientSummary({
                         </CardHeader>
                         <CardContent>
                             {summary.active_protocols.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-sm text-muted-foreground">
                                     No active protocols.
                                 </p>
                             ) : (
@@ -189,7 +189,7 @@ export default function ClientSummary({
                                                     ] ?? p.observation_type}
                                                 </Badge>
                                                 <div className="flex items-center gap-1">
-                                                    <span className="text-muted-foreground text-xs capitalize">
+                                                    <span className="text-xs text-muted-foreground capitalize">
                                                         {p.frequency.replace(
                                                             '_',
                                                             ' ',
@@ -206,7 +206,7 @@ export default function ClientSummary({
                                                 </div>
                                             </div>
                                             {p.next_due_at && (
-                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                <p className="mt-1 text-xs text-muted-foreground">
                                                     Next due:{' '}
                                                     {new Date(
                                                         p.next_due_at,
@@ -238,7 +238,7 @@ export default function ClientSummary({
                         </CardHeader>
                         <CardContent>
                             {summary.recent_observations.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-sm text-muted-foreground">
                                     No observations in the last 7 days.
                                 </p>
                             ) : (
@@ -258,13 +258,13 @@ export default function ClientSummary({
                                                     ] ?? obs.observation_type}
                                                 </Badge>
                                                 {obs.notes && (
-                                                    <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">
+                                                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                                                         {obs.notes}
                                                     </p>
                                                 )}
                                             </div>
                                             <div className="text-right">
-                                                <span className="text-muted-foreground text-xs">
+                                                <span className="text-xs text-muted-foreground">
                                                     {new Date(
                                                         obs.recorded_at,
                                                     ).toLocaleDateString(
@@ -277,7 +277,7 @@ export default function ClientSummary({
                                                         },
                                                     )}
                                                 </span>
-                                                <p className="text-muted-foreground text-xs">
+                                                <p className="text-xs text-muted-foreground">
                                                     {obs.recorder?.name}
                                                 </p>
                                             </div>
@@ -299,7 +299,7 @@ export default function ClientSummary({
                     </CardHeader>
                     <CardContent>
                         {summary.recent_events.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">
+                            <p className="text-sm text-muted-foreground">
                                 No clinical events in the last 30 days.
                             </p>
                         ) : (
@@ -334,11 +334,11 @@ export default function ClientSummary({
                                                         </Badge>
                                                     )}
                                             </div>
-                                            <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
+                                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                                 {evt.description}
                                             </p>
                                         </div>
-                                        <span className="text-muted-foreground shrink-0 text-xs">
+                                        <span className="shrink-0 text-xs text-muted-foreground">
                                             {new Date(
                                                 evt.occurred_at,
                                             ).toLocaleDateString('en-NZ', {

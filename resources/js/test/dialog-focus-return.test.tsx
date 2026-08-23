@@ -36,6 +36,7 @@ function OutcomeDialog() {
             <DialogContent>
                 <DialogTitle>Search</DialogTitle>
                 <DialogDescription>Find a module.</DialogDescription>
+                {/* eslint-disable-next-line no-restricted-syntax -- native test-harness control isolates dialog focus behavior from shared Button styling */}
                 <button
                     type="button"
                     onClick={() => setError('Search failed. Try again.')}
@@ -46,6 +47,7 @@ function OutcomeDialog() {
                 <DialogClose asChild>
                     <button type="button">Cancel search</button>
                 </DialogClose>
+                {/* eslint-disable-next-line no-restricted-syntax -- native test-harness control isolates dialog focus behavior from shared Button styling */}
                 <button type="button" onClick={() => setOpen(false)}>
                     Complete search
                 </button>
@@ -59,6 +61,7 @@ function ProgrammaticDialog() {
 
     return (
         <>
+            {/* eslint-disable-next-line no-restricted-syntax -- native test-harness control isolates dialog focus behavior from shared Button styling */}
             <button type="button" onClick={() => setOpen(true)}>
                 Open from shortcut
             </button>
@@ -143,6 +146,7 @@ function StaleActivatorDialog() {
                 <DialogContent>
                     <DialogTitle>Request</DialogTitle>
                     <DialogDescription>Complete the request.</DialogDescription>
+                    {/* eslint-disable-next-line no-restricted-syntax -- native test-harness control isolates dialog focus behavior from shared Button styling */}
                     <button
                         type="button"
                         onClick={() => {

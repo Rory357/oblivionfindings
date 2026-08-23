@@ -681,8 +681,7 @@ function externalSettlementConcurrentRound(
     int $runId,
     string $artifactRoot,
     array $actions,
-): array
-{
+): array {
     if (! str_ends_with($actions[0][0], '_hold') || str_ends_with($actions[1][0], '_hold')) {
         throw new InvalidArgumentException('A forced external-settlement round requires one holder followed by one contender.');
     }

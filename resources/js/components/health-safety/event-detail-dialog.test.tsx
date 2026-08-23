@@ -160,8 +160,7 @@ function eventDetail(overrides: EventDetailOverrides = {}): EventDetail {
                 next_mandatory_review_date: '2027-04-01',
                 source_url:
                     'https://www.worksafe.govt.nz/notifications/what-events-need-to-be-notified/',
-                content_owner:
-                    'Health & Safety / Legal & Compliance / Product',
+                content_owner: 'Health & Safety / Legal & Compliance / Product',
                 specified_injury_or_illness: [
                     'amputation_requiring_immediate_treatment',
                 ],
@@ -169,9 +168,7 @@ function eventDetail(overrides: EventDetailOverrides = {}): EventDetail {
                     'Amputation requiring immediate treatment beyond first aid',
                 ],
                 dangerous_incidents: ['implosion_explosion_or_fire'],
-                dangerous_incident_labels: [
-                    'An implosion, explosion or fire',
-                ],
+                dangerous_incident_labels: ['An implosion, explosion or fire'],
             },
             decided_at: '2026-07-14T02:20:00Z',
             decided_by: { id: 9, name: 'Tama Lewis' },
@@ -898,7 +895,9 @@ describe('EventDetailDialog WorkSafe governance', () => {
         expect(
             screen.getByText(/content owner.*Health & Safety/i),
         ).toBeInTheDocument();
-        expect(screen.getByText(/review before.*1 Apr 2027/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/review before.*1 Apr 2027/i),
+        ).toBeInTheDocument();
         expect(
             screen.getByRole('link', {
                 name: /Review the official WorkSafe criteria/,

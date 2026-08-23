@@ -220,10 +220,11 @@ export default function PayrollIndex({
         router.post(
             `/hr/payroll/runs/${run.id}/reject-net-pay`,
             {
-                idempotency_key: `payroll-reject:${run.id}:${reference}:${evidenceReference}`.slice(
-                    0,
-                    128,
-                ),
+                idempotency_key:
+                    `payroll-reject:${run.id}:${reference}:${evidenceReference}`.slice(
+                        0,
+                        128,
+                    ),
                 reference,
                 reason,
                 evidence: { rejection_digest: evidenceReference },
@@ -448,7 +449,9 @@ export default function PayrollIndex({
             });
         if (
             can.manage &&
-            ['exported', 'accepted'].includes(run.net_settlement?.status || '') &&
+            ['exported', 'accepted'].includes(
+                run.net_settlement?.status || '',
+            ) &&
             !run.net_paid_at
         )
             items.push({
@@ -794,13 +797,19 @@ export default function PayrollIndex({
                                                                         )
                                                                     }
                                                                 >
-                                                                    Prepare
-                                                                    bank file
+                                                                    Prepare bank
+                                                                    file
                                                                 </Button>
                                                             )}
                                                         {can.manage &&
-                                                            ['exported', 'accepted'].includes(
-                                                                run.net_settlement?.status || '',
+                                                            [
+                                                                'exported',
+                                                                'accepted',
+                                                            ].includes(
+                                                                run
+                                                                    .net_settlement
+                                                                    ?.status ||
+                                                                    '',
                                                             ) &&
                                                             !run.net_paid_at && (
                                                                 <Button
@@ -871,8 +880,14 @@ export default function PayrollIndex({
                                                             )}
                                                         {can.export_data &&
                                                             run.net_settlement &&
-                                                            ['prepared', 'exported', 'accepted'].includes(
-                                                                run.net_settlement.status,
+                                                            [
+                                                                'prepared',
+                                                                'exported',
+                                                                'accepted',
+                                                            ].includes(
+                                                                run
+                                                                    .net_settlement
+                                                                    .status,
                                                             ) && (
                                                                 <Button
                                                                     variant="outline"

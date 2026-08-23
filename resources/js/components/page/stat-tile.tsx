@@ -242,13 +242,13 @@ export function StatTile({
             <div className="min-w-0 text-center">
                 <p
                     className={cn(
-                        'text-primary-foreground text-2xl font-bold tabular-nums',
+                        'text-2xl font-bold text-primary-foreground tabular-nums',
                         valueClassName,
                     )}
                 >
                     {renderedValue}
                 </p>
-                <p className="text-primary-foreground/60 text-xs">{label}</p>
+                <p className="text-xs text-primary-foreground/60">{label}</p>
             </div>
         );
         return href ? <Link href={href}>{content}</Link> : content;
@@ -265,7 +265,7 @@ export function StatTile({
             <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                        <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+                        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
                             {label}
                         </p>
                         <p
@@ -292,7 +292,7 @@ export function StatTile({
                 {(subtitle || (trend && trend.length > 1)) && (
                     <div className="mt-2 flex items-center justify-between gap-2">
                         {subtitle ? (
-                            <span className="text-muted-foreground truncate text-[10px]">
+                            <span className="truncate text-[10px] text-muted-foreground">
                                 {subtitle}
                             </span>
                         ) : (

@@ -103,7 +103,7 @@ export default function CreateSpendApproval({
                                         required
                                     />
                                     {form.errors.title && (
-                                        <p className="text-status-critical mt-1 text-xs">
+                                        <p className="mt-1 text-xs text-status-critical">
                                             {form.errors.title}
                                         </p>
                                     )}
@@ -159,7 +159,7 @@ export default function CreateSpendApproval({
                                         </SelectContent>
                                     </Select>
                                     {form.errors.site_id && (
-                                        <p className="text-status-critical mt-1 text-xs">
+                                        <p className="mt-1 text-xs text-status-critical">
                                             {form.errors.site_id}
                                         </p>
                                     )}
@@ -181,11 +181,11 @@ export default function CreateSpendApproval({
                                         required
                                     />
                                     {form.errors.amount && (
-                                        <p className="text-status-critical mt-1 text-xs">
+                                        <p className="mt-1 text-xs text-status-critical">
                                             {form.errors.amount}
                                         </p>
                                     )}
-                                    <p className="text-muted-foreground mt-1 text-xs">
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                         Threshold for this category:{' '}
                                         {new Intl.NumberFormat('en-NZ', {
                                             style: 'currency',
@@ -193,7 +193,7 @@ export default function CreateSpendApproval({
                                         }).format(threshold)}
                                     </p>
                                     {requiresBoard && numericAmount > 0 && (
-                                        <p className="text-status-warning mt-1 text-xs font-medium">
+                                        <p className="mt-1 text-xs font-medium text-status-warning">
                                             ⚠ This amount exceeds the threshold
                                             and will require a board resolution.
                                         </p>

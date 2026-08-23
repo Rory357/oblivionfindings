@@ -55,7 +55,7 @@ export default function AppSidebarLayout({
             <div className="min-h-svh w-full">
                 <a
                     href="#main-content"
-                    className="focus:bg-primary focus:text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:px-4 focus:py-2"
+                    className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
                 >
                     Skip to main content
                 </a>
@@ -69,7 +69,7 @@ export default function AppSidebarLayout({
                 <main
                     id="main-content"
                     className={cn(
-                        'bg-background relative flex min-h-svh flex-col transition-[margin-left] duration-200 ease-in-out',
+                        'relative flex min-h-svh flex-col bg-background transition-[margin-left] duration-200 ease-in-out',
                         collapsed ? 'md:ml-16' : 'md:ml-64',
                     )}
                 >
