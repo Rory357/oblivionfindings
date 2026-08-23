@@ -21,7 +21,12 @@ enum ComplianceExportDataset: string
     case Drivers = 'drivers';
     case Renewals = 'renewals';
 
-    /** @return array<class-string, string> */
+    /**
+     * Declare every model that owns a value emitted by this dataset and the
+     * action capability that permits that disclosure.
+     *
+     * @return array<class-string, string>
+     */
     public function emittedModelPermissions(): array
     {
         return match ($this) {
@@ -69,6 +74,7 @@ enum ComplianceExportDataset: string
     public static function routePermissionEnvelope(): string
     {
         $permissions = [];
+
         foreach (self::cases() as $dataset) {
             $permissions = [...$permissions, ...$dataset->requiredPermissions()];
         }
