@@ -53,6 +53,7 @@ use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\TaxController;
 use App\Domain\Finance\Http\Controllers\VendorController;
+use App\Domain\Finance\Http\Middleware\RejectUnsupportedConsolidation;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -506,7 +507,7 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
 
     // ── Tax & Compliance hub ────────────────────────────────────────────
     // /finance/tax is the hub entry point; it redirects to the first tax tab the
-    // user can open (GST returns · IRD filings · audit exports · consolidation).
+    // user can open (GST returns · IRD filings · audit exports).
     Route::get('/tax', [TaxController::class, 'index'])->name('tax.index');
 
     // Settings hub entry — redirects to the first openable admin tab
@@ -638,7 +639,10 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     });
 
     // ── Consolidation & Intercompany ─────────────────────────────────────
-    Route::middleware('permission:finance.admin')->group(function () {
+    Route::middleware([
+        RejectUnsupportedConsolidation::class,
+        'permission:finance.admin',
+    ])->group(function () {
         Route::get('/consolidation', [ConsolidationController::class, 'index'])->name('consolidation.index');
         Route::post('/consolidation', [ConsolidationController::class, 'store'])->name('consolidation.store');
         Route::get('/consolidation/{group}', [ConsolidationController::class, 'show'])->name('consolidation.show');

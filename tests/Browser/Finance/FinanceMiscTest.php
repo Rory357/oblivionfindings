@@ -203,16 +203,6 @@ test('finance EFTPOS terminals page loads', function () {
     });
 });
 
-test('finance consolidation page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/finance/consolidation')
-            ->waitForText('Consolidation', 10)
-            ->assertSee('Consolidation');
-    });
-});
-
 test('finance FX revaluations page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();

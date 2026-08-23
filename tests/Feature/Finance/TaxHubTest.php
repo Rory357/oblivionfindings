@@ -6,8 +6,8 @@ use App\Models\User;
 /**
  * /finance/tax is the Tax & Compliance hub entry — it redirects to the first tab
  * the user can open across the heterogeneous gates (tax.view → GST returns,
- * tax.manage → IRD filings, reports.view → audit exports, admin → consolidation),
- * and 403s otherwise.
+ * tax.manage → IRD filings, reports.view → audit exports), and 403s otherwise.
+ * The unsupported consolidation boundary is not a hub destination.
  */
 function taxUser(array $permissionKeys): User
 {
@@ -26,10 +26,10 @@ it('redirects a tax-view user to GST returns', function () {
         ->assertRedirect(route('finance.gst-returns.index'));
 });
 
-it('redirects an admin-only user to consolidation', function () {
+it('does not route an admin-only user into quarantined consolidation', function () {
     $this->actingAs(taxUser(['finance.admin']))
         ->get(route('finance.tax.index'))
-        ->assertRedirect(route('finance.consolidation.index'));
+        ->assertForbidden();
 });
 
 it('403s a user with no tax/compliance permissions', function () {

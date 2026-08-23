@@ -1892,13 +1892,12 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
 
     const other: NavItem[] = [];
-    // Tax & Compliance hub — GST returns, IRD filings, audit exports and
-    // consolidation are now tabs here.
+    // Tax & Compliance hub — GST returns, IRD filings and audit exports are
+    // tabs here. The unsupported consolidation surface remains quarantined.
     if (
         can?.finance?.tax?.view ||
         can?.finance?.tax?.manage ||
-        can?.finance?.reports?.view ||
-        can?.finance?.admin
+        can?.finance?.reports?.view
     ) {
         other.push({
             title: 'Tax & Compliance',

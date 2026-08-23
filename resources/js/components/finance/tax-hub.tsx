@@ -11,9 +11,9 @@ import {
 /**
  * Canonical Tax & Compliance hub tabs. Mirrors the Ledger/Banking hubs
  * (heterogeneous permissions): GST returns is `finance.tax.view`, IRD filings is
- * `finance.tax.manage`, audit exports is `finance.reports.view`, consolidation is
- * `finance.admin`. The tabs SPA-navigate under the shared finance hero; `requires`
- * mirrors each route's gate so a tab the user can't open is never shown.
+ * `finance.tax.manage`, and audit exports is `finance.reports.view`. The legacy
+ * consolidation definition is retained for its unreachable page contract but
+ * remains hidden while the unsupported product boundary is quarantined.
  */
 export type TaxTabId =
     | 'gst-returns'
@@ -60,7 +60,7 @@ export const TAX_TABS: TaxTabDef[] = [
         icon: Building2,
         tone: 'violet',
         href: '/finance/consolidation',
-        requires: (c) => !!c?.finance?.admin,
+        requires: () => false,
     },
 ];
 
