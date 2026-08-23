@@ -24,28 +24,49 @@ type Agreement = {
 };
 
 type ClaimItem = {
+    billing_entry_id: string;
     description: string;
     quantity: string;
     unit_price: string;
     service_date: string;
     service_agreement_line_item_id: string;
+    shift_id: string;
+    timesheet_id: string;
     funding_contract_reference: string;
+};
+
+type Delivery = {
+    id: number;
+    service_agreement_id: number;
+    service_agreement_line_item_id: number;
+    shift_id: number;
+    timesheet_id: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    total_amount: string;
+    service_date: string;
+    funding_contract_reference?: string | null;
 };
 
 type Props = {
     agreements: Agreement[];
+    deliveries: Delivery[];
 };
 
 const blankItem = (): ClaimItem => ({
+    billing_entry_id: '',
     description: '',
-    quantity: '1',
-    unit_price: '0',
+    quantity: '',
+    unit_price: '',
     service_date: '',
     service_agreement_line_item_id: '',
+    shift_id: '',
+    timesheet_id: '',
     funding_contract_reference: '',
 });
 
-export default function FundingClaimCreate({ agreements }: Props) {
+export default function FundingClaimCreate({ agreements, deliveries }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         service_agreement_id: '',
         client_id: '',
@@ -54,6 +75,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
         period_end: '',
         items: [blankItem()],
     });
+    const fieldErrors = errors as Record<string, string | undefined>;
 
     const selectedAgreement = agreements.find(
         (agreement) => String(agreement.id) === data.service_agreement_id,
@@ -70,11 +92,29 @@ export default function FundingClaimCreate({ agreements }: Props) {
         );
     };
 
-    const updateItem = (index: number, key: keyof ClaimItem, value: string) => {
+    const selectDelivery = (index: number, deliveryId: string) => {
+        const delivery = deliveries.find(
+            (candidate) => String(candidate.id) === deliveryId,
+        );
         setData(
             'items',
             data.items.map((item, itemIndex) =>
-                itemIndex === index ? { ...item, [key]: value } : item,
+                itemIndex !== index || !delivery
+                    ? item
+                    : {
+                          billing_entry_id: String(delivery.id),
+                          description: delivery.description,
+                          quantity: delivery.quantity,
+                          unit_price: delivery.unit_price,
+                          service_date: delivery.service_date,
+                          service_agreement_line_item_id: String(
+                              delivery.service_agreement_line_item_id,
+                          ),
+                          shift_id: String(delivery.shift_id),
+                          timesheet_id: String(delivery.timesheet_id),
+                          funding_contract_reference:
+                              delivery.funding_contract_reference ?? '',
+                      },
             ),
         );
     };
@@ -127,6 +167,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                             claim_reference:
                                                 agreement?.reference_number ??
                                                 data.claim_reference,
+                                            items: [blankItem()],
                                         });
                                     }}
                                 >
@@ -145,7 +186,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.service_agreement_id && (
-                                    <p className="text-xs text-destructive">
+                                    <p className="text-destructive text-xs">
                                         {errors.service_agreement_id}
                                     </p>
                                 )}
@@ -178,7 +219,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                     }
                                 />
                                 {errors.period_start && (
-                                    <p className="text-xs text-destructive">
+                                    <p className="text-destructive text-xs">
                                         {errors.period_start}
                                     </p>
                                 )}
@@ -197,15 +238,15 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                     }
                                 />
                                 {errors.period_end && (
-                                    <p className="text-xs text-destructive">
+                                    <p className="text-destructive text-xs">
                                         {errors.period_end}
                                     </p>
                                 )}
                             </div>
 
-                            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground md:col-span-2">
+                            <div className="bg-muted/30 text-muted-foreground rounded-lg border p-3 text-sm md:col-span-2">
                                 Claiming for{' '}
-                                <span className="font-medium text-foreground">
+                                <span className="text-foreground font-medium">
                                     {selectedAgreement?.client
                                         ? `${selectedAgreement.client.first_name} ${selectedAgreement.client.last_name}`
                                         : 'No client selected yet'}
@@ -236,17 +277,85 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                     key={index}
                                     className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1.4fr,0.7fr,0.7fr,1fr,40px]"
                                 >
+                                    <div className="space-y-2 md:col-span-5">
+                                        <Label>Delivered Support</Label>
+                                        <Select
+                                            value={item.billing_entry_id}
+                                            onValueChange={(value) =>
+                                                selectDelivery(index, value)
+                                            }
+                                            disabled={
+                                                !data.service_agreement_id
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select approved delivered support" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {deliveries
+                                                    .filter(
+                                                        (delivery) =>
+                                                            String(
+                                                                delivery.service_agreement_id,
+                                                            ) ===
+                                                                data.service_agreement_id &&
+                                                            (String(
+                                                                delivery.id,
+                                                            ) ===
+                                                                item.billing_entry_id ||
+                                                                !data.items.some(
+                                                                    (
+                                                                        selected,
+                                                                        selectedIndex,
+                                                                    ) =>
+                                                                        selectedIndex !==
+                                                                            index &&
+                                                                        selected.billing_entry_id ===
+                                                                            String(
+                                                                                delivery.id,
+                                                                            ),
+                                                                )),
+                                                    )
+                                                    .map((delivery) => (
+                                                        <SelectItem
+                                                            key={delivery.id}
+                                                            value={String(
+                                                                delivery.id,
+                                                            )}
+                                                        >
+                                                            {
+                                                                delivery.service_date
+                                                            }{' '}
+                                                            -{' '}
+                                                            {
+                                                                delivery.description
+                                                            }{' '}
+                                                            (
+                                                            {
+                                                                delivery.total_amount
+                                                            }{' '}
+                                                            NZD)
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {fieldErrors[
+                                            `items.${index}.billing_entry_id`
+                                        ] && (
+                                            <p className="text-destructive text-sm">
+                                                {
+                                                    fieldErrors[
+                                                        `items.${index}.billing_entry_id`
+                                                    ]
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
                                     <div className="space-y-2">
                                         <Label>Description</Label>
                                         <Input
                                             value={item.description}
-                                            onChange={(event) =>
-                                                updateItem(
-                                                    index,
-                                                    'description',
-                                                    event.target.value,
-                                                )
-                                            }
+                                            readOnly
                                             placeholder="Describe the delivered support"
                                         />
                                     </div>
@@ -256,13 +365,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                             type="number"
                                             step="0.01"
                                             value={item.quantity}
-                                            onChange={(event) =>
-                                                updateItem(
-                                                    index,
-                                                    'quantity',
-                                                    event.target.value,
-                                                )
-                                            }
+                                            readOnly
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -271,13 +374,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                             type="number"
                                             step="0.01"
                                             value={item.unit_price}
-                                            onChange={(event) =>
-                                                updateItem(
-                                                    index,
-                                                    'unit_price',
-                                                    event.target.value,
-                                                )
-                                            }
+                                            readOnly
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -285,13 +382,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
                                         <Input
                                             type="date"
                                             value={item.service_date}
-                                            onChange={(event) =>
-                                                updateItem(
-                                                    index,
-                                                    'service_date',
-                                                    event.target.value,
-                                                )
-                                            }
+                                            readOnly
                                         />
                                     </div>
                                     <div className="flex items-end">
@@ -310,12 +401,12 @@ export default function FundingClaimCreate({ agreements }: Props) {
                             ))}
 
                             {errors.items && (
-                                <p className="text-xs text-destructive">
+                                <p className="text-destructive text-xs">
                                     {errors.items}
                                 </p>
                             )}
 
-                            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+                            <div className="bg-muted/30 rounded-lg border px-4 py-3 text-sm">
                                 Draft total:{' '}
                                 <span className="font-semibold">
                                     {new Intl.NumberFormat('en-NZ', {

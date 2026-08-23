@@ -85,7 +85,7 @@ class FundingController extends Controller
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
-                ['reports.viewAny'],
+                ['funding.viewAllSites'],
             ));
     }
 
@@ -95,9 +95,14 @@ class FundingController extends Controller
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
-                ['reports.viewAny'],
+                ['funding.viewAllSites'],
             ))
             ->whereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
-                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'));
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'))
+            ->where(function (Builder $scope): void {
+                $scope->whereNull('funding_claims.site_id')
+                    ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery
+                        ->whereColumn('clients.site_id', 'funding_claims.site_id'));
+            });
     }
 }

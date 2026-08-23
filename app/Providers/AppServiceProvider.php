@@ -114,7 +114,6 @@ use App\Models\FirstAidRecord;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
-use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
 use App\Models\ItChange;
 use App\Models\ItMajorIncident;
@@ -153,7 +152,6 @@ use App\Observers\FirstAidObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
 use App\Observers\FleetWorkOrderObserver;
-use App\Observers\FundingClaimObserver;
 use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
 use App\Observers\HrEmployeeProfileObserver;
@@ -490,7 +488,6 @@ class AppServiceProvider extends ServiceProvider
         Timesheet::observe(TimesheetMileageObserver::class);
         HouseLedgerEntry::observe(HouseLedgerEntryObserver::class);
         ClientLedgerEntry::observe(ClientLedgerEntryObserver::class);
-        FundingClaim::observe(FundingClaimObserver::class);
         ClientFundTransaction::observe(ClientFundTransactionObserver::class);
 
         // Register Socialite providers (Microsoft + Google)

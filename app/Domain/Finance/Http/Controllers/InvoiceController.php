@@ -20,6 +20,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\User;
+use App\Services\Operations\BillingService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -206,7 +207,11 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function store(StoreInvoiceRequest $request, GstTaxRateResolver $gstTaxRateResolver)
+    public function store(
+        StoreInvoiceRequest $request,
+        GstTaxRateResolver $gstTaxRateResolver,
+        BillingService $billing,
+    )
     {
         $validated = $request->validated();
 
@@ -219,15 +224,28 @@ class InvoiceController extends Controller
             ? $this->accessibleClients($request->user())->findOrFail($validated['client_id'])
             : null;
 
-        $billingEntryIds = collect($validated['lines'])
+        $requestedBillingEntryIds = collect($validated['lines'])
             ->pluck('billing_entry_id')
             ->filter()
-            ->unique()
+            ->map(fn ($entryId): int => (int) $entryId)
             ->values();
+        if ($requestedBillingEntryIds->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'lines' => 'A delivered-support record may appear only once on an invoice.',
+            ]);
+        }
+        $billingEntryIds = $requestedBillingEntryIds->unique()->values();
+        if ($billingEntryIds->isNotEmpty() && $billingEntryIds->count() !== count($validated['lines'])) {
+            throw ValidationException::withMessages([
+                'lines' => 'Delivered-support invoice lines cannot be mixed with unbound manual lines.',
+            ]);
+        }
 
         if ($billingEntryIds->isNotEmpty()) {
             $accessibleBillingEntries = $this->accessibleBillingEntries($request->user())
                 ->whereIn('id', $billingEntryIds)
+                ->whereIn('status', ['pending', 'approved'])
+                ->whereDoesntHave('fundingClaimItem')
                 ->get(['id', 'client_id']);
 
             if ($accessibleBillingEntries->count() !== $billingEntryIds->count()) {
@@ -248,7 +266,33 @@ class InvoiceController extends Controller
             }
         }
 
-        $invoice = DB::transaction(function () use ($validated, $orgId, $request, $client, $billingEntryIds, $isOperationsPayload, $gstTaxRateResolver) {
+        $invoice = DB::transaction(function () use (
+            $validated,
+            $orgId,
+            $request,
+            $client,
+            $gstTaxRateResolver,
+            $billing,
+            $billingEntryIds,
+            $isOperationsPayload,
+        ) {
+            $lockedBillingEntries = collect();
+            $invoiceClient = $client;
+            if ($billingEntryIds->isNotEmpty()) {
+                $lockedBillingEntries = $billing
+                    ->lockInvoiceDeliveries($billingEntryIds->all(), (int) $client->id)
+                    ->keyBy('id');
+                $accessibleCount = $this->accessibleBillingEntries($request->user())
+                    ->whereIn('id', $billingEntryIds)
+                    ->count();
+                if ($accessibleCount !== $billingEntryIds->count()) {
+                    throw ValidationException::withMessages([
+                        'lines' => 'One or more billing entries are not available for an accessible Client Site.',
+                    ]);
+                }
+                $invoiceClient = $lockedBillingEntries->first()->client;
+            }
+
             // Auto-generate invoice number if not provided
             $invoiceNumber = $validated['invoice_number'] ?? $this->generateInvoiceNumber($orgId);
 
@@ -258,6 +302,41 @@ class InvoiceController extends Controller
             $taxTotal = '0';
 
             foreach ($validated['lines'] as $index => $lineData) {
+                $billingEntryId = (int) ($lineData['billing_entry_id'] ?? 0);
+                if ($billingEntryId > 0) {
+                    /** @var BillingEntry|null $entry */
+                    $entry = $lockedBillingEntries->get($billingEntryId);
+                    if (! $entry) {
+                        throw ValidationException::withMessages([
+                            'lines' => 'One or more delivered-support records are no longer billable.',
+                        ]);
+                    }
+                    if (
+                        bccomp((string) $lineData['quantity'], (string) $entry->hours, 2) !== 0
+                        || bccomp((string) $lineData['unit_price'], (string) $entry->rate, 2) !== 0
+                        || (
+                            filled($lineData['service_date'] ?? null)
+                            && (string) $lineData['service_date'] !== $entry->service_date->toDateString()
+                        )
+                    ) {
+                        throw ValidationException::withMessages([
+                            'lines' => 'Invoice quantity, rate and service date must match the selected delivered-support record.',
+                        ]);
+                    }
+
+                    $lineData['description'] = sprintf(
+                        '%s - %s (%s hrs @ $%s)',
+                        $entry->service_date->format('d M Y'),
+                        $entry->rate_type,
+                        $entry->hours,
+                        number_format((float) $entry->rate, 2),
+                    );
+                    $lineData['quantity'] = (string) $entry->hours;
+                    $lineData['unit_price'] = (string) $entry->rate;
+                    $lineData['service_date'] = $entry->service_date->toDateString();
+                    $lineData['category'] = $entry->rate_type;
+                }
+
                 $qty = (string) $lineData['quantity'];
                 $price = (string) $lineData['unit_price'];
                 $lineSubtotal = bcmul($qty, $price, 2);
@@ -300,12 +379,14 @@ class InvoiceController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'invoice_date' => $validated['invoice_date'],
                 'due_date' => $validated['due_date'],
-                'client_name' => $validated['client_name'] ?? $client?->full_name ?? $validated['funding_body'],
-                'client_email' => $validated['client_email'] ?? $client?->email,
-                'client_address' => $validated['client_address'] ?? $this->formatClientAddress($client),
+                'client_name' => $validated['client_name'] ?? $invoiceClient?->full_name ?? $validated['funding_body'],
+                'client_email' => $validated['client_email'] ?? $invoiceClient?->email,
+                'client_address' => $validated['client_address'] ?? $this->formatClientAddress($invoiceClient),
                 'funding_body' => $validated['funding_body'] ?? null,
                 'bill_id' => $validated['bill_id'] ?? null,
                 'source' => $isOperationsPayload || $billingEntryIds->isNotEmpty() ? 'operations' : null,
+                'source_type' => $billingEntryIds->isNotEmpty() ? BillingEntry::class : null,
+                'source_id' => $billingEntryIds->first(),
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxTotal,
                 'total_amount' => bcadd($subtotal, $taxTotal, 2),
@@ -323,9 +404,9 @@ class InvoiceController extends Controller
             }
 
             if ($billingEntryIds->isNotEmpty()) {
-                $this->accessibleBillingEntries($request->user())
-                    ->whereIn('id', $billingEntryIds)
-                    ->update(['status' => 'invoiced']);
+                foreach ($lockedBillingEntries as $entry) {
+                    $entry->update(['status' => 'invoiced']);
+                }
             }
 
             return $invoice;
@@ -352,6 +433,10 @@ class InvoiceController extends Controller
 
     public function edit(Request $request, FinInvoice $invoice)
     {
+        if ($this->isDeliveryBoundInvoice($invoice)) {
+            return redirect()->route('finance.invoices.show', $invoice)
+                ->with('error', 'Delivered-support invoice provenance is immutable; use the finance correction workflow.');
+        }
         if ($invoice->status !== 'draft') {
             return redirect()->route('finance.invoices.show', $invoice)
                 ->with('error', 'Only draft invoices can be edited.');
@@ -391,6 +476,11 @@ class InvoiceController extends Controller
         FinInvoice $invoice,
         GstTaxRateResolver $gstTaxRateResolver,
     ) {
+        if ($this->isDeliveryBoundInvoice($invoice)) {
+            return back()->withErrors([
+                'invoice' => 'Delivered-support invoice provenance is immutable; use the finance correction workflow.',
+            ]);
+        }
         if ($invoice->status !== 'draft') {
             return redirect()->route('finance.invoices.show', $invoice)
                 ->with('error', 'Only draft invoices can be updated.');
@@ -646,6 +736,12 @@ class InvoiceController extends Controller
     private function generateInvoiceNumber(int $orgId): string
     {
         return FinInvoice::nextNumber($orgId);
+    }
+
+    private function isDeliveryBoundInvoice(FinInvoice $invoice): bool
+    {
+        return $invoice->source_type === BillingEntry::class
+            || $invoice->lines()->whereNotNull('billing_entry_id')->exists();
     }
 
     private function clientOptions(User $user)

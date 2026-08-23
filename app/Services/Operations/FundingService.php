@@ -10,8 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
  *
  * NOTE (gap 1.3): the previous `generateClaimFromBilling()` / `approveClaim()`
  * methods were stale, broken (they wrote non-fillable keys — `reference`/`amount`
- * instead of `claim_reference`/`total_amount`, and a non-existent
- * `FundingClaimItem.billing_entry_id`) and had ZERO callers. Funding claims are
+ * instead of `claim_reference`/`total_amount`) and had ZERO callers. Funding claims are
  * created and approved through `FundingClaimController` + `FundingClaimJournalService`,
  * so the dead methods were removed rather than left as a latent corruption risk.
  * Only the live, wired alert helpers (used by CheckExpiringAgreementsJob) remain.

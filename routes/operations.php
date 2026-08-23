@@ -1115,6 +1115,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/funding/claims/{claim}/approve', [FundingClaimController::class, 'approve'])
         ->middleware('permission:funding.claims.approve')
         ->name('operations.funding.claims.approve');
+    Route::post('/funding/claims/{claim}/retry-posting', [FundingClaimController::class, 'retryPosting'])
+        ->middleware('permission:funding.claims.retryPosting')
+        ->name('operations.funding.claims.retry-posting');
 
     // -------------------------------------------------------------------------
     // Messages (NEW)

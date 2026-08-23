@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { CalendarDays, CheckCircle2, Send } from 'lucide-react';
+import { CalendarDays, CheckCircle2, RefreshCw, Send } from 'lucide-react';
 
 type ClaimItem = {
     id: number;
@@ -21,6 +21,7 @@ type Claim = {
     id: number;
     claim_reference?: string | null;
     status: string;
+    gl_posting_status: string;
     total_amount: number;
     period_start?: string | null;
     period_end?: string | null;
@@ -39,6 +40,7 @@ type Claim = {
 
 type Props = {
     claim: Claim;
+    can_retry_posting: boolean;
 };
 
 function formatDate(value?: string | null): string {
@@ -51,7 +53,7 @@ function formatDate(value?: string | null): string {
     });
 }
 
-export default function FundingClaimShow({ claim }: Props) {
+export default function FundingClaimShow({ claim, can_retry_posting }: Props) {
     const nzd = new Intl.NumberFormat('en-NZ', {
         style: 'currency',
         currency: 'NZD',
@@ -80,20 +82,37 @@ export default function FundingClaimShow({ claim }: Props) {
                                 Submit Claim
                             </Button>
                         )}
-                        {claim.status === 'submitted' && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.post(
-                                        `/operations/funding/claims/${claim.id}/approve`,
-                                    )
-                                }
-                            >
-                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                Approve Claim
-                            </Button>
-                        )}
+                        {can_retry_posting &&
+                            claim.status === 'submitted' &&
+                            claim.gl_posting_status === 'failed' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        router.post(
+                                            `/operations/funding/claims/${claim.id}/retry-posting`,
+                                        )
+                                    }
+                                >
+                                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                                    Retry GL Posting
+                                </Button>
+                            )}
+                        {claim.status === 'submitted' &&
+                            claim.gl_posting_status === 'posted' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        router.post(
+                                            `/operations/funding/claims/${claim.id}/approve`,
+                                        )
+                                    }
+                                >
+                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                    Approve Claim
+                                </Button>
+                            )}
                     </div>
                 }
             />
@@ -138,9 +157,19 @@ export default function FundingClaimShow({ claim }: Props) {
                             >
                                 {claim.status}
                             </Badge>
-                            <p className="mt-2 text-sm font-semibold text-status-success dark:text-status-success">
+                            <p className="text-status-success dark:text-status-success mt-2 text-sm font-semibold">
                                 {nzd.format(claim.total_amount ?? 0)}
                             </p>
+                            <p className="text-muted-foreground mt-2 text-xs">
+                                General Ledger:{' '}
+                                {claim.gl_posting_status.replaceAll('_', ' ')}
+                            </p>
+                            {claim.gl_posting_status === 'failed' && (
+                                <p className="text-destructive mt-1 text-xs">
+                                    Posting failed. Retry when the finance
+                                    service is available.
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -148,7 +177,7 @@ export default function FundingClaimShow({ claim }: Props) {
                 <Card className="mt-4">
                     <CardContent className="grid gap-3 p-4 md:grid-cols-4">
                         <div>
-                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
                                 Claim Window
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -157,7 +186,7 @@ export default function FundingClaimShow({ claim }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
                                 Submitted
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -165,7 +194,7 @@ export default function FundingClaimShow({ claim }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
                                 Approved
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -173,7 +202,7 @@ export default function FundingClaimShow({ claim }: Props) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                            <p className="text-muted-foreground text-xs uppercase tracking-wide">
                                 Raised By
                             </p>
                             <p className="mt-1 text-sm font-medium">
@@ -197,7 +226,7 @@ export default function FundingClaimShow({ claim }: Props) {
                                     <p className="text-sm font-semibold">
                                         {item.description}
                                     </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <p className="text-muted-foreground mt-1 text-xs">
                                         <span className="inline-flex items-center gap-1">
                                             <CalendarDays className="h-3 w-3" />
                                             {formatDate(item.service_date)}
@@ -213,13 +242,13 @@ export default function FundingClaimShow({ claim }: Props) {
                                         )}
                                     </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-muted-foreground text-sm">
                                     Qty {item.quantity}
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-muted-foreground text-sm">
                                     {nzd.format(item.unit_price)}
                                 </p>
-                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
+                                <p className="text-status-success dark:text-status-success text-sm font-semibold">
                                     {nzd.format(item.total_amount)}
                                 </p>
                             </div>

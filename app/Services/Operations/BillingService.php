@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Services\ShiftOperationalSnapshotService;
 use Carbon\Carbon;
@@ -59,9 +60,13 @@ class BillingService
         );
 
         return DB::transaction(function () use ($timesheet, $allocations, $rateType, $baseSnapshot) {
-            $existing = BillingEntry::where('timesheet_id', $timesheet->id)->get();
+            $existing = BillingEntry::where('timesheet_id', $timesheet->id)
+                ->with('fundingClaimItem:id,billing_entry_id')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
             $invoicedClientIds = $existing
-                ->whereNotIn('status', ['pending'])
+                ->filter(fn (BillingEntry $entry): bool => $entry->status !== 'pending' || $entry->fundingClaimItem !== null)
                 ->pluck('client_id')
                 ->all();
 
@@ -69,6 +74,7 @@ class BillingService
             // financially locked and must not be replaced.
             BillingEntry::where('timesheet_id', $timesheet->id)
                 ->where('status', 'pending')
+                ->whereDoesntHave('fundingClaimItem')
                 ->delete();
 
             $created = new Collection;
@@ -90,13 +96,14 @@ class BillingService
                     continue;
                 }
 
-                $hours = round((float) $allocation['hours'], 2);
-                if ($hours <= 0) {
+                $hours = bcadd((string) $allocation['hours'], '0', 2);
+                if (bccomp($hours, '0', 2) <= 0) {
                     continue;
                 }
 
                 $agreement = $this->findActiveAgreement($client, $timesheet->work_date);
-                $rate = $this->resolveRate($agreement, $rateType);
+                $lineItem = $agreement ? $this->matchLineItem($agreement, $rateType) : null;
+                $rate = $this->resolveRate($agreement, $rateType, $timesheet->work_date, $lineItem);
 
                 $entry = BillingEntry::create([
                     'timesheet_id' => $timesheet->id,
@@ -104,11 +111,11 @@ class BillingService
                     'client_id' => $client->id,
                     'staff_id' => $timesheet->user_id,
                     'service_agreement_id' => $agreement?->id,
-                    'line_item_id' => $agreement ? $this->matchLineItem($agreement, $rateType)?->id : null,
+                    'line_item_id' => $lineItem?->id,
                     'service_date' => $timesheet->work_date,
                     'hours' => $hours,
                     'rate' => $rate,
-                    'amount' => round($hours * $rate, 2),
+                    'amount' => bcmul($hours, $rate, 2),
                     'rate_type' => $rateType,
                     ...$baseSnapshot,
                     'site_id' => $client->site_id,
@@ -126,14 +133,25 @@ class BillingService
 
     protected function findActiveAgreement(Client $client, $workDate): ?ServiceAgreement
     {
-        return ServiceAgreement::where('client_id', $client->id)
+        $agreements = ServiceAgreement::where('client_id', $client->id)
             ->where('status', 'active')
-            ->where('starts_at', '<=', $workDate)
+            ->where(function ($query) use ($workDate): void {
+                $query->whereNull('starts_at')->orWhere('starts_at', '<=', $workDate);
+            })
             ->where(function ($q) use ($workDate) {
                 $q->whereNull('ends_at')
                     ->orWhere('ends_at', '>=', $workDate);
             })
-            ->first();
+            ->orderBy('id')
+            ->get();
+
+        if ($agreements->count() > 1) {
+            throw new \RuntimeException(
+                "Client {$client->id} has multiple active Service Agreements for the delivery date."
+            );
+        }
+
+        return $agreements->first();
     }
 
     protected function clientName(?Client $client): ?string
@@ -155,39 +173,17 @@ class BillingService
             ->unique()
             ->values();
 
-        $entries = BillingEntry::whereIn('id', $entryIds)
-            ->whereIn('status', ['pending', 'approved'])
-            ->whereHas('client', fn ($clientQuery) => $clientQuery
-                ->whereNotNull('site_id')
-                ->whereHas('site', fn ($siteQuery) => $siteQuery
-                    ->active()
-                    ->notArchived()
-                    ->whereNull('archived_at')))
-            ->where(function ($query): void {
-                $query->whereNull('service_agreement_id')
-                    ->orWhereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
-                        ->whereColumn('service_agreements.client_id', 'billing_entries.client_id'));
-            })
-            ->with(['client', 'serviceAgreement'])
-            ->get();
+        return DB::transaction(function () use ($entryIds, $createdBy) {
+            $entries = $this->lockInvoiceDeliveries($entryIds->all());
 
-        abort_if(
-            $entries->isEmpty() || $entries->count() !== $entryIds->count(),
-            422,
-            'No complete billable billing-entry selection was found.',
-        );
-        abort_unless(
-            $entries->pluck('client_id')->unique()->count() === 1,
-            422,
-            'Billing entries for different clients cannot share one invoice.',
-        );
-
-        return DB::transaction(function () use ($entries, $createdBy) {
             $firstEntry = $entries->first();
             $client = $firstEntry->client;
-            $subtotal = $entries->sum('amount');
-            $taxRate = 0.15; // NZ GST
-            $taxAmount = round($subtotal * $taxRate, 2);
+            $subtotal = $entries->reduce(
+                fn (string $sum, BillingEntry $entry): string => bcadd($sum, (string) $entry->amount, 2),
+                '0.00',
+            );
+            $taxAmount = bcmul($subtotal, '0.15', 2); // NZ GST
+            $totalAmount = bcadd($subtotal, $taxAmount, 2);
 
             $invoice = FinInvoice::create([
                 'organization_id' => self::APPLICATION_STORAGE_CONTEXT_ID,
@@ -201,7 +197,7 @@ class BillingService
                 'client_address' => $this->formatClientAddress($client),
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxAmount,
-                'total_amount' => $subtotal + $taxAmount,
+                'total_amount' => $totalAmount,
                 'currency_code' => 'NZD',
                 'status' => 'draft',
                 'terms' => 'Due within 20 days of the 20th of the month',
@@ -212,8 +208,8 @@ class BillingService
             ]);
 
             foreach ($entries as $index => $entry) {
-                $lineSubtotal = (float) $entry->amount;
-                $lineTax = round($lineSubtotal * $taxRate, 2);
+                $lineSubtotal = bcadd((string) $entry->amount, '0', 2);
+                $lineTax = bcmul($lineSubtotal, '0.15', 2);
 
                 $invoice->lines()->create([
                     'billing_entry_id' => $entry->id,
@@ -227,7 +223,7 @@ class BillingService
                     'quantity' => $entry->hours,
                     'unit_price' => $entry->rate,
                     'tax_amount' => $lineTax,
-                    'line_total' => $lineSubtotal + $lineTax,
+                    'line_total' => bcadd($lineSubtotal, $lineTax, 2),
                     'sort_order' => $index,
                     'service_date' => $entry->service_date,
                     'category' => $entry->rate_type,
@@ -240,14 +236,128 @@ class BillingService
         });
     }
 
+    /**
+     * Lock the canonical delivery hierarchy before reserving Billing Entries
+     * for an invoice. Funding Claims use the same Agreement -> Client -> Site
+     * -> Billing Entry order, so competing monetisation commands serialize on
+     * the same durable rows without a reverse lock cycle.
+     *
+     * @param  array<int, int|string>  $billingEntryIds
+     * @return Collection<int, BillingEntry>
+     */
+    public function lockInvoiceDeliveries(array $billingEntryIds, ?int $expectedClientId = null): Collection
+    {
+        $entryIds = collect($billingEntryIds)
+            ->map(fn ($entryId): int => (int) $entryId)
+            ->filter(fn (int $entryId): bool => $entryId > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        abort_if($entryIds->isEmpty(), 422, 'No complete billable billing-entry selection was found.');
+
+        // This non-locking read is only a locator for the canonical lock set.
+        // Every value is re-read and compared after the ordered locks are held.
+        $candidates = BillingEntry::query()
+            ->whereIn('id', $entryIds)
+            ->orderBy('id')
+            ->get(['id', 'client_id', 'site_id', 'service_agreement_id']);
+        abort_if(
+            $candidates->count() !== $entryIds->count(),
+            422,
+            'No complete billable billing-entry selection was found.',
+        );
+
+        $clientIds = $candidates->pluck('client_id')->map(fn ($id): int => (int) $id)->unique()->values();
+        abort_unless(
+            $clientIds->count() === 1,
+            422,
+            'Billing entries for different clients cannot share one invoice.',
+        );
+        $clientId = (int) $clientIds->first();
+        abort_if(
+            $expectedClientId !== null && $clientId !== $expectedClientId,
+            422,
+            'Every billing entry must belong to the selected Client.',
+        );
+
+        $agreementIds = $candidates->pluck('service_agreement_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values();
+        $agreements = ServiceAgreement::query()
+            ->whereIn('id', $agreementIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+        abort_unless(
+            $agreements->count() === $agreementIds->count()
+                && $agreements->every(fn (ServiceAgreement $agreement): bool => (int) $agreement->client_id === $clientId),
+            422,
+            'A billing entry no longer belongs to its canonical Service Agreement.',
+        );
+
+        $client = Client::query()->whereKey($clientId)->lockForUpdate()->first();
+        abort_unless($client && (int) $client->site_id > 0, 422, 'The invoice Client has no active Site.');
+        $site = Site::query()
+            ->whereKey($client->site_id)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->lockForUpdate()
+            ->first();
+        abort_unless($site, 422, 'The invoice Client has no active Site.');
+
+        $entries = BillingEntry::query()
+            ->whereIn('id', $entryIds)
+            ->where('client_id', $clientId)
+            ->where('site_id', $site->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereDoesntHave('fundingClaimItem')
+            ->whereNotExists(fn ($invoiceLines) => $invoiceLines
+                ->selectRaw('1')
+                ->from('fin_invoice_lines')
+                ->whereColumn('fin_invoice_lines.billing_entry_id', 'billing_entries.id'))
+            ->where(function ($query): void {
+                $query->whereNull('service_agreement_id')
+                    ->orWhereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                        ->whereColumn('service_agreements.client_id', 'billing_entries.client_id'));
+            })
+            ->with(['client', 'serviceAgreement'])
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        abort_if(
+            $entries->count() !== $entryIds->count(),
+            422,
+            'No complete billable billing-entry selection was found.',
+        );
+
+        $lockedAgreementIds = $entries->pluck('service_agreement_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values();
+        abort_unless(
+            $lockedAgreementIds->all() === $agreementIds->all(),
+            409,
+            'A billing entry changed Service Agreement while the invoice was being created.',
+        );
+
+        return $entries;
+    }
+
     public function updateAgreementUsage(ServiceAgreement $agreement): void
     {
         $totalUsed = BillingEntry::where('service_agreement_id', $agreement->id)
-            ->whereIn('status', ['pending', 'invoiced', 'paid'])
+            ->whereIn('status', ['pending', 'claimed', 'invoiced', 'paid'])
             ->sum('amount');
 
         $hoursUsed = BillingEntry::where('service_agreement_id', $agreement->id)
-            ->whereIn('status', ['pending', 'invoiced', 'paid'])
+            ->whereIn('status', ['pending', 'claimed', 'invoiced', 'paid'])
             ->sum('hours');
 
         $agreement->update([
@@ -257,7 +367,7 @@ class BillingService
 
         // Update line item usage
         $lineItemUsage = BillingEntry::where('service_agreement_id', $agreement->id)
-            ->whereIn('status', ['pending', 'invoiced', 'paid'])
+            ->whereIn('status', ['pending', 'claimed', 'invoiced', 'paid'])
             ->whereNotNull('line_item_id')
             ->selectRaw('line_item_id, SUM(amount) as total_used')
             ->groupBy('line_item_id')
@@ -298,40 +408,65 @@ class BillingService
         return 'weekday';
     }
 
-    protected function resolveRate(?ServiceAgreement $agreement, string $rateType): float
-    {
+    protected function resolveRate(
+        ?ServiceAgreement $agreement,
+        string $rateType,
+        mixed $serviceDate,
+        ?ServiceAgreementLineItem $lineItem,
+    ): string {
         if (! $agreement) {
-            return $agreement?->hourly_rate ?? 0;
+            return '0.00';
         }
 
-        $rate = ServiceAgreementRate::where('service_agreement_id', $agreement->id)
-            ->where('rate_type', $rateType)
-            ->where(function ($q) {
+        $rateSchedule = ServiceAgreementRate::where('service_agreement_id', $agreement->id)
+            ->where('rate_type', $rateType);
+        $hasExplicitSchedule = (clone $rateSchedule)->exists();
+        $rate = $rateSchedule
+            ->where(function ($q) use ($serviceDate) {
                 $q->whereNull('effective_from')
-                    ->orWhere('effective_from', '<=', now());
+                    ->orWhere('effective_from', '<=', $serviceDate);
             })
-            ->where(function ($q) {
+            ->where(function ($q) use ($serviceDate) {
                 $q->whereNull('effective_to')
-                    ->orWhere('effective_to', '>=', now());
+                    ->orWhere('effective_to', '>=', $serviceDate);
             })
-            ->first();
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->value('rate');
 
-        if ($rate) {
-            return (float) $rate->rate;
+        if ($hasExplicitSchedule && $rate === null) {
+            throw new \RuntimeException(
+                "Service Agreement {$agreement->id} has no {$rateType} rate effective on the delivery date."
+            );
         }
 
-        return (float) ($agreement->hourly_rate ?? 0);
+        $canonical = $rate ?? $lineItem?->unit_price ?? $agreement->hourly_rate ?? '0';
+
+        return bcadd((string) $canonical, '0', 2);
     }
 
     protected function matchLineItem(ServiceAgreement $agreement, string $rateType): ?ServiceAgreementLineItem
     {
-        return ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
+        $candidates = ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
             ->where(function ($q) use ($rateType) {
                 $q->where('category', 'like', "%{$rateType}%")
                     ->orWhereNull('category');
             })
             ->orderByRaw('CASE WHEN category LIKE ? THEN 0 ELSE 1 END', ["%{$rateType}%"])
-            ->first();
+            ->orderBy('id')
+            ->get();
+        $exact = $candidates->filter(fn (ServiceAgreementLineItem $line): bool => $line->category !== null && str_contains((string) $line->category, $rateType)
+        );
+        $eligible = $exact->isNotEmpty()
+            ? $exact
+            : $candidates->filter(fn (ServiceAgreementLineItem $line): bool => $line->category === null);
+        if ($eligible->count() > 1) {
+            throw new \RuntimeException(
+                "Service Agreement {$agreement->id} has multiple {$rateType} delivery lines."
+            );
+        }
+
+        return $eligible->first();
     }
 
     protected function generateInvoiceNumber(): string

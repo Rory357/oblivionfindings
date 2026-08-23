@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use LogicException;
 
 class FundingClaimItem extends Model
 {
@@ -15,6 +16,7 @@ class FundingClaimItem extends Model
 
     protected $fillable = [
         'funding_claim_id',
+        'billing_entry_id',
         'service_agreement_line_item_id',
         'shift_id',
         'timesheet_id',
@@ -24,6 +26,7 @@ class FundingClaimItem extends Model
         'total_amount',
         'service_date',
         'funding_contract_reference',
+        'delivery_digest',
     ];
 
     protected $casts = [
@@ -33,9 +36,29 @@ class FundingClaimItem extends Model
         'service_date' => 'date',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $item): void {
+            if ($item->getOriginal('delivery_digest')) {
+                throw new LogicException('Funding-claim delivery provenance is immutable.');
+            }
+        });
+
+        static::deleting(function (self $item): void {
+            if ($item->delivery_digest) {
+                throw new LogicException('Funding-claim delivery provenance cannot be deleted.');
+            }
+        });
+    }
+
     public function fundingClaim()
     {
         return $this->belongsTo(FundingClaim::class);
+    }
+
+    public function billingEntry()
+    {
+        return $this->belongsTo(BillingEntry::class);
     }
 
     public function lineItem()

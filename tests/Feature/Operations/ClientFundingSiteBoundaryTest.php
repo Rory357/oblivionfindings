@@ -144,6 +144,9 @@ it('Site-scopes Funding Claims and denies direct workflow actions across Sites',
     $this->actingAs($user)
         ->post(route('operations.funding.claims.submit', $otherClaim))
         ->assertNotFound();
+    $this->actingAs($user)
+        ->post(route('operations.funding.claims.approve', $otherClaim))
+        ->assertNotFound();
 });
 
 it('requires every Claim and linked line item to match the accessible parent agreement', function () {
@@ -167,6 +170,7 @@ it('requires every Claim and linked line item to match the accessible parent agr
         'period_start' => now()->startOfMonth()->toDateString(),
         'period_end' => now()->endOfMonth()->toDateString(),
         'items' => [[
+            'billing_entry_id' => 999999999,
             'description' => 'Supported activity',
             'quantity' => '1.00',
             'unit_price' => '50.00',
@@ -180,13 +184,13 @@ it('requires every Claim and linked line item to match the accessible parent agr
             ...$payload,
             'client_id' => $otherClient->id,
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertNotFound();
 
     $payload['items'][0]['service_agreement_line_item_id'] = $otherLineItem->id;
     $this->actingAs($user)
         ->from(route('operations.funding.claims.create'))
         ->post(route('operations.funding.claims.store'), $payload)
-        ->assertSessionHasErrors('items');
+        ->assertNotFound();
 
     $payload['service_agreement_id'] = $siteLessAgreement->id;
     unset($payload['items'][0]['service_agreement_line_item_id']);

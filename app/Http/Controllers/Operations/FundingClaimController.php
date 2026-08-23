@@ -5,37 +5,37 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\FundingClaim;
-use App\Models\FundingClaimItem;
 use App\Models\ServiceAgreement;
-use App\Models\Shift;
-use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Operations\FundingClaimService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class FundingClaimController extends Controller
 {
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly FundingClaimService $claims,
     ) {}
 
     public function index(Request $request)
     {
-        $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.viewAny']);
+        $auth = $this->authorizeAny($request, ['funding.viewAny']);
 
         $data = $request->validate([
             'status' => ['nullable', 'string', 'in:draft,submitted,approved,rejected,paid'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         if (! empty($data['client_id'])) {
-            $this->siteAccess->assertCanAccessClientId(
-                $auth,
-                (int) $data['client_id'],
-                ['reports.viewAny'],
+            abort_unless(
+                $this->siteAccess->applyClientScope(
+                    Client::query()->whereKey((int) $data['client_id']),
+                    $auth,
+                    ['funding.viewAllSites'],
+                )->exists(),
+                404,
             );
         }
 
@@ -55,7 +55,7 @@ class FundingClaimController extends Controller
         $clients = $this->siteAccess->applyClientScope(
             Client::query(),
             $auth,
-            ['reports.viewAny'],
+            ['funding.viewAllSites'],
         )
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
@@ -69,7 +69,7 @@ class FundingClaimController extends Controller
 
     public function create(Request $request)
     {
-        $auth = $this->authorizeAny($request, ['funding.claims.create', 'funding_claims.create']);
+        $auth = $this->authorizeAny($request, ['funding.claims.create']);
 
         $agreements = $this->accessibleAgreements($auth)
             ->active()
@@ -79,86 +79,57 @@ class FundingClaimController extends Controller
 
         return inertia('operations/funding/claims/Create', [
             'agreements' => $agreements,
+            'deliveries' => $this->claims->eligibleDeliveries($auth)
+                ->map(fn ($entry): array => [
+                    'id' => (int) $entry->id,
+                    'service_agreement_id' => (int) $entry->service_agreement_id,
+                    'service_agreement_line_item_id' => (int) $entry->line_item_id,
+                    'shift_id' => (int) $entry->shift_id,
+                    'timesheet_id' => (int) $entry->timesheet_id,
+                    'description' => (string) $entry->lineItem?->description,
+                    'quantity' => (string) $entry->hours,
+                    'unit_price' => (string) $entry->rate,
+                    'total_amount' => (string) $entry->amount,
+                    'service_date' => $entry->service_date?->toDateString(),
+                    'funding_contract_reference' => $entry->lineItem?->funding_contract_reference,
+                ])
+                ->values(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $auth = $this->authorizeAny($request, ['funding.claims.create', 'funding_claims.create']);
+        $auth = $this->authorizeAny($request, ['funding.claims.create']);
 
         $data = $request->validate([
-            'service_agreement_id' => ['required', 'integer', 'exists:service_agreements,id'],
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'service_agreement_id' => ['required', 'integer', 'min:1'],
+            'client_id' => ['required', 'integer', 'min:1'],
             'claim_reference' => ['nullable', 'string', 'max:100'],
+            'client_request_uuid' => ['nullable', 'uuid'],
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after_or_equal:period_start'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.billing_entry_id' => ['required', 'integer', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.service_date' => ['required', 'date'],
-            'items.*.service_agreement_line_item_id' => ['nullable', 'integer', 'exists:service_agreement_line_items,id'],
-            'items.*.shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
-            'items.*.timesheet_id' => ['nullable', 'integer', 'exists:timesheets,id'],
+            'items.*.service_agreement_line_item_id' => ['nullable', 'integer', 'min:1'],
+            'items.*.shift_id' => ['nullable', 'integer', 'min:1'],
+            'items.*.timesheet_id' => ['nullable', 'integer', 'min:1'],
             'items.*.funding_contract_reference' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $this->siteAccess->assertCanAccessClientId(
-            $auth,
-            (int) $data['client_id'],
-            ['reports.viewAny'],
-        );
-
-        $agreement = $this->accessibleAgreements($auth)
-            ->with('lineItems:id,service_agreement_id')
-            ->findOrFail($data['service_agreement_id']);
-
-        if ((int) $agreement->client_id !== (int) $data['client_id']) {
-            throw ValidationException::withMessages([
-                'client_id' => 'The Funding Claim Client must match its Service Agreement.',
-            ]);
-        }
-
-        $this->assertItemOwnership($agreement, $data['items']);
-
-        $claim = DB::transaction(function () use ($data, $agreement) {
-            $totalAmount = collect($data['items'])->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
-
-            $claim = FundingClaim::create([
-                'service_agreement_id' => $agreement->id,
-                'client_id' => $agreement->client_id,
-                'claim_reference' => $data['claim_reference'] ?? null,
-                'status' => 'draft',
-                'period_start' => $data['period_start'],
-                'period_end' => $data['period_end'],
-                'total_amount' => $totalAmount,
-            ]);
-
-            foreach ($data['items'] as $itemData) {
-                FundingClaimItem::create([
-                    'funding_claim_id' => $claim->id,
-                    'service_agreement_line_item_id' => $itemData['service_agreement_line_item_id'] ?? null,
-                    'shift_id' => $itemData['shift_id'] ?? null,
-                    'timesheet_id' => $itemData['timesheet_id'] ?? null,
-                    'description' => $itemData['description'],
-                    'quantity' => $itemData['quantity'],
-                    'unit_price' => $itemData['unit_price'],
-                    'total_amount' => $itemData['quantity'] * $itemData['unit_price'],
-                    'service_date' => $itemData['service_date'],
-                    'funding_contract_reference' => $itemData['funding_contract_reference'] ?? null,
-                ]);
-            }
-
-            return $claim;
-        });
+        $result = $this->claims->createDraft($auth, $data);
+        $claim = $result['claim'];
 
         return redirect()->route('operations.funding.claims.show', $claim)
-            ->with('success', 'Funding claim created.');
+            ->with('success', $result['replayed'] ? 'Funding claim already created.' : 'Funding claim created.');
     }
 
     public function show(Request $request, $claim)
     {
-        $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.view']);
+        $auth = $this->authorizeAny($request, ['funding.viewAny']);
 
         $claim = $this->accessibleClaims($auth)
             ->with([
@@ -173,41 +144,44 @@ class FundingClaimController extends Controller
 
         return inertia('operations/funding/claims/Show', [
             'claim' => $claim,
+            'can_retry_posting' => $auth->canDo('funding.claims.retryPosting'),
         ]);
     }
 
     public function submit(Request $request, $claim)
     {
-        $auth = $this->authorizeAny($request, ['funding.claims.submit', 'funding_claims.submit']);
+        $auth = $this->authorizeAny($request, ['funding.claims.submit']);
 
-        $claim = $this->accessibleClaims($auth)
-            ->where('status', 'draft')
-            ->findOrFail($claim);
+        $result = $this->claims->submit($auth, (int) $claim);
 
-        $claim->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'submitted_by' => $auth->id,
-        ]);
-
-        return redirect()->back()->with('success', 'Claim submitted.');
+        return redirect()->back()->with(
+            $result['posting_failed'] ? 'error' : 'success',
+            $result['posting_failed']
+                ? 'Claim submitted, but its General Ledger posting could not be queued. An authorised user can retry it.'
+                : ($result['replayed'] ? 'Claim already submitted.' : 'Claim submitted.'),
+        );
     }
 
     public function approve(Request $request, $claim)
     {
-        $auth = $this->authorizeAny($request, ['funding.claims.approve', 'funding_claims.approve']);
+        $auth = $this->authorizeAny($request, ['funding.claims.approve']);
 
-        $claim = $this->accessibleClaims($auth)
-            ->where('status', 'submitted')
-            ->findOrFail($claim);
-
-        $claim->update([
-            'status' => 'approved',
-            'approved_at' => now(),
-            'approved_by' => $auth->id,
-        ]);
+        $this->claims->approve($auth, (int) $claim);
 
         return redirect()->back()->with('success', 'Claim approved.');
+    }
+
+    public function retryPosting(Request $request, $claim)
+    {
+        $auth = $this->authorizeAny($request, ['funding.claims.retryPosting']);
+        $result = $this->claims->retryPosting($auth, (int) $claim);
+
+        return redirect()->back()->with(
+            $result['posting_failed'] ? 'error' : 'success',
+            $result['posting_failed']
+                ? 'General Ledger posting could not be queued. Try again after the finance service has recovered.'
+                : 'General Ledger posting queued.',
+        );
     }
 
     private function authorizeAny(Request $request, array $permissions)
@@ -227,10 +201,15 @@ class FundingClaimController extends Controller
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
-                ['reports.viewAny'],
+                ['funding.viewAllSites'],
             ))
             ->whereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
-                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'));
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'))
+            ->where(function (Builder $scope): void {
+                $scope->whereNull('funding_claims.site_id')
+                    ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery
+                        ->whereColumn('clients.site_id', 'funding_claims.site_id'));
+            });
     }
 
     private function accessibleAgreements(User $user): Builder
@@ -239,36 +218,7 @@ class FundingClaimController extends Controller
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
-                ['reports.viewAny'],
+                ['funding.viewAllSites'],
             ));
-    }
-
-    /** @param array<int, array<string, mixed>> $items */
-    private function assertItemOwnership(ServiceAgreement $agreement, array $items): void
-    {
-        $lineItemIds = collect($items)
-            ->pluck('service_agreement_line_item_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique();
-        if ($agreement->lineItems->whereIn('id', $lineItemIds)->count() !== $lineItemIds->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'Every Funding Claim line item must belong to the selected Service Agreement.',
-            ]);
-        }
-
-        $shiftIds = collect($items)->pluck('shift_id')->filter()->map(fn ($id) => (int) $id)->unique();
-        if (Shift::query()->whereIn('id', $shiftIds)->where('client_id', $agreement->client_id)->count() !== $shiftIds->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'Every linked Shift must belong to the Funding Claim Client.',
-            ]);
-        }
-
-        $timesheetIds = collect($items)->pluck('timesheet_id')->filter()->map(fn ($id) => (int) $id)->unique();
-        if (Timesheet::query()->whereIn('id', $timesheetIds)->where('client_id', $agreement->client_id)->count() !== $timesheetIds->count()) {
-            throw ValidationException::withMessages([
-                'items' => 'Every linked Timesheet must belong to the Funding Claim Client.',
-            ]);
-        }
     }
 }

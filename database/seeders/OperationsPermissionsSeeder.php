@@ -48,9 +48,11 @@ class OperationsPermissionsSeeder extends Seeder
 
             // Funding
             ['key' => 'funding.viewAny', 'description' => 'View Funding'],
+            ['key' => 'funding.viewAllSites', 'description' => 'View Funding across all active Sites'],
             ['key' => 'funding.claims.create', 'description' => 'Create Funding Claims'],
             ['key' => 'funding.claims.submit', 'description' => 'Submit Funding Claims'],
             ['key' => 'funding.claims.approve', 'description' => 'Approve Funding Claims'],
+            ['key' => 'funding.claims.retryPosting', 'description' => 'Retry failed Funding Claim journal posting'],
 
             // Messages
             ['key' => 'messages.viewAny', 'description' => 'View Messages'],

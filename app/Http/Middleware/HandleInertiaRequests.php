@@ -1014,6 +1014,7 @@ class HandleInertiaRequests extends Middleware
                 'viewAny' => $user->canDo('funding.viewAny'),
                 'claimsCreate' => $user->canDo('funding.claims.create'),
                 'claimsSubmit' => $user->canDo('funding.claims.submit'),
+                'claimsRetryPosting' => $user->canDo('funding.claims.retryPosting'),
             ],
             'messages' => [
                 'viewAny' => $user->canDo('messages.viewAny'),

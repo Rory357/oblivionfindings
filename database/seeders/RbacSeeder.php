@@ -543,6 +543,8 @@ class RbacSeeder extends Seeder
             ['key' => 'finance.reports.view', 'description' => 'View financial reports', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'finance.admin', 'description' => 'Finance administration', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'funding.claims.approve', 'description' => 'Approve funding claims', 'group' => 'funding', 'module' => 'Finance'],
+            ['key' => 'funding.claims.retryPosting', 'description' => 'Retry failed funding claim journal posting', 'group' => 'funding', 'module' => 'Finance'],
+            ['key' => 'funding.viewAllSites', 'description' => 'View funding records across all active Sites', 'group' => 'funding', 'module' => 'Finance'],
         ];
 
         foreach ($permissionDefinitions as $permDef) {
