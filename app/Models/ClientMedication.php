@@ -17,6 +17,39 @@ class ClientMedication extends Model
     use HasFactory;
     use SoftDeletes;
 
+    private const VERIFICATION_SENSITIVE_FIELDS = [
+        'client_id',
+        'created_by',
+        'name',
+        'dosage',
+        'dose_amount',
+        'dose_unit',
+        'frequency',
+        'frequency_code',
+        'dose_times',
+        'is_prn',
+        'controlled_drug',
+        'cd_schedule',
+        'high_risk',
+        'witness_required',
+        'prn_reason',
+        'max_per_day',
+        'min_hours_between_doses',
+        'route',
+        'form',
+        'prescriber',
+        'indication',
+        'pharmacy',
+        'pharmac_therapeutic_group',
+        'pharmac_subgroup',
+        'start_date',
+        'end_date',
+        'review_date',
+        'instructions',
+        'barcode',
+        'nzulm_code',
+    ];
+
     protected $fillable = [
         'client_id',
         'created_by',
@@ -81,6 +114,31 @@ class ClientMedication extends Model
         'min_hours_between_doses' => 'float',
         'version' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $medication): void {
+            if ($medication->created_by !== null) {
+                $medication->approval_status = 'pending_verification';
+                $medication->verified_by = null;
+                $medication->verified_at = null;
+                $medication->rejection_reason = null;
+            }
+        });
+
+        static::updating(function (self $medication): void {
+            if (! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
+                return;
+            }
+
+            $medication->forceFill([
+                'approval_status' => 'pending_verification',
+                'verified_by' => null,
+                'verified_at' => null,
+                'rejection_reason' => null,
+            ]);
+        });
+    }
 
     public function client(): BelongsTo
     {
@@ -239,6 +297,67 @@ class ClientMedication extends Model
     }
 
     /**
+     * High-risk order classes need a verifier other than their creator.
+     */
+    public function requiresIndependentVerification(): bool
+    {
+        return (bool) $this->high_risk
+            || (bool) $this->controlled_drug
+            || (bool) $this->witness_required;
+    }
+
+    /**
+     * Canonical pre-transition evidence for the exact order revision being
+     * verified or rejected. The audit log stores only the digest, avoiding a
+     * second copy of medication instructions while still binding the decision
+     * to the locked order, client, clinical fields, and scan identifiers.
+     *
+     * @return array<string, mixed>
+     */
+    public function verificationEvidence(): array
+    {
+        return [
+            'order_id' => (int) $this->getKey(),
+            'client_id' => (int) $this->client_id,
+            'version' => (int) ($this->version ?? 1),
+            'created_by' => $this->created_by !== null ? (int) $this->created_by : null,
+            'name' => (string) $this->name,
+            'dosage' => (string) $this->dosage,
+            'dose_amount' => $this->dose_amount !== null ? (string) $this->dose_amount : null,
+            'dose_unit' => $this->dose_unit,
+            'frequency' => (string) $this->frequency,
+            'frequency_code' => $this->frequency_code,
+            'dose_times' => array_values($this->dose_times ?? []),
+            'route' => $this->route,
+            'form' => $this->form,
+            'instructions' => $this->instructions,
+            'indication' => $this->indication,
+            'is_prn' => (bool) $this->is_prn,
+            'controlled_drug' => (bool) $this->controlled_drug,
+            'high_risk' => (bool) $this->high_risk,
+            'witness_required' => (bool) $this->witness_required,
+            'prescriber' => $this->prescriber,
+            'barcode' => $this->getAttribute('barcode'),
+            'nzulm_code' => $this->getAttribute('nzulm_code'),
+            'start_date' => $this->start_date?->toDateString(),
+            'end_date' => $this->end_date?->toDateString(),
+            'state' => (string) $this->state,
+            'active' => (bool) $this->active,
+            'approval_status' => $this->approval_status,
+            'superseded_by' => $this->superseded_by !== null ? (int) $this->superseded_by : null,
+            'updated_at' => $this->updated_at?->toISOString(),
+        ];
+    }
+
+    public function verificationEvidenceHash(): string
+    {
+        return hash('sha256', json_encode(
+            $this->verificationEvidence(),
+            JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION,
+        ));
+    }
+
+    /**
      * Check if medication is currently active
      */
     public function isActive(): bool
@@ -384,6 +503,8 @@ class ClientMedication extends Model
      */
     public function createVersion(int $changedBy, ?string $changeReason = null): self
     {
+        $isPrn = (bool) ($this->getAttribute('is_prn') ?? false);
+
         // Mark current as superseded
         $this->superseded_at = now();
         $this->save();
@@ -397,6 +518,12 @@ class ClientMedication extends Model
             'superseded_by',
         ]);
         $newVersion->version = ($this->version ?? 1) + 1;
+        $newVersion->created_by = $changedBy;
+        $newVersion->is_prn = $isPrn;
+        $newVersion->approval_status = 'pending_verification';
+        $newVersion->verified_by = null;
+        $newVersion->verified_at = null;
+        $newVersion->rejection_reason = null;
         $newVersion->save();
 
         // Link old to new
@@ -419,7 +546,7 @@ class ClientMedication extends Model
             'form' => $this->form,
             'instructions' => $this->instructions,
             'indication' => $this->indication,
-            'is_prn' => $this->is_prn,
+            'is_prn' => $isPrn,
             'prn_reason' => $this->prn_reason,
             'max_per_day' => $this->max_per_day,
             'min_hours_between_doses' => $this->min_hours_between_doses,

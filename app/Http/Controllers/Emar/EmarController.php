@@ -112,11 +112,7 @@ class EmarController extends Controller
 
     private function canVerifyMedicationOrders(?User $user): bool
     {
-        return (bool) $user && (
-            $user->canDo('medications.orders.verify')
-            || $user->canDo('medications.orders.manage')
-            || $user->canDo('clients.update')
-        );
+        return (bool) $user && $user->canDo('medications.orders.verify');
     }
 
     private function buildClientMedicationContext(Client $client): array
@@ -4628,7 +4624,6 @@ class EmarController extends Controller
             (int) $validated['client_id'],
             now(),
             function (MedicationScopeDecision $scope) use ($validated, $user) {
-                $canVerify = $this->canVerifyMedicationOrders($user);
                 $payload = $this->buildMedicationPayload($validated);
                 $payload['client_id'] = $scope->client->id;
 
@@ -4639,9 +4634,9 @@ class EmarController extends Controller
                         'start_date' => $validated['start_date'] ?? now()->toDateString(),
                         'state' => 'active',
                         'active' => true,
-                        'approval_status' => $canVerify ? 'verified' : 'pending_verification',
-                        'verified_by' => $canVerify ? $user->id : null,
-                        'verified_at' => $canVerify ? now() : null,
+                        'approval_status' => 'pending_verification',
+                        'verified_by' => null,
+                        'verified_at' => null,
                     ],
                 ));
                 $this->medicationScope->recordBreakGlassUse(
@@ -4692,7 +4687,7 @@ class EmarController extends Controller
             $user,
             $medication,
             now(),
-            function (MedicationScopeDecision $scope) use ($validated, $user) {
+            function (MedicationScopeDecision $scope) use ($validated) {
                 if (array_key_exists('client_id', $validated)
                     && (int) $validated['client_id'] !== (int) $scope->client->id) {
                     throw ValidationException::withMessages([
@@ -4702,13 +4697,10 @@ class EmarController extends Controller
 
                 $payload = $this->buildMedicationPayload($validated);
                 unset($payload['client_id']);
-
-                if (! $this->canVerifyMedicationOrders($user)) {
-                    $payload['approval_status'] = 'pending_verification';
-                    $payload['verified_by'] = null;
-                    $payload['verified_at'] = null;
-                    $payload['rejection_reason'] = null;
-                }
+                $payload['approval_status'] = 'pending_verification';
+                $payload['verified_by'] = null;
+                $payload['verified_at'] = null;
+                $payload['rejection_reason'] = null;
 
                 $scope->medication->update($payload);
                 $this->medicationScope->recordBreakGlassUse(
@@ -4724,19 +4716,128 @@ class EmarController extends Controller
 
     public function verifyMedication(Request $request, ClientMedication $medication)
     {
-        abort_unless($this->canVerifyMedicationOrders($request->user()), 403);
+        $verifier = $request->user();
+        abort_unless($this->canVerifyMedicationOrders($verifier), 403);
 
         return $this->medicationScope->forMedication(
-            $request->user(),
+            $verifier,
             $medication,
             now(),
-            function (MedicationScopeDecision $scope) use ($request) {
+            function (MedicationScopeDecision $scope) use ($request, $verifier) {
+                if ($scope->medication->approval_status === 'verified') {
+                    return redirect()->back()->with('success', 'Medication order was already verified.');
+                }
+
+                if ($scope->medication->approval_status !== 'pending_verification') {
+                    throw ValidationException::withMessages([
+                        'approval_status' => 'Only a medication order awaiting verification can be verified.',
+                    ]);
+                }
+
+                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
+                    throw ValidationException::withMessages([
+                        'medication' => 'Only an active medication order can be verified.',
+                    ]);
+                }
+
+                $validated = $request->validate([
+                    'waiver_reason' => [
+                        'nullable',
+                        'string',
+                        'max:1000',
+                        'required_with:waiver_approved_by,waiver_approver_credential',
+                    ],
+                    'waiver_approved_by' => [
+                        'nullable',
+                        'integer',
+                        'required_with:waiver_reason,waiver_approver_credential',
+                    ],
+                    'waiver_approver_credential' => [
+                        'nullable',
+                        'string',
+                        'max:255',
+                        'required_with:waiver_reason,waiver_approved_by',
+                    ],
+                    'scan_code' => ['nullable', 'string', 'max:255'],
+                    'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+                    'scan_verified' => ['nullable', 'boolean'],
+                    'scan_match_source' => ['nullable', 'string', 'max:50'],
+                ]);
+
+                $scanEvidenceSubmitted = collect([
+                    'scan_code',
+                    'scan_source',
+                    'scan_verified',
+                    'scan_match_source',
+                ])->contains(fn (string $key): bool => $request->exists($key));
+                $scanAudit = $scanEvidenceSubmitted
+                    ? $this->verifyMedicationScanOrFail(
+                        $scope->client,
+                        $scope->medication,
+                        $validated,
+                    )
+                    : null;
+
+                $requiresIndependentVerifier = $scope->medication->requiresIndependentVerification();
+                $creatorSeparationUnproved = $scope->medication->created_by === null
+                    || (int) $scope->medication->created_by === (int) $verifier->id;
+                $waiverApprover = null;
+                $waiverEvidenceSubmitted = collect([
+                    'waiver_reason',
+                    'waiver_approved_by',
+                    'waiver_approver_credential',
+                ])->contains(fn (string $key): bool => filled($validated[$key] ?? null));
+
+                if ($requiresIndependentVerifier && $creatorSeparationUnproved) {
+                    $waiverApprover = $this->resolveMedicationVerificationWaiverApprover(
+                        $scope,
+                        $verifier,
+                        $validated,
+                    );
+                } elseif ($waiverEvidenceSubmitted) {
+                    throw ValidationException::withMessages([
+                        'waiver_reason' => 'An emergency waiver is only available when a high-risk order creator must verify their own order.',
+                    ]);
+                }
+
+                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
+                $orderVersion = (int) ($scope->medication->version ?? 1);
+
                 $scope->medication->forceFill([
                     'approval_status' => 'verified',
-                    'verified_by' => $request->user()->id,
+                    'verified_by' => $verifier->id,
                     'verified_at' => now(),
                     'rejection_reason' => null,
                 ])->save();
+
+                $auditMeta = [
+                    'site_id' => $scope->siteId,
+                    'creator_user_id' => $scope->medication->created_by !== null
+                        ? (int) $scope->medication->created_by
+                        : null,
+                    'verifier_user_id' => (int) $verifier->id,
+                    'independent_verifier_required' => $requiresIndependentVerifier,
+                    'verification_mode' => $waiverApprover !== null
+                        ? 'emergency_waiver'
+                        : ($requiresIndependentVerifier ? 'independent_verifier' : 'standard'),
+                    'approval_status_from' => 'pending_verification',
+                    'approval_status_to' => 'verified',
+                    'order_version' => $orderVersion,
+                    'order_evidence_sha256' => $orderEvidenceHash,
+                    'scan_verification_used' => $scanAudit !== null,
+                ];
+                if ($waiverApprover !== null) {
+                    $auditMeta['waiver_reason'] = trim((string) $validated['waiver_reason']);
+                    $auditMeta['waiver_approved_by_user_id'] = (int) $waiverApprover->id;
+                }
+                if ($scanAudit !== null) {
+                    $auditMeta['scan_source'] = $scanAudit['scan_source'];
+                    $auditMeta['scan_match_source'] = $scanAudit['scan_match_source'];
+                    $auditMeta['scan_match_label'] = $scanAudit['scan_match_label'];
+                    $auditMeta['entered_code_suffix'] = $scanAudit['scan_code_suffix'];
+                }
+
+                AuditLogger::logOrFail('medications.order.verified', $scope->medication, $auditMeta);
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'verified_medication_order',
@@ -4748,25 +4849,97 @@ class EmarController extends Controller
         );
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function resolveMedicationVerificationWaiverApprover(
+        MedicationScopeDecision $scope,
+        User $verifier,
+        array $validated,
+    ): User {
+        if (blank($validated['waiver_reason'] ?? null)
+            || empty($validated['waiver_approved_by'])
+            || blank($validated['waiver_approver_credential'] ?? null)) {
+            throw ValidationException::withMessages([
+                'verified_by' => 'A different authorized verifier is required for high-risk medication orders.',
+            ]);
+        }
+
+        $approver = User::query()
+            ->whereKey((int) $validated['waiver_approved_by'])
+            ->whereNotNull('approved_at')
+            ->first();
+        $approverIsEligible = $approver !== null
+            && (int) $approver->id !== (int) $verifier->id
+            && $this->canVerifyMedicationOrders($approver)
+            && in_array(
+                $scope->siteId,
+                $this->siteAccess()->accessibleSiteIds($approver, ['clinical.accessAllSites', 'sites.viewAll']),
+                true,
+            )
+            && Hash::check((string) $validated['waiver_approver_credential'], (string) $approver->password);
+
+        if (! $approverIsEligible) {
+            throw ValidationException::withMessages([
+                'waiver_approver_credential' => 'The emergency waiver approval could not be verified.',
+            ]);
+        }
+
+        return $approver;
+    }
+
     public function rejectMedication(Request $request, ClientMedication $medication)
     {
-        abort_unless($this->canVerifyMedicationOrders($request->user()), 403);
-
-        $validated = $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:1000'],
-        ]);
+        $reviewer = $request->user();
+        abort_unless($this->canVerifyMedicationOrders($reviewer), 403);
 
         return $this->medicationScope->forMedication(
-            $request->user(),
+            $reviewer,
             $medication,
             now(),
-            function (MedicationScopeDecision $scope) use ($validated) {
+            function (MedicationScopeDecision $scope) use ($request, $reviewer) {
+                if ($scope->medication->approval_status === 'rejected') {
+                    return redirect()->back()->with('success', 'Medication order was already rejected.');
+                }
+
+                if ($scope->medication->approval_status !== 'pending_verification') {
+                    throw ValidationException::withMessages([
+                        'approval_status' => 'Only a medication order awaiting verification can be rejected.',
+                    ]);
+                }
+
+                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
+                    throw ValidationException::withMessages([
+                        'medication' => 'Only an active medication order can be rejected.',
+                    ]);
+                }
+
+                $validated = $request->validate([
+                    'rejection_reason' => ['required', 'string', 'max:1000'],
+                ]);
+                $reason = trim($validated['rejection_reason']);
+                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
+                $orderVersion = (int) ($scope->medication->version ?? 1);
+
                 $scope->medication->forceFill([
                     'approval_status' => 'rejected',
                     'verified_by' => null,
                     'verified_at' => null,
-                    'rejection_reason' => $validated['rejection_reason'],
+                    'rejection_reason' => $reason,
                 ])->save();
+
+                AuditLogger::logOrFail('medications.order.rejected', $scope->medication, [
+                    'site_id' => $scope->siteId,
+                    'creator_user_id' => $scope->medication->created_by !== null
+                        ? (int) $scope->medication->created_by
+                        : null,
+                    'reviewer_user_id' => (int) $reviewer->id,
+                    'approval_status_from' => 'pending_verification',
+                    'approval_status_to' => 'rejected',
+                    'order_version' => $orderVersion,
+                    'order_evidence_sha256' => $orderEvidenceHash,
+                    'rejection_reason_sha256' => hash('sha256', $reason),
+                ]);
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'rejected_medication_order',
@@ -5262,6 +5435,9 @@ class EmarController extends Controller
             'csv_file' => 'required|file|mimes:csv,txt|max:2048',
         ]);
 
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
         $file = $request->file('csv_file');
         $handle = fopen($file->getRealPath(), 'r');
 
@@ -5269,89 +5445,139 @@ class EmarController extends Controller
             return redirect()->back()->withErrors(['csv_file' => 'Unable to read the CSV file.']);
         }
 
-        $imported = 0;
-        $skipped = 0;
+        $rows = [];
         $rowNumber = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
-            $rowNumber++;
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNumber++;
 
-            // Skip empty rows
-            if (empty(array_filter($row))) {
-                continue;
-            }
-
-            // Skip header row
-            if ($rowNumber === 1 && stripos($row[0] ?? '', 'client') !== false) {
-                continue;
-            }
-
-            // Expect: client_name, medication_name, dose, frequency, route
-            if (count($row) < 4) {
-                $skipped++;
-
-                continue;
-            }
-
-            $clientName = trim($row[0] ?? '');
-            $medicationName = trim($row[1] ?? '');
-            $dose = trim($row[2] ?? '');
-            $frequency = trim($row[3] ?? '');
-            $route = trim($row[4] ?? 'oral');
-
-            if (! $clientName || ! $medicationName || ! $dose || ! $frequency) {
-                $skipped++;
-
-                continue;
-            }
-
-            // Try to match client by name ("Last, First" or "First Last")
-            $client = null;
-            if (str_contains($clientName, ',')) {
-                [$lastName, $firstName] = array_map('trim', explode(',', $clientName, 2));
-                $client = Client::where('last_name', $lastName)
-                    ->where('first_name', $firstName)
-                    ->first();
-            } else {
-                $parts = explode(' ', $clientName, 2);
-                if (count($parts) === 2) {
-                    $client = Client::where('first_name', $parts[0])
-                        ->where('last_name', $parts[1])
-                        ->first();
+                if (empty(array_filter($row))) {
+                    continue;
                 }
+
+                if ($rowNumber === 1 && stripos($row[0] ?? '', 'client') !== false) {
+                    continue;
+                }
+
+                if (count($row) < 4) {
+                    continue;
+                }
+
+                $clientName = trim($row[0] ?? '');
+                $medicationName = trim($row[1] ?? '');
+                $dose = trim($row[2] ?? '');
+                $frequency = trim($row[3] ?? '');
+                $route = trim($row[4] ?? 'oral');
+
+                if (! $clientName || ! $medicationName || ! $dose || ! $frequency) {
+                    continue;
+                }
+
+                if (str_contains($clientName, ',')) {
+                    [$lastName, $firstName] = array_map('trim', explode(',', $clientName, 2));
+                } else {
+                    $nameParts = explode(' ', $clientName, 2);
+                    if (count($nameParts) !== 2) {
+                        continue;
+                    }
+
+                    [$firstName, $lastName] = array_map('trim', $nameParts);
+                }
+
+                if ($firstName === '' || $lastName === '') {
+                    continue;
+                }
+
+                $rows[] = [
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'medication_name' => $medicationName,
+                    'dose' => $dose,
+                    'frequency' => $frequency,
+                    'route' => $route,
+                ];
             }
-
-            if (! $client) {
-                $skipped++;
-
-                continue;
-            }
-
-            // Calculate dose times from frequency
-            $doseTimes = DoseSchedulingService::calculateDoseTimes($frequency);
-
-            $canVerify = $this->canVerifyMedicationOrders($request->user());
-
-            ClientMedication::create([
-                'client_id' => $client->id,
-                'created_by' => $request->user()?->id,
-                'name' => $medicationName,
-                'dosage' => $dose,
-                'frequency' => $frequency,
-                'dose_times' => $doseTimes,
-                'route' => $route,
-                'state' => 'active',
-                'active' => true,
-                'start_date' => now()->toDateString(),
-                'approval_status' => $canVerify ? 'verified' : 'pending_verification',
-                'verified_by' => $canVerify ? $request->user()?->id : null,
-                'verified_at' => $canVerify ? now() : null,
-            ]);
-
-            $imported++;
+        } finally {
+            fclose($handle);
         }
 
-        fclose($handle);
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds(
+            $user,
+            ['clinical.accessAllSites', 'sites.viewAll'],
+        );
+        if ($rows === [] || $accessibleSiteIds === []) {
+            return redirect()->back();
+        }
+
+        $resolvedRows = [];
+        foreach ($rows as $row) {
+            $matchingClientIds = Client::query()
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->where('status', 'active')
+                ->where('first_name', $row['first_name'])
+                ->where('last_name', $row['last_name'])
+                ->orderBy('id')
+                ->limit(2)
+                ->pluck('id');
+
+            if ($matchingClientIds->count() !== 1) {
+                continue;
+            }
+
+            $row['client_id'] = (int) $matchingClientIds->first();
+            $resolvedRows[] = $row;
+        }
+
+        if ($resolvedRows === []) {
+            return redirect()->back();
+        }
+
+        DB::transaction(function () use ($resolvedRows, $accessibleSiteIds, $user): void {
+            $clientIds = collect($resolvedRows)
+                ->pluck('client_id')
+                ->map(fn ($clientId): int => (int) $clientId)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+            $lockedClients = Client::query()
+                ->whereIn('id', $clientIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (Client $client): int => (int) $client->id);
+
+            foreach ($resolvedRows as $row) {
+                /** @var Client|null $client */
+                $client = $lockedClients->get($row['client_id']);
+                if (! $client
+                    || ! in_array((int) $client->site_id, $accessibleSiteIds, true)
+                    || $client->status !== 'active'
+                    || $client->first_name !== $row['first_name']
+                    || $client->last_name !== $row['last_name']) {
+                    throw ValidationException::withMessages([
+                        'csv_file' => 'A matched client changed while the import was being processed. Please try again.',
+                    ]);
+                }
+
+                ClientMedication::query()->create([
+                    'client_id' => $client->id,
+                    'created_by' => $user->id,
+                    'name' => $row['medication_name'],
+                    'dosage' => $row['dose'],
+                    'frequency' => $row['frequency'],
+                    'dose_times' => DoseSchedulingService::calculateDoseTimes($row['frequency']),
+                    'route' => $row['route'],
+                    'state' => 'active',
+                    'active' => true,
+                    'start_date' => now()->toDateString(),
+                    'approval_status' => 'pending_verification',
+                    'verified_by' => null,
+                    'verified_at' => null,
+                ]);
+            }
+        }, 3);
 
         return redirect()->back();
     }

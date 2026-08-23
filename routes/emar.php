@@ -230,7 +230,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     }); // end medications.orders.manage middleware group
 
-    Route::middleware('permission:medications.orders.verify|medications.orders.manage|clients.update')->group(function () {
+    Route::middleware('permission:medications.orders.verify')->group(function () {
         Route::post('/medications/{medication}/verify', [EmarController::class, 'verifyMedication'])->name('emar.medications.verify');
         Route::post('/medications/{medication}/reject', [EmarController::class, 'rejectMedication'])->name('emar.medications.reject');
     });
