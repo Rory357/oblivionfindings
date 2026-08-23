@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Services\PeopleMutationLockService;
@@ -89,6 +90,7 @@ class ComplianceMatrixController extends Controller
             'siteTypes' => $siteTypes,
             'wizard' => $this->complianceWizardData($user),
             'can' => [
+                'export' => ComplianceExportDataset::Staff->allows($user),
                 'manage' => $user->canDo('hr.compliance.manage'),
                 // Real perms for the shared hub header's cross-domain create actions.
                 'vetting_manage' => $user->canDo('hr.vetting.manage'),

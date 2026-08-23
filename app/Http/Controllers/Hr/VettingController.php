@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
@@ -80,6 +81,7 @@ class VettingController extends Controller
                 'q' => $search,
             ],
             'can' => [
+                'export' => ComplianceExportDataset::Vetting->allows($user),
                 'manage' => $user->canDo('hr.vetting.manage'),
                 // The shared hub header offers cross-domain create actions;
                 // gate each on the real manage perm so it isn't advertised to

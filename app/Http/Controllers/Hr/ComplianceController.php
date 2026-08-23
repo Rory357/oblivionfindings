@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Models\HrComplianceRenewalSnooze;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrDriverEligibility;
@@ -182,6 +183,7 @@ class ComplianceController extends Controller
                 'requirement_id' => $requirementId,
             ],
             'can' => [
+                'export' => ComplianceExportDataset::Staff->allows($user),
                 'manage' => $user->canDo('hr.compliance.manage'),
                 // .view gates the "View vetting/drivers" nav links in the row menu.
                 'vetting' => $user->canDo('hr.vetting.view'),

@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 
 import type { PersonOption } from '@/components/hr/people-picker';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { complianceExportHref } from '@/lib/hr/compliance-export';
 import {
     AvatarBubble,
     ComplianceContextMenu,
@@ -95,6 +96,7 @@ interface Props {
     };
     filters: { status: string | null; q: string };
     can: {
+        export: boolean;
         manage: boolean;
         compliance_manage: boolean;
         vetting_manage: boolean;
@@ -132,6 +134,7 @@ export default function DriversIndex({
     const [reason, setReason] = useState('');
     const searchRef = useRef<HTMLInputElement>(null);
     const { ctx, open: openCtx, close: closeCtx } = useContextMenu();
+    const exportHref = complianceExportHref('drivers', can.export);
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -210,6 +213,7 @@ export default function DriversIndex({
                     hero={hero}
                     active="drivers"
                     can={{
+                        export: can.export,
                         manage: can.compliance_manage,
                         vetting: can.vetting_manage,
                         driver: can.manage,
@@ -256,15 +260,16 @@ export default function DriversIndex({
                         shift-eligibility hard-stop
                     </p>
                     <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                (window.location.href =
-                                    '/hr/compliance/export?dataset=drivers')
-                            }
-                        >
-                            <Download className="h-4 w-4" /> Export
-                        </Button>
+                        {exportHref && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    (window.location.href = exportHref)
+                                }
+                            >
+                                <Download className="h-4 w-4" /> Export
+                            </Button>
+                        )}
                         {can.manage && (
                             <Button onClick={() => setWz({ type: 'driver' })}>
                                 <Plus className="h-4 w-4" /> Add driver

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Http\Controllers\Controller;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,8 +21,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ComplianceExportController extends Controller
 {
-    private const DATASETS = ['staff', 'vetting', 'drivers', 'renewals'];
-
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly ComplianceMatrixService $complianceMatrix,
@@ -32,30 +32,23 @@ class ComplianceExportController extends Controller
         abort_unless($user, 403);
 
         $validated = $request->validate([
-            'dataset' => ['required', 'string', Rule::in(self::DATASETS)],
+            'dataset' => ['required', Rule::enum(ComplianceExportDataset::class)],
             'format' => ['nullable', 'string', Rule::in(['csv'])],
         ]);
 
-        $dataset = $validated['dataset'];
+        $dataset = ComplianceExportDataset::from($validated['dataset']);
+        abort_unless($dataset->allows($user), 403);
 
-        // Per-dataset permission gate.
-        $perm = match ($dataset) {
-            'vetting' => 'hr.vetting.view',
-            'drivers' => 'hr.driver.view',
-            default => 'hr.compliance.view',
-        };
-        abort_unless($user->canDo($perm), 403);
-
-        $filename = "compliance-{$dataset}-".date('Y-m-d').'.csv';
+        $filename = "compliance-{$dataset->value}-".date('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($dataset, $user) {
             $out = fopen('php://output', 'w');
 
             match ($dataset) {
-                'staff' => $this->streamStaff($out, $user),
-                'vetting' => $this->streamVetting($out, $user),
-                'drivers' => $this->streamDrivers($out, $user),
-                'renewals' => $this->streamRenewals($out, $user),
+                ComplianceExportDataset::Staff => $this->streamStaff($out, $user),
+                ComplianceExportDataset::Vetting => $this->streamVetting($out, $user),
+                ComplianceExportDataset::Drivers => $this->streamDrivers($out, $user),
+                ComplianceExportDataset::Renewals => $this->streamRenewals($out, $user),
             };
 
             fclose($out);
@@ -152,7 +145,7 @@ class ComplianceExportController extends Controller
 
         $staff = User::query()
             ->with(['roles:id,name', 'complianceStatuses']);
-        $this->siteAccess->applyStaffScope($staff, $viewer);
+        $this->siteAccess->applyHrEmployeeStaffScope($staff, $viewer);
         $staff->orderBy('users.id')
             ->chunkById(200, function ($users) use ($out): void {
                 $snapshots = $this->complianceMatrix->snapshotsForUsers($users);
@@ -174,7 +167,7 @@ class ComplianceExportController extends Controller
             }, 'users.id', 'id');
 
         StaffBackgroundCheck::query()
-            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
+            ->whereIn('user_id', $this->visibleRenewalStaffIds($viewer))
             ->whereNotNull('expires_at')
             ->with('user:id,name')
             ->orderBy('expires_at')
@@ -191,15 +184,35 @@ class ComplianceExportController extends Controller
             });
 
         HrDriverEligibility::query()
-            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
+            ->whereIn('user_id', $this->visibleRenewalStaffIds($viewer))
             ->whereNotNull('licence_expires_at')
             ->with('user:id,name')
             ->orderBy('licence_expires_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    $this->putCsv($out, ['Driver', $r->user?->name ?? '', 'Class '.$r->licence_class.' licence', optional($r->licence_expires_at)->toDateString(), $r->status]);
+                    $this->putCsv($out, [
+                        'Driver',
+                        $r->user?->name ?? '',
+                        'Driver licence',
+                        optional($r->licence_expires_at)->toDateString(),
+                        $this->renewalTimingStatus($r->licence_expires_at),
+                    ]);
                 }
             });
+    }
+
+    private function renewalTimingStatus(CarbonInterface $dueDate): string
+    {
+        return $dueDate->isBefore(today()) ? 'overdue' : 'upcoming';
+    }
+
+    /** @return Builder<User> */
+    private function visibleRenewalStaffIds(User $viewer): Builder
+    {
+        $query = User::query()->select('id');
+        $this->siteAccess->applyHrEmployeeStaffScope($query, $viewer);
+
+        return $query;
     }
 
     /** @return Builder<User> */

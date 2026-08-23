@@ -8,6 +8,7 @@ import {
     ComplianceTabs,
     type ComplianceTab,
 } from '@/components/hr/compliance-tabs';
+import { complianceExportHref } from '@/lib/hr/compliance-export';
 import { ComplianceHubHero, type HeroChip } from './compliance-hero';
 import type { WizardType } from './compliance-wizards';
 
@@ -51,7 +52,12 @@ export function ComplianceHubHeader({
     hero: HeroPayload;
     active: ComplianceTab;
     counts?: Partial<Record<ComplianceTab, number>>;
-    can: { manage?: boolean; vetting?: boolean; driver?: boolean };
+    can: {
+        export?: boolean;
+        manage?: boolean;
+        vetting?: boolean;
+        driver?: boolean;
+    };
     onWizard: (type: WizardType) => void;
 }) {
     const s = hero.summary;
@@ -59,6 +65,7 @@ export function ComplianceHubHeader({
         s.total_staff > 0
             ? Math.round((s.fully_compliant / s.total_staff) * 100)
             : 0;
+    const exportHref = complianceExportHref(active, can.export === true);
 
     const stats = [
         {
@@ -129,11 +136,17 @@ export function ComplianceHubHeader({
                   },
               ]
             : []),
-        {
-            icon: Download,
-            label: 'Export',
-            onClick: () => go('/hr/compliance/export?dataset=staff'),
-        },
+        ...(exportHref
+            ? [
+                  {
+                      icon: Download,
+                      label: 'Export',
+                      onClick: () => {
+                          window.location.href = exportHref;
+                      },
+                  },
+              ]
+            : []),
     ];
 
     const needs = hero.needs.map((n) => ({

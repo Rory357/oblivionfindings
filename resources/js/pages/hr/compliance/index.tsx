@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import type { PersonOption } from '@/components/hr/people-picker';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { complianceExportHref } from '@/lib/hr/compliance-export';
 import {
     AvatarBubble,
     ComplianceContextMenu,
@@ -104,6 +105,7 @@ interface Props {
         requirement_id: string | null;
     };
     can: {
+        export: boolean;
         manage: boolean;
         vetting: boolean;
         driver: boolean;
@@ -136,6 +138,7 @@ export default function ComplianceOverview({
         summary.total_staff > 0
             ? Math.round((summary.fully_compliant / summary.total_staff) * 100)
             : 0;
+    const exportHref = complianceExportHref('overview', can.export);
     const selectedIds = Object.keys(selected)
         .filter((k) => selected[Number(k)])
         .map(Number);
@@ -253,7 +256,15 @@ export default function ComplianceOverview({
                   },
               ]
             : []),
-        { icon: Download, label: 'Export', onClick: () => exportStaff() },
+        ...(exportHref
+            ? [
+                  {
+                      icon: Download,
+                      label: 'Export',
+                      onClick: () => (window.location.href = exportHref),
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -265,6 +276,7 @@ export default function ComplianceOverview({
                     active="overview"
                     counts={{ matrix: wizard.requirements.length || undefined }}
                     can={{
+                        export: can.export,
                         manage: can.manage,
                         vetting: can.vetting_manage,
                         driver: can.driver_manage,
@@ -426,9 +438,15 @@ export default function ComplianceOverview({
                                     </BulkBtn>
                                 </>
                             )}
-                            <BulkBtn onClick={() => exportStaff()}>
-                                Export
-                            </BulkBtn>
+                            {exportHref && (
+                                <BulkBtn
+                                    onClick={() =>
+                                        (window.location.href = exportHref)
+                                    }
+                                >
+                                    Export
+                                </BulkBtn>
+                            )}
                         </div>
                         <GuardrailButton
                             unstyled
@@ -602,10 +620,6 @@ export default function ComplianceOverview({
             />
         </AppLayout>
     );
-}
-
-function exportStaff() {
-    window.location.href = '/hr/compliance/export?dataset=staff';
 }
 
 function cleanFilters(filters: Props['filters']): Record<string, string> {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Models\HrComplianceRenewalSnooze;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
@@ -108,6 +109,7 @@ class ComplianceCalendarController extends Controller
                 'type' => $filterType,
             ],
             'can' => [
+                'export' => ComplianceExportDataset::Renewals->allows($user),
                 'manage' => $user->canDo('hr.compliance.manage'),
                 // Real perms for the shared hub header's cross-domain create actions.
                 'vetting_manage' => $user->canDo('hr.vetting.manage'),

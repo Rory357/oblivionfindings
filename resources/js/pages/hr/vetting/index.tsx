@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 
 import type { PersonOption } from '@/components/hr/people-picker';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { complianceExportHref } from '@/lib/hr/compliance-export';
 import {
     AvatarBubble,
     ComplianceContextMenu,
@@ -84,6 +85,7 @@ interface Props {
     };
     filters: { status: string | null; q: string };
     can: {
+        export: boolean;
         manage: boolean;
         compliance_manage: boolean;
         driver_manage: boolean;
@@ -135,6 +137,7 @@ export default function VettingIndex({
     const [search, setSearch] = useState(filters.q ?? '');
     const searchRef = useRef<HTMLInputElement>(null);
     const { ctx, open: openCtx, close: closeCtx } = useContextMenu();
+    const exportHref = complianceExportHref('vetting', can.export);
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -219,6 +222,7 @@ export default function VettingIndex({
                     hero={hero}
                     active="vetting"
                     can={{
+                        export: can.export,
                         manage: can.compliance_manage,
                         vetting: can.manage,
                         driver: can.driver_manage,
@@ -265,15 +269,16 @@ export default function VettingIndex({
                         safety checks
                     </p>
                     <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                (window.location.href =
-                                    '/hr/compliance/export?dataset=vetting')
-                            }
-                        >
-                            <Download className="h-4 w-4" /> Export
-                        </Button>
+                        {exportHref && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    (window.location.href = exportHref)
+                                }
+                            >
+                                <Download className="h-4 w-4" /> Export
+                            </Button>
+                        )}
                         {can.manage && (
                             <Button onClick={() => setWz({ type: 'vetting' })}>
                                 <Plus className="h-4 w-4" /> Add vetting check

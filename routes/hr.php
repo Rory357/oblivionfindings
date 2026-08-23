@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Http\Controllers\Hr\AnalyticsDashboardController;
 use App\Http\Controllers\Hr\AnnouncementController;
 use App\Http\Controllers\Hr\ApprovalController;
@@ -290,10 +291,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Compliance
     |--------------------------------------------------------------------------
     */
+    Route::get('/compliance/export', [ComplianceExportController::class, 'export'])
+        ->middleware('permission:'.ComplianceExportDataset::routePermissionEnvelope())
+        ->name('compliance.export');
+
     Route::middleware('permission:hr.compliance.view')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
-        Route::get('/compliance/export', [ComplianceExportController::class, 'export'])->name('compliance.export');
         Route::get('/compliance/staff/{staff}', [ComplianceController::class, 'staffDetail'])
             ->whereNumber('staff')->name('compliance.staff');
         Route::get('/compliance/staff/{invalidStaff}', [ComplianceController::class, 'concealInvalidStaff'])

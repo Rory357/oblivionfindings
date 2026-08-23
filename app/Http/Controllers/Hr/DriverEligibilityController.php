@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Enums\ComplianceExportDataset;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\ComplianceMatrixService;
@@ -90,6 +91,7 @@ class DriverEligibilityController extends Controller
                 'q' => $search,
             ],
             'can' => [
+                'export' => ComplianceExportDataset::Drivers->allows($user),
                 'manage' => $user->canDo('hr.driver.manage'),
                 // The shared hub header offers cross-domain create actions;
                 // gate each on the real manage perm so it isn't advertised to

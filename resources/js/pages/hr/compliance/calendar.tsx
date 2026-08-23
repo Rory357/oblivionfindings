@@ -64,7 +64,12 @@ interface Props {
         siteTypes: string[];
     };
     filters: { type: string };
-    can: { manage: boolean; vetting_manage: boolean; driver_manage: boolean };
+    can: {
+        export: boolean;
+        manage: boolean;
+        vetting_manage: boolean;
+        driver_manage: boolean;
+    };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -196,6 +201,7 @@ export default function ComplianceRenewals({
                     hero={hero}
                     active="calendar"
                     can={{
+                        export: can.export,
                         manage: can.manage,
                         vetting: can.vetting_manage,
                         driver: can.driver_manage,
