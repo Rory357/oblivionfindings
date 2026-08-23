@@ -579,6 +579,10 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame(15, $device->meta['battery_level']);
         $this->assertSame('low', $device->meta['battery_status']);
         $this->assertSame('not_charging', $device->meta['charging_status']);
+        $this->assertSame(15, $device->provider_observed_state['battery_level']['value']);
+        $this->assertSame('queclink', $device->provider_observed_state['battery_level']['source']);
+        $this->assertSame('runtime_telemetry', $device->provider_observed_state['battery_level']['quality']);
+        $this->assertNotNull($device->provider_observed_state['battery_level']['observed_at']);
 
         $this->assertDatabaseHas('fleet_telemetry_events', [
             'asset_id' => $asset->id,

@@ -33,6 +33,16 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 type FilterOption = { value: string; label: string };
 type DeviceTaxonomy = Record<string, Record<string, Record<string, string>>>;
 
+type DeviceFieldOwnership = {
+    provider_managed: boolean;
+    provider_fields: string[];
+    conflicts: string[];
+    active_overrides: Record<
+        string,
+        { reason: string; expires_at: string; value: unknown }
+    >;
+};
+
 type DeviceFormOptions = {
     taxonomy: DeviceTaxonomy;
     domains: FilterOption[];
@@ -58,6 +68,7 @@ type EditableDevice = {
     provider: string | null;
     location_description: string | null;
     notes: string | null;
+    field_ownership?: DeviceFieldOwnership;
 };
 
 type AddDeviceForm = {
@@ -77,6 +88,8 @@ type AddDeviceForm = {
     provider: string;
     location_description: string;
     notes: string;
+    override_reason: string;
+    override_expires_at: string;
     site_id: number | null;
     _modal: boolean;
 };
@@ -143,6 +156,8 @@ function emptyForm(
         provider: '',
         location_description: '',
         notes: '',
+        override_reason: '',
+        override_expires_at: '',
         site_id: prefillSiteId,
         _modal: true,
     };
@@ -166,6 +181,8 @@ function formFromDevice(device: Partial<EditableDevice>): AddDeviceForm {
         provider: device.provider ?? '',
         location_description: device.location_description ?? '',
         notes: device.notes ?? '',
+        override_reason: '',
+        override_expires_at: '',
         site_id: null,
         _modal: true,
     };
@@ -452,6 +469,38 @@ export function AddDeviceDialog({
     const basicsComplete = Boolean(
         data.name.trim() && data.domain && data.category,
     );
+    const providerManaged = Boolean(
+        mode === 'edit' && options?.device?.field_ownership?.provider_managed,
+    );
+    const providerFieldsChanged = useMemo(() => {
+        if (!providerManaged || !options?.device) return false;
+
+        const editableProviderFields: Array<keyof AddDeviceForm> = [
+            'manufacturer',
+            'model',
+            'serial_number',
+            'mac_address',
+            'imei',
+            'firmware_version',
+            'ip_address',
+            'status',
+        ];
+
+        return editableProviderFields.some((field) => {
+            const current = data[field] ?? '';
+            const original =
+                (options.device?.[field as keyof EditableDevice] as
+                    | string
+                    | null
+                    | undefined) ?? '';
+
+            return current !== original;
+        });
+    }, [data, options?.device, providerManaged]);
+    const overrideComplete = Boolean(
+        !providerFieldsChanged ||
+        (data.override_reason.trim().length >= 10 && data.override_expires_at),
+    );
 
     return (
         <WizardShell
@@ -502,7 +551,12 @@ export function AddDeviceDialog({
                     <Button
                         type="button"
                         onClick={submit}
-                        disabled={!basicsComplete || processing || !options}
+                        disabled={
+                            !basicsComplete ||
+                            !overrideComplete ||
+                            processing ||
+                            !options
+                        }
                     >
                         {processing ? (
                             <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -802,6 +856,31 @@ export function AddDeviceDialog({
                             </div>
                         </div>
                     ) : null}
+                    {providerManaged ? (
+                        <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning">
+                            <p className="font-medium">
+                                Provider-observed fields stay independently
+                                recorded
+                            </p>
+                            <p className="mt-1 text-xs leading-5">
+                                Changing manufacturer, model, hardware IDs,
+                                firmware, IP address or status creates a
+                                temporary governed override. Provider linkage
+                                remains integration-owned. Later observations
+                                remain visible and resume when the override
+                                expires.
+                            </p>
+                            {options?.device?.field_ownership?.conflicts
+                                .length ? (
+                                <p className="mt-2 text-xs font-medium">
+                                    Active conflicts:{' '}
+                                    {options.device.field_ownership.conflicts
+                                        .map(humanise)
+                                        .join(', ')}
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <div className="grid gap-4 sm:grid-cols-2">
                         <TextField
                             id="device-provider"
@@ -809,6 +888,7 @@ export function AddDeviceDialog({
                             value={data.provider}
                             error={errors.provider}
                             placeholder="e.g. UniFi, Queclink or manual"
+                            disabled={providerManaged}
                             onChange={(value) => setData('provider', value)}
                         />
                         <TextField
@@ -854,6 +934,48 @@ export function AddDeviceDialog({
                                 placeholder="Operational notes only—never credentials or secrets."
                             />
                         </FormField>
+                        {providerManaged && providerFieldsChanged ? (
+                            <>
+                                <FormField
+                                    id="device-override-reason"
+                                    label="Override reason"
+                                    error={errors.override_reason}
+                                    required
+                                >
+                                    <textarea
+                                        id="device-override-reason"
+                                        rows={3}
+                                        value={data.override_reason}
+                                        onChange={(event) =>
+                                            setData(
+                                                'override_reason',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Explain the operational need for this temporary value"
+                                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    />
+                                </FormField>
+                                <FormField
+                                    id="device-override-expires-at"
+                                    label="Override expires"
+                                    error={errors.override_expires_at}
+                                    required
+                                >
+                                    <Input
+                                        id="device-override-expires-at"
+                                        type="datetime-local"
+                                        value={data.override_expires_at}
+                                        onChange={(event) =>
+                                            setData(
+                                                'override_expires_at',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormField>
+                            </>
+                        ) : null}
                     </div>
                 </WizardStepPane>
             ) : (
@@ -1000,6 +1122,7 @@ function TextField({
     value,
     error,
     placeholder,
+    disabled,
     onChange,
 }: {
     id: string;
@@ -1007,6 +1130,7 @@ function TextField({
     value: string;
     error?: string;
     placeholder?: string;
+    disabled?: boolean;
     onChange: (value: string) => void;
 }) {
     return (
@@ -1015,6 +1139,7 @@ function TextField({
                 id={id}
                 value={value}
                 placeholder={placeholder}
+                disabled={disabled}
                 onChange={(event) => onChange(event.target.value)}
             />
         </FormField>

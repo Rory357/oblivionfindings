@@ -47,6 +47,19 @@ class DeviceRegistryServiceTest extends TestCase
         ], $site->id, $actor->id);
 
         $this->assertSame(1, $device->assignments()->count());
+        $this->assertSame(
+            'native_discovery',
+            data_get($device->provider_observed_state, 'provider.value'),
+        );
+        $this->assertSame(
+            'reviewed_discovery',
+            data_get($device->provider_observed_state, 'provider.quality'),
+        );
+        $this->assertSame(
+            'Discovered core switch',
+            data_get($device->local_intended_state, 'name.value'),
+        );
+        $this->assertNull(data_get($device->local_intended_state, 'provider'));
         $this->assertDatabaseHas('device_assignments', [
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,

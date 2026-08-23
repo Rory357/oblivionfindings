@@ -77,6 +77,9 @@ class Device extends Model
         'external_ref',
         'config',
         'meta',
+        'local_intended_state',
+        'provider_observed_state',
+        'provider_field_overrides',
         'latitude',
         'longitude',
         'location_description',
@@ -101,6 +104,15 @@ class Device extends Model
         'external_ref' => 'array',
         'config' => 'array',
         'meta' => 'array',
+        'local_intended_state' => 'array',
+        'provider_observed_state' => 'array',
+        'provider_field_overrides' => 'array',
+    ];
+
+    protected $hidden = [
+        'local_intended_state',
+        'provider_observed_state',
+        'provider_field_overrides',
     ];
 
     protected static function booted(): void

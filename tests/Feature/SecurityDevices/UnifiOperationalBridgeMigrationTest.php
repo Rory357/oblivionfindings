@@ -79,6 +79,10 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame('wireless_ap', $device->subcategory);
         $this->assertSame('Ubiquiti', $device->manufacturer);
         $this->assertSame('unifi-ap-1', $device->external_ref['provider_entity_id']);
+        $this->assertSame('UNIFI-001', data_get($device->provider_observed_state, 'serial_number.value'));
+        $this->assertSame('unifi', data_get($device->provider_observed_state, 'serial_number.source'));
+        $this->assertSame('authoritative_provider', data_get($device->provider_observed_state, 'serial_number.quality'));
+        $this->assertNotNull(data_get($device->provider_observed_state, 'serial_number.observed_at'));
         $this->assertSame(DeviceStatus::Active, $device->status);
         $this->assertSame(HealthStatus::Healthy, $device->health_status);
 

@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\LocationHardware;
 use App\Models\Site;
@@ -29,6 +30,7 @@ class UnifiOperationalBridgeService
 
     public function __construct(
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
     ) {}
 
     /**
@@ -59,14 +61,12 @@ class UnifiOperationalBridgeService
         $device = $this->findCanonicalDevice($siteConfig, $providerEntityId, $payload) ?? new Device;
         $created = ! $device->exists;
 
-        $externalRef = is_array($device->external_ref) ? $device->external_ref : [];
-        $meta = is_array($device->meta) ? $device->meta : [];
         $productLine = strtolower((string) ($payload['productLine'] ?? ''));
         $isNetworkDevice = $productLine === 'network'
             || ($domain === 'it_infrastructure' && $category === 'network');
         $sourceApp = $productLine !== '' ? $productLine : ($isNetworkDevice ? 'network' : null);
 
-        $device->fill([
+        $observed = array_filter([
             'name' => $this->resolveDeviceName($payload),
             'domain' => $domain,
             'category' => $category,
@@ -79,29 +79,34 @@ class UnifiOperationalBridgeService
             'ip_address' => $payload['ip'] ?? null,
             'status' => $status,
             'health_status' => $this->mapHealthStatus($status),
-            'last_seen_at' => $lastSeenAt ?? $device->last_seen_at,
+            'last_seen_at' => $lastSeenAt,
             'provider' => 'unifi',
-            'external_ref' => array_merge($externalRef, [
-                'provider' => 'unifi',
-                'provider_entity_id' => $providerEntityId,
-                'provider_type' => $payload['shortname'] ?? $payload['productLine'] ?? null,
-                'model' => $payload['model'] ?? null,
-                'firmware' => $payload['version'] ?? $payload['firmware_version'] ?? null,
-                'ip' => $payload['ip'] ?? null,
-                'source_app' => $sourceApp,
-                'host_id' => $payload['_resolved_host_id'] ?? null,
-            ]),
-            'meta' => array_merge($meta, [
-                'provider_type' => $payload['shortname'] ?? null,
-                'model_long' => $payload['model'] ?? $payload['model_long_name'] ?? null,
-                'product_line' => $productLine !== '' ? $productLine : null,
-                'firmware_status' => $payload['firmwareStatus'] ?? null,
-                'uptime' => $payload['uptime'] ?? null,
-                'experience_score' => $payload['satisfaction'] ?? null,
-                'host_id' => $payload['_resolved_host_id'] ?? null,
-            ]),
-        ]);
-        $device->save();
+        ], fn (mixed $value): bool => $value !== null && $value !== '');
+
+        $device = $this->fieldOwnership->applyProviderObservation(
+            $device,
+            'unifi',
+            $observed,
+            $lastSeenAt,
+            providerAttributes: [
+                'external_ref' => [
+                    'provider' => 'unifi',
+                    'provider_entity_id' => $providerEntityId,
+                    'provider_type' => $payload['shortname'] ?? $payload['productLine'] ?? null,
+                    'source_app' => $sourceApp,
+                    'host_id' => $payload['_resolved_host_id'] ?? null,
+                ],
+                'meta' => [
+                    'provider_type' => $payload['shortname'] ?? null,
+                    'model_long' => $payload['model'] ?? $payload['model_long_name'] ?? null,
+                    'product_line' => $productLine !== '' ? $productLine : null,
+                    'firmware_status' => $payload['firmwareStatus'] ?? null,
+                    'uptime' => $payload['uptime'] ?? null,
+                    'experience_score' => $payload['satisfaction'] ?? null,
+                    'host_id' => $payload['_resolved_host_id'] ?? null,
+                ],
+            ],
+        );
 
         $assignment = $this->ensureInventoryPlacement($device, $siteConfig->site_id);
         $roomId = $assignment->assignable_type === DeviceAssignment::TARGET_ROOM ? $assignment->assignable_id : null;
@@ -359,12 +364,17 @@ class UnifiOperationalBridgeService
 
         if ($device) {
             $status = $this->mapCanonicalStatus($entry['status'] ?? null);
-            $device->fill([
+            $observed = array_filter([
                 'status' => $status,
                 'health_status' => $this->mapHealthStatus($status),
-                'last_seen_at' => $lastSeenAt ?? $device->last_seen_at,
-            ]);
-            $device->save();
+                'last_seen_at' => $lastSeenAt,
+            ], fn (mixed $value): bool => $value !== null && $value !== '');
+            $this->fieldOwnership->applyProviderObservation(
+                $device,
+                'unifi',
+                $observed,
+                $lastSeenAt,
+            );
         }
 
         return $device !== null;

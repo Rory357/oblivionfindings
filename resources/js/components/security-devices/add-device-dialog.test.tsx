@@ -193,4 +193,59 @@ describe('AddDeviceDialog', () => {
             expect.objectContaining({ credentials: 'same-origin' }),
         );
     });
+
+    it('explains provider ownership and requires expiry evidence for changed observed fields', async () => {
+        vi.mocked(fetch).mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 42,
+                    name: 'Main entrance camera',
+                    domain: 'security',
+                    category: 'cctv',
+                    subcategory: 'dome_camera',
+                    status: 'active',
+                    provider: 'unifi',
+                    firmware_version: '1.0.0',
+                    field_ownership: {
+                        provider_managed: true,
+                        provider_fields: ['firmware_version'],
+                        active_overrides: {},
+                        conflicts: ['serial_number'],
+                    },
+                },
+            }),
+        } as Response);
+
+        render(<EditDeviceDialog open onClose={vi.fn()} deviceId={42} />);
+        expect(
+            await screen.findByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Main entrance camera');
+
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+        expect(
+            screen.getByText(
+                'Provider-observed fields stay independently recorded',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/Active conflicts: Serial Number/),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('textbox', { name: 'Provider' }),
+        ).toBeDisabled();
+
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'Firmware version' }),
+            { target: { value: '2.0.0' } },
+        );
+
+        expect(
+            screen.getByRole('textbox', { name: /Override reason/ }),
+        ).toBeVisible();
+        expect(screen.getByLabelText(/Override expires/)).toBeVisible();
+    });
 });

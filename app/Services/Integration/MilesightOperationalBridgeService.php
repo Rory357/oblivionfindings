@@ -12,6 +12,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\SiteRoom;
 use Illuminate\Database\QueryException;
@@ -31,6 +32,7 @@ final class MilesightOperationalBridgeService
 
     public function __construct(
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
     ) {}
 
     /**
@@ -63,9 +65,6 @@ final class MilesightOperationalBridgeService
         if ($applicationId !== null && Str::length($applicationId) > 255) {
             throw new \InvalidArgumentException('Milesight application identity is invalid.');
         }
-        $externalRef = is_array($device->external_ref) ? $device->external_ref : [];
-        $meta = is_array($device->meta) ? $device->meta : [];
-
         DB::transaction(function () use (
             $device,
             $siteConfig,
@@ -79,42 +78,48 @@ final class MilesightOperationalBridgeService
             $battery,
             $applicationId,
             $applicationName,
-            $externalRef,
-            $meta,
         ): void {
-            $device->fill([
+            $observed = array_filter([
                 'name' => $this->deviceName($payload, $providerEntityId),
                 'domain' => $domain,
                 'category' => $category,
                 'subcategory' => $subcategory,
                 'manufacturer' => 'Milesight',
-                'model' => $this->bounded($payload['model'] ?? null) ?? $device->model,
-                'serial_number' => $this->bounded($payload['sn'] ?? null) ?? $device->serial_number,
-                'mac_address' => $this->bounded($payload['mac'] ?? $payload['wlanMac'] ?? null) ?? $device->mac_address,
-                'imei' => $this->bounded($payload['imei'] ?? null) ?? $device->imei,
-                'firmware_version' => $this->bounded($payload['firmwareVersion'] ?? null) ?? $device->firmware_version,
+                'model' => $this->bounded($payload['model'] ?? null),
+                'serial_number' => $this->bounded($payload['sn'] ?? null),
+                'mac_address' => $this->bounded($payload['mac'] ?? $payload['wlanMac'] ?? null),
+                'imei' => $this->bounded($payload['imei'] ?? null),
+                'firmware_version' => $this->bounded($payload['firmwareVersion'] ?? null),
                 'status' => $status,
                 'health_status' => $this->health($status),
-                'last_seen_at' => $lastSeenAt ?? $device->last_seen_at,
-                'battery_level' => $battery ?? $device->battery_level,
-                'battery_updated_at' => $battery !== null ? ($lastSeenAt ?? now()) : $device->battery_updated_at,
+                'last_seen_at' => $lastSeenAt,
+                'battery_level' => $battery,
+                'battery_updated_at' => $battery !== null ? ($lastSeenAt ?? now()) : null,
                 'provider' => 'milesight',
-                'external_ref' => array_merge($externalRef, [
-                    'provider' => 'milesight',
-                    'provider_entity_id' => $providerEntityId,
-                    'provider_type' => $this->bounded($payload['deviceType'] ?? null),
-                    'application_id' => $applicationId,
-                ]),
-                'meta' => array_merge($meta, [
-                    'application_name' => $applicationName,
-                    'hardware_version' => $this->bounded($payload['hardwareVersion'] ?? null),
-                    'license_status' => $this->bounded($payload['licenseStatus'] ?? null),
-                ]),
-            ]);
-            $device->save();
+            ], fn (mixed $value): bool => $value !== null && $value !== '');
 
-            $this->ensureSitePlacement($device, (int) $siteConfig->site_id);
-            $this->ensureProviderMonitor($device, $providerEntityId);
+            $canonical = $this->fieldOwnership->applyProviderObservation(
+                $device,
+                'milesight',
+                $observed,
+                $lastSeenAt,
+                providerAttributes: [
+                    'external_ref' => [
+                        'provider' => 'milesight',
+                        'provider_entity_id' => $providerEntityId,
+                        'provider_type' => $this->bounded($payload['deviceType'] ?? null),
+                        'application_id' => $applicationId,
+                    ],
+                    'meta' => [
+                        'application_name' => $applicationName,
+                        'hardware_version' => $this->bounded($payload['hardwareVersion'] ?? null),
+                        'license_status' => $this->bounded($payload['licenseStatus'] ?? null),
+                    ],
+                ],
+            );
+
+            $this->ensureSitePlacement($canonical, (int) $siteConfig->site_id);
+            $this->ensureProviderMonitor($canonical, $providerEntityId);
         });
 
         return ['device' => $device->fresh(), 'created' => $created];

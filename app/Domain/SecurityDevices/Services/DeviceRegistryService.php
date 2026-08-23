@@ -26,6 +26,7 @@ class DeviceRegistryService
         private readonly DeviceAssignmentService $deviceAssignments,
         private readonly DeviceLinkService $deviceLinks,
         private readonly NativeMonitoringDefinitionService $monitoringDefinitions,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
     ) {}
 
     /** Base query for the single application registry. */
@@ -59,6 +60,7 @@ class DeviceRegistryService
                 ...$attributes,
                 'created_by_user_id' => $actor->id,
             ]);
+            $device = $this->fieldOwnership->recordLocalRegistration($device, $attributes, $actor);
 
             if ($site !== null) {
                 $this->deviceAssignments->assign(
@@ -117,6 +119,50 @@ class DeviceRegistryService
 
         return DB::transaction(function () use ($allowed, $site, $actor): Device {
             $device = Device::query()->create($allowed);
+            $provider = strtolower(trim((string) ($allowed['provider'] ?? '')));
+            if ($provider !== '' && ! in_array($provider, ['manual', 'local'], true)) {
+                $device = $this->fieldOwnership->recordLocalRegistration(
+                    $device,
+                    array_intersect_key($allowed, array_flip([
+                        'name',
+                        'domain',
+                        'category',
+                        'subcategory',
+                    ])),
+                    $actor,
+                );
+                $providerObservation = array_intersect_key($allowed, array_flip([
+                    'name',
+                    'domain',
+                    'category',
+                    'subcategory',
+                    'manufacturer',
+                    'model',
+                    'serial_number',
+                    'mac_address',
+                    'firmware_version',
+                    'ip_address',
+                    'status',
+                    'provider',
+                ]));
+                $providerObservation = array_filter(
+                    $providerObservation,
+                    fn (mixed $value): bool => $value !== null && $value !== '',
+                );
+                $providerAttributes = is_array($allowed['external_ref'] ?? null)
+                    ? ['external_ref' => $allowed['external_ref']]
+                    : [];
+                $device = $this->fieldOwnership->applyProviderObservation(
+                    $device,
+                    $provider,
+                    $providerObservation,
+                    now(),
+                    'reviewed_discovery',
+                    $providerAttributes,
+                );
+            } else {
+                $device = $this->fieldOwnership->recordLocalRegistration($device, $allowed, $actor);
+            }
             $this->deviceAssignments->assign(
                 device: $device,
                 assignableType: DeviceAssignment::TARGET_SITE,

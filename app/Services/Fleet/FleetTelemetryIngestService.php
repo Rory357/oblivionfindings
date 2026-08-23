@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Events\FleetVehiclePositionUpdated;
 use App\Jobs\ReverseGeocodeFleetTelemetryEvent;
 use App\Models\Asset;
@@ -123,6 +124,7 @@ class FleetTelemetryIngestService
         protected FleetDrivingMetricsService $metrics,
         protected FleetDeviceRuntimeService $deviceRuntime,
         protected UserSiteAccessService $siteAccess,
+        protected DeviceFieldOwnershipService $fieldOwnership,
     ) {}
 
     public function ingest(string $vendor, array $payload, ?int $expectedCanonicalDeviceId = null): array
@@ -344,9 +346,10 @@ class FleetTelemetryIngestService
             );
 
             if ($device) {
-                $deviceUpdates = [
+                $providerObserved = [
                     'last_seen_at' => now(),
                 ];
+                $deviceUpdates = [];
 
                 $meta = $device->meta ?? [];
                 $raw = $persistedRawPayload;
@@ -358,21 +361,21 @@ class FleetTelemetryIngestService
                 $frameName = trim((string) ($raw['device_name'] ?? ''));
                 if ($frameName !== '') {
                     if (empty($device->model)) {
-                        $deviceUpdates['model'] = $frameName;
+                        $providerObserved['model'] = $frameName;
                     }
                     if (empty($device->name)) {
-                        $deviceUpdates['name'] = $frameName;
+                        $providerObserved['name'] = $frameName;
                     }
                 } elseif (empty($device->model) && ! empty($device->imei)) {
                     $hint = $this->modelHintFromImei((string) $device->imei);
                     if ($hint !== null) {
-                        $deviceUpdates['model'] = $hint;
+                        $providerObserved['model'] = $hint;
                     }
                 }
 
                 if ($normalized['battery_pct'] !== null) {
-                    $deviceUpdates['battery_level'] = $normalized['battery_pct'];
-                    $deviceUpdates['battery_updated_at'] = now();
+                    $providerObserved['battery_level'] = $normalized['battery_pct'];
+                    $providerObserved['battery_updated_at'] = now();
 
                     $meta['battery'] = $normalized['battery_pct'];
                     $meta['battery_level'] = $normalized['battery_pct'];
@@ -437,6 +440,13 @@ class FleetTelemetryIngestService
 
                 $deviceUpdates['meta'] = $meta;
 
+                $device = $this->fieldOwnership->applyProviderObservation(
+                    $device,
+                    strtolower(trim($vendor)),
+                    $providerObserved,
+                    $occurredAt instanceof Carbon ? $occurredAt : now(),
+                    'runtime_telemetry',
+                );
                 $device->forceFill($deviceUpdates)->save();
             }
 

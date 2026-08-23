@@ -15,6 +15,7 @@ use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\DeviceRelationshipLifecycleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -22,6 +23,7 @@ use App\Models\Asset;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -36,6 +38,7 @@ class DeviceController extends Controller
     public function __construct(
         private readonly DeviceRegistryService $registry,
         private readonly DeviceLinkService $linkService,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
         private readonly DeviceRelationshipLifecycleService $relationshipLifecycle,
         private readonly SecurityDevicesAccessService $access,
         private readonly DeviceProfilePresenter $profilePresenter,
@@ -790,7 +793,13 @@ class DeviceController extends Controller
             'next_service_due' => ['nullable', 'date'],
         ]);
 
-        $device->update($validated);
+        $this->fieldOwnership->updateFromLocal(
+            $device,
+            $validated,
+            $user,
+            null,
+            null,
+        );
 
         return redirect()->back()->with('success', 'Device updated.');
     }
@@ -814,14 +823,33 @@ class DeviceController extends Controller
             'asset_tag' => ['nullable', 'string', 'max:100'],
             'firmware_version' => ['nullable', 'string', 'max:100'],
             'ip_address' => ['nullable', 'string', 'max:45'],
-            'status' => ['nullable', 'string'],
-            'health_status' => ['nullable', 'string'],
+            'status' => ['nullable', Rule::enum(DeviceStatus::class)],
+            'health_status' => ['nullable', Rule::enum(HealthStatus::class)],
             'provider' => ['nullable', 'string', 'max:100'],
             'location_description' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'override_reason' => ['nullable', 'string', 'min:10', 'max:1000'],
+            'override_expires_at' => [
+                'nullable',
+                'date',
+                'after:now',
+                'before_or_equal:'.now()->addYear()->toDateTimeString(),
+            ],
         ]);
 
-        $device->update($validated);
+        $overrideReason = $validated['override_reason'] ?? null;
+        $overrideExpiresAt = filled($validated['override_expires_at'] ?? null)
+            ? CarbonImmutable::parse((string) $validated['override_expires_at'])
+            : null;
+        unset($validated['override_reason'], $validated['override_expires_at']);
+
+        $device = $this->fieldOwnership->updateFromLocal(
+            $device,
+            $validated,
+            $user,
+            $overrideReason,
+            $overrideExpiresAt,
+        );
 
         if ($request->boolean('_modal')) {
             return redirect()->back()
@@ -894,6 +922,7 @@ class DeviceController extends Controller
             'provider' => $d->provider,
             'location_description' => $d->location_description,
             'notes' => $d->notes,
+            'field_ownership' => $this->fieldOwnership->snapshot($d),
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,
         ];

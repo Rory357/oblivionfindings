@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceCustodySiteResolver;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
@@ -69,6 +70,7 @@ class QueclinkHubController extends Controller
         private readonly SecurityDevicesAccessService $devicesAccess,
         private readonly DeviceLinkService $deviceLinks,
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
     ) {}
 
@@ -1663,40 +1665,55 @@ class QueclinkHubController extends Controller
 
         if ($existing) {
             abort_unless($this->devicesAccess->visibleDevices($viewer)->whereKey($existing->id)->exists(), 404);
-            $existing->fill([
+            $observed = array_filter([
                 'imei' => $qd->imei,
-                'device_uid' => $existing->device_uid ?: $qd->imei,
-                'manufacturer' => $existing->manufacturer ?: 'Queclink',
-                'model' => $existing->model ?: $qd->model_hint,
-                'firmware_version' => $existing->firmware_version ?: $qd->firmware_version,
-                'last_seen_at' => $qd->last_seen_at ?: $existing->last_seen_at,
-                'config' => $this->withNativeManagementCapability($existing->config ?? []),
-            ])->save();
+                'manufacturer' => 'Queclink',
+                'model' => $qd->model_hint,
+                'firmware_version' => $qd->firmware_version,
+                'last_seen_at' => $qd->last_seen_at,
+                'provider' => 'queclink',
+            ], fn (mixed $value): bool => $value !== null && $value !== '');
 
-            return $existing;
+            return $this->fieldOwnership->applyProviderObservation(
+                $existing,
+                'queclink',
+                $observed,
+                $qd->last_seen_at,
+                providerAttributes: [
+                    'device_uid' => $existing->device_uid ?: $qd->imei,
+                    'config' => $this->withNativeManagementCapability($existing->config ?? []),
+                ],
+            );
         }
 
-        return Device::create([
-            'device_uid' => $qd->imei,
-            'name' => match ($pairingType) {
-                'vehicle' => "Vehicle tracker {$qd->imei}",
-                'staff' => "Lone-worker tracker {$qd->imei}",
-                'client' => "Care tracker {$qd->imei}",
-            },
-            'domain' => 'tracking',
-            'category' => match ($pairingType) {
-                'vehicle' => 'vehicle_tracker',
-                'staff', 'client' => 'personal_tracker',
-            },
-            'manufacturer' => 'Queclink',
-            'model' => $qd->model_hint,
-            'imei' => $qd->imei,
-            'firmware_version' => $qd->firmware_version,
-            'provider' => 'queclink',
-            'config' => $this->withNativeManagementCapability([]),
-            'status' => 'active',
-            'last_seen_at' => $qd->last_seen_at,
-        ]);
+        return $this->fieldOwnership->applyProviderObservation(
+            new Device,
+            'queclink',
+            [
+                'name' => match ($pairingType) {
+                    'vehicle' => "Vehicle tracker {$qd->imei}",
+                    'staff' => "Lone-worker tracker {$qd->imei}",
+                    'client' => "Care tracker {$qd->imei}",
+                },
+                'domain' => 'tracking',
+                'category' => match ($pairingType) {
+                    'vehicle' => 'vehicle_tracker',
+                    'staff', 'client' => 'personal_tracker',
+                },
+                'manufacturer' => 'Queclink',
+                'model' => $qd->model_hint,
+                'imei' => $qd->imei,
+                'firmware_version' => $qd->firmware_version,
+                'provider' => 'queclink',
+                'status' => 'active',
+                'last_seen_at' => $qd->last_seen_at,
+            ],
+            $qd->last_seen_at,
+            providerAttributes: [
+                'device_uid' => $qd->imei,
+                'config' => $this->withNativeManagementCapability([]),
+            ],
+        );
     }
 
     /** @param array<string, mixed> $config @return array<string, mixed> */

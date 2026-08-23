@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
@@ -109,19 +110,27 @@ class FleetDeviceRuntimeService
 
             if ($device) {
                 $device = Device::query()->lockForUpdate()->findOrFail($device->id);
-                $device->fill([
-                    'legacy_asset_tracker_id' => $device->legacy_asset_tracker_id ?: $lockedTracker->id,
-                    'provider' => $device->provider ?: $lockedTracker->vendor,
-                    'manufacturer' => $device->manufacturer ?: $lockedTracker->vendor,
-                    'imei' => $device->imei ?: $lockedTracker->imei,
-                    'serial_number' => $device->serial_number ?: $lockedTracker->serial_number,
-                    'last_seen_at' => $lockedTracker->last_seen_at ?: $device->last_seen_at,
-                    'external_ref' => $device->external_ref ?: $lockedTracker->vendor_metadata,
-                ]);
-                $device->save();
+                $observed = array_filter([
+                    'provider' => $lockedTracker->vendor,
+                    'manufacturer' => $lockedTracker->vendor,
+                    'imei' => $lockedTracker->imei,
+                    'serial_number' => $lockedTracker->serial_number,
+                    'last_seen_at' => $lockedTracker->last_seen_at,
+                    'status' => $this->mapTrackerStatus($lockedTracker->status),
+                ], fn (mixed $value): bool => $value !== null && $value !== '');
+                $device = $this->fieldOwnership()->applyProviderObservation(
+                    $device,
+                    strtolower(trim((string) $lockedTracker->vendor)),
+                    $observed,
+                    $lockedTracker->last_seen_at,
+                    providerAttributes: [
+                        'device_uid' => $device->device_uid ?: $lockedTracker->device_uid,
+                        'external_ref' => $this->minimumProviderReference($lockedTracker),
+                        'legacy_asset_tracker_id' => $device->legacy_asset_tracker_id ?: $lockedTracker->id,
+                    ],
+                );
             } else {
-                $device = Device::create([
-                    'device_uid' => $lockedTracker->device_uid,
+                $observed = array_filter([
                     'name' => "Tracker {$lockedTracker->device_uid}",
                     'domain' => 'tracking',
                     'category' => 'vehicle_tracker',
@@ -132,9 +141,18 @@ class FleetDeviceRuntimeService
                     'status' => $this->mapTrackerStatus($lockedTracker->status),
                     'last_seen_at' => $lockedTracker->last_seen_at,
                     'provider' => $lockedTracker->vendor,
-                    'external_ref' => $lockedTracker->vendor_metadata,
-                    'legacy_asset_tracker_id' => $lockedTracker->id,
-                ]);
+                ], fn (mixed $value): bool => $value !== null && $value !== '');
+                $device = $this->fieldOwnership()->applyProviderObservation(
+                    new Device,
+                    strtolower(trim((string) $lockedTracker->vendor)),
+                    $observed,
+                    $lockedTracker->last_seen_at,
+                    providerAttributes: [
+                        'device_uid' => $lockedTracker->device_uid,
+                        'external_ref' => $this->minimumProviderReference($lockedTracker),
+                        'legacy_asset_tracker_id' => $lockedTracker->id,
+                    ],
+                );
             }
 
             $this->ensureCanonicalAssetLink($device, $lockedTracker);
@@ -225,6 +243,40 @@ class FleetDeviceRuntimeService
         return Device::query()
             ->where('domain', 'tracking')
             ->where('provider', $vendor);
+    }
+
+    private function fieldOwnership(): DeviceFieldOwnershipService
+    {
+        return app(DeviceFieldOwnershipService::class);
+    }
+
+    /** @return array{provider: string, provider_entity_id?: string} */
+    private function minimumProviderReference(AssetTracker $tracker): array
+    {
+        $metadata = is_array($tracker->vendor_metadata) ? $tracker->vendor_metadata : [];
+        $providerEntityId = null;
+        foreach ([
+            'provider_entity_id',
+            'provider_device_id',
+            'device_id',
+            'external_id',
+            'tracker_id',
+        ] as $key) {
+            if (! is_scalar($metadata[$key] ?? null)) {
+                continue;
+            }
+            $candidate = trim((string) $metadata[$key]);
+            if ($candidate !== '' && mb_strlen($candidate) <= 255) {
+                $providerEntityId = $candidate;
+                break;
+            }
+        }
+        $providerEntityId ??= $this->normalizeIdentifier($tracker->device_uid);
+
+        return array_filter([
+            'provider' => strtolower(trim((string) $tracker->vendor)),
+            'provider_entity_id' => $providerEntityId,
+        ], fn (?string $value): bool => filled($value));
     }
 
     private function ensureCanonicalAssetLink(Device $device, AssetTracker $tracker): void

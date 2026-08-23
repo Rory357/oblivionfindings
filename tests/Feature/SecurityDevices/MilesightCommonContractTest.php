@@ -310,7 +310,8 @@ class MilesightCommonContractTest extends TestCase
         $this->assertSame(0, $result->created);
         $this->assertSame(1, $result->updated);
         $device->refresh();
-        $this->assertSame('Updated sensor', $device->name);
+        $this->assertSame('Existing sensor', $device->name);
+        $this->assertSame('Updated sensor', data_get($device->provider_observed_state, 'name.value'));
         $this->assertSame('Existing model', $device->model);
         $this->assertSame(51, $device->battery_level);
         $this->assertSame('keep', $device->external_ref['migration_reference']);

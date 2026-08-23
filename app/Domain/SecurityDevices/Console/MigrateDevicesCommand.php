@@ -10,12 +10,14 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Models\Client;
 use App\Services\ConsentValidationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * One-time migration command: moves data from legacy hardware tables into the
@@ -65,6 +67,7 @@ class MigrateDevicesCommand extends Command
 
     public function __construct(
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly DeviceFieldOwnershipService $fieldOwnership,
     ) {
         parent::__construct();
     }
@@ -154,6 +157,7 @@ class MigrateDevicesCommand extends Command
 
             DB::transaction(function () use ($deviceData, $row) {
                 $device = Device::create($deviceData);
+                $device = $this->recordImportedProviderState($device, $deviceData);
 
                 $this->devicesCreated++;
 
@@ -256,14 +260,15 @@ class MigrateDevicesCommand extends Command
                 if (! $dryRun) {
                     DB::transaction(function () use ($match, $row) {
                         $updates = [];
+                        $providerObserved = [];
 
                         // Merge health/signal fields if the CR device has newer data.
                         if ($row->last_signal_at && (! $match->last_signal_at || $row->last_signal_at > $match->last_signal_at->toDateTimeString())) {
                             $updates['last_signal_at'] = $row->last_signal_at;
                         }
                         if ($row->battery_level !== null && $match->battery_level === null) {
-                            $updates['battery_level'] = $row->battery_level;
-                            $updates['battery_updated_at'] = $row->battery_updated_at;
+                            $providerObserved['battery_level'] = $row->battery_level;
+                            $providerObserved['battery_updated_at'] = $row->battery_updated_at;
                         }
                         if ($row->latitude && ! $match->latitude) {
                             $updates['latitude'] = $row->latitude;
@@ -275,6 +280,17 @@ class MigrateDevicesCommand extends Command
 
                         if ($updates !== []) {
                             $match->update($updates);
+                        }
+                        if ($providerObserved !== []) {
+                            $match = $this->fieldOwnership->applyProviderObservation(
+                                $match,
+                                strtolower(trim((string) ($row->vendor ?: 'legacy_control_room'))),
+                                $providerObserved,
+                                filled($row->battery_updated_at)
+                                    ? Carbon::parse($row->battery_updated_at)
+                                    : now(),
+                                'legacy_import',
+                            );
                         }
 
                         DB::table('control_room_devices')
@@ -320,6 +336,7 @@ class MigrateDevicesCommand extends Command
 
             DB::transaction(function () use ($deviceData, $row) {
                 $device = Device::create($deviceData);
+                $device = $this->recordImportedProviderState($device, $deviceData);
 
                 DB::table('control_room_devices')
                     ->where('id', $row->id)
@@ -419,10 +436,21 @@ class MigrateDevicesCommand extends Command
             if ($match) {
                 if (! $dryRun) {
                     DB::transaction(function () use ($match, $row) {
-                        $match->update([
-                            'legacy_asset_tracker_id' => $row->id,
-                            'imei' => $match->imei ?: ($row->imei ?: null),
-                        ]);
+                        $observed = $row->imei
+                            ? ['imei' => $row->imei]
+                            : [];
+                        $match = $this->fieldOwnership->applyProviderObservation(
+                            $match,
+                            strtolower(trim((string) $row->vendor)),
+                            $observed,
+                            filled($row->last_seen_at)
+                                ? Carbon::parse($row->last_seen_at)
+                                : now(),
+                            'legacy_import',
+                            [
+                                'legacy_asset_tracker_id' => $row->id,
+                            ],
+                        );
 
                         // Create asset link if not already present.
                         $existingLink = DeviceAssetLink::where('device_id', $match->id)
@@ -464,7 +492,7 @@ class MigrateDevicesCommand extends Command
                 'health_status' => HealthStatus::Unknown->value,
                 'last_seen_at' => $row->last_seen_at,
                 'provider' => $row->vendor,
-                'external_ref' => $row->vendor_metadata ? json_decode($row->vendor_metadata, true) : null,
+                'external_ref' => $this->minimumTrackerProviderReference($row),
                 'legacy_asset_tracker_id' => $row->id,
             ];
 
@@ -477,6 +505,7 @@ class MigrateDevicesCommand extends Command
 
             DB::transaction(function () use ($deviceData, $row) {
                 $device = Device::create($deviceData);
+                $device = $this->recordImportedProviderState($device, $deviceData);
 
                 $this->devicesCreated++;
 
@@ -492,6 +521,104 @@ class MigrateDevicesCommand extends Command
                 $this->maybeCreateConsentAssignment($device, $row);
             });
         }
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function recordImportedProviderState(Device $device, array $attributes): Device
+    {
+        $provider = strtolower(trim((string) ($attributes['provider'] ?? '')));
+        if ($provider === '' || in_array($provider, ['manual', 'local'], true)) {
+            return $this->fieldOwnership->recordImportedLocalState(
+                $device,
+                $attributes,
+                'legacy_import',
+            );
+        }
+
+        $observed = array_intersect_key($attributes, array_flip([
+            'name',
+            'domain',
+            'category',
+            'subcategory',
+            'manufacturer',
+            'model',
+            'serial_number',
+            'mac_address',
+            'imei',
+            'firmware_version',
+            'ip_address',
+            'status',
+            'health_status',
+            'provider',
+            'last_seen_at',
+            'battery_level',
+            'battery_updated_at',
+        ]));
+        $observed = array_filter(
+            $observed,
+            fn (mixed $value): bool => $value !== null && $value !== '',
+        );
+        $providerAttributes = [];
+        foreach (['external_ref', 'meta', 'config'] as $field) {
+            if (is_array($attributes[$field] ?? null)) {
+                $providerAttributes[$field] = $attributes[$field];
+            }
+        }
+        foreach (['device_uid', 'legacy_location_hardware_id', 'legacy_asset_tracker_id'] as $field) {
+            if (filled($attributes[$field] ?? null)) {
+                $providerAttributes[$field] = $attributes[$field];
+            }
+        }
+
+        return $this->fieldOwnership->applyProviderObservation(
+            $device,
+            $provider,
+            $observed,
+            filled($attributes['last_seen_at'] ?? null)
+                ? Carbon::parse($attributes['last_seen_at'])
+                : now(),
+            'legacy_import',
+            $providerAttributes,
+        );
+    }
+
+    /** @return array{provider: string, provider_entity_id?: string} */
+    private function minimumTrackerProviderReference(object $tracker): array
+    {
+        $metadata = is_string($tracker->vendor_metadata ?? null)
+            ? json_decode($tracker->vendor_metadata, true)
+            : $tracker->vendor_metadata;
+        $metadata = is_array($metadata) ? $metadata : [];
+        $providerEntityId = null;
+
+        foreach ([
+            'provider_entity_id',
+            'provider_device_id',
+            'device_id',
+            'external_id',
+            'tracker_id',
+        ] as $key) {
+            if (! is_scalar($metadata[$key] ?? null)) {
+                continue;
+            }
+
+            $candidate = trim((string) $metadata[$key]);
+            if ($candidate !== '' && Str::length($candidate) <= 255) {
+                $providerEntityId = $candidate;
+                break;
+            }
+        }
+        if ($providerEntityId === null && is_scalar($tracker->device_uid ?? null)) {
+            $candidate = trim((string) $tracker->device_uid);
+            if ($candidate !== '' && Str::length($candidate) <= 255) {
+                $providerEntityId = $candidate;
+            }
+        }
+
+        return array_filter([
+            'provider' => strtolower(trim((string) ($tracker->vendor ?? ''))),
+            'provider_entity_id' => $providerEntityId,
+        ], fn (?string $value): bool => filled($value));
     }
 
     /**

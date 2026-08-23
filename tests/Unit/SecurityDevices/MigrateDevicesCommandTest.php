@@ -137,6 +137,26 @@ class MigrateDevicesCommandTest extends TestCase
         $this->assertEquals('Lobby Cam', $device->name);
         $this->assertEquals('security', $device->domain);
         $this->assertEquals('cctv', $device->category);
+        $this->assertSame('legacy_import', data_get($device->local_intended_state, 'name.source'));
+        $this->assertSame('legacy_inferred', data_get($device->local_intended_state, 'name.quality'));
+        $this->assertNull(data_get($device->local_intended_state, 'name.recorded_by_user_id'));
+    }
+
+    public function test_migrated_provider_device_records_observed_state_instead_of_local_intent(): void
+    {
+        $lhId = $this->insertLocationHardware([
+            'provider' => 'unifi',
+            'serial' => 'UNIFI-LEGACY-001',
+            'name' => 'Imported provider camera',
+        ]);
+
+        $this->artisan('sd:migrate-devices')->assertSuccessful();
+
+        $device = Device::where('legacy_location_hardware_id', $lhId)->firstOrFail();
+        $this->assertSame('UNIFI-LEGACY-001', data_get($device->provider_observed_state, 'serial_number.value'));
+        $this->assertSame('unifi', data_get($device->provider_observed_state, 'serial_number.source'));
+        $this->assertSame('legacy_import', data_get($device->provider_observed_state, 'serial_number.quality'));
+        $this->assertNull($device->local_intended_state);
     }
 
     public function test_maps_all_location_hardware_categories(): void
@@ -341,6 +361,9 @@ class MigrateDevicesCommandTest extends TestCase
         );
         // Battery merged from CR.
         $this->assertEquals(85, $device->battery_level);
+        $this->assertEquals(85, data_get($device->provider_observed_state, 'battery_level.value'));
+        $this->assertSame('hikvision', data_get($device->provider_observed_state, 'battery_level.source'));
+        $this->assertSame('legacy_import', data_get($device->provider_observed_state, 'battery_level.quality'));
     }
 
     public function test_cr_device_creates_site_assignment(): void
@@ -369,6 +392,11 @@ class MigrateDevicesCommandTest extends TestCase
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'imei' => '123456789012345',
+            'vendor_metadata' => json_encode([
+                'provider_device_id' => 'provider-tracker-001',
+                'access_token' => 'must-not-enter-canonical-device-state',
+                'position' => ['latitude' => -36.8485, 'longitude' => 174.7633],
+            ], JSON_THROW_ON_ERROR),
         ]);
 
         $this->artisan('sd:migrate-devices')->assertSuccessful();
@@ -379,6 +407,10 @@ class MigrateDevicesCommandTest extends TestCase
         $this->assertEquals('tracking', $device->domain);
         $this->assertEquals('vehicle_tracker', $device->category);
         $this->assertEquals('123456789012345', $device->imei);
+        $this->assertSame([
+            'provider' => 'queclink',
+            'provider_entity_id' => 'provider-tracker-001',
+        ], $device->external_ref);
     }
 
     public function test_deduplicates_tracker_by_imei(): void
