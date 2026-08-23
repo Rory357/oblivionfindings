@@ -2,10 +2,12 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Exceptions\UnsafeWebhookDestination;
 use App\Domain\Hr\Exceptions\UnsafeWebhookHeaders;
 use App\Domain\Hr\Jobs\DeliverHrWebhookJob;
 use App\Domain\Hr\Models\HrWebhookDelivery;
 use App\Domain\Hr\Models\HrWebhookEndpoint;
+use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 class HrWebhookService
 {
     public function __construct(
+        private readonly HrWebhookDestinationPolicy $destinationPolicy,
         private readonly HrWebhookHeaderPolicy $headerPolicy,
     ) {}
 
@@ -110,9 +113,26 @@ class HrWebhookService
         return $deliveries->count();
     }
 
-    public function queueRetry(HrWebhookDelivery $delivery): HrWebhookDelivery
+    public function queueRetry(User $actor, HrWebhookDelivery $delivery): HrWebhookDelivery
     {
-        return DB::transaction(function () use ($delivery): HrWebhookDelivery {
+        $this->assertActorCanManage($actor);
+
+        $preflightEndpoint = HrWebhookEndpoint::query()->find($delivery->endpoint_id);
+        if (! $preflightEndpoint || ! $preflightEndpoint->is_active) {
+            throw ValidationException::withMessages([
+                'delivery' => 'Resume the webhook endpoint before retrying this delivery.',
+            ]);
+        }
+        $preflightTargetUrl = (string) $preflightEndpoint->target_url;
+        try {
+            $this->destinationPolicy->authorize($preflightTargetUrl);
+        } catch (UnsafeWebhookDestination) {
+            throw ValidationException::withMessages([
+                'delivery' => 'The webhook destination is not approved. Update the endpoint before retrying.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($delivery, $preflightTargetUrl): HrWebhookDelivery {
             $locked = HrWebhookDelivery::query()
                 ->lockForUpdate()
                 ->findOrFail($delivery->id);
@@ -131,6 +151,11 @@ class HrWebhookService
                     'delivery' => 'Resume the webhook endpoint before retrying this delivery.',
                 ]);
             }
+            if (! hash_equals($preflightTargetUrl, (string) $endpoint->target_url)) {
+                throw ValidationException::withMessages([
+                    'delivery' => 'The webhook endpoint changed while the retry was being queued. Try again.',
+                ]);
+            }
 
             if (HrWebhookDelivery::query()->where('retry_of_id', $locked->id)->exists()) {
                 throw ValidationException::withMessages([
@@ -138,17 +163,19 @@ class HrWebhookService
                 ]);
             }
 
+            $logicalDelivery = $this->logicalDelivery($locked);
+
             $retry = HrWebhookDelivery::query()->create([
                 'endpoint_id' => $locked->endpoint_id,
                 'retry_of_id' => $locked->id,
-                'event_type' => $locked->event_type,
-                'event_uuid' => (string) Str::uuid(),
-                'payload' => $locked->payload ?? [],
+                'event_type' => $logicalDelivery->event_type,
+                'event_uuid' => $logicalDelivery->event_uuid,
+                'payload' => $logicalDelivery->payload ?? [],
                 'status' => HrWebhookDelivery::STATUS_PENDING,
                 'attempts' => 0,
                 'max_attempts' => max(1, (int) ($endpoint->retry_limit ?: $locked->max_attempts ?: 3)),
                 'queued_at' => now(),
-                'idempotency_key' => sha1($locked->endpoint_id.'|retry|'.Str::uuid()),
+                'idempotency_key' => sha1($logicalDelivery->idempotency_key.'|manual-retry|'.$locked->id),
             ]);
 
             DeliverHrWebhookJob::dispatch($retry->id)->afterCommit();
@@ -160,35 +187,79 @@ class HrWebhookService
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function createEndpoint(int $userId, array $attributes): HrWebhookEndpoint
+    public function createEndpoint(User $actor, array $attributes): HrWebhookEndpoint
     {
+        $this->assertActorCanManage($actor);
+        $targetUrl = $this->normalizedDestination((string) $attributes['target_url']);
+
         return $this->persistEndpoint(fn () => HrWebhookEndpoint::query()->create([
             'name' => trim((string) $attributes['name']),
-            'target_url' => $attributes['target_url'],
+            'target_url' => $targetUrl,
             'signing_secret' => $attributes['signing_secret'] ?? null,
             'event_types' => array_values(array_unique($attributes['event_types'] ?? [])),
             'headers' => $this->normalizedHeaders($attributes['headers'] ?? null),
             'timeout_seconds' => (int) ($attributes['timeout_seconds'] ?? 10),
             'retry_limit' => (int) ($attributes['retry_limit'] ?? 3),
             'is_active' => (bool) ($attributes['is_active'] ?? true),
-            'created_by' => $userId,
-            'updated_by' => $userId,
+            'created_by' => $actor->id,
+            'updated_by' => $actor->id,
         ]));
     }
 
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function updateEndpoint(HrWebhookEndpoint $endpoint, int $userId, array $attributes): HrWebhookEndpoint
-    {
-        return DB::transaction(function () use ($endpoint, $userId, $attributes): HrWebhookEndpoint {
+    public function updateEndpoint(
+        User $actor,
+        HrWebhookEndpoint $endpoint,
+        array $attributes,
+    ): HrWebhookEndpoint {
+        $this->assertActorCanManage($actor);
+        $targetWasProvided = array_key_exists('target_url', $attributes);
+        $preflightTargetUrl = (string) $endpoint->target_url;
+        $preflightIsActive = (bool) $endpoint->is_active;
+        $willBeActive = array_key_exists('is_active', $attributes)
+            ? (bool) $attributes['is_active']
+            : $preflightIsActive;
+        $normalizedTargetUrl = null;
+        if ($targetWasProvided || $willBeActive) {
+            $normalizedTargetUrl = $this->normalizedDestination(
+                $targetWasProvided ? (string) $attributes['target_url'] : $preflightTargetUrl,
+            );
+        }
+
+        return DB::transaction(function () use (
+            $endpoint,
+            $actor,
+            $attributes,
+            $targetWasProvided,
+            $willBeActive,
+            $preflightTargetUrl,
+            $preflightIsActive,
+            $normalizedTargetUrl,
+        ): HrWebhookEndpoint {
             $locked = HrWebhookEndpoint::query()->lockForUpdate()->findOrFail($endpoint->id);
+            if (! array_key_exists('is_active', $attributes)
+                && $preflightIsActive !== (bool) $locked->is_active) {
+                throw ValidationException::withMessages([
+                    'is_active' => 'The webhook endpoint state changed while it was being updated. Try again.',
+                ]);
+            }
+            if ($willBeActive && ! $targetWasProvided
+                && ! hash_equals($preflightTargetUrl, (string) $locked->target_url)) {
+                throw ValidationException::withMessages([
+                    'target_url' => 'The webhook endpoint changed while it was being updated. Try again.',
+                ]);
+            }
+            $targetUrl = ($targetWasProvided || $willBeActive) && $normalizedTargetUrl !== null
+                ? $normalizedTargetUrl
+                : (string) $locked->target_url;
 
             $this->persistEndpoint(fn () => $locked->update([
                 'name' => array_key_exists('name', $attributes)
                     ? trim((string) $attributes['name'])
                     : $locked->name,
-                'target_url' => $attributes['target_url'] ?? $locked->target_url,
+                'target_url' => $targetUrl,
                 'signing_secret' => array_key_exists('signing_secret', $attributes)
                     ? ($attributes['signing_secret'] ?: null)
                     : $locked->signing_secret,
@@ -203,7 +274,7 @@ class HrWebhookService
                 'is_active' => array_key_exists('is_active', $attributes)
                     ? (bool) $attributes['is_active']
                     : $locked->is_active,
-                'updated_by' => $userId,
+                'updated_by' => $actor->id,
             ]));
 
             return $locked->fresh();
@@ -213,8 +284,10 @@ class HrWebhookService
     /**
      * @return Collection<int, HrWebhookEndpoint>
      */
-    public function endpointsForApplication(): Collection
+    public function endpointsForApplication(User $actor): Collection
     {
+        $this->assertActorCanManage($actor);
+
         return HrWebhookEndpoint::query()
             ->withCount([
                 'deliveries',
@@ -260,5 +333,46 @@ class HrWebhookService
                 'headers' => 'Custom headers must use safe names and values and cannot replace delivery authentication headers.',
             ]);
         }
+    }
+
+    private function normalizedDestination(string $url): string
+    {
+        try {
+            return $this->destinationPolicy->authorize($url)->url;
+        } catch (UnsafeWebhookDestination) {
+            throw ValidationException::withMessages([
+                'target_url' => 'Use a public HTTPS webhook URL. Private, local, reserved, or credential-bearing destinations are not allowed.',
+            ]);
+        }
+    }
+
+    private function logicalDelivery(HrWebhookDelivery $delivery): HrWebhookDelivery
+    {
+        $logicalDelivery = $delivery;
+        $seen = [];
+
+        while ($logicalDelivery->retry_of_id !== null) {
+            if (isset($seen[$logicalDelivery->id])) {
+                throw ValidationException::withMessages([
+                    'delivery' => 'The webhook delivery lineage is invalid.',
+                ]);
+            }
+            $seen[$logicalDelivery->id] = true;
+
+            $parent = HrWebhookDelivery::query()->find($logicalDelivery->retry_of_id);
+            if (! $parent || (int) $parent->endpoint_id !== (int) $delivery->endpoint_id) {
+                throw ValidationException::withMessages([
+                    'delivery' => 'The webhook delivery lineage is invalid.',
+                ]);
+            }
+            $logicalDelivery = $parent;
+        }
+
+        return $logicalDelivery;
+    }
+
+    private function assertActorCanManage(User $actor): void
+    {
+        abort_unless($actor->canDo('hr.settings.manage'), 403);
     }
 }

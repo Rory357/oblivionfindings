@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrWebhookDelivery;
 use App\Domain\Hr\Models\HrWebhookEndpoint;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -18,10 +19,9 @@ class HrWebhookController extends Controller
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        $user = $this->authorizedActor($request);
 
-        $endpoints = $this->webhookService->endpointsForApplication()
+        $endpoints = $this->webhookService->endpointsForApplication($user)
             ->map(fn (HrWebhookEndpoint $endpoint) => [
                 'id' => $endpoint->id,
                 'name' => $endpoint->name,
@@ -75,8 +75,7 @@ class HrWebhookController extends Controller
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        $user = $this->authorizedActor($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'target_url' => ['required', 'url', 'max:1500'],
@@ -90,15 +89,15 @@ class HrWebhookController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $this->webhookService->createEndpoint($user->id, $validated);
+        $this->webhookService->createEndpoint($user, $validated);
 
         return redirect()->back()->with('success', 'Webhook endpoint created.');
     }
 
-    public function update(Request $request, HrWebhookEndpoint $endpoint)
+    public function update(Request $request, string $endpoint)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        $user = $this->authorizedActor($request);
+        $endpointRecord = $this->endpoint($endpoint);
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'target_url' => ['sometimes', 'url', 'max:1500'],
@@ -112,29 +111,51 @@ class HrWebhookController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        $this->webhookService->updateEndpoint($endpoint, $user->id, $validated);
+        $this->webhookService->updateEndpoint($user, $endpointRecord, $validated);
 
         return redirect()->back()->with('success', 'Webhook endpoint updated.');
     }
 
-    public function toggle(Request $request, HrWebhookEndpoint $endpoint)
+    public function toggle(Request $request, string $endpoint)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $wasActive = (bool) $endpoint->is_active;
-        $this->webhookService->updateEndpoint($endpoint, $user->id, [
+        $user = $this->authorizedActor($request);
+        $endpointRecord = $this->endpoint($endpoint);
+        $wasActive = (bool) $endpointRecord->is_active;
+        $this->webhookService->updateEndpoint($user, $endpointRecord, [
             'is_active' => ! $wasActive,
         ]);
 
         return redirect()->back()->with('success', $wasActive ? 'Webhook endpoint paused.' : 'Webhook endpoint resumed.');
     }
 
-    public function retryDelivery(Request $request, HrWebhookDelivery $delivery)
+    public function retryDelivery(Request $request, string $delivery)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $this->webhookService->queueRetry($delivery);
+        $user = $this->authorizedActor($request);
+        $deliveryRecord = $this->delivery($delivery);
+        $this->webhookService->queueRetry($user, $deliveryRecord);
 
         return redirect()->back()->with('success', 'Webhook delivery retry queued.');
+    }
+
+    private function authorizedActor(Request $request): User
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User && $actor->canDo('hr.settings.manage'), 403);
+
+        return $actor;
+    }
+
+    private function endpoint(string $endpoint): HrWebhookEndpoint
+    {
+        abort_unless(ctype_digit($endpoint) && (int) $endpoint > 0, 404);
+
+        return HrWebhookEndpoint::query()->findOrFail((int) $endpoint);
+    }
+
+    private function delivery(string $delivery): HrWebhookDelivery
+    {
+        abort_unless(ctype_digit($delivery) && (int) $delivery > 0, 404);
+
+        return HrWebhookDelivery::query()->findOrFail((int) $delivery);
     }
 }
