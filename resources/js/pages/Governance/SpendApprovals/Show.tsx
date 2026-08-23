@@ -23,6 +23,8 @@ interface Approval {
     amount: number;
     currency: string;
     status: string;
+    version: number;
+    content_digest: string | null;
     requires_board: boolean;
     submitted_at: string | null;
     decided_at: string | null;
@@ -39,6 +41,12 @@ interface Props extends PageProps {
     categories: Record<string, string>;
     threshold: number;
     attachments: GovernanceAttachment[];
+    authority: {
+        update: boolean;
+        submit: boolean;
+        decide: boolean;
+        manage_attachments: boolean;
+    };
 }
 
 const formatNzd = (amount: number) =>
@@ -53,44 +61,62 @@ export default function ShowSpendApproval({
     categories,
     threshold,
     attachments,
+    authority,
 }: Props) {
-    const can = auth.can?.governance?.spend ?? {};
-    const canManageAttachments = Boolean(
-        can?.request &&
-        ((approval.status === 'draft' &&
-            approval.requestedBy?.id === auth.user?.id) ||
-            can?.approve),
-    );
-    const [decisionDraft, setDecisionDraft] = useState('');
+    const canManageAttachments = authority.manage_attachments;
     const [showApprove, setShowApprove] = useState(false);
     const [showReject, setShowReject] = useState(false);
 
-    const submitForm = useForm({});
+    const submitForm = useForm({ expected_version: approval.version });
 
     const approveForm = useForm({
+        decision_key: crypto.randomUUID(),
+        expected_version: approval.version,
+        expected_content_digest: approval.content_digest ?? '',
         decision_notes: '',
         resolution_id: '' as string | number | null,
     });
 
     const rejectForm = useForm({
+        decision_key: crypto.randomUUID(),
+        expected_version: approval.version,
+        expected_content_digest: approval.content_digest ?? '',
         decision_notes: '',
     });
 
     const handleSubmit = () => {
-        submitForm.post(`/governance/spend-approvals/${approval.id}/submit`);
+        submitForm.transform((current) => ({
+            ...current,
+            expected_version: approval.version,
+        }));
+        submitForm.post(`/governance/spend-approvals/${approval.id}/submit`, {
+            onFinish: () => submitForm.transform((current) => current),
+        });
     };
 
     const handleApprove = (e: React.FormEvent) => {
         e.preventDefault();
+        approveForm.transform((current) => ({
+            ...current,
+            expected_version: approval.version,
+            expected_content_digest: approval.content_digest ?? '',
+        }));
         approveForm.post(`/governance/spend-approvals/${approval.id}/approve`, {
             onSuccess: () => setShowApprove(false),
+            onFinish: () => approveForm.transform((current) => current),
         });
     };
 
     const handleReject = (e: React.FormEvent) => {
         e.preventDefault();
+        rejectForm.transform((current) => ({
+            ...current,
+            expected_version: approval.version,
+            expected_content_digest: approval.content_digest ?? '',
+        }));
         rejectForm.post(`/governance/spend-approvals/${approval.id}/reject`, {
             onSuccess: () => setShowReject(false),
+            onFinish: () => rejectForm.transform((current) => current),
         });
     };
 
@@ -154,7 +180,7 @@ export default function ShowSpendApproval({
                             <CardContent className="space-y-3 text-sm">
                                 {approval.description && (
                                     <div>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Description
                                         </p>
                                         <p className="mt-1 whitespace-pre-wrap">
@@ -164,7 +190,7 @@ export default function ShowSpendApproval({
                                 )}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Requested by
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -172,7 +198,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Submitted at
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -181,7 +207,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Valid until
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -189,7 +215,7 @@ export default function ShowSpendApproval({
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Currency
                                         </p>
                                         <p className="mt-1 font-medium">
@@ -222,12 +248,12 @@ export default function ShowSpendApproval({
                                         </span>
                                     </div>
                                     {approval.decision_notes && (
-                                        <p className="text-sm whitespace-pre-wrap">
+                                        <p className="whitespace-pre-wrap text-sm">
                                             {approval.decision_notes}
                                         </p>
                                     )}
                                     {approval.resolution && (
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-muted-foreground text-xs">
                                             Linked resolution:{' '}
                                             {approval.resolution.title} (
                                             {approval.resolution.outcome})
@@ -238,7 +264,7 @@ export default function ShowSpendApproval({
                         )}
 
                         {isSubmitted &&
-                            can.approve &&
+                            authority.decide &&
                             (showApprove || showReject) && (
                                 <Card>
                                     <CardHeader>
@@ -261,7 +287,7 @@ export default function ShowSpendApproval({
                                                 rows={4}
                                                 placeholder={
                                                     showApprove
-                                                        ? 'Optional decision notes'
+                                                        ? 'Reason for approval (required)'
                                                         : 'Reason for rejection (required)'
                                                 }
                                                 value={
@@ -282,7 +308,7 @@ export default function ShowSpendApproval({
                                                               e.target.value,
                                                           )
                                                 }
-                                                required={showReject}
+                                                required
                                             />
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button
@@ -322,7 +348,7 @@ export default function ShowSpendApproval({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                {isDraft && (
+                                {isDraft && authority.submit && (
                                     <Button
                                         onClick={handleSubmit}
                                         disabled={submitForm.processing}
@@ -333,7 +359,7 @@ export default function ShowSpendApproval({
                                     </Button>
                                 )}
                                 {isSubmitted &&
-                                    can.approve &&
+                                    authority.decide &&
                                     !showApprove &&
                                     !showReject && (
                                         <>
@@ -359,7 +385,7 @@ export default function ShowSpendApproval({
                                         </>
                                     )}
                                 {!isDraft && !isSubmitted && !isDecided && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-muted-foreground text-xs">
                                         No actions available.
                                     </p>
                                 )}
@@ -377,7 +403,7 @@ export default function ShowSpendApproval({
                                     <p className="font-medium">
                                         {approval.budget.title}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-muted-foreground text-xs">
                                         FY {approval.budget.fiscal_year}
                                     </p>
                                 </CardContent>
@@ -391,11 +417,11 @@ export default function ShowSpendApproval({
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Paperclip className="h-5 w-5" />
                             Supporting documents
-                            <span className="ml-1 text-sm font-normal text-muted-foreground">
+                            <span className="text-muted-foreground ml-1 text-sm font-normal">
                                 ({attachments.length})
                             </span>
                         </CardTitle>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="text-muted-foreground mt-1 text-sm">
                             Quotes, contracts, invoices, vendor due diligence —
                             the documentary trail behind the spend decision.
                         </p>

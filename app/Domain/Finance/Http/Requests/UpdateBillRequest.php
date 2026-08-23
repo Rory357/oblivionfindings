@@ -2,7 +2,9 @@
 
 namespace App\Domain\Finance\Http\Requests;
 
+use App\Domain\Finance\Services\AccountsPayableService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateBillRequest extends FormRequest
 {
@@ -20,7 +22,7 @@ class UpdateBillRequest extends FormRequest
             'due_date' => 'sometimes|required|date',
             'notes' => 'nullable|string|max:2000',
             'purchase_order_id' => 'nullable|exists:fin_purchase_orders,id',
-            'spend_approval_id' => 'nullable|exists:spend_approvals,id',
+            'spend_approval_id' => ['nullable', 'integer', 'min:1'],
             'lines' => 'sometimes|required|array|min:1',
             'lines.*.description' => 'required|string|max:500',
             'lines.*.quantity' => 'required|numeric|min:0.01',
@@ -31,5 +33,21 @@ class UpdateBillRequest extends FormRequest
             'lines.*.cost_centre_id' => 'nullable|exists:fin_cost_centres,id',
             'lines.*.funding_stream_id' => 'nullable|exists:fin_funding_streams,id',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->has('spend_approval_id')
+                || ! filled($this->input('spend_approval_id'))) {
+                return;
+            }
+
+            app(AccountsPayableService::class)->assertSpendApprovalLinkVisible(
+                $this->user(),
+                $this->route('bill'),
+                (int) $this->input('spend_approval_id'),
+            );
+        });
     }
 }

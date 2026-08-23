@@ -12,6 +12,7 @@ use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
+use App\Domain\Governance\Services\SpendApprovalCommandService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Schema;
 
 class GovernancePresenter
 {
+    public function __construct(protected SpendApprovalCommandService $spendApprovalReader) {}
+
     public function dashboard(array $widgets, array $period, array $freshness, array $workflow, ?User $user = null): array
     {
         $cards = collect([
@@ -99,8 +102,8 @@ class GovernancePresenter
             'next_meeting' => $this->buildNextMeeting($user),
             'board_pack' => $this->buildBoardPack(),
             'calendar_events' => $this->buildCalendarEvents(),
-            'timeline' => $this->buildTimeline(),
-            'recently_completed' => $this->buildRecentlyCompleted(),
+            'timeline' => $this->buildTimeline($user),
+            'recently_completed' => $this->buildRecentlyCompleted($user),
         ];
     }
 
@@ -140,7 +143,7 @@ class GovernancePresenter
                 'label' => 'Upcoming Meetings',
                 'value' => (string) $upcomingMeetings,
                 'sublabel' => $nextMeeting
-                    ? 'Next: ' . $nextMeeting->scheduled_at->timezone('Pacific/Auckland')->format('j M Y')
+                    ? 'Next: '.$nextMeeting->scheduled_at->timezone('Pacific/Auckland')->format('j M Y')
                     : 'No meeting scheduled',
                 'tone' => $upcomingMeetings > 0 ? 'info' : 'muted',
                 'href' => '/governance/meetings',
@@ -164,7 +167,7 @@ class GovernancePresenter
             [
                 'key' => 'policy_attestations',
                 'label' => 'Policy Attestations',
-                'value' => $attestation['percent'] . '%',
+                'value' => $attestation['percent'].'%',
                 'sublabel' => $attestation['percent'] >= 90
                     ? 'Board complete'
                     : 'Board completion',
@@ -297,7 +300,7 @@ class GovernancePresenter
                 ->get()
                 ->each(function (GovernanceMeeting $meeting) use ($events) {
                     $events->push([
-                        'id' => 'meeting-' . $meeting->id,
+                        'id' => 'meeting-'.$meeting->id,
                         'kind' => 'meeting',
                         'date' => $meeting->scheduled_at?->toDateString(),
                         'title' => $meeting->title,
@@ -314,7 +317,7 @@ class GovernancePresenter
                 ->get()
                 ->each(function (ComplianceObligation $obligation) use ($events) {
                     $events->push([
-                        'id' => 'compliance-' . $obligation->id,
+                        'id' => 'compliance-'.$obligation->id,
                         'kind' => 'compliance',
                         'date' => $obligation->due_date?->toDateString(),
                         'title' => $obligation->obligation_title,
@@ -330,10 +333,10 @@ class GovernancePresenter
                 ->get()
                 ->each(function (GovernancePolicy $policy) use ($events) {
                     $events->push([
-                        'id' => 'policy-' . $policy->id,
+                        'id' => 'policy-'.$policy->id,
                         'kind' => 'policy',
                         'date' => $policy->next_review_date?->toDateString(),
-                        'title' => 'Review: ' . ($policy->title ?? $policy->name ?? 'Policy'),
+                        'title' => 'Review: '.($policy->title ?? $policy->name ?? 'Policy'),
                         'href' => "/governance/policies/{$policy->id}",
                     ]);
                 });
@@ -350,7 +353,7 @@ class GovernancePresenter
     /**
      * What changed since the last completed board meeting.
      */
-    protected function buildTimeline(): array
+    protected function buildTimeline(?User $user): array
     {
         $sinceMeeting = Schema::hasTable('governance_meetings')
             ? GovernanceMeeting::query()
@@ -364,23 +367,44 @@ class GovernancePresenter
 
         $events = GovernanceAuditService::recentEventsSince($since, 60);
 
-        $formatted = collect($events)->map(function (array $row) {
-            $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at']) : null;
+        $spendEventIds = collect($events)
+            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') === 'SpendApproval')
+            ->pluck('entity_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $readableSpendIds = collect();
+        if ($spendEventIds->isNotEmpty()) {
+            $spendQuery = $this->spendApprovalReader->readableApprovalQuery($user);
+            if ($spendQuery) {
+                $readableSpendIds = $spendQuery
+                    ->whereKey($spendEventIds->all())
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id);
+            }
+        }
 
-            return [
-                'id' => ($row['kind'] ?? 'event') . '-' . ($row['id'] ?? 0),
-                'kind' => $row['kind'] ?? 'event',
-                'actor' => $row['actor_name'] ?? 'System',
-                'type' => $this->humaniseEventType($row['type'] ?? ''),
-                'entity_type' => $this->humaniseEntityType($row['entity_type'] ?? ''),
-                'entity_id' => $row['entity_id'] ?? null,
-                'description' => $row['description'] ?? null,
-                'occurred_at' => $createdAt?->toIso8601String(),
-                'occurred_label' => $createdAt?->timezone('Pacific/Auckland')->format('j M g:i A'),
-                'day' => $createdAt?->timezone('Pacific/Auckland')->format('j M Y'),
-                'href' => $this->entityHref($row['entity_type'] ?? '', $row['entity_id'] ?? null),
-            ];
-        });
+        $formatted = collect($events)
+            ->filter(fn (array $row) => class_basename($row['entity_type'] ?? '') !== 'SpendApproval'
+                || $readableSpendIds->contains((int) ($row['entity_id'] ?? 0)))
+            ->map(function (array $row) {
+                $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at']) : null;
+
+                return [
+                    'id' => ($row['kind'] ?? 'event').'-'.($row['id'] ?? 0),
+                    'kind' => $row['kind'] ?? 'event',
+                    'actor' => $row['actor_name'] ?? 'System',
+                    'type' => $this->humaniseEventType($row['type'] ?? ''),
+                    'entity_type' => $this->humaniseEntityType($row['entity_type'] ?? ''),
+                    'entity_id' => $row['entity_id'] ?? null,
+                    'description' => $row['description'] ?? null,
+                    'occurred_at' => $createdAt?->toIso8601String(),
+                    'occurred_label' => $createdAt?->timezone('Pacific/Auckland')->format('j M g:i A'),
+                    'day' => $createdAt?->timezone('Pacific/Auckland')->format('j M Y'),
+                    'href' => $this->entityHref($row['entity_type'] ?? '', $row['entity_id'] ?? null),
+                ];
+            });
 
         return [
             'since' => $sinceMeeting ? [
@@ -396,7 +420,7 @@ class GovernancePresenter
     /**
      * Recently completed items so the board can see what no longer needs action.
      */
-    protected function buildRecentlyCompleted(): array
+    protected function buildRecentlyCompleted(?User $user): array
     {
         $since = now()->subDays(14);
         $items = collect();
@@ -411,7 +435,7 @@ class GovernancePresenter
                 ->each(function (RiskRegisterEntry $risk) use ($items) {
                     $items->push([
                         'kind' => 'risk_closed',
-                        'title' => ($risk->risk_reference ? "{$risk->risk_reference} " : '') . $risk->title,
+                        'title' => ($risk->risk_reference ? "{$risk->risk_reference} " : '').$risk->title,
                         'completed_at' => $risk->closed_at?->toIso8601String(),
                         'completed_label' => $risk->closed_at?->diffForHumans(),
                         'href' => "/governance/risks/{$risk->id}",
@@ -431,7 +455,7 @@ class GovernancePresenter
                 ->each(function (ActionItem $action) use ($items) {
                     $items->push([
                         'kind' => 'action_completed',
-                        'title' => ($action->action_reference ? "{$action->action_reference} " : '') . $action->description,
+                        'title' => ($action->action_reference ? "{$action->action_reference} " : '').$action->description,
                         'completed_at' => $action->completed_at?->toIso8601String(),
                         'completed_label' => $action->completed_at?->diffForHumans(),
                         'href' => "/governance/actions/{$action->id}",
@@ -450,7 +474,7 @@ class GovernancePresenter
                 ->each(function (MeetingMinute $minute) use ($items) {
                     $items->push([
                         'kind' => 'minutes_approved',
-                        'title' => 'Minutes ' . $minute->status . ' for meeting #' . $minute->meeting_id,
+                        'title' => 'Minutes '.$minute->status.' for meeting #'.$minute->meeting_id,
                         'completed_at' => $minute->updated_at?->toIso8601String(),
                         'completed_label' => $minute->updated_at?->diffForHumans(),
                         'href' => "/governance/meetings/{$minute->meeting_id}?tab=minutes",
@@ -469,7 +493,7 @@ class GovernancePresenter
                 ->each(function (GovernancePolicy $policy) use ($items) {
                     $items->push([
                         'kind' => 'policy_signed',
-                        'title' => 'Policy approved: ' . ($policy->title ?? $policy->name ?? 'Policy #' . $policy->id),
+                        'title' => 'Policy approved: '.($policy->title ?? $policy->name ?? 'Policy #'.$policy->id),
                         'completed_at' => $policy->approved_at?->toIso8601String(),
                         'completed_label' => $policy->approved_at?->diffForHumans(),
                         'href' => "/governance/policies/{$policy->id}",
@@ -479,22 +503,25 @@ class GovernancePresenter
         }
 
         if (Schema::hasTable('spend_approvals')) {
-            SpendApproval::query()
-                ->where('status', SpendApproval::STATUS_APPROVED)
-                ->where('updated_at', '>=', $since)
-                ->orderByDesc('updated_at')
-                ->limit(6)
-                ->get()
-                ->each(function (SpendApproval $approval) use ($items) {
-                    $items->push([
-                        'kind' => 'spend_approved',
-                        'title' => 'Spend approved: ' . ($approval->description ?? 'Request #' . $approval->id),
-                        'completed_at' => $approval->updated_at?->toIso8601String(),
-                        'completed_label' => $approval->updated_at?->diffForHumans(),
-                        'href' => "/governance/spend-approvals/{$approval->id}",
-                        'owner' => null,
-                    ]);
-                });
+            $spendQuery = $this->spendApprovalReader->readableApprovalQuery($user);
+            if ($spendQuery) {
+                $spendQuery
+                    ->where('status', SpendApproval::STATUS_APPROVED)
+                    ->where('updated_at', '>=', $since)
+                    ->orderByDesc('updated_at')
+                    ->limit(6)
+                    ->get()
+                    ->each(function (SpendApproval $approval) use ($items) {
+                        $items->push([
+                            'kind' => 'spend_approved',
+                            'title' => 'Spend approved: '.($approval->description ?? 'Request #'.$approval->id),
+                            'completed_at' => $approval->updated_at?->toIso8601String(),
+                            'completed_label' => $approval->updated_at?->diffForHumans(),
+                            'href' => "/governance/spend-approvals/{$approval->id}",
+                            'owner' => null,
+                        ]);
+                    });
+            }
         }
 
         return $items
@@ -644,7 +671,7 @@ class GovernancePresenter
                     'status' => $ceoSubmitted ? 'done' : ($meeting->ceo_report_deadline && $meeting->ceo_report_deadline->isPast() ? 'warning' : 'todo'),
                     'value' => $ceoSubmitted ? 'Submitted' : 'Pending',
                     'detail' => $meeting->ceo_report_deadline
-                        ? 'Due ' . $meeting->ceo_report_deadline->timezone('Pacific/Auckland')->format('j M Y g:i A')
+                        ? 'Due '.$meeting->ceo_report_deadline->timezone('Pacific/Auckland')->format('j M Y g:i A')
                         : 'No deadline set',
                     'href' => $meeting->ceoReport ? "/governance/ceo-reports/{$meeting->ceoReport->id}" : '/governance/ceo-reports',
                 ],
@@ -680,7 +707,7 @@ class GovernancePresenter
                     'status' => in_array($minutesStatus, ['signed', 'archived'], true) ? 'done' : ($meeting->minutes ? 'in_progress' : 'todo'),
                     'value' => $meeting->minutes ? $this->titleize($meeting->minutes->status) : 'Not drafted',
                     'detail' => $meeting->minutes
-                        ? 'Version ' . $meeting->minutes->version_number . ' is currently ' . $this->titleize($meeting->minutes->status) . '.'
+                        ? 'Version '.$meeting->minutes->version_number.' is currently '.$this->titleize($meeting->minutes->status).'.'
                         : 'Minutes will be drafted after the meeting.',
                     'href' => "/governance/meetings/{$meeting->id}?tab=minutes",
                 ],
@@ -814,7 +841,7 @@ class GovernancePresenter
             ],
             $items->isEmpty()
                 ? ['No open governance follow-through is currently outstanding.']
-                : $items->take(3)->map(fn (ActionItem $item) => $item->action_reference . ' ' . $item->description)->values()->all(),
+                : $items->take(3)->map(fn (ActionItem $item) => $item->action_reference.' '.$item->description)->values()->all(),
             '/governance/actions'
         );
     }
@@ -1003,8 +1030,8 @@ class GovernancePresenter
             isset($widget['funding_gaps_count']) && $widget['funding_gaps_count'] > 0
                 ? "{$widget['funding_gaps_count']} donor fund(s) over-committed"
                 : null,
-            isset($widget['roadmap_forecast_total']) ? 'Roadmap forecast ' . $this->formatCurrency($widget['roadmap_forecast_total']) : null,
-            isset($widget['governance_envelope_total']) ? 'Governance envelope ' . $this->formatCurrency($widget['governance_envelope_total']) : null,
+            isset($widget['roadmap_forecast_total']) ? 'Roadmap forecast '.$this->formatCurrency($widget['roadmap_forecast_total']) : null,
+            isset($widget['governance_envelope_total']) ? 'Governance envelope '.$this->formatCurrency($widget['governance_envelope_total']) : null,
         ]));
 
         return $this->makeCard(
@@ -1291,12 +1318,24 @@ class GovernancePresenter
         }
 
         $actions = [];
-        if ($user->canDo('governance.meetings.view')) { $actions[] = ['label' => 'Meetings', 'href' => '/governance/meetings', 'description' => 'Open the next meeting cockpit.']; }
-        if ($user->canDo('governance.resolutions.view')) { $actions[] = ['label' => 'Decisions', 'href' => '/governance/resolutions', 'description' => 'Review open resolutions and board decisions.']; }
-        if ($user->boardMember && $user->canDo('governance.interests.view')) { $actions[] = ['label' => 'My interests', 'href' => '/governance/interests/mine', 'description' => 'Maintain your current interest declarations.']; }
-        if ($user->canDo('governance.evaluations.view')) { $actions[] = ['label' => 'Evaluations', 'href' => '/governance/evaluations', 'description' => 'Review or respond to board evaluations.']; }
-        if ($user->canDo('governance.packs.view')) { $actions[] = ['label' => 'Board packs', 'href' => '/governance/meetings', 'description' => 'Open pack generation and distribution workflows.']; }
-        if ($user->canDo('governance.budgets.view')) { $actions[] = ['label' => 'Budgets', 'href' => '/governance/budgets', 'description' => 'Review governance budget position and approvals.']; }
+        if ($user->canDo('governance.meetings.view')) {
+            $actions[] = ['label' => 'Meetings', 'href' => '/governance/meetings', 'description' => 'Open the next meeting cockpit.'];
+        }
+        if ($user->canDo('governance.resolutions.view')) {
+            $actions[] = ['label' => 'Decisions', 'href' => '/governance/resolutions', 'description' => 'Review open resolutions and board decisions.'];
+        }
+        if ($user->boardMember && $user->canDo('governance.interests.view')) {
+            $actions[] = ['label' => 'My interests', 'href' => '/governance/interests/mine', 'description' => 'Maintain your current interest declarations.'];
+        }
+        if ($user->canDo('governance.evaluations.view')) {
+            $actions[] = ['label' => 'Evaluations', 'href' => '/governance/evaluations', 'description' => 'Review or respond to board evaluations.'];
+        }
+        if ($user->canDo('governance.packs.view')) {
+            $actions[] = ['label' => 'Board packs', 'href' => '/governance/meetings', 'description' => 'Open pack generation and distribution workflows.'];
+        }
+        if ($user->canDo('governance.budgets.view')) {
+            $actions[] = ['label' => 'Budgets', 'href' => '/governance/budgets', 'description' => 'Review governance budget position and approvals.'];
+        }
 
         return $actions;
     }
@@ -1312,9 +1351,11 @@ class GovernancePresenter
 
         $at = Carbon::parse($timestamp);
         $minutes = max(0, $at->diffInMinutes(now()));
-        $status = match (true) { $minutes <= 15 => 'fresh', $minutes <= 60 => 'stable', default => 'stale' };
+        $status = match (true) {
+            $minutes <= 15 => 'fresh', $minutes <= 60 => 'stable', default => 'stale'
+        };
 
-        return ['status' => $status, 'at' => $at->toIso8601String(), 'label' => $minutes < 1 ? 'Updated just now' : ($minutes < 60 ? "Updated {$minutes} min ago" : 'Updated ' . $at->timezone('Pacific/Auckland')->format('j M g:i A'))];
+        return ['status' => $status, 'at' => $at->toIso8601String(), 'label' => $minutes < 1 ? 'Updated just now' : ($minutes < 60 ? "Updated {$minutes} min ago" : 'Updated '.$at->timezone('Pacific/Auckland')->format('j M g:i A'))];
     }
 
     protected function derivedFreshness(): array
@@ -1327,7 +1368,8 @@ class GovernancePresenter
         $type = $period['type'] ?? 'month';
         $start = isset($period['start']) ? Carbon::parse($period['start']) : null;
         $end = isset($period['end']) ? Carbon::parse($period['end']) : null;
-        return $start && $end ? $this->titleize($type) . ' (' . $start->format('j M Y') . ' to ' . $end->format('j M Y') . ')' : $this->titleize($type);
+
+        return $start && $end ? $this->titleize($type).' ('.$start->format('j M Y').' to '.$end->format('j M Y').')' : $this->titleize($type);
     }
 
     protected function titleize(?string $value): string
@@ -1337,21 +1379,21 @@ class GovernancePresenter
 
     protected function formatPercent(?float $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1) . '%';
+        return $value === null ? 'Unavailable' : number_format($value, 1).'%';
     }
 
     protected function formatCurrency(mixed $value): string
     {
-        return $value === null || $value === '' ? 'Unavailable' : '$' . number_format((float) $value, 2);
+        return $value === null || $value === '' ? 'Unavailable' : '$'.number_format((float) $value, 2);
     }
 
     protected function formatMinutes(?float $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1) . ' min';
+        return $value === null ? 'Unavailable' : number_format($value, 1).' min';
     }
 
     protected function formatHours(?float $value): string
     {
-        return $value === null ? 'Unavailable' : number_format($value, 1) . ' h';
+        return $value === null ? 'Unavailable' : number_format($value, 1).' h';
     }
 }

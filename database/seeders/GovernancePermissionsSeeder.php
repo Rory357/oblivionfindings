@@ -13,38 +13,38 @@ class GovernancePermissionsSeeder extends Seeder
         $permissions = [
             // Dashboard
             ['key' => 'governance.view', 'description' => 'View Governance Dashboard'],
-            
+
             // Meetings
             ['key' => 'governance.meetings.view', 'description' => 'View Board Meetings'],
             ['key' => 'governance.meetings.manage', 'description' => 'Manage Board Meetings'],
-            
+
             // Resolutions
             ['key' => 'governance.resolutions.view', 'description' => 'View Resolutions'],
             ['key' => 'governance.resolutions.vote', 'description' => 'Vote on Resolutions'],
             ['key' => 'governance.resolutions.manage', 'description' => 'Manage Resolutions'],
-            
+
             // Risks
             ['key' => 'governance.risks.view', 'description' => 'View Risk Register'],
             ['key' => 'governance.risks.manage', 'description' => 'Manage Risk Register'],
-            
+
             // Compliance
             ['key' => 'governance.compliance.view', 'description' => 'View Compliance'],
             ['key' => 'governance.compliance.manage', 'description' => 'Manage Compliance'],
-            
+
             // Performance
             ['key' => 'governance.performance.view', 'description' => 'View Performance Reviews'],
             ['key' => 'governance.performance.manage', 'description' => 'Manage Performance Reviews'],
-            
+
             // Strategy
             ['key' => 'governance.strategy.view', 'description' => 'View Strategic Plans'],
             ['key' => 'governance.strategy.manage', 'description' => 'Manage Strategic Plans'],
-            
+
             // Budgets
             ['key' => 'governance.budgets.view', 'description' => 'View Budgets'],
             ['key' => 'governance.budgets.create', 'description' => 'Create & Edit Budgets'],
             ['key' => 'governance.budgets.submit', 'description' => 'Submit Budgets for Board Approval'],
             ['key' => 'governance.budgets.approve', 'description' => 'Approve Budgets on behalf of the Board'],
-            
+
             // Board Packs
             ['key' => 'governance.packs.view', 'description' => 'View Board Packs'],
             ['key' => 'governance.packs.manage', 'description' => 'Manage Board Packs'],
@@ -92,6 +92,8 @@ class GovernancePermissionsSeeder extends Seeder
             ['key' => 'governance.spend.view', 'description' => 'View Spend Approvals'],
             ['key' => 'governance.spend.request', 'description' => 'Request Spend Approval'],
             ['key' => 'governance.spend.approve', 'description' => 'Approve Spend Requests'],
+            ['key' => 'governance.spend.manageAny', 'description' => 'Manage Any Spend Approval Draft'],
+            ['key' => 'governance.spend.viewAllSites', 'description' => 'Access Spend Approvals Across All Sites'],
 
             // Settings (governance configuration)
             ['key' => 'governance.settings.view', 'description' => 'View Governance Settings'],
@@ -110,7 +112,7 @@ class GovernancePermissionsSeeder extends Seeder
         if ($adminRole) {
             foreach ($permissions as $perm) {
                 $permission = Permission::where('key', $perm['key'])->first();
-                if ($permission && !$adminRole->permissions()->where('permissions.id', $permission->id)->exists()) {
+                if ($permission && ! $adminRole->permissions()->where('permissions.id', $permission->id)->exists()) {
                     $adminRole->permissions()->attach($permission->id);
                 }
             }
@@ -119,10 +121,10 @@ class GovernancePermissionsSeeder extends Seeder
         // Assign governance view to board roles
         $boardRoles = Role::whereIn('name', ['board_chair', 'board_secretary', 'board_member', 'board_observer'])->get();
         $viewPerm = Permission::where('key', 'governance.view')->first();
-        
+
         if ($viewPerm) {
             foreach ($boardRoles as $role) {
-                if (!$role->permissions()->where('permissions.id', $viewPerm->id)->exists()) {
+                if (! $role->permissions()->where('permissions.id', $viewPerm->id)->exists()) {
                     $role->permissions()->attach($viewPerm->id);
                 }
             }
@@ -133,7 +135,7 @@ class GovernancePermissionsSeeder extends Seeder
         if ($boardChair) {
             $allGovernancePerms = Permission::where('key', 'like', 'governance.%')->get();
             foreach ($allGovernancePerms as $perm) {
-                if (!$boardChair->permissions()->where('permissions.id', $perm->id)->exists()) {
+                if (! $boardChair->permissions()->where('permissions.id', $perm->id)->exists()) {
                     $boardChair->permissions()->attach($perm->id);
                 }
             }
@@ -172,7 +174,7 @@ class GovernancePermissionsSeeder extends Seeder
             ];
             foreach ($secretaryPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
-                if ($perm && !$boardSecretary->permissions()->where('permissions.id', $perm->id)->exists()) {
+                if ($perm && ! $boardSecretary->permissions()->where('permissions.id', $perm->id)->exists()) {
                     $boardSecretary->permissions()->attach($perm->id);
                 }
             }
@@ -208,7 +210,7 @@ class GovernancePermissionsSeeder extends Seeder
             ];
             foreach ($memberPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
-                if ($perm && !$boardMember->permissions()->where('permissions.id', $perm->id)->exists()) {
+                if ($perm && ! $boardMember->permissions()->where('permissions.id', $perm->id)->exists()) {
                     $boardMember->permissions()->attach($perm->id);
                 }
             }
@@ -238,7 +240,7 @@ class GovernancePermissionsSeeder extends Seeder
             ];
             foreach ($observerPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
-                if ($perm && !$boardObserver->permissions()->where('permissions.id', $perm->id)->exists()) {
+                if ($perm && ! $boardObserver->permissions()->where('permissions.id', $perm->id)->exists()) {
                     $boardObserver->permissions()->attach($perm->id);
                 }
             }

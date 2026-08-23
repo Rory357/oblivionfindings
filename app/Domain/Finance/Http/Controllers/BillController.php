@@ -93,7 +93,7 @@ class BillController extends Controller
             // Approved, still-valid governance spend approvals available to link on
             // the bill modal (for the spend-approval gate). Governance-owned; the
             // link is one-directional (a bill points at one, never creates one).
-            'spendApprovals' => $canManage ? $this->linkableSpendApprovals() : [],
+            'spendApprovals' => $canManage ? $this->linkableSpendApprovals($request) : [],
         ]);
     }
 
@@ -102,14 +102,13 @@ class BillController extends Controller
      * their validity window. Shaped for the New Bill modal's picker. Single-tenant,
      * so not org-scoped (spend_approvals has no organization_id).
      */
-    private function linkableSpendApprovals()
+    private function linkableSpendApprovals(Request $request)
     {
-        return \App\Domain\Governance\Models\SpendApproval::query()
-            ->where('status', \App\Domain\Governance\Models\SpendApproval::STATUS_APPROVED)
-            ->where(fn ($q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', now()->toDateString()))
-            ->orderByDesc('decided_at')
-            ->limit(200)
-            ->get(['id', 'reference', 'title', 'amount', 'category']);
+        if (! $request->user()->canDo('governance.spend.view')) {
+            return [];
+        }
+
+        return $this->service->linkableSpendApprovals($request->user());
     }
 
     /**
@@ -214,7 +213,11 @@ class BillController extends Controller
     {
         $validated = $request->validated();
 
-        $bill = $this->service->createBill($request->user()->organization_id, $validated);
+        $bill = $this->service->createBill(
+            $request->user()->organization_id,
+            $validated,
+            $request->user(),
+        );
 
         return redirect()->route('finance.bills.show', $bill)
             ->with('success', 'Bill created successfully.');
@@ -308,7 +311,7 @@ class BillController extends Controller
         $validated = $request->validated();
 
         try {
-            $this->service->updateBill($bill, $validated);
+            $this->service->updateBill($bill, $validated, $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['bill' => $e->getMessage()]);
         }

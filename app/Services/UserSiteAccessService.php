@@ -40,6 +40,14 @@ class UserSiteAccessService
      */
     public const HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS = ['hr.employees.viewAllSites'];
 
+    /**
+     * Explicit governance spend Site-scope bypass. The request, manageAny,
+     * and approve permissions remain separate action/ownership authority.
+     *
+     * @var array<int, string>
+     */
+    public const GOVERNANCE_SPEND_SITE_BYPASS_PERMISSIONS = ['governance.spend.viewAllSites'];
+
     /** @var array<string, bool> */
     private array $clientIncidentSiteColumnCache = [];
 

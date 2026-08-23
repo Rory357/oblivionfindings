@@ -45,7 +45,10 @@ class DashboardController extends Controller
 
         try {
             $this->syncBudgetActuals($request);
-            $snapshot = $this->aggregator->captureSnapshot($period);
+            $snapshot = $this->aggregator->captureSnapshot(
+                $period,
+                viewer: $request->user(),
+            );
             $periodData = $snapshot->snapshot_data['period'] ?? [
                 'type' => $period,
                 'start' => now()->startOfMonth()->toDateString(),

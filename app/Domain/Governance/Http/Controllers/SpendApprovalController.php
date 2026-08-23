@@ -3,21 +3,34 @@
 namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Models\SpendApproval;
-use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Services\SpendApprovalCommandService;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class SpendApprovalController extends Controller
 {
+    public function __construct(private readonly SpendApprovalCommandService $commands) {}
+
     public function index(Request $request): Response
     {
-        $query = SpendApproval::query()
+        $this->authorize('viewAny', SpendApproval::class);
+
+        $scope = $this->commands->accessibleApprovalQuery($request->user());
+        $query = (clone $scope)
+            ->select([
+                'id', 'reference', 'title', 'category', 'amount', 'currency',
+                'status', 'requires_board', 'requested_by', 'decided_by',
+                'resolution_id', 'submitted_at', 'decided_at', 'created_at',
+            ])
             ->with(['requestedBy:id,name,email', 'decidedBy:id,name,email', 'resolution:id,title,outcome'])
             ->latest('id');
 
@@ -30,18 +43,18 @@ class SpendApprovalController extends Controller
         if ($search = $request->string('search')->toString()) {
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('reference', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('reference', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
         $approvals = $query->paginate(25)->withQueryString();
 
         $summary = [
-            'pending' => SpendApproval::whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED])->count(),
-            'approved_ytd' => SpendApproval::where('status', SpendApproval::STATUS_APPROVED)
+            'pending' => (clone $scope)->whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED])->count(),
+            'approved_ytd' => (clone $scope)->where('status', SpendApproval::STATUS_APPROVED)
                 ->whereYear('decided_at', now()->year)->sum('amount'),
-            'rejected_ytd' => SpendApproval::where('status', SpendApproval::STATUS_REJECTED)
+            'rejected_ytd' => (clone $scope)->where('status', SpendApproval::STATUS_REJECTED)
                 ->whereYear('decided_at', now()->year)->sum('amount'),
         ];
 
@@ -70,9 +83,13 @@ class SpendApprovalController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $this->authorize('create', SpendApproval::class);
+        $this->commands->assertHasAccessibleSite($request->user());
+
         return Inertia::render('Governance/SpendApprovals/Create', [
+            'sites' => $this->commands->accessibleSiteOptions($request->user()),
             'categories' => SpendApproval::categories(),
             'thresholds' => [
                 'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
@@ -83,12 +100,15 @@ class SpendApprovalController extends Controller
         ]);
     }
 
-    public function edit(SpendApproval $approval): Response
+    public function edit(Request $request, SpendApproval $approval): Response
     {
-        abort_unless($approval->status === SpendApproval::STATUS_DRAFT, 422, 'Cannot edit a submitted approval');
+        $this->authorize('requestAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('update', $approval);
 
         return Inertia::render('Governance/SpendApprovals/Edit', [
             'approval' => $approval,
+            'sites' => $this->commands->accessibleSiteOptions($request->user()),
             'categories' => SpendApproval::categories(),
             'thresholds' => [
                 'capex' => SpendApproval::thresholdFor(SpendApproval::CATEGORY_CAPEX),
@@ -99,14 +119,17 @@ class SpendApprovalController extends Controller
         ]);
     }
 
-    public function show(SpendApproval $approval): Response
+    public function show(Request $request, SpendApproval $approval): Response
     {
+        $this->authorize('view', $approval);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->commands->assertCanonicalSourceForRead($request->user(), $approval);
         $approval->load([
             'requestedBy:id,name,email',
+            'submittedBy:id,name,email',
             'decidedBy:id,name,email',
             'resolution:id,title,outcome,votes_for,votes_against',
             'budget:id,fiscal_year,title',
-            'source',
         ]);
 
         return Inertia::render('Governance/SpendApprovals/Show', [
@@ -114,24 +137,21 @@ class SpendApprovalController extends Controller
             'categories' => SpendApproval::categories(),
             'threshold' => SpendApproval::thresholdFor($approval->category),
             'attachments' => $this->presentAttachments($approval),
+            'authority' => [
+                'update' => Gate::forUser($request->user())->allows('update', $approval),
+                'submit' => Gate::forUser($request->user())->allows('submit', $approval),
+                'decide' => Gate::forUser($request->user())->allows('decide', $approval),
+                'manage_attachments' => Gate::forUser($request->user())->allows('manageAttachments', $approval),
+            ],
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', SpendApproval::class);
+        $this->commands->assertHasAccessibleSite($request->user());
         $data = $this->validatePayload($request);
-        $data['reference'] = $this->nextReference();
-        $data['status'] = SpendApproval::STATUS_DRAFT;
-        $data['requested_by'] = auth()->id();
-        $data['requires_board'] = $this->shouldRequireBoard($data['category'], (float) $data['amount']);
-
-        $approval = SpendApproval::create($data);
-
-        GovernanceAuditService::log('spend_approval.created', 'SpendApproval', $approval->id, [
-            'amount' => $approval->amount,
-            'category' => $approval->category,
-            'requires_board' => $approval->requires_board,
-        ]);
+        $approval = $this->commands->create($request->user(), $data);
 
         return redirect()->route('governance.spend-approvals.show', $approval)
             ->with('success', 'Spend approval drafted.');
@@ -139,73 +159,51 @@ class SpendApprovalController extends Controller
 
     public function update(Request $request, SpendApproval $approval): RedirectResponse
     {
-        abort_unless($approval->status === SpendApproval::STATUS_DRAFT, 422, 'Cannot edit a submitted approval');
+        $this->authorize('requestAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('update', $approval);
 
         $data = $this->validatePayload($request);
-        $data['requires_board'] = $this->shouldRequireBoard($data['category'], (float) $data['amount']);
+        $expectedVersion = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ])['expected_version'];
 
-        $approval->update($data);
+        $this->commands->update($request->user(), $approval->id, $data, (int) $expectedVersion);
 
         return back()->with('success', 'Spend approval updated.');
     }
 
-    public function submit(SpendApproval $approval): RedirectResponse
+    public function submit(Request $request, SpendApproval $approval): RedirectResponse
     {
-        abort_unless($approval->status === SpendApproval::STATUS_DRAFT, 422, 'Only drafts can be submitted');
-
-        $approval->update([
-            'status' => SpendApproval::STATUS_SUBMITTED,
-            'submitted_at' => now(),
-        ]);
-
-        GovernanceAuditService::log('spend_approval.submitted', 'SpendApproval', $approval->id);
+        $this->authorize('requestAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('submit', $approval);
+        $expectedVersion = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ])['expected_version'];
+        $this->commands->submit($request->user(), $approval->id, (int) $expectedVersion);
 
         return back()->with('success', 'Spend approval submitted for sign-off.');
     }
 
     public function approve(Request $request, SpendApproval $approval): RedirectResponse
     {
-        abort_unless($approval->status === SpendApproval::STATUS_SUBMITTED, 422, 'Only submitted approvals can be decided');
-
-        $validated = $request->validate([
-            'decision_notes' => ['nullable', 'string', 'max:2000'],
-            'resolution_id' => ['nullable', 'integer', 'exists:resolutions,id'],
-        ]);
-
-        DB::transaction(function () use ($approval, $validated) {
-            $approval->update([
-                'status' => SpendApproval::STATUS_APPROVED,
-                'decided_by' => auth()->id(),
-                'decided_at' => now(),
-                'decision_notes' => $validated['decision_notes'] ?? null,
-                'resolution_id' => $validated['resolution_id'] ?? $approval->resolution_id,
-            ]);
-
-            GovernanceAuditService::log('spend_approval.approved', 'SpendApproval', $approval->id, [
-                'amount' => $approval->amount,
-                'resolution_id' => $approval->resolution_id,
-            ]);
-        });
+        $this->authorize('decideAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('decide', $approval);
+        $validated = $this->validateDecision($request);
+        $this->commands->decide($request->user(), $approval->id, SpendApproval::STATUS_APPROVED, $validated);
 
         return back()->with('success', 'Spend approval approved.');
     }
 
     public function reject(Request $request, SpendApproval $approval): RedirectResponse
     {
-        abort_unless($approval->status === SpendApproval::STATUS_SUBMITTED, 422, 'Only submitted approvals can be decided');
-
-        $validated = $request->validate([
-            'decision_notes' => ['required', 'string', 'max:2000'],
-        ]);
-
-        $approval->update([
-            'status' => SpendApproval::STATUS_REJECTED,
-            'decided_by' => auth()->id(),
-            'decided_at' => now(),
-            'decision_notes' => $validated['decision_notes'],
-        ]);
-
-        GovernanceAuditService::log('spend_approval.rejected', 'SpendApproval', $approval->id);
+        $this->authorize('decideAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('decide', $approval);
+        $validated = $this->validateDecision($request);
+        $this->commands->decide($request->user(), $approval->id, SpendApproval::STATUS_REJECTED, $validated);
 
         return back()->with('success', 'Spend approval rejected.');
     }
@@ -216,43 +214,40 @@ class SpendApprovalController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'category' => ['required', 'string', 'in:capex,opex,supplier_contract,donor_restricted'],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
             'currency' => ['nullable', 'string', 'size:3'],
-            'site_id' => ['nullable', 'integer'],
-            'cost_centre_id' => ['nullable', 'integer'],
-            'funding_stream_id' => ['nullable', 'integer'],
-            'donor_fund_id' => ['nullable', 'integer'],
-            'budget_id' => ['nullable', 'integer', 'exists:budgets,id'],
-            'budget_line_item_id' => ['nullable', 'integer', 'exists:budget_line_items,id'],
-            'attachments' => ['nullable', 'array'],
+            'source_type' => ['nullable', 'string', 'required_with:source_id', Rule::in(SpendApproval::SOURCE_TYPES)],
+            'source_id' => ['nullable', 'integer', 'min:1', 'required_with:source_type'],
+            'site_id' => ['nullable', 'integer', 'min:1'],
+            'cost_centre_id' => ['nullable', 'integer', 'min:1'],
+            'funding_stream_id' => ['nullable', 'integer', 'min:1'],
+            'donor_fund_id' => ['nullable', 'integer', 'min:1'],
+            'budget_id' => ['nullable', 'integer', 'min:1'],
+            'budget_line_item_id' => ['nullable', 'integer', 'min:1'],
             'valid_until' => ['nullable', 'date'],
         ]);
     }
 
-    private function shouldRequireBoard(string $category, float $amount): bool
+    private function validateDecision(Request $request): array
     {
-        return $amount >= SpendApproval::thresholdFor($category);
-    }
-
-    private function nextReference(): string
-    {
-        $year = now()->format('Y');
-        $count = SpendApproval::whereYear('created_at', $year)->count() + 1;
-
-        return sprintf('SA-%s-%04d', $year, $count);
+        return $request->validate([
+            'decision_key' => ['required', 'uuid'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'expected_content_digest' => ['required', 'string', 'size:64', 'regex:/\A[a-f0-9]{64}\z/'],
+            'decision_notes' => ['required', 'string', 'max:2000'],
+            'resolution_id' => ['nullable', 'integer', 'min:1'],
+        ]);
     }
 
     /**
      * Upload supporting documents (quotes, contracts, invoices, due diligence)
      * for a spend approval. Critical for board audit of money decisions.
      */
-    public function attachFiles(Request $request, SpendApproval $approval): RedirectResponse|Response|\Illuminate\Http\JsonResponse
+    public function attachFiles(Request $request, SpendApproval $approval): RedirectResponse|Response|JsonResponse
     {
-        // Drafts can be edited by their requester; submitted approvals lock
-        // edits to manage-level users (handled by route middleware).
-        if ($approval->status === SpendApproval::STATUS_DRAFT && $approval->requested_by !== auth()->id()) {
-            abort(403, 'Only the requester can attach documents to a draft.');
-        }
+        $this->authorize('requestAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('manageAttachments', $approval);
 
         $request->validate([
             'files' => 'required|array|min:1|max:10',
@@ -264,79 +259,61 @@ class SpendApprovalController extends Controller
             ],
         ]);
 
-        $existing = is_array($approval->attachments) ? $approval->attachments : [];
+        $storedPaths = [];
+        $attachments = [];
 
-        foreach ($request->file('files') as $file) {
-            $directory = "governance/spend-approvals/{$approval->id}";
-            $extension = $file->getClientOriginalExtension() ?: $file->extension();
-            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
-            $path = $file->storeAs($directory, $storedName, 'local');
+        try {
+            foreach ($request->file('files') as $file) {
+                $directory = "governance/spend-approvals/{$approval->id}";
+                $extension = $file->getClientOriginalExtension() ?: $file->extension();
+                $storedName = Str::uuid()->toString().($extension ? ".{$extension}" : '');
+                $path = $file->storeAs($directory, $storedName, 'local');
+                $storedPaths[] = $path;
+                $attachments[] = [
+                    'id' => Str::uuid()->toString(),
+                    'path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size_bytes' => $file->getSize(),
+                    'sha256' => hash_file('sha256', Storage::disk('local')->path($path)),
+                    'uploaded_at' => now()->toIso8601String(),
+                    'uploaded_by_id' => $request->user()->id,
+                    'uploaded_by_name' => $request->user()->name,
+                ];
+            }
 
-            $existing[] = [
-                'id' => Str::uuid()->toString(),
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size_bytes' => $file->getSize(),
-                'uploaded_at' => now()->toIso8601String(),
-                'uploaded_by_id' => auth()->id(),
-                'uploaded_by_name' => auth()->user()?->name,
-            ];
+            $approval = $this->commands->appendAttachments($request->user(), $approval->id, $attachments);
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($storedPaths);
+            throw $exception;
         }
-
-        $approval->update(['attachments' => $existing]);
-
-        GovernanceAuditService::log(
-            'spend_approval.attachment_added',
-            'SpendApproval',
-            $approval->id,
-            ['count' => count($request->file('files'))],
-        );
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
             : redirect()->back()->with('success', 'Document(s) attached.');
     }
 
-    public function deleteAttachment(Request $request, SpendApproval $approval, string $attachment): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function deleteAttachment(Request $request, SpendApproval $approval, string $attachment): RedirectResponse|JsonResponse
     {
-        if ($approval->status === SpendApproval::STATUS_DRAFT && $approval->requested_by !== auth()->id()) {
-            abort(403, 'Only the requester can remove documents from a draft.');
-        }
-
-        $existing = is_array($approval->attachments) ? $approval->attachments : [];
-        $target = collect($existing)->firstWhere('id', $attachment);
-
-        if (! $target) {
-            abort(404, 'Attachment not found.');
-        }
+        $this->authorize('requestAny', SpendApproval::class);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->authorize('manageAttachments', $approval);
+        [$approval, $target] = $this->commands->removeAttachment($request->user(), $approval->id, $attachment);
 
         if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
             Storage::disk('local')->delete($target['path']);
         }
-
-        $remaining = array_values(
-            array_filter($existing, fn (array $row) => ($row['id'] ?? null) !== $attachment),
-        );
-
-        $approval->update(['attachments' => $remaining]);
-
-        GovernanceAuditService::log(
-            'spend_approval.attachment_removed',
-            'SpendApproval',
-            $approval->id,
-            ['attachment_id' => $attachment, 'original_name' => $target['original_name'] ?? null],
-        );
 
         return $request->wantsJson()
             ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
             : redirect()->back()->with('success', 'Attachment removed.');
     }
 
-    public function downloadAttachment(SpendApproval $approval, string $attachment)
+    public function downloadAttachment(Request $request, SpendApproval $approval, string $attachment)
     {
-        // Route is gated by spend.view permission; anyone who can see the
-        // approval can download the supporting documents.
+        $this->authorize('download', $approval);
+        $approval = $this->commands->resolveAccessibleApproval($request->user(), $approval->id);
+        $this->commands->assertCanonicalSourceForRead($request->user(), $approval);
         $existing = is_array($approval->attachments) ? $approval->attachments : [];
         $target = collect($existing)->firstWhere('id', $attachment);
 

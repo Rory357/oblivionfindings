@@ -30,6 +30,7 @@ class DashboardAggregatorService
 {
     public function __construct(
         protected HsGovernanceService $hsGovernanceService,
+        protected SpendApprovalCommandService $spendApprovalReader,
         protected ?RoadmapDashboardService $roadmapDashboardService = null,
     ) {}
 
@@ -55,7 +56,7 @@ class DashboardAggregatorService
             'operational_safety' => fn () => $this->getOperationalSafetyMetrics($range),
             'privacy_data' => fn () => $this->getPrivacyMetrics($range),
             'workforce' => fn () => $this->getWorkforceMetrics($range),
-            'financial' => fn () => $this->getFinancialMetrics($range),
+            'financial' => fn () => $this->getFinancialMetrics($range, $viewer),
             'it_cyber' => fn () => $this->getItCyberMetrics($range),
             'fleet_assets' => fn () => $this->getFleetAssetMetrics($range),
             'compliance_calendar' => fn () => $this->getComplianceCalendar(),
@@ -260,7 +261,7 @@ class DashboardAggregatorService
         ];
     }
 
-    public function getFinancialMetrics(array $range): array
+    public function getFinancialMetrics(array $range, ?User $viewer = null): array
     {
         $currentBudget = Budget::approved()
             ->latest('approved_by_board_at')
@@ -295,14 +296,19 @@ class DashboardAggregatorService
 
         // Pending spend approvals (waiting on board / finance committee).
         if (Schema::hasTable('spend_approvals')) {
-            $pendingApprovals = SpendApproval::query()
-                ->whereIn('status', ['draft', 'submitted'])
-                ->get();
-            $base['pending_spend_count'] = $pendingApprovals->count();
-            $base['pending_spend_total'] = round((float) $pendingApprovals->sum('amount'), 2);
-            $base['pending_board_approvals'] = $pendingApprovals
-                ->where('requires_board', true)
-                ->count();
+            $spendQuery = $this->spendApprovalReader->readableApprovalQuery(
+                $viewer ?? auth()->user(),
+            );
+            if ($spendQuery) {
+                $pendingApprovals = $spendQuery
+                    ->whereIn('status', [SpendApproval::STATUS_DRAFT, SpendApproval::STATUS_SUBMITTED])
+                    ->get(['amount', 'requires_board']);
+                $base['pending_spend_count'] = $pendingApprovals->count();
+                $base['pending_spend_total'] = round((float) $pendingApprovals->sum('amount'), 2);
+                $base['pending_board_approvals'] = $pendingApprovals
+                    ->where('requires_board', true)
+                    ->count();
+            }
         }
 
         // Sites over budget — pulled via Finance's BudgetVarianceService (source of truth).

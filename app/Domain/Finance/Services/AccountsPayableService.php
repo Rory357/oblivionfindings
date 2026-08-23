@@ -8,24 +8,127 @@ use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Governance\Models\SpendApproval;
+use App\Domain\Governance\Models\SpendApprovalDecision;
+use App\Domain\Governance\Services\SpendApprovalCommandService;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
+use Throwable;
 
 class AccountsPayableService
 {
     public function __construct(
         private JournalPostingService $journalPostingService,
         private GstTaxRateResolver $gstTaxRateResolver,
+        private SpendApprovalCommandService $spendApprovals,
+        private UserSiteAccessService $siteAccess,
     ) {}
+
+    /**
+     * Return only decided approvals whose exact FinBill source and immutable
+     * evidence remain current within the actor's canonical governance Site scope.
+     *
+     * @return Collection<int, array{id:int, reference:string, title:string, amount:string, category:string}>
+     */
+    public function linkableSpendApprovals(User $actor): Collection
+    {
+        if (Gate::forUser($actor)->denies('viewAny', SpendApproval::class)) {
+            return collect();
+        }
+
+        $siteIds = $this->accessibleSpendSiteIds($actor);
+        if ($siteIds === []) {
+            return collect();
+        }
+
+        return SpendApproval::query()
+            ->where('status', SpendApproval::STATUS_APPROVED)
+            ->whereIn('site_id', $siteIds)
+            ->where('source_type', FinBill::class)
+            ->whereNotNull('source_id')
+            ->where(fn ($query) => $query
+                ->whereNull('valid_until')
+                ->orWhere('valid_until', '>=', now()->toDateString()))
+            ->orderByDesc('decided_at')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->filter(function (SpendApproval $approval): bool {
+                $bill = FinBill::query()
+                    ->whereKey($approval->source_id)
+                    ->where('site_id', $approval->site_id)
+                    ->first();
+                if (! $bill) {
+                    return false;
+                }
+
+                $decision = $this->currentDecisionQuery($approval)->first();
+
+                return $this->hasCurrentSpendApprovalEvidence($approval, $bill, $decision);
+            })
+            ->map(fn (SpendApproval $approval): array => [
+                'id' => (int) $approval->id,
+                'reference' => $approval->reference,
+                'title' => $approval->title,
+                'amount' => (string) $approval->amount,
+                'category' => $approval->category,
+            ])
+            ->values();
+    }
+
+    public function assertSpendApprovalLinkVisible(
+        User $actor,
+        ?FinBill $bill,
+        int $approvalId,
+    ): void {
+        Gate::forUser($actor)->authorize('viewAny', SpendApproval::class);
+        $siteIds = $this->accessibleSpendSiteIds($actor);
+        if ($siteIds === []) {
+            $this->concealSpendApproval();
+        }
+
+        $approval = SpendApproval::query()
+            ->whereKey($approvalId)
+            ->whereIn('site_id', $siteIds)
+            ->where('source_type', FinBill::class)
+            ->when($bill, fn ($query) => $query->where('source_id', $bill->id))
+            ->firstOrFail();
+        $sourceBill = FinBill::query()
+            ->whereKey($approval->source_id)
+            ->where('site_id', $approval->site_id)
+            ->first();
+        $decision = $this->currentDecisionQuery($approval)->first();
+
+        if (! $sourceBill || ! $this->hasCurrentSpendApprovalEvidence($approval, $sourceBill, $decision)) {
+            $this->concealSpendApproval();
+        }
+    }
 
     /**
      * Create a bill with lines. Auto-generate bill_number if not provided.
      */
-    public function createBill(?int $orgId, array $data): FinBill
+    public function createBill(?int $orgId, array $data, ?User $actor = null): FinBill
     {
-        return DB::transaction(function () use ($orgId, $data) {
+        return DB::transaction(function () use ($orgId, $data, $actor) {
+            $approvalId = filled($data['spend_approval_id'] ?? null)
+                ? (int) $data['spend_approval_id']
+                : null;
+            $approval = null;
+            if ($approvalId) {
+                if (! $actor) {
+                    $this->concealSpendApproval();
+                }
+                $lockedActor = $this->lockUser($actor->id);
+                Gate::forUser($lockedActor)->authorize('create', FinBill::class);
+                $approval = $this->lockVisibleSpendApproval($lockedActor, $approvalId);
+            }
+
             $billNumber = ! empty($data['bill_number'])
                 ? $data['bill_number']
                 : $this->generateBillNumber($orgId);
@@ -48,7 +151,7 @@ class AccountsPayableService
                 'total_amount' => 0,
                 'amount_paid' => 0,
                 'notes' => $data['notes'] ?? null,
-                'created_by' => Auth::id(),
+                'created_by' => $actor?->id ?? Auth::id(),
             ]);
 
             $subtotal = '0';
@@ -93,6 +196,13 @@ class AccountsPayableService
                 'gst_amount' => $gstAmount,
                 'total_amount' => $totalAmount,
             ]);
+
+            if ($approval) {
+                $decision = $this->currentDecisionQuery($approval, true)->first();
+                if (! $this->hasCurrentSpendApprovalEvidence($approval, $bill->fresh(), $decision)) {
+                    $this->concealSpendApproval();
+                }
+            }
 
             return $bill->load('lines', 'vendor');
         });
@@ -178,14 +288,32 @@ class AccountsPayableService
     /**
      * Update a bill. Only allowed if draft.
      */
-    public function updateBill(FinBill $bill, array $data): FinBill
+    public function updateBill(FinBill $bill, array $data, ?User $actor = null): FinBill
     {
-        if ($bill->status !== 'draft') {
-            throw new InvalidArgumentException('Only draft bills can be updated.');
-        }
+        return DB::transaction(function () use ($bill, $data, $actor) {
+            $approvalId = filled($data['spend_approval_id'] ?? null)
+                ? (int) $data['spend_approval_id']
+                : null;
+            $approval = null;
+            if ($approvalId) {
+                if (! $actor) {
+                    $this->concealSpendApproval();
+                }
+                $lockedActor = $this->lockUser($actor->id);
+                $approval = $this->lockVisibleSpendApproval($lockedActor, $approvalId);
+            }
 
-        return DB::transaction(function () use ($bill, $data) {
-            $bill->update([
+            $lockedBill = FinBill::query()
+                ->lockForUpdate()
+                ->findOrFail($bill->id);
+            if ($lockedBill->status !== 'draft') {
+                throw new InvalidArgumentException('Only draft bills can be updated.');
+            }
+            if ($approval) {
+                Gate::forUser($lockedActor)->authorize('update', $lockedBill);
+            }
+
+            $lockedBill->update([
                 'vendor_id' => $data['vendor_id'],
                 'vendor_reference' => $data['vendor_reference'] ?? null,
                 'bill_date' => $data['bill_date'],
@@ -196,7 +324,7 @@ class AccountsPayableService
             ]);
 
             // Delete existing lines and recreate
-            $bill->lines()->delete();
+            $lockedBill->lines()->delete();
 
             $subtotal = '0';
             $gstAmount = '0';
@@ -216,7 +344,7 @@ class AccountsPayableService
                 $lineGst = bcmul($lineSubtotal, (string) $gstFraction, 2);
                 $lineTotal = bcadd($lineSubtotal, $lineGst, 2);
 
-                $bill->lines()->create([
+                $lockedBill->lines()->create([
                     'description' => $line['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
@@ -235,13 +363,20 @@ class AccountsPayableService
 
             $totalAmount = bcadd($subtotal, $gstAmount, 2);
 
-            $bill->update([
+            $lockedBill->update([
                 'subtotal' => $subtotal,
                 'gst_amount' => $gstAmount,
                 'total_amount' => $totalAmount,
             ]);
 
-            return $bill->load('lines', 'vendor');
+            if ($approval) {
+                $decision = $this->currentDecisionQuery($approval, true)->first();
+                if (! $this->hasCurrentSpendApprovalEvidence($approval, $lockedBill->fresh(), $decision)) {
+                    $this->concealSpendApproval();
+                }
+            }
+
+            return $lockedBill->load('lines', 'vendor');
         });
     }
 
@@ -251,28 +386,63 @@ class AccountsPayableService
      */
     public function approveBill(FinBill $bill, int $userId): FinBill
     {
-        if (! in_array($bill->status, ['draft', 'awaiting_approval'])) {
-            throw new InvalidArgumentException('Only draft or awaiting approval bills can be approved.');
-        }
+        $preflight = FinBill::query()
+            ->whereKey($bill->id)
+            ->firstOrFail(['id', 'spend_approval_id', 'total_amount']);
+        $threshold = (float) config('finance.spend_approval.threshold', 10000);
+        $preflightRequiresSpendApproval = config('finance.spend_approval.enforce', false)
+            && (float) $preflight->total_amount >= $threshold;
 
-        $this->assertSpendApprovalSatisfied($bill);
+        return DB::transaction(function () use (
+            $bill,
+            $userId,
+            $preflight,
+            $preflightRequiresSpendApproval,
+            $threshold,
+        ) {
+            $lockedActor = $this->lockUser($userId);
+            $approval = null;
+            if ($preflightRequiresSpendApproval && $preflight->spend_approval_id) {
+                $approval = $this->lockVisibleSpendApproval(
+                    $lockedActor,
+                    (int) $preflight->spend_approval_id,
+                );
+            }
 
-        return DB::transaction(function () use ($bill, $userId) {
-            $bill->loadMissing('lines.taxRate');
+            $lockedBill = FinBill::query()
+                ->lockForUpdate()
+                ->findOrFail($bill->id);
+            if (! in_array($lockedBill->status, ['draft', 'awaiting_approval'])) {
+                throw new InvalidArgumentException('Only draft or awaiting approval bills can be approved.');
+            }
 
-            $apAccount = $this->findApAccount($bill->organization_id);
+            $requiresSpendApproval = config('finance.spend_approval.enforce', false)
+                && (float) $lockedBill->total_amount >= $threshold;
+            if ($requiresSpendApproval) {
+                Gate::forUser($lockedActor)->authorize('approve', $lockedBill);
+                if (! $approval
+                    || (int) $lockedBill->spend_approval_id !== (int) $preflight->spend_approval_id) {
+                    $this->throwSpendApprovalGate($lockedBill, $threshold);
+                }
+                $decision = $this->currentDecisionQuery($approval, true)->first();
+                $this->assertSpendApprovalSatisfied($lockedBill, $approval, $decision, $threshold);
+            }
+
+            $lockedBill->loadMissing('lines.taxRate', 'vendor');
+
+            $apAccount = $this->findApAccount($lockedBill->organization_id);
 
             $journalLines = [];
 
             // DR net expense/asset amounts. The per-source tax metadata remains
             // on these lines; the separate 2210 line carries the recoverable GST
             // control balance without being counted as a second GST component.
-            foreach ($bill->lines as $line) {
+            foreach ($lockedBill->lines as $line) {
                 $taxRate = $this->gstTaxRateResolver->resolveStoredRate(
-                    (int) $bill->organization_id,
+                    (int) $lockedBill->organization_id,
                     $line->tax_rate_id === null ? null : (int) $line->tax_rate_id,
                     (string) $line->gst_rate,
-                    "Bill {$bill->bill_number} line #{$line->id}",
+                    "Bill {$lockedBill->bill_number} line #{$line->id}",
                 );
                 $netAmount = bcsub((string) $line->line_total, (string) $line->gst_amount, 2);
 
@@ -288,11 +458,11 @@ class AccountsPayableService
                 ];
             }
 
-            if (bccomp((string) $bill->gst_amount, '0.00', 2) > 0) {
+            if (bccomp((string) $lockedBill->gst_amount, '0.00', 2) > 0) {
                 $journalLines[] = [
-                    'account_id' => $this->findAccountByCode($bill->organization_id, '2210')->id,
-                    'description' => "GST Paid - {$bill->bill_number}",
-                    'debit' => $bill->gst_amount,
+                    'account_id' => $this->findAccountByCode($lockedBill->organization_id, '2210')->id,
+                    'description' => "GST Paid - {$lockedBill->bill_number}",
+                    'debit' => $lockedBill->gst_amount,
                     'credit' => 0,
                 ];
             }
@@ -300,31 +470,31 @@ class AccountsPayableService
             // CR Accounts Payable for the total amount
             $journalLines[] = [
                 'account_id' => $apAccount->id,
-                'description' => 'Bill '.$bill->bill_number.' — '.($bill->vendor?->name ?? 'Unknown vendor'),
+                'description' => 'Bill '.$lockedBill->bill_number.' — '.($lockedBill->vendor?->name ?? 'Unknown vendor'),
                 'debit' => 0,
-                'credit' => $bill->total_amount,
+                'credit' => $lockedBill->total_amount,
             ];
 
-            $journal = $this->journalPostingService->createAndPost($bill->organization_id, [
-                'journal_date' => $bill->bill_date->toDateString(),
+            $journal = $this->journalPostingService->createAndPost($lockedBill->organization_id, [
+                'journal_date' => $lockedBill->bill_date->toDateString(),
                 'type' => 'standard',
-                'reference' => $bill->bill_number,
-                'description' => "Bill {$bill->bill_number} approved",
+                'reference' => $lockedBill->bill_number,
+                'description' => "Bill {$lockedBill->bill_number} approved",
                 'source_type' => FinBill::class,
-                'source_id' => $bill->id,
+                'source_id' => $lockedBill->id,
                 'lines' => $journalLines,
             ]);
 
-            $bill->update([
+            $lockedBill->update([
                 'status' => 'approved',
-                'approved_by' => $userId,
+                'approved_by' => $lockedActor->id,
                 'approved_at' => now(),
                 'journal_id' => $journal->id,
             ]);
 
-            $this->allocateCapturedBill($bill, $journal);
+            $this->allocateCapturedBill($lockedBill, $journal);
 
-            return $bill->refresh();
+            return $lockedBill->refresh();
         });
     }
 
@@ -374,31 +544,119 @@ class AccountsPayableService
      * InvalidArgumentException (the approve action catches it → flash error);
      * this NEVER creates a SpendApproval — the link is one-directional.
      */
-    private function assertSpendApprovalSatisfied(FinBill $bill): void
+    private function assertSpendApprovalSatisfied(
+        FinBill $bill,
+        SpendApproval $approval,
+        ?SpendApprovalDecision $decision,
+        float $threshold,
+    ): void {
+        if (! $this->hasCurrentSpendApprovalEvidence($approval, $bill, $decision)) {
+            $this->throwSpendApprovalGate($bill, $threshold);
+        }
+    }
+
+    private function hasCurrentSpendApprovalEvidence(
+        SpendApproval $approval,
+        FinBill $bill,
+        ?SpendApprovalDecision $decision,
+    ): bool {
+        if ($approval->status !== SpendApproval::STATUS_APPROVED
+            || ! $approval->site_id
+            || ! $bill->site_id
+            || (int) $approval->site_id !== (int) $bill->site_id
+            || $approval->source_type !== FinBill::class
+            || (int) $approval->source_id !== (int) $bill->id
+            || (float) $approval->amount < (float) $bill->total_amount
+            || strtoupper((string) $approval->currency) !== 'NZD'
+            || ($approval->valid_until && $approval->valid_until->isBefore(today()))
+            || (int) $approval->requested_by === (int) $approval->decided_by
+            || ! $decision) {
+            return false;
+        }
+
+        try {
+            $sourceEvidence = $this->spendApprovals->canonicalBillSourceEvidence(
+                $bill,
+                (int) $approval->site_id,
+            );
+            $currentDigest = $approval->decisionContentDigest($sourceEvidence);
+        } catch (Throwable) {
+            return false;
+        }
+
+        $decisionSource = $decision->parent_evidence['source'] ?? null;
+
+        return is_string($approval->content_digest)
+            && hash_equals($approval->content_digest, $currentDigest)
+            && $decision->outcome === SpendApproval::STATUS_APPROVED
+            && (int) $decision->submission_version === (int) $approval->submission_version
+            && is_string($decision->content_digest)
+            && hash_equals($decision->content_digest, $approval->content_digest)
+            && (int) $decision->decided_by === (int) $approval->decided_by
+            && $decision->decided_at?->equalTo($approval->decided_at) === true
+            && trim((string) $decision->reason) !== ''
+            && trim((string) $approval->decision_notes) === trim((string) $decision->reason)
+            && $decisionSource === $sourceEvidence;
+    }
+
+    private function currentDecisionQuery(SpendApproval $approval, bool $lock = false)
     {
-        if (! config('finance.spend_approval.enforce', false)) {
-            return;
+        $query = SpendApprovalDecision::query()
+            ->where('spend_approval_id', $approval->id)
+            ->where('submission_version', $approval->submission_version)
+            ->where('content_digest', $approval->content_digest)
+            ->orderByDesc('evidence_version')
+            ->orderByDesc('id');
+        if ($lock) {
+            $query->lockForUpdate();
         }
 
-        $threshold = (float) config('finance.spend_approval.threshold', 10000);
-        $total = (float) $bill->total_amount;
+        return $query;
+    }
 
-        if ($total < $threshold) {
-            return;
+    private function lockVisibleSpendApproval(User $actor, int $approvalId): SpendApproval
+    {
+        Gate::forUser($actor)->authorize('viewAny', SpendApproval::class);
+        $siteIds = $this->accessibleSpendSiteIds($actor);
+        if ($siteIds === []) {
+            $this->concealSpendApproval();
         }
 
-        $approval = $bill->spendApproval;
-        $satisfied = $approval
-            && $approval->status === SpendApproval::STATUS_APPROVED
-            && (float) $approval->amount >= $total;
+        return SpendApproval::query()
+            ->whereKey($approvalId)
+            ->whereIn('site_id', $siteIds)
+            ->where('source_type', FinBill::class)
+            ->whereNotNull('source_id')
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
 
-        if (! $satisfied) {
-            throw new InvalidArgumentException(sprintf(
-                'This bill (NZD %s) is at or above the NZD %s spend-approval threshold. Link an approved spend approval covering the full amount before approving it.',
-                number_format($total, 2),
-                number_format($threshold, 2),
-            ));
-        }
+    /** @return array<int, int> */
+    private function accessibleSpendSiteIds(User $actor): array
+    {
+        return $this->siteAccess->accessibleSiteIds(
+            $actor,
+            UserSiteAccessService::GOVERNANCE_SPEND_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function lockUser(int $userId): User
+    {
+        return User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+    }
+
+    private function concealSpendApproval(): never
+    {
+        throw (new ModelNotFoundException)->setModel(SpendApproval::class);
+    }
+
+    private function throwSpendApprovalGate(FinBill $bill, float $threshold): never
+    {
+        throw new InvalidArgumentException(sprintf(
+            'This bill (NZD %s) is at or above the NZD %s spend-approval threshold. Link an approved spend approval covering the full amount before approving it.',
+            number_format((float) $bill->total_amount, 2),
+            number_format($threshold, 2),
+        ));
     }
 
     /**

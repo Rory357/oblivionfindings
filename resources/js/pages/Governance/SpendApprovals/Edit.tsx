@@ -25,6 +25,8 @@ interface Approval {
     amount: number;
     currency: string;
     status: string;
+    version: number;
+    site_id: number | null;
     valid_until: string | null;
 }
 
@@ -32,6 +34,7 @@ interface Props extends PageProps {
     approval: Approval;
     categories: Record<string, string>;
     thresholds: Record<string, number>;
+    sites: Array<{ id: number; name: string }>;
 }
 
 export default function EditSpendApproval({
@@ -39,6 +42,7 @@ export default function EditSpendApproval({
     approval,
     categories,
     thresholds,
+    sites,
 }: Props) {
     const form = useForm({
         title: approval.title,
@@ -46,7 +50,9 @@ export default function EditSpendApproval({
         category: approval.category,
         amount: String(approval.amount),
         currency: approval.currency,
+        site_id: approval.site_id ? String(approval.site_id) : '',
         valid_until: approval.valid_until ?? '',
+        expected_version: approval.version,
     });
 
     const submit = (e: React.FormEvent) => {
@@ -107,6 +113,34 @@ export default function EditSpendApproval({
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 lg:grid-cols-2">
                                 <div>
+                                    <Label htmlFor="site_id">Site</Label>
+                                    <Select
+                                        value={form.data.site_id}
+                                        onValueChange={(value) =>
+                                            form.setData('site_id', value)
+                                        }
+                                    >
+                                        <SelectTrigger id="site_id">
+                                            <SelectValue placeholder="Select a site" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {sites.map((site) => (
+                                                <SelectItem
+                                                    key={site.id}
+                                                    value={String(site.id)}
+                                                >
+                                                    {site.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.site_id && (
+                                        <p className="text-status-critical mt-1 text-xs">
+                                            {form.errors.site_id}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
                                     <Label htmlFor="title">Title</Label>
                                     <Input
                                         id="title"
@@ -120,7 +154,7 @@ export default function EditSpendApproval({
                                         required
                                     />
                                     {form.errors.title && (
-                                        <p className="mt-1 text-xs text-status-critical">
+                                        <p className="text-status-critical mt-1 text-xs">
                                             {form.errors.title}
                                         </p>
                                     )}
@@ -170,11 +204,11 @@ export default function EditSpendApproval({
                                         required
                                     />
                                     {form.errors.amount && (
-                                        <p className="mt-1 text-xs text-status-critical">
+                                        <p className="text-status-critical mt-1 text-xs">
                                             {form.errors.amount}
                                         </p>
                                     )}
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <p className="text-muted-foreground mt-1 text-xs">
                                         Threshold for this category:{' '}
                                         {new Intl.NumberFormat('en-NZ', {
                                             style: 'currency',
@@ -182,7 +216,7 @@ export default function EditSpendApproval({
                                         }).format(threshold)}
                                     </p>
                                     {requiresBoard && numericAmount > 0 && (
-                                        <p className="mt-1 text-xs font-medium text-status-warning">
+                                        <p className="text-status-warning mt-1 text-xs font-medium">
                                             ⚠ This amount exceeds the threshold
                                             and will require a board resolution.
                                         </p>

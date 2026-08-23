@@ -4,7 +4,10 @@ namespace Tests\Feature\Governance;
 
 use App\Domain\Governance\Models\GovernanceSetting;
 use App\Domain\Governance\Models\SpendApproval;
+use App\Models\Site;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\Support\GovernanceTestHelpers;
 use Tests\TestCase;
 
@@ -13,10 +16,13 @@ class GovernanceSpendApprovalsTest extends TestCase
     use GovernanceTestHelpers;
     use RefreshDatabase;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seedGovernance();
+        $this->site = Site::factory()->create();
     }
 
     public function test_admin_can_view_index(): void
@@ -45,6 +51,7 @@ class GovernanceSpendApprovalsTest extends TestCase
             'category' => 'capex',
             'amount' => 28500,
             'currency' => 'NZD',
+            'site_id' => $this->site->id,
         ]);
 
         $response->assertRedirect();
@@ -68,6 +75,7 @@ class GovernanceSpendApprovalsTest extends TestCase
             'category' => 'capex',
             'amount' => 800,
             'currency' => 'NZD',
+            'site_id' => $this->site->id,
         ])->assertRedirect();
 
         $approval = SpendApproval::latest('id')->first();
@@ -84,9 +92,12 @@ class GovernanceSpendApprovalsTest extends TestCase
             'amount' => 12000, 'currency' => 'NZD',
             'status' => SpendApproval::STATUS_DRAFT,
             'requested_by' => $admin->id,
+            'site_id' => $this->site->id,
         ]);
 
-        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/submit")
+        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/submit", [
+            'expected_version' => 1,
+        ])
             ->assertRedirect();
 
         $approval->refresh();
@@ -96,39 +107,29 @@ class GovernanceSpendApprovalsTest extends TestCase
 
     public function test_submitted_can_be_approved(): void
     {
-        $admin = $this->createAdminUser();
-        $approval = SpendApproval::create([
-            'reference' => 'SA-2026-0001',
-            'title' => 'Test', 'category' => 'opex',
-            'amount' => 12000, 'currency' => 'NZD',
-            'status' => SpendApproval::STATUS_SUBMITTED,
-            'submitted_at' => now(),
-            'requested_by' => $admin->id,
-        ]);
+        $requester = $this->createAdminUser();
+        $decider = $this->createAdminUser();
+        $approval = $this->submittedApproval($requester, 'SA-2026-0001');
 
-        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/approve", [
+        $this->actingAs($decider)->post("/governance/spend-approvals/{$approval->id}/approve", [
+            ...$this->decisionPayload($approval),
             'decision_notes' => 'Approved on the spot — within delegated authority.',
         ])->assertRedirect();
 
         $approval->refresh();
         $this->assertSame(SpendApproval::STATUS_APPROVED, $approval->status);
-        $this->assertSame($admin->id, $approval->decided_by);
+        $this->assertSame($decider->id, $approval->decided_by);
         $this->assertNotNull($approval->decided_at);
     }
 
     public function test_submitted_can_be_rejected_with_reason(): void
     {
-        $admin = $this->createAdminUser();
-        $approval = SpendApproval::create([
-            'reference' => 'SA-2026-0002',
-            'title' => 'Test', 'category' => 'opex',
-            'amount' => 12000, 'currency' => 'NZD',
-            'status' => SpendApproval::STATUS_SUBMITTED,
-            'submitted_at' => now(),
-            'requested_by' => $admin->id,
-        ]);
+        $requester = $this->createAdminUser();
+        $decider = $this->createAdminUser();
+        $approval = $this->submittedApproval($requester, 'SA-2026-0002');
 
-        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/reject", [
+        $this->actingAs($decider)->post("/governance/spend-approvals/{$approval->id}/reject", [
+            ...$this->decisionPayload($approval),
             'decision_notes' => 'Rejected — funding not yet secured.',
         ])->assertRedirect();
 
@@ -138,34 +139,50 @@ class GovernanceSpendApprovalsTest extends TestCase
 
     public function test_reject_requires_reason(): void
     {
-        $admin = $this->createAdminUser();
-        $approval = SpendApproval::create([
-            'reference' => 'SA-2026-0003',
-            'title' => 'Test', 'category' => 'opex',
-            'amount' => 12000, 'currency' => 'NZD',
-            'status' => SpendApproval::STATUS_SUBMITTED,
-            'submitted_at' => now(),
-            'requested_by' => $admin->id,
-        ]);
+        $requester = $this->createAdminUser();
+        $decider = $this->createAdminUser();
+        $approval = $this->submittedApproval($requester, 'SA-2026-0003');
 
-        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/reject", [
+        $this->actingAs($decider)->post("/governance/spend-approvals/{$approval->id}/reject", [
+            ...$this->decisionPayload($approval),
             'decision_notes' => '',
         ])->assertSessionHasErrors('decision_notes');
     }
 
+    public function test_approve_requires_reason(): void
+    {
+        $requester = $this->createAdminUser();
+        $decider = $this->createAdminUser();
+        $approval = $this->submittedApproval($requester, 'SA-2026-0006');
+
+        $this->actingAs($decider)->post("/governance/spend-approvals/{$approval->id}/approve", [
+            ...$this->decisionPayload($approval),
+            'decision_notes' => '   ',
+        ])->assertSessionHasErrors('decision_notes');
+
+        $this->assertSame(SpendApproval::STATUS_SUBMITTED, $approval->fresh()->status);
+        $this->assertDatabaseMissing('spend_approval_decisions', ['spend_approval_id' => $approval->id]);
+    }
+
     public function test_cannot_approve_a_draft(): void
     {
-        $admin = $this->createAdminUser();
+        $requester = $this->createAdminUser();
+        $decider = $this->createAdminUser();
         $approval = SpendApproval::create([
             'reference' => 'SA-2026-0004',
             'title' => 'Test', 'category' => 'opex',
             'amount' => 12000, 'currency' => 'NZD',
             'status' => SpendApproval::STATUS_DRAFT,
-            'requested_by' => $admin->id,
+            'requested_by' => $requester->id,
+            'site_id' => $this->site->id,
         ]);
 
-        $this->actingAs($admin)->post("/governance/spend-approvals/{$approval->id}/approve")
-            ->assertStatus(422);
+        $this->actingAs($decider)->post("/governance/spend-approvals/{$approval->id}/approve", [
+            'decision_key' => (string) Str::uuid(),
+            'expected_version' => 1,
+            'expected_content_digest' => str_repeat('0', 64),
+            'decision_notes' => 'Drafts cannot be decided.',
+        ])->assertSessionHasErrors('decision');
 
         $approval->refresh();
         $this->assertSame(SpendApproval::STATUS_DRAFT, $approval->status);
@@ -181,13 +198,14 @@ class GovernanceSpendApprovalsTest extends TestCase
             'status' => SpendApproval::STATUS_SUBMITTED,
             'submitted_at' => now(),
             'requested_by' => $admin->id,
+            'site_id' => $this->site->id,
         ]);
 
         $this->actingAs($admin)->put("/governance/spend-approvals/{$approval->id}", [
             'title' => 'Edited',
             'category' => 'opex',
             'amount' => 99999,
-        ])->assertStatus(422);
+        ])->assertForbidden();
 
         $approval->refresh();
         $this->assertSame('Original', $approval->title);
@@ -203,6 +221,7 @@ class GovernanceSpendApprovalsTest extends TestCase
             'category' => 'capex',
             'amount' => 1200,
             'currency' => 'NZD',
+            'site_id' => $this->site->id,
         ])->assertRedirect();
 
         $approval = SpendApproval::latest('id')->first();
@@ -217,6 +236,7 @@ class GovernanceSpendApprovalsTest extends TestCase
             'category' => 'opex',
             'amount' => 200,
             'currency' => 'NZD',
+            'site_id' => $this->site->id,
         ])->assertRedirect();
 
         $this->assertDatabaseHas('governance_audit_log', [
@@ -224,5 +244,40 @@ class GovernanceSpendApprovalsTest extends TestCase
             'resource_type' => 'SpendApproval',
             'user_id' => $admin->id,
         ]);
+    }
+
+    private function submittedApproval(User $requester, string $reference): SpendApproval
+    {
+        $approval = SpendApproval::create([
+            'reference' => $reference,
+            'title' => 'Test',
+            'category' => 'opex',
+            'amount' => 12000,
+            'currency' => 'NZD',
+            'site_id' => $this->site->id,
+            'status' => SpendApproval::STATUS_DRAFT,
+            'requested_by' => $requester->id,
+            'version' => 1,
+        ]);
+
+        $approval->update([
+            'status' => SpendApproval::STATUS_SUBMITTED,
+            'submitted_by' => $requester->id,
+            'submitted_at' => now(),
+            'submission_version' => 2,
+            'content_digest' => $approval->decisionContentDigest(),
+            'version' => 2,
+        ]);
+
+        return $approval->fresh();
+    }
+
+    private function decisionPayload(SpendApproval $approval): array
+    {
+        return [
+            'decision_key' => (string) Str::uuid(),
+            'expected_version' => $approval->version,
+            'expected_content_digest' => $approval->content_digest,
+        ];
     }
 }

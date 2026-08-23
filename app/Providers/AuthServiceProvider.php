@@ -48,6 +48,7 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\RiskRegisterEntry;
+use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Models\StrategicPlan;
 use App\Domain\Governance\Policies\ActionItemPolicy;
 use App\Domain\Governance\Policies\BoardEvaluationPolicy;
@@ -61,6 +62,7 @@ use App\Domain\Governance\Policies\GovernanceMeetingPolicy;
 use App\Domain\Governance\Policies\GovernancePolicyPolicy;
 use App\Domain\Governance\Policies\ResolutionPolicy;
 use App\Domain\Governance\Policies\RiskRegisterEntryPolicy;
+use App\Domain\Governance\Policies\SpendApprovalPolicy;
 use App\Domain\Governance\Policies\StrategicPlanPolicy;
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrCourse;
@@ -183,6 +185,7 @@ class AuthServiceProvider extends ServiceProvider
         GovernanceMeeting::class => GovernanceMeetingPolicy::class,
         Resolution::class => ResolutionPolicy::class,
         RiskRegisterEntry::class => RiskRegisterEntryPolicy::class,
+        SpendApproval::class => SpendApprovalPolicy::class,
         ActionItem::class => ActionItemPolicy::class,
         Budget::class => BudgetPolicy::class,
         ComplianceObligation::class => ComplianceObligationPolicy::class,

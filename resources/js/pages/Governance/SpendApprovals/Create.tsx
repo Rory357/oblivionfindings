@@ -19,12 +19,14 @@ import { ArrowLeft, HandCoins } from 'lucide-react';
 interface Props extends PageProps {
     categories: Record<string, string>;
     thresholds: Record<string, number>;
+    sites: Array<{ id: number; name: string }>;
 }
 
 export default function CreateSpendApproval({
     auth,
     categories,
     thresholds,
+    sites,
 }: Props) {
     const form = useForm({
         title: '',
@@ -32,6 +34,7 @@ export default function CreateSpendApproval({
         category: 'capex',
         amount: '' as string | number,
         currency: 'NZD',
+        site_id: sites.length === 1 ? String(sites[0].id) : '',
         valid_until: '',
     });
 
@@ -100,7 +103,7 @@ export default function CreateSpendApproval({
                                         required
                                     />
                                     {form.errors.title && (
-                                        <p className="mt-1 text-xs text-status-critical">
+                                        <p className="text-status-critical mt-1 text-xs">
                                             {form.errors.title}
                                         </p>
                                     )}
@@ -134,6 +137,34 @@ export default function CreateSpendApproval({
 
                             <div className="grid gap-4 lg:grid-cols-2">
                                 <div>
+                                    <Label htmlFor="site_id">Site</Label>
+                                    <Select
+                                        value={form.data.site_id}
+                                        onValueChange={(value) =>
+                                            form.setData('site_id', value)
+                                        }
+                                    >
+                                        <SelectTrigger id="site_id">
+                                            <SelectValue placeholder="Select a site" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {sites.map((site) => (
+                                                <SelectItem
+                                                    key={site.id}
+                                                    value={String(site.id)}
+                                                >
+                                                    {site.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.site_id && (
+                                        <p className="text-status-critical mt-1 text-xs">
+                                            {form.errors.site_id}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
                                     <Label htmlFor="amount">Amount (NZD)</Label>
                                     <Input
                                         id="amount"
@@ -150,11 +181,11 @@ export default function CreateSpendApproval({
                                         required
                                     />
                                     {form.errors.amount && (
-                                        <p className="mt-1 text-xs text-status-critical">
+                                        <p className="text-status-critical mt-1 text-xs">
                                             {form.errors.amount}
                                         </p>
                                     )}
-                                    <p className="mt-1 text-xs text-muted-foreground">
+                                    <p className="text-muted-foreground mt-1 text-xs">
                                         Threshold for this category:{' '}
                                         {new Intl.NumberFormat('en-NZ', {
                                             style: 'currency',
@@ -162,7 +193,7 @@ export default function CreateSpendApproval({
                                         }).format(threshold)}
                                     </p>
                                     {requiresBoard && numericAmount > 0 && (
-                                        <p className="mt-1 text-xs font-medium text-status-warning">
+                                        <p className="text-status-warning mt-1 text-xs font-medium">
                                             ⚠ This amount exceeds the threshold
                                             and will require a board resolution.
                                         </p>
