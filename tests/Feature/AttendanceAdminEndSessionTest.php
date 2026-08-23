@@ -2,10 +2,13 @@
 
 use App\Domain\Hr\Models\HrAttendanceBreakEvent;
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
+use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 
@@ -18,6 +21,8 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->seed(\Database\Seeders\RbacSeeder::class);
+
+    $this->site = Site::factory()->create();
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -37,6 +42,17 @@ beforeEach(function () {
         Permission::query()->where('key', 'timesheets.viewAny')->first(),
     ])->filter()->mapWithKeys(fn (Permission $p) => [$p->id => ['allowed' => true]])->all();
     $this->manager->permissionOverrides()->syncWithoutDetaching($overrides);
+
+    foreach ([$this->worker, $this->manager] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 function stuckSessionFor(User $user, array $attributes = []): HrAttendanceSession
@@ -44,6 +60,7 @@ function stuckSessionFor(User $user, array $attributes = []): HrAttendanceSessio
     return HrAttendanceSession::query()->create(array_merge([
         'tenant_id' => null,
         'user_id' => $user->id,
+        'site_id' => $user->hrEmployeeProfile()->value('primary_site_id'),
         'clock_in_at' => now()->subHours(20),
         'status' => 'open',
         'source' => 'manual',
@@ -79,8 +96,14 @@ it('lets a manager end a stale shiftless session with attribution, timesheet and
 });
 
 it('closes a shift-linked session at the rostered end and completes the shift', function () {
+    $client = Client::factory()->create([
+        'site_id' => $this->site->id,
+        'status' => 'active',
+    ]);
     $shift = Shift::factory()->create([
         'organization_id' => 1,
+        'client_id' => $client->id,
+        'site_id' => $this->site->id,
         'user_id' => $this->worker->id,
         'starts_at' => now()->subHours(20),
         'ends_at' => now()->subHours(12),

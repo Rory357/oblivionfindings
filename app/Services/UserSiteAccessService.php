@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -47,6 +48,14 @@ class UserSiteAccessService
      * @var array<int, string>
      */
     public const GOVERNANCE_SPEND_SITE_BYPASS_PERMISSIONS = ['governance.spend.viewAllSites'];
+
+    /**
+     * Application-wide attendance/timesheet Site scope. This broadens the
+     * Site boundary only; callers must still require the attendance action.
+     *
+     * @var array<int, string>
+     */
+    public const ATTENDANCE_SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
 
     /** @var array<string, bool> */
     private array $clientIncidentSiteColumnCache = [];
@@ -554,6 +563,243 @@ class UserSiteAccessService
             $bypassPermissions,
             $message,
         );
+    }
+
+    /**
+     * Resolve an attendance session through its immutable Shift/session/worker
+     * provenance before exposing its lifecycle state.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function resolveAuthorizedAttendanceSession(
+        ?User $user,
+        int $sessionId,
+        array $bypassPermissions = [],
+        bool $lockForUpdate = false,
+    ): HrAttendanceSession {
+        $query = HrAttendanceSession::query()->with([
+            'shift.client:id,site_id',
+            'user:id',
+            'user.hrEmployeeProfile',
+        ]);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $session = $query->find($sessionId);
+        abort_unless($session, 404);
+
+        // The session row is the aggregate lock owner. Re-lock its Shift
+        // before authorization so a concurrent Site reassignment cannot turn
+        // a locally-authorized close into a foreign-Site Shift mutation.
+        if ($lockForUpdate && $session->shift_id !== null) {
+            $session->setRelation(
+                'shift',
+                Shift::query()
+                    ->with('client:id,site_id')
+                    ->lockForUpdate()
+                    ->find($session->shift_id),
+            );
+        }
+
+        try {
+            $siteId = $this->attendanceSessionSiteId($session);
+        } catch (\LogicException) {
+            abort(404);
+        }
+
+        abort_unless(
+            in_array($siteId, $this->accessibleSiteIds($user, $bypassPermissions), true),
+            404,
+        );
+
+        return $session;
+    }
+
+    /**
+     * Apply the same canonical Site precedence as direct attendance-session
+     * access: Shift provenance, then a captured session Site, then the current
+     * primary Site only for a legacy shiftless row.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyAttendanceSessionScope(
+        Builder $query,
+        ?User $user,
+        array $bypassPermissions = [],
+    ): Builder {
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $sessionSiteColumn = $query->qualifyColumn('site_id');
+        $sessionShiftColumn = $query->qualifyColumn('shift_id');
+        $sessionUserColumn = $query->qualifyColumn('user_id');
+
+        return $query
+            ->whereHas('user')
+            ->where(function (Builder $provenance) use (
+                $siteIds,
+                $sessionSiteColumn,
+                $sessionShiftColumn,
+                $sessionUserColumn,
+            ): void {
+                $provenance->where(function (Builder $linkedShift) use (
+                    $siteIds,
+                    $sessionSiteColumn,
+                    $sessionShiftColumn,
+                    $sessionUserColumn,
+                ): void {
+                    $linkedShift->whereNotNull($sessionShiftColumn)
+                        ->whereHas('shift', function (Builder $shift) use (
+                            $siteIds,
+                            $sessionSiteColumn,
+                            $sessionUserColumn,
+                        ): void {
+                            $shiftSiteColumn = $shift->qualifyColumn('site_id');
+                            $shiftClientColumn = $shift->qualifyColumn('client_id');
+                            $shiftUserColumn = $shift->qualifyColumn('user_id');
+
+                            $shift->whereColumn($shiftUserColumn, $sessionUserColumn)
+                                ->where(function (Builder $shiftSite) use (
+                                    $siteIds,
+                                    $sessionSiteColumn,
+                                    $shiftSiteColumn,
+                                    $shiftClientColumn,
+                                ): void {
+                                    $shiftSite->where(function (Builder $directSite) use (
+                                        $siteIds,
+                                        $sessionSiteColumn,
+                                        $shiftSiteColumn,
+                                        $shiftClientColumn,
+                                    ): void {
+                                        $directSite->whereIn($shiftSiteColumn, $siteIds)
+                                            ->where(function (Builder $capturedSite) use (
+                                                $sessionSiteColumn,
+                                                $shiftSiteColumn,
+                                            ): void {
+                                                $capturedSite->whereNull($sessionSiteColumn)
+                                                    ->orWhereColumn($sessionSiteColumn, $shiftSiteColumn);
+                                            })
+                                            ->where(function (Builder $clientIntegrity) use (
+                                                $shiftClientColumn,
+                                                $shiftSiteColumn,
+                                            ): void {
+                                                $clientIntegrity->whereNull($shiftClientColumn)
+                                                    ->orWhereHas('client', fn (Builder $client) => $client
+                                                        ->whereColumn(
+                                                            $client->qualifyColumn('site_id'),
+                                                            $shiftSiteColumn,
+                                                        ));
+                                            });
+                                    })->orWhere(function (Builder $clientFallback) use (
+                                        $siteIds,
+                                        $sessionSiteColumn,
+                                        $shiftSiteColumn,
+                                        $shiftClientColumn,
+                                    ): void {
+                                        $clientFallback->whereNull($shiftSiteColumn)
+                                            ->whereNotNull($shiftClientColumn)
+                                            ->whereHas('client', function (Builder $client) use (
+                                                $siteIds,
+                                                $sessionSiteColumn,
+                                            ): void {
+                                                $clientSiteColumn = $client->qualifyColumn('site_id');
+                                                $client->whereIn($clientSiteColumn, $siteIds)
+                                                    ->where(function (Builder $capturedSite) use (
+                                                        $sessionSiteColumn,
+                                                        $clientSiteColumn,
+                                                    ): void {
+                                                        $capturedSite->whereNull($sessionSiteColumn)
+                                                            ->orWhereColumn($sessionSiteColumn, $clientSiteColumn);
+                                                    });
+                                            });
+                                    });
+                                });
+                        });
+                })->orWhere(function (Builder $capturedSession) use (
+                    $siteIds,
+                    $sessionSiteColumn,
+                    $sessionShiftColumn,
+                ): void {
+                    $capturedSession->whereNull($sessionShiftColumn)
+                        ->whereIn($sessionSiteColumn, $siteIds);
+                })->orWhere(function (Builder $profileFallback) use (
+                    $siteIds,
+                    $sessionSiteColumn,
+                    $sessionShiftColumn,
+                ): void {
+                    $profileFallback->whereNull($sessionShiftColumn)
+                        ->whereNull($sessionSiteColumn)
+                        ->whereHas('user.hrEmployeeProfile', function (Builder $profile) use ($siteIds): void {
+                            $this->applyCurrentEmployeeProfileScope($profile)
+                                ->whereIn($profile->qualifyColumn('primary_site_id'), $siteIds);
+                        });
+                });
+            });
+    }
+
+    /**
+     * Shift provenance is authoritative when present. A captured session Site
+     * is authoritative for shiftless clock-ins, with the worker's current
+     * primary Site retained only as the legacy fallback.
+     */
+    public function attendanceSessionSiteId(HrAttendanceSession $session): int
+    {
+        $session->loadMissing([
+            'shift.client:id,site_id',
+            'user:id',
+            'user.hrEmployeeProfile',
+        ]);
+
+        if (! $session->user) {
+            throw new \LogicException('Attendance-session worker provenance is missing.');
+        }
+        if ($session->shift_id !== null && ! $session->shift) {
+            throw new \LogicException('Attendance-session Shift provenance is missing.');
+        }
+
+        $capturedSiteId = $this->nullablePositiveId($session->site_id);
+        $siteId = $capturedSiteId;
+
+        if ($session->shift) {
+            if ((int) ($session->shift->user_id ?? 0) !== (int) $session->user_id) {
+                throw new \LogicException('Attendance-session Shift worker provenance conflicts.');
+            }
+            if ($session->shift->client_id !== null && ! $session->shift->client) {
+                throw new \LogicException('Attendance-session Shift Client provenance is missing.');
+            }
+
+            $shiftSiteIds = collect([
+                $this->nullablePositiveId($session->shift->site_id),
+                $this->nullablePositiveId($session->shift->client?->site_id),
+            ])->filter()->unique()->values();
+            if ($shiftSiteIds->count() !== 1) {
+                throw new \LogicException('Attendance-session Shift Site provenance is missing or conflicting.');
+            }
+
+            $siteId = (int) $shiftSiteIds->first();
+            if ($capturedSiteId !== null && $capturedSiteId !== $siteId) {
+                throw new \LogicException('Attendance-session captured Site conflicts with its Shift.');
+            }
+        } elseif ($siteId === null) {
+            $profile = $session->user->hrEmployeeProfile;
+            if ($profile && $this->isCurrentEmployeeProfile($profile)) {
+                $siteId = $this->nullablePositiveId($profile->primary_site_id);
+            }
+        }
+
+        if ($siteId === null || ! Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereKey($siteId)
+            ->exists()) {
+            throw new \LogicException('Attendance-session Site provenance is unavailable.');
+        }
+
+        return $siteId;
     }
 
     /**

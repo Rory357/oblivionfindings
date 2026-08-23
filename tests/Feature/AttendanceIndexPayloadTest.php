@@ -66,6 +66,11 @@ test('managers see the on-clock-now board with stale sessions flagged', function
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $staleWorker->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+    ]);
     openSessionFor($staleWorker, ['clock_in_at' => now()->subHours(20)]);
 
     $response = $this->actingAs($this->manager)->get('/attendance');

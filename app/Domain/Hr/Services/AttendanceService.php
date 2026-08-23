@@ -275,18 +275,25 @@ class AttendanceService
      * end-of-shift checklist blockers (the worker isn't here to answer them)
      * but records who closed it, why, and an audit-log row.
      *
-     * Caller is responsible for authorization (timesheets.manageAny — the same
-     * permission that gates the board itself).
+     * The command owns both the timesheets.manageAny action check and the
+     * canonical attendance Site boundary. The controller repeats the action
+     * check only to fail before request validation.
      *
      * @throws \LogicException
      */
     public function adminEndSession(User $admin, HrAttendanceSession $session, string $reason, ?Carbon $endAt = null): HrAttendanceSession
     {
+        abort_unless($admin->canDo('timesheets.manageAny'), 403);
+
         return DB::transaction(function () use ($admin, $session, $reason, $endAt) {
-            $session = HrAttendanceSession::query()
-                ->with(['shift'])
-                ->lockForUpdate()
-                ->findOrFail($session->id);
+            $siteAccess = app(UserSiteAccessService::class);
+            $session = $siteAccess->resolveAuthorizedAttendanceSession(
+                $admin,
+                (int) $session->id,
+                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+                true,
+            );
+            $siteId = $siteAccess->attendanceSessionSiteId($session);
 
             if ($session->status !== 'open' || $session->clock_out_at) {
                 throw new \LogicException('This attendance session has already been closed.');
@@ -322,6 +329,9 @@ class AttendanceService
             );
 
             $session->update([
+                // Preserve the resolved Site on legacy rows so downstream
+                // timesheet/audit provenance no longer follows a mutable profile.
+                'site_id' => $session->site_id ?: $siteId,
                 'clock_out_at' => $endAt,
                 'break_minutes' => $breakMinutes,
                 'break_started_at' => null,
@@ -356,6 +366,7 @@ class AttendanceService
                 'attendance_session_id' => $session->id,
                 'session_user_id' => $session->user_id,
                 'shift_id' => $session->shift_id,
+                'site_id' => $siteId,
                 'reason' => $reason,
                 'clock_out_at' => $endAt->toDateTimeString(),
                 'was_stale' => $wasStale,

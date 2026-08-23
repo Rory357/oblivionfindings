@@ -14,6 +14,7 @@ use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -38,10 +39,32 @@ class AttendanceController extends Controller
         ]);
 
         $canManageAny = $auth->canDo('timesheets.manageAny');
-        $targetUserId = $canManageAny ? (int) ($request->integer('user_id') ?: $auth->id) : $auth->id;
-        $targetUser = $targetUserId === $auth->id
+        $requestedTargetUserId = $canManageAny
+            ? (int) ($request->integer('user_id') ?: $auth->id)
+            : (int) $auth->id;
+        $targetUser = $requestedTargetUserId === (int) $auth->id
             ? $auth
-            : User::query()->find($targetUserId);
+            : $this->siteAccess->applyStaffScope(
+                User::query()->whereKey($requestedTargetUserId),
+                $auth,
+                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+            )->first();
+        abort_unless($targetUser, 404);
+        $targetUserId = (int) $targetUser->id;
+
+        $scopeTargetAttendance = function (Builder $query) use ($auth, $targetUserId): Builder {
+            $query->where('user_id', $targetUserId);
+
+            if ($targetUserId !== (int) $auth->id) {
+                $this->siteAccess->applyAttendanceSessionScope(
+                    $query,
+                    $auth,
+                    UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+                );
+            }
+
+            return $query;
+        };
 
         // Week is the unit of navigation for the sessions list (Mon–Sun, hero
         // week stepper). Compute the window in the worker timezone, then query
@@ -52,9 +75,8 @@ class AttendanceController extends Controller
             : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
 
-        $sessions = HrAttendanceSession::query()
-            ->with(['timesheet:id,attendance_session_id,status'])
-            ->where('user_id', $targetUserId)
+        $sessions = $scopeTargetAttendance(HrAttendanceSession::query()
+            ->with(['timesheet:id,attendance_session_id,status']))
             ->whereBetween('clock_in_at', [$weekStart->copy()->utc(), $weekEnd->copy()->utc()])
             ->orderByDesc('clock_in_at')
             ->limit(100)
@@ -72,18 +94,15 @@ class AttendanceController extends Controller
                 'timesheet_status' => $session->timesheet?->status,
             ])->values();
 
-        $totalSessions = HrAttendanceSession::query()
-            ->where('user_id', $targetUserId)
-            ->count();
+        $totalSessions = $scopeTargetAttendance(HrAttendanceSession::query())->count();
 
-        $openSession = HrAttendanceSession::query()
+        $openSession = $scopeTargetAttendance(HrAttendanceSession::query()
             ->with([
                 'shift:id,client_id,starts_at,ends_at,location',
                 'shift.client:id,first_name,last_name',
                 'timesheet:id,attendance_session_id,status',
                 'breakEvents' => fn ($query) => $query->orderBy('started_at'),
-            ])
-            ->where('user_id', $targetUserId)
+            ]))
             ->open()
             ->latest('clock_in_at')
             ->first();
@@ -94,29 +113,38 @@ class AttendanceController extends Controller
         $activeShift = $eligibleShifts->count() === 1 ? $eligibleShifts->first() : null;
 
         $staff = $canManageAny
-            ? User::query()->staff()->orderBy('name')->get(['id', 'name', 'email'])
+            ? $this->siteAccess->applyStaffScope(
+                User::query(),
+                $auth,
+                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+            )->orderBy('name')->get(['id', 'name', 'email'])
             : collect();
 
-        $todayHours = HrAttendanceSession::query()
-            ->where('user_id', $targetUserId)
+        $todayHours = $scopeTargetAttendance(HrAttendanceSession::query())
             ->whereDate('clock_in_at', now()->toDateString())
             ->get()
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
-        $weekHours = HrAttendanceSession::query()
-            ->where('user_id', $targetUserId)
+        $weekHours = $scopeTargetAttendance(HrAttendanceSession::query())
             ->whereBetween('clock_in_at', [now()->startOfWeek(), now()->endOfWeek()])
             ->get()
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
-        // Managers get a live "who is on the clock now" board — open sessions
-        // across the staff they can already see in the picker. Sessions open
-        // for 16h+ are flagged as likely missed clock-outs.
+        // Managers get a live "who is on the clock now" board for canonical
+        // attendance Sites they can access. Sessions open for 16h+ are flagged
+        // as likely missed clock-outs.
         $staleCutoff = now()->subHours(16);
-        $onClockNow = $canManageAny
-            ? HrAttendanceSession::query()
+        $onClockNow = collect();
+        if ($canManageAny) {
+            $onClockNowQuery = HrAttendanceSession::query()
                 ->with(['user:id,name', 'shift:id,client_id,location,ends_at'])
-                ->whereIn('user_id', User::staff()->select('id'))
+                ->whereIn('user_id', User::query()->staff()->select('id'));
+            $this->siteAccess->applyAttendanceSessionScope(
+                $onClockNowQuery,
+                $auth,
+                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+            );
+            $onClockNow = $onClockNowQuery
                 ->open()
                 ->latest('clock_in_at')
                 ->limit(50)
@@ -130,8 +158,8 @@ class AttendanceController extends Controller
                     'shift_location' => $session->shift?->location,
                     'shift_ends_at' => optional($session->shift?->ends_at)->toIso8601String(),
                     'is_stale' => $session->clock_in_at !== null && $session->clock_in_at->lt($staleCutoff),
-                ])->values()
-            : collect();
+                ])->values();
+        }
 
         // Handovers involving the VIEWED user (both directions) feed the
         // Handovers tab — same row shape as the Shift Handovers workspace.
@@ -141,7 +169,11 @@ class AttendanceController extends Controller
         // signed-in user, as does the `incoming` treatment only when viewing
         // yourself.
         $handovers = ShiftHandover::query()
-            ->tap(fn ($query) => $this->siteAccess->applyHandoverScope($query, $auth, ['reports.viewAny']))
+            ->tap(fn ($query) => $this->siteAccess->applyHandoverScope(
+                $query,
+                $auth,
+                UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+            ))
             ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
             ->where(function ($involving) use ($targetUserId) {
                 $involving->where('outgoing_staff_id', $targetUserId)
@@ -378,6 +410,12 @@ class AttendanceController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
+
+        $session = $this->siteAccess->resolveAuthorizedAttendanceSession(
+            $auth,
+            (int) $session->id,
+            UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
+        );
 
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
