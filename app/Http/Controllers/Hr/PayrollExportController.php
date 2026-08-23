@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Finance\Jobs\PostPayrollJournalJob;
-use App\Domain\Finance\Services\PayrollJournalService;
+use App\Domain\Finance\Services\ExternalSettlementService;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Services\HrPayrollAccessService;
@@ -27,7 +27,7 @@ class PayrollExportController extends Controller
     public function __construct(
         protected PayrollExportService $payrollService,
         protected HrWebhookService $webhookService,
-        protected PayrollJournalService $payrollJournalService,
+        protected ExternalSettlementService $externalSettlements,
         protected PayslipService $payslipService,
         private readonly HrPayrollAccessService $payrollAccess,
     ) {}
@@ -43,7 +43,7 @@ class PayrollExportController extends Controller
         $visibleRuns = $this->payrollAccess->visibleRunsQuery($user);
 
         $runs = (clone $visibleRuns)
-            ->with(['lockedBy:id,name', 'exportedBy:id,name', 'exportProfile:id,name,provider_key'])
+            ->with(['lockedBy:id,name', 'exportedBy:id,name', 'exportProfile:id,name,provider_key', 'externalSettlement'])
             ->withCount('items')
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('period_end')
@@ -64,6 +64,14 @@ class PayrollExportController extends Controller
             'gl_posted_at' => optional($run->gl_posted_at)->toDateTimeString(),
             'gl_error' => $run->gl_error,
             'net_paid_at' => optional($run->net_paid_at)->toDateTimeString(),
+            'net_settlement' => $run->externalSettlement ? [
+                'status' => $run->externalSettlement->status,
+                'artifact_sha256' => $run->externalSettlement->artifact_sha256,
+                'exported_at' => optional($run->externalSettlement->exported_at)->toDateTimeString(),
+                'accepted_at' => optional($run->externalSettlement->accepted_at)->toDateTimeString(),
+                'acceptance_reference' => $run->externalSettlement->acceptance_reference,
+                'rejection_reason' => $run->externalSettlement->rejection_reason,
+            ] : null,
             'export_profile' => $run->exportProfile ? [
                 'id' => $run->exportProfile->id,
                 'name' => $run->exportProfile->name,
@@ -228,9 +236,24 @@ class PayrollExportController extends Controller
         return redirect()->back()->with('success', 'Payroll journal posted.');
     }
 
+    public function prepareNetPay(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $run = $this->payrollAccess->payrollRun($user, $run);
+
+        try {
+            $this->externalSettlements->preparePayrollNetPay($run, $user);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            return redirect()->back()->withErrors(['net_pay' => $exception->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Net-pay bank file prepared. Download and submit it before recording acceptance.');
+    }
+
     /**
-     * Pay employee net pay for a GL-posted run: post the DR Accrued Wages /
-     * CR bank journal and mark payslips paid.
+     * Record immutable bank acceptance, then settle the accepted instruction.
+     * If posting fails the accepted evidence remains retryable with the same key.
      */
     public function payNet(Request $request, HrPayrollRun $run)
     {
@@ -239,32 +262,59 @@ class PayrollExportController extends Controller
         $run = $this->payrollAccess->payrollRun($user, $run);
         $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
-        if ($run->journal_id === null) {
-            return redirect()->back()->with('error', 'Post the payroll run to the GL before paying net pay.');
-        }
-
-        if ($run->net_paid_at !== null) {
-            return redirect()->back()->with('error', 'Net pay for this run has already been paid.');
-        }
+        $alreadySettled = $run->net_paid_at !== null;
 
         try {
-            $journal = $this->payrollJournalService->postNetPayPayment($run);
-        } catch (\RuntimeException $e) {
+            $settlement = $this->externalSettlements->requiredSettlement(
+                $run,
+                ExternalSettlementService::PAYROLL_NET_PAY,
+                $user,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->back()->withErrors(['net_pay' => $exception->getMessage()]);
+        }
+        $needsAcceptance = $settlement->status === 'exported';
+        $validated = $request->validate([
+            'idempotency_key' => ['required', 'string', 'max:128'],
+            'acceptance_reference' => [$needsAcceptance ? 'required' : 'nullable', 'string', 'max:255'],
+            'acceptance_evidence' => [$needsAcceptance ? 'required' : 'nullable', 'array', $needsAcceptance ? 'min:1' : 'min:0'],
+        ]);
+
+        try {
+            if ($needsAcceptance) {
+                $this->externalSettlements->accept(
+                    $run,
+                    ExternalSettlementService::PAYROLL_NET_PAY,
+                    $user,
+                    $validated['idempotency_key'].':accept',
+                    $validated['acceptance_reference'],
+                    $validated['acceptance_evidence'],
+                );
+            }
+            $journal = $this->externalSettlements->settlePayrollNetPay(
+                $run,
+                $user,
+                $validated['idempotency_key'].':settle',
+            );
+        } catch (\InvalidArgumentException|\RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $this->webhookService->publishApplicationEvent('payroll.run.paid', [
-            'payroll_run_id' => $run->id,
-            'payment_journal_id' => $journal->id,
-            'paid_by' => $user->id,
-            'status' => 'paid',
-        ]);
+        if (! $alreadySettled) {
+            $this->webhookService->publishApplicationEvent('payroll.run.paid', [
+                'payroll_run_id' => $run->id,
+                'payment_journal_id' => $journal->id,
+                'paid_by' => $user->id,
+                'status' => 'paid',
+            ]);
+        }
 
-        return redirect()->back()->with('success', 'Net pay disbursed and payslips marked paid.');
+        return redirect()->back()->with('success', 'Bank-accepted net pay settled and payslips marked paid.');
     }
 
     /**
-     * Download the net-pay direct-credit (bank batch) CSV for a disbursed run.
+     * Stream the hash-verified canonical net-pay file. The first successful
+     * download advances prepared to exported; later evidence replays do not.
      */
     public function downloadNetPayFile(Request $request, HrPayrollRun $run)
     {
@@ -273,12 +323,20 @@ class PayrollExportController extends Controller
         $run = $this->payrollAccess->payrollRun($user, $run);
         $this->payrollAccess->assertCanManageApplicationPayroll($user);
 
-        abort_unless($run->net_paid_at !== null, 404, 'Net pay has not been disbursed for this run.');
-
-        $csv = $this->payrollJournalService->buildNetPayDirectCreditCsv($run);
+        try {
+            $artifact = $this->externalSettlements->exportArtifact(
+                $run,
+                ExternalSettlementService::PAYROLL_NET_PAY,
+                $user,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->back()->withErrors(['net_pay' => $exception->getMessage()]);
+        }
 
         return response()->streamDownload(
-            fn () => print ($csv),
+            static function () use ($artifact): void {
+                echo $artifact['contents'];
+            },
             "net-pay-run-{$run->id}.csv",
             [
                 'Content-Type' => 'text/csv; charset=UTF-8',
@@ -287,6 +345,64 @@ class PayrollExportController extends Controller
                 'X-Content-Type-Options' => 'nosniff',
             ],
         );
+    }
+
+    public function rejectNetPay(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $run = $this->payrollAccess->payrollRun($user, $run);
+        $validated = $request->validate([
+            'idempotency_key' => ['required', 'string', 'max:128'],
+            'reference' => ['required', 'string', 'max:255'],
+            'reason' => ['required', 'string', 'max:1000'],
+            'evidence' => ['required', 'array', 'min:1'],
+        ]);
+
+        try {
+            $this->externalSettlements->reject(
+                $run,
+                ExternalSettlementService::PAYROLL_NET_PAY,
+                $user,
+                $validated['idempotency_key'],
+                $validated['reference'],
+                $validated['reason'],
+                $validated['evidence'],
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->back()->withErrors(['net_pay' => $exception->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Payroll bank rejection recorded. No net-pay journal was posted.');
+    }
+
+    public function reconcileNetPay(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $run = $this->payrollAccess->payrollRun($user, $run);
+        $validated = $request->validate([
+            'idempotency_key' => ['required', 'string', 'max:128'],
+            'reference' => ['required', 'string', 'max:255'],
+            'evidence' => ['required', 'array', 'min:1'],
+            'bank_transaction_id' => ['required', 'integer'],
+        ]);
+
+        try {
+            $this->externalSettlements->reconcile(
+                $run,
+                ExternalSettlementService::PAYROLL_NET_PAY,
+                (int) $validated['bank_transaction_id'],
+                $user,
+                $validated['idempotency_key'],
+                $validated['reference'],
+                $validated['evidence'],
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->back()->withErrors(['net_pay' => $exception->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Payroll settlement reconciled to the cleared bank transaction.');
     }
 
     /**

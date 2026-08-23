@@ -672,7 +672,10 @@ it('allows AP-only history access without exposing receivable rows from the mixe
 
 it('fails closed on canonical organisation client bill and target mismatches', function (): void {
     $site = Site::factory()->create();
-    $actor = paymentAllocationActor(null, [PaymentSettlementSiteScope::GLOBAL_PERMISSION]);
+    $actor = paymentAllocationActor(null, [
+        'finance.ap.manage',
+        PaymentSettlementSiteScope::GLOBAL_PERMISSION,
+    ]);
     $bankAccount = FinBankAccount::factory()->create([
         'organization_id' => 1,
         'gl_account_id' => FinAccount::where('code', '1000')->value('id'),
@@ -708,6 +711,7 @@ it('fails closed on canonical organisation client bill and target mismatches', f
 
     $bill = paymentAllocationBill($site, '30.00');
     $otherBill = paymentAllocationBill($site, '30.00');
+    $maker = User::factory()->create(['organization_id' => 1]);
     $run = FinPaymentRun::factory()->create([
         'organization_id' => 1,
         'bank_account_id' => $bankAccount->id,
@@ -715,12 +719,16 @@ it('fails closed on canonical organisation client bill and target mismatches', f
         'payment_date' => now(),
         'item_count' => 1,
         'total_amount' => '30.00',
+        'created_by' => $maker->id,
+        'approved_by' => $actor->id,
+        'approved_at' => now(),
     ]);
     FinPaymentRunItem::query()->create([
         'payment_run_id' => $run->id,
         'site_id' => $site->id,
         'bill_id' => $bill->id,
         'settlement_bill_id' => $otherBill->id,
+        'active_settlement_bill_id' => $otherBill->id,
         'vendor_id' => $bill->vendor_id,
         'amount' => '30.00',
         'status' => 'pending',

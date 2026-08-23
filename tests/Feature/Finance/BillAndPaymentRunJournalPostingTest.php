@@ -5,12 +5,15 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinFiscalPeriod;
+use App\Domain\Finance\Models\FinExternalSettlement;
+use App\Domain\Finance\Models\FinExternalSettlementEvent;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinPaymentRun;
 use App\Domain\Finance\Models\FinPaymentRunItem;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\ExternalSettlementService;
 use App\Domain\Finance\Services\PaymentRunService;
 use App\Domain\Finance\Services\PaymentSettlementSiteScope;
 use App\Models\Permission;
@@ -18,13 +21,13 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * End-to-end lock-in for the two AP money pipelines that post a GL journal but
- * had no journal-posting coverage: bill approval (DR Expense / CR AP) and payment
- * run processing (DR AP / CR Bank). Both must post a BALANCED journal, and both
- * are idempotent-by-state-machine — replaying the action throws (the status has
- * already advanced) and never posts a second journal.
+ * End-to-end lock-in for bill approval (DR Expense / CR AP) and the separate
+ * externally accepted payment-run settlement (DR AP / CR Bank). Preparing or
+ * downloading the bank instruction must never pay a bill or post GL.
  */
 function seedApJournalAccounts(): void
 {
@@ -133,18 +136,25 @@ function approvedPaymentRun(): FinPaymentRun
         'total_amount' => '300.00',
         'amount_paid' => 0,
     ]);
+    $creator = User::factory()->create(['organization_id' => 1]);
+    $approver = User::factory()->create(['organization_id' => 1]);
     $run = FinPaymentRun::factory()->create([
         'organization_id' => 1,
         'status' => 'approved',
         'payment_date' => now()->subDay(),
+        'total_amount' => '300.00',
         'item_count' => 1,
         'bank_account_id' => $bankAccount->id,
+        'created_by' => $creator->id,
+        'approved_by' => $approver->id,
+        'approved_at' => now(),
     ]);
     FinPaymentRunItem::create([
         'payment_run_id' => $run->id,
         'site_id' => $site->id,
         'bill_id' => $bill->id,
         'settlement_bill_id' => $bill->id,
+        'active_settlement_bill_id' => $bill->id,
         'vendor_id' => $vendor->id,
         'amount' => '300.00',
         'reference' => 'REF-1',
@@ -171,7 +181,7 @@ function apGlobalPaymentManager(): User
     return $user;
 }
 
-it('processing a payment run posts a single balanced DR AP / CR Bank journal', function () {
+it('processing prepares an immutable bank file without paying bills or posting GL', function () {
     Storage::fake('local');
     seedApJournalAccounts();
     $run = approvedPaymentRun();
@@ -179,7 +189,36 @@ it('processing a payment run posts a single balanced DR AP / CR Bank journal', f
 
     $result = app(PaymentRunService::class)->processPaymentRun($run, $user);
 
-    expect($result->status)->toBe('completed')
+    expect($result->status)->toBe('prepared')
+        ->and($result->journal_id)->toBeNull()
+        ->and(FinBill::query()->findOrFail($run->items()->value('bill_id'))->status)->toBe('approved')
+        ->and(FinPaymentAllocation::query()->count())->toBe(0)
+        ->and(FinJournal::where('source_type', FinExternalSettlement::class)->count())->toBe(0);
+    Storage::disk('local')->assertExists($result->file_path);
+});
+
+it('settles one bank-accepted payment run with exact balanced GL and stable replay', function () {
+    Storage::fake('local');
+    seedApJournalAccounts();
+    $run = approvedPaymentRun();
+    $preparer = apGlobalPaymentManager();
+    $checker = apGlobalPaymentManager();
+    $service = app(PaymentRunService::class);
+    $settlements = app(ExternalSettlementService::class);
+
+    $service->processPaymentRun($run, $preparer);
+    $settlements->markExported($run, ExternalSettlementService::PAYMENT_RUN, $preparer);
+    $settlements->accept(
+        $run,
+        ExternalSettlementService::PAYMENT_RUN,
+        $checker,
+        'accept-payment-run-1',
+        'BANK-ACCEPTED-1',
+        ['confirmation_digest' => hash('sha256', 'bank-confirmation-1')],
+    );
+    $result = $settlements->settlePaymentRun($run, $checker, 'settle-payment-run-1');
+
+    expect($result->status)->toBe('settled')
         ->and($result->journal_id)->not->toBeNull();
 
     $journal = FinJournal::findOrFail($result->journal_id);
@@ -195,9 +234,13 @@ it('processing a payment run posts a single balanced DR AP / CR Bank journal', f
             ->where('source_type', FinPaymentRunItem::class)
             ->where('integrity_state', FinPaymentAllocation::INTEGRITY_TRACEABLE)
             ->count())->toBe(1);
+
+    expect($settlements->settlePaymentRun($run->fresh(), $checker, 'settle-payment-run-1')->journal_id)
+        ->toBe($journal->id)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(1);
 });
 
-it('re-processing a payment run throws and posts no second journal', function () {
+it('re-preparing a payment run returns the same occurrence and posts no journal', function () {
     Storage::fake('local');
     seedApJournalAccounts();
     $run = approvedPaymentRun();
@@ -206,13 +249,83 @@ it('re-processing a payment run throws and posts no second journal', function ()
 
     $service->processPaymentRun($run, $user);
 
-    expect(fn () => $service->processPaymentRun($run->fresh(), $user))
-        ->toThrow(InvalidArgumentException::class);
+    $replay = $service->processPaymentRun($run->fresh(), $user);
 
-    expect(FinJournal::where('source_type', FinPaymentRun::class)->where('source_id', $run->id)->count())->toBe(1);
+    expect($replay->status)->toBe('prepared')
+        ->and(FinExternalSettlement::query()->where('source_id', $run->id)->count())->toBe(1)
+        ->and(FinJournal::where('source_type', FinExternalSettlement::class)->count())->toBe(0);
 });
 
-it('rolls back bill allocation journal and run state when bank-file storage fails', function () {
+it('fails closed when a prepared or exported payment file is tampered with or missing', function () {
+    Storage::fake('local');
+    seedApJournalAccounts();
+    $run = approvedPaymentRun();
+    $preparer = apGlobalPaymentManager();
+    $checker = apGlobalPaymentManager();
+    $service = app(PaymentRunService::class);
+    $settlements = app(ExternalSettlementService::class);
+    $service->processPaymentRun($run, $preparer);
+    $path = $run->fresh()->file_path;
+    $original = Storage::disk('local')->get($path);
+    $billId = $run->items()->value('bill_id');
+
+    Storage::disk('local')->put($path, 'tampered bank instruction');
+    expect(fn () => $service->processPaymentRun($run->fresh(), $preparer))
+        ->toThrow(InvalidArgumentException::class);
+    $this->actingAs($preparer)
+        ->get(route('finance.payment-runs.download', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('payment_run');
+
+    expect($run->fresh()->status)->toBe('prepared')
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'exported')->count())->toBe(0)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(FinPaymentAllocation::query()->count())->toBe(0)
+        ->and((string) FinBill::query()->findOrFail($billId)->amount_paid)->toBe('0.00');
+
+    Storage::disk('local')->put($path, $original);
+    $this->get(route('finance.payment-runs.download', $run))
+        ->assertOk()
+        ->assertDownload($run->run_number.'.csv');
+    expect($run->fresh()->status)->toBe('exported')
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'exported')->count())->toBe(1);
+
+    Storage::disk('local')->put($path, 'tampered after export');
+    expect(fn () => $settlements->accept(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        $checker,
+        'accept-tampered-payment-file',
+        'BANK-MUST-NOT-ACCEPT',
+        ['digest' => hash('sha256', 'must-not-accept')],
+    ))->toThrow(InvalidArgumentException::class);
+    expect($run->fresh()->status)->toBe('exported')
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'accepted')->count())->toBe(0);
+
+    Storage::disk('local')->delete($path);
+    expect(fn () => $settlements->markExported($run->fresh(), ExternalSettlementService::PAYMENT_RUN, $preparer))
+        ->toThrow(InvalidArgumentException::class);
+    $this->get(route('finance.payment-runs.download', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('payment_run');
+
+    Storage::disk('local')->put($path, $original);
+    DB::table('fin_external_settlements')
+        ->where('source_id', $run->id)
+        ->update(['artifact_path' => "finance/payment-runs/../{$run->run_number}.csv"]);
+    $this->get(route('finance.payment-runs.download', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('payment_run');
+
+    expect($run->fresh()->status)->toBe('exported')
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'exported')->count())->toBe(1)
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'accepted')->count())->toBe(0)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(FinPaymentAllocation::query()->count())->toBe(0)
+        ->and((string) FinBill::query()->findOrFail($billId)->amount_paid)->toBe('0.00');
+});
+
+it('rolls back payment-run preparation when bank-file storage fails', function () {
     seedApJournalAccounts();
     $run = approvedPaymentRun();
     $billId = $run->items()->value('bill_id');
@@ -232,7 +345,7 @@ it('rolls back bill allocation journal and run state when bank-file storage fail
         ->and(FinJournal::where('source_type', FinPaymentRun::class)->count())->toBe(0);
 });
 
-it('deletes a written bank file and rolls back DB effects when the later completion audit fails', function () {
+it('deletes a written bank file and rolls back DB effects when the preparation audit fails', function () {
     Storage::fake('local');
     seedApJournalAccounts();
     $run = approvedPaymentRun();
@@ -243,8 +356,8 @@ it('deletes a written bank file and rolls back DB effects when the later complet
     DB::listen(function ($query) use (&$blockCompletionAudit): void {
         if ($blockCompletionAudit
             && str_contains(strtolower($query->sql), 'insert into `audit_logs`')
-            && in_array('finance.payment_run.completed', $query->bindings, true)) {
-            throw new RuntimeException('Forced payment-run completion audit failure.');
+            && in_array('finance.payment_run.prepared', $query->bindings, true)) {
+            throw new RuntimeException('Forced payment-run preparation audit failure.');
         }
     });
 
@@ -263,10 +376,11 @@ it('deletes a written bank file and rolls back DB effects when the later complet
         ->and((string) FinBill::query()->findOrFail($billId)->amount_paid)->toBe('0.00')
         ->and(FinPaymentAllocation::query()->count())->toBe(0)
         ->and(FinJournal::where('source_type', FinPaymentRun::class)->count())->toBe(0)
-        ->and(DB::table('audit_logs')->where('action', 'finance.payment_run.completed')->count())->toBe(0);
+        ->and(DB::table('audit_logs')->where('action', 'finance.payment_run.prepared')->count())->toBe(0);
 });
 
-it('conceals wrong-Site payment-run processing and download while explicit global authority passes the scope', function () {
+it('conceals wrong-Site payment-run IDs and lifecycle transitions while explicit global authority passes', function () {
+    Storage::fake('local');
     seedApJournalAccounts();
     $run = approvedPaymentRun();
     $runSite = Site::query()->findOrFail($run->items()->value('site_id'));
@@ -277,7 +391,31 @@ it('conceals wrong-Site payment-run processing and download while explicit globa
         $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key]);
         $siteUser->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
+    $scopeOnly = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $globalScope = Permission::query()->firstOrCreate(
+        ['key' => PaymentSettlementSiteScope::GLOBAL_PERMISSION],
+        ['description' => PaymentSettlementSiteScope::GLOBAL_PERMISSION],
+    );
+    $scopeOnly->permissionOverrides()->syncWithoutDetaching([
+        $globalScope->id => ['allowed' => true],
+    ]);
 
+    $this->actingAs($scopeOnly)
+        ->post(route('finance.payment-runs.process', $run))
+        ->assertForbidden();
+    expect(fn () => app(PaymentRunService::class)->processPaymentRun($run, $scopeOnly))
+        ->toThrow(HttpException::class);
+
+    foreach ([$run->items()->value('bill_id'), PHP_INT_MAX] as $concealedBillId) {
+        $this->actingAs($siteUser)
+            ->post(route('finance.payment-runs.store'), [
+                'bank_account_id' => $run->bank_account_id,
+                'payment_date' => now()->toDateString(),
+                'bill_ids' => [$concealedBillId],
+            ])
+            ->assertNotFound();
+    }
+    expect(FinPaymentRun::query()->count())->toBe(1);
     $this->actingAs($siteUser)
         ->post(route('finance.payment-runs.process', $run))
         ->assertNotFound();
@@ -288,14 +426,101 @@ it('conceals wrong-Site payment-run processing and download while explicit globa
     expect($run->fresh()->status)->toBe('approved')
         ->and(FinPaymentAllocation::query()->count())->toBe(0);
 
-    $global = apGlobalPaymentManager();
-    $this->actingAs($global)
-        ->get(route('finance.payment-runs.download', $run))
+    $preparer = apGlobalPaymentManager();
+    $checker = apGlobalPaymentManager();
+    $this->actingAs($preparer)
+        ->post(route('finance.payment-runs.process', $run))
         ->assertRedirect()
-        ->assertSessionHasErrors('payment_run');
+        ->assertSessionHas('success');
+    $this->get(route('finance.payment-runs.download', $run))
+        ->assertOk();
+
+    $evidence = [
+        'idempotency_key' => 'wrong-site-settlement-transition',
+        'reference' => 'BANK-WRONG-SITE-DENIED',
+        'evidence' => ['digest' => hash('sha256', 'wrong-site-denied')],
+    ];
+    $externalSettlements = app(ExternalSettlementService::class);
+    expect(fn () => $externalSettlements->accept(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        $siteUser,
+        $evidence['idempotency_key'],
+        $evidence['reference'],
+        $evidence['evidence'],
+    ))->toThrow(NotFoundHttpException::class);
+    expect(fn () => $externalSettlements->reject(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        $siteUser,
+        $evidence['idempotency_key'],
+        $evidence['reference'],
+        'Must be concealed before mutation.',
+        $evidence['evidence'],
+    ))->toThrow(NotFoundHttpException::class);
+    expect(fn () => $externalSettlements->settlePaymentRun(
+        $run->fresh(),
+        $siteUser,
+        'wrong-site-settle-denied',
+    ))->toThrow(NotFoundHttpException::class);
+    expect(fn () => $externalSettlements->reconcile(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        1,
+        $siteUser,
+        $evidence['idempotency_key'],
+        $evidence['reference'],
+        $evidence['evidence'],
+    ))->toThrow(NotFoundHttpException::class);
+    $this->actingAs($siteUser)
+        ->post(route('finance.payment-runs.accept', $run), $evidence)
+        ->assertNotFound();
+    $this->post(route('finance.payment-runs.reject', $run), [
+        ...$evidence,
+        'reason' => 'Must be concealed before mutation.',
+    ])->assertNotFound();
+    $this->post(route('finance.payment-runs.settle', $run), [
+        'idempotency_key' => 'wrong-site-settle-denied',
+    ])->assertNotFound();
+    $this->post(route('finance.payment-runs.reconcile', $run), [
+        ...$evidence,
+        'bank_transaction_id' => 1,
+    ])->assertNotFound();
+
+    expect($run->fresh()->status)->toBe('exported')
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'accepted')->count())->toBe(0)
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'rejected')->count())->toBe(0)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(FinPaymentAllocation::query()->count())->toBe(0);
+
+    $this->actingAs($checker)
+        ->post(route('finance.payment-runs.accept', $run), [
+            'idempotency_key' => 'global-settlement-accept',
+            'reference' => 'BANK-GLOBAL-ACCEPTED',
+            'evidence' => ['digest' => hash('sha256', 'global-accepted')],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+    expect($run->fresh()->status)->toBe('accepted');
+    expect(fn () => $externalSettlements->accept(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        $siteUser,
+        'global-settlement-accept',
+        'BANK-GLOBAL-ACCEPTED',
+        ['digest' => hash('sha256', 'global-accepted')],
+    ))->toThrow(NotFoundHttpException::class);
+    expect(fn () => $externalSettlements->accept(
+        $run->fresh(),
+        ExternalSettlementService::PAYMENT_RUN,
+        $scopeOnly,
+        'global-settlement-accept',
+        'BANK-GLOBAL-ACCEPTED',
+        ['digest' => hash('sha256', 'global-accepted')],
+    ))->toThrow(HttpException::class);
 
     $runSite->update(['is_active' => false]);
-    $this->actingAs($global)
+    $this->actingAs($checker)
         ->get(route('finance.payment-runs.download', $run))
         ->assertNotFound();
 });

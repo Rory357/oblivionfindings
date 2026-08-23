@@ -322,6 +322,18 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/payment-runs/{paymentRun}/download', [PaymentRunController::class, 'download'])
         ->name('payment-runs.download')
         ->middleware('permission:finance.ap.manage');
+    Route::post('/payment-runs/{paymentRun}/accept', [PaymentRunController::class, 'accept'])
+        ->name('payment-runs.accept')
+        ->middleware('permission:finance.ap.manage');
+    Route::post('/payment-runs/{paymentRun}/reject', [PaymentRunController::class, 'reject'])
+        ->name('payment-runs.reject')
+        ->middleware('permission:finance.ap.manage');
+    Route::post('/payment-runs/{paymentRun}/settle', [PaymentRunController::class, 'settle'])
+        ->name('payment-runs.settle')
+        ->middleware('permission:finance.ap.manage');
+    Route::post('/payment-runs/{paymentRun}/reconcile', [PaymentRunController::class, 'reconcile'])
+        ->name('payment-runs.reconcile')
+        ->middleware('permission:finance.ap.manage');
 
     // ── Payment Allocations ─────────────────────────────────────────────
     Route::get('/payment-allocations', [PaymentAllocationController::class, 'index'])

@@ -17,6 +17,7 @@ class FinPaymentRunItem extends Model
         'site_id',
         'bill_id',
         'settlement_bill_id',
+        'active_settlement_bill_id',
         'vendor_id',
         'amount',
         'reference',

@@ -78,11 +78,11 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
 
     const hasFilters = Boolean(filters.status);
 
-    const completedCount = paymentRuns.data.filter(
-        (r) => r.status === 'completed',
+    const settledCount = paymentRuns.data.filter((r) =>
+        ['completed', 'settled', 'reconciled'].includes(r.status),
     ).length;
-    const processingCount = paymentRuns.data.filter(
-        (r) => r.status === 'processing',
+    const awaitingBankCount = paymentRuns.data.filter((r) =>
+        ['prepared', 'exported', 'accepted'].includes(r.status),
     ).length;
     const draftCount = paymentRuns.data.filter(
         (r) => r.status === 'draft',
@@ -114,8 +114,8 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         description="Manage batch payments to vendors"
                         stats={[
                             { label: 'Total', value: paymentRuns.total },
-                            { label: 'Completed', value: completedCount },
-                            { label: 'Processing', value: processingCount },
+                            { label: 'Settled', value: settledCount },
+                            { label: 'Awaiting bank', value: awaitingBankCount },
                             { label: 'Drafts', value: draftCount },
                         ]}
                         actions={
@@ -166,10 +166,28 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                         Approved
                                     </SelectItem>
                                     <SelectItem value="processing">
-                                        Processing
+                                        Legacy processing
+                                    </SelectItem>
+                                    <SelectItem value="prepared">
+                                        Prepared
+                                    </SelectItem>
+                                    <SelectItem value="exported">
+                                        Exported
+                                    </SelectItem>
+                                    <SelectItem value="accepted">
+                                        Bank accepted
+                                    </SelectItem>
+                                    <SelectItem value="settled">
+                                        Settled
+                                    </SelectItem>
+                                    <SelectItem value="reconciled">
+                                        Reconciled
+                                    </SelectItem>
+                                    <SelectItem value="rejected">
+                                        Rejected
                                     </SelectItem>
                                     <SelectItem value="completed">
-                                        Completed
+                                        Legacy completed
                                     </SelectItem>
                                     <SelectItem value="failed">
                                         Failed

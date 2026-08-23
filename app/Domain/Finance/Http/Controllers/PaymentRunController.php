@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinPaymentRun;
+use App\Domain\Finance\Services\ExternalSettlementService;
 use App\Domain\Finance\Services\PaymentRunService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ class PaymentRunController extends Controller
 {
     public function __construct(
         private PaymentRunService $service,
+        private ExternalSettlementService $externalSettlements,
     ) {}
 
     public function index(Request $request)
@@ -127,10 +129,12 @@ class PaymentRunController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'bank_account_id' => 'required|exists:fin_bank_accounts,id',
+            // Canonical organization/Site lookups happen under lock in the
+            // service so validation cannot be used as a foreign-ID oracle.
+            'bank_account_id' => ['required', 'integer'],
             'payment_date' => 'required|date',
             'bill_ids' => 'required|array|min:1',
-            'bill_ids.*' => 'exists:fin_bills,id',
+            'bill_ids.*' => ['required', 'integer'],
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -159,6 +163,7 @@ class PaymentRunController extends Controller
             'journal:id,journal_number',
             'approvedBy:id,name',
             'processedBy:id,name',
+            'externalSettlement',
         ]);
 
         return Inertia::render('finance/payment-runs/Show', [
@@ -173,6 +178,17 @@ class PaymentRunController extends Controller
                 'approved_at' => $paymentRun->approved_at?->toDateTimeString(),
                 'processed_at' => $paymentRun->processed_at?->toDateTimeString(),
                 'file_path' => $paymentRun->file_path,
+                'settlement' => $paymentRun->externalSettlement ? [
+                    'status' => $paymentRun->externalSettlement->status,
+                    'artifact_sha256' => $paymentRun->externalSettlement->artifact_sha256,
+                    'exported_at' => $paymentRun->externalSettlement->exported_at?->toDateTimeString(),
+                    'accepted_at' => $paymentRun->externalSettlement->accepted_at?->toDateTimeString(),
+                    'acceptance_reference' => $paymentRun->externalSettlement->acceptance_reference,
+                    'rejected_at' => $paymentRun->externalSettlement->rejected_at?->toDateTimeString(),
+                    'rejection_reason' => $paymentRun->externalSettlement->rejection_reason,
+                    'settled_at' => $paymentRun->externalSettlement->settled_at?->toDateTimeString(),
+                    'reconciled_at' => $paymentRun->externalSettlement->reconciled_at?->toDateTimeString(),
+                ] : null,
                 'bank_account' => $paymentRun->bankAccount ? [
                     'id' => $paymentRun->bankAccount->id,
                     'name' => $paymentRun->bankAccount->name,
@@ -240,7 +256,7 @@ class PaymentRunController extends Controller
             return back()->withErrors(['payment_run' => 'An error occurred while processing the payment run. Please try again.']);
         }
 
-        return back()->with('success', 'Payment run processed successfully.');
+        return back()->with('success', 'Payment run prepared. Download and submit the bank file before recording acceptance.');
     }
 
     public function download(Request $request, FinPaymentRun $paymentRun)
@@ -252,15 +268,132 @@ class PaymentRunController extends Controller
             return back()->withErrors(['payment_run' => 'No bank file available for this payment run.']);
         }
 
-        $fullPath = storage_path('app/'.$paymentRun->file_path);
-
-        if (! file_exists($fullPath)) {
-            return back()->withErrors(['payment_run' => 'Bank file not found on disk.']);
+        try {
+            $artifact = $this->externalSettlements->exportArtifact(
+                $paymentRun,
+                ExternalSettlementService::PAYMENT_RUN,
+                $request->user(),
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['payment_run' => $exception->getMessage()]);
         }
 
-        return response()->download($fullPath, $paymentRun->run_number.'.csv', [
-            'Content-Type' => 'text/csv',
+        return response()->streamDownload(
+            static function () use ($artifact): void {
+                echo $artifact['contents'];
+            },
+            $paymentRun->run_number.'.csv',
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Cache-Control' => 'no-store, private',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
+    }
+
+    public function accept(Request $request, FinPaymentRun $paymentRun)
+    {
+        $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
+        $validated = $request->validate($this->evidenceRules());
+
+        try {
+            $this->externalSettlements->accept(
+                $paymentRun,
+                ExternalSettlementService::PAYMENT_RUN,
+                $request->user(),
+                $validated['idempotency_key'],
+                $validated['reference'],
+                $validated['evidence'],
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['payment_run' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Bank acceptance evidence recorded. The run is ready to settle.');
+    }
+
+    public function reject(Request $request, FinPaymentRun $paymentRun)
+    {
+        $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
+        $validated = $request->validate([
+            ...$this->evidenceRules(),
+            'reason' => ['required', 'string', 'max:1000'],
         ]);
+
+        try {
+            $this->externalSettlements->reject(
+                $paymentRun,
+                ExternalSettlementService::PAYMENT_RUN,
+                $request->user(),
+                $validated['idempotency_key'],
+                $validated['reference'],
+                $validated['reason'],
+                $validated['evidence'],
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['payment_run' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Bank rejection recorded. The bills are available for a corrected run.');
+    }
+
+    public function settle(Request $request, FinPaymentRun $paymentRun)
+    {
+        $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
+        $validated = $request->validate([
+            'idempotency_key' => ['required', 'string', 'max:128'],
+        ]);
+
+        try {
+            $this->externalSettlements->settlePaymentRun(
+                $paymentRun,
+                $request->user(),
+                $validated['idempotency_key'],
+            );
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            return back()->withErrors(['payment_run' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Accepted payment run settled and posted.');
+    }
+
+    public function reconcile(Request $request, FinPaymentRun $paymentRun)
+    {
+        $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
+        $validated = $request->validate([
+            ...$this->evidenceRules(),
+            'bank_transaction_id' => ['required', 'integer'],
+        ]);
+
+        try {
+            $this->externalSettlements->reconcile(
+                $paymentRun,
+                ExternalSettlementService::PAYMENT_RUN,
+                (int) $validated['bank_transaction_id'],
+                $request->user(),
+                $validated['idempotency_key'],
+                $validated['reference'],
+                $validated['evidence'],
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['payment_run' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Payment run reconciled to the cleared bank transaction.');
+    }
+
+    private function evidenceRules(): array
+    {
+        return [
+            'idempotency_key' => ['required', 'string', 'max:128'],
+            'reference' => ['required', 'string', 'max:255'],
+            'evidence' => ['required', 'array', 'min:1'],
+        ];
     }
 
     /**

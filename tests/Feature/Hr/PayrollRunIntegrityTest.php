@@ -158,7 +158,7 @@ test('payroll run cannot be locked when linked timesheets fail validation', func
     expect($run->validation_errors)->not->toBeEmpty();
 });
 
-test('locking a run cascades linked approved timesheets to paid', function () {
+test('locking a run preserves linked approved timesheets until accepted settlement', function () {
     $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     HrPayRateRule::query()->create([
@@ -195,9 +195,9 @@ test('locking a run cascades linked approved timesheets to paid', function () {
     $service->lockRun($run->fresh(), $this->hr->id);
 
     $timesheet->refresh();
-    expect($timesheet->status)->toBe('paid');
-    expect($timesheet->payroll_reference)->toBe("hr-payroll-run:{$run->id}");
-    expect($timesheet->exported_to_payroll_at)->not->toBeNull();
+    expect($timesheet->status)->toBe('approved');
+    expect($timesheet->payroll_reference)->toBeNull();
+    expect($timesheet->exported_to_payroll_at)->toBeNull();
 });
 
 test('paid cascade is idempotent', function () {
@@ -236,7 +236,8 @@ test('paid cascade is idempotent', function () {
     $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
 
-    // Re-running the cascade on an already-paid run marks nothing new and does not error.
+    expect($service->markRunTimesheetsPaid($run->fresh()))->toBe(1);
+    // Re-running the settlement-only cascade marks nothing new and does not error.
     $newlyPaid = $service->markRunTimesheetsPaid($run->fresh());
     expect($newlyPaid)->toBe(0);
 });
@@ -292,6 +293,7 @@ test('timesheets outside the run period are not marked paid', function () {
     $service = app(PayrollExportService::class);
     $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
+    $service->markRunTimesheetsPaid($run->fresh());
 
     $inPeriod->refresh();
     expect($inPeriod->status)->toBe('paid');
@@ -345,6 +347,7 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
 
     // Must not throw despite the pre-existing payroll stamp.
     $service->lockRun($run->fresh(), $this->hr->id);
+    $service->markRunTimesheetsPaid($run->fresh());
 
     $timesheet->refresh();
     expect($timesheet->status)->toBe('paid');

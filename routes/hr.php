@@ -718,7 +718,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/retry-gl', [PayrollExportController::class, 'retryGlPost'])->name('payroll.runs.retry-gl');
+            Route::post('/payroll/runs/{run}/prepare-net-pay', [PayrollExportController::class, 'prepareNetPay'])->name('payroll.runs.prepare-net-pay');
             Route::post('/payroll/runs/{run}/pay', [PayrollExportController::class, 'payNet'])->name('payroll.runs.pay');
+            Route::post('/payroll/runs/{run}/reject-net-pay', [PayrollExportController::class, 'rejectNetPay'])->name('payroll.runs.reject-net-pay');
+            Route::post('/payroll/runs/{run}/reconcile-net-pay', [PayrollExportController::class, 'reconcileNetPay'])->name('payroll.runs.reconcile-net-pay');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
             Route::get('/payroll/runs/{run}/net-pay-file', [PayrollExportController::class, 'downloadNetPayFile'])->name('payroll.runs.net-pay-file');
             Route::post('/payroll/export-profiles', [PayrollExportController::class, 'storeProfile'])->name('payroll.profiles.store');

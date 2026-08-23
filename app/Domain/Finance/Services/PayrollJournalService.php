@@ -4,10 +4,12 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinExternalSettlement;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Http\Controllers\Concerns\SanitizesCsvOutput;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -33,7 +35,13 @@ class PayrollJournalService
 
     public function postPayrollJournal(HrPayrollRun $payrollRun): FinJournal
     {
-        return DB::transaction(function () use ($payrollRun) {
+        $organizationId = (int) HrPayrollRun::query()
+            ->whereKey($payrollRun->id)
+            ->firstOrFail(['tenant_id'])
+            ->tenant_id;
+
+        return DB::transaction(function () use ($payrollRun, $organizationId) {
+            $this->journalPostingService->lockJournalSequence($organizationId);
             $payrollRun = HrPayrollRun::query()
                 ->whereKey($payrollRun->id)
                 ->lockForUpdate()
@@ -44,6 +52,9 @@ class PayrollJournalService
             }
 
             $orgId = $payrollRun->tenant_id;
+            if ((int) $orgId !== $organizationId) {
+                throw new RuntimeException('The payroll organisation changed while acquiring its journal-sequence mutex.');
+            }
 
             $existingJournal = $this->findExistingPayrollJournal($payrollRun);
             if ($existingJournal) {
@@ -226,94 +237,114 @@ class PayrollJournalService
      | ------------------------------------------------------------------ */
 
     /**
-     * Post the employee net-pay disbursement for a GL-posted payroll run:
-     * DR 2300 Accrued Wages / CR bank for the total net pay, mark every payslip
-     * paid, and stamp the run. Idempotent — a second call returns the existing
-     * payment journal without double-posting.
+     * Post a bank-accepted net-pay instruction. The external-settlement owner
+     * must already hold the 000080 sequence mutex, payroll run and settlement
+     * row in that order inside one transaction.
      */
-    public function postNetPayPayment(HrPayrollRun $payrollRun): FinJournal
+    public function postAcceptedNetPay(
+        HrPayrollRun $payrollRun,
+        FinExternalSettlement $settlement,
+        User $actor,
+    ): FinJournal
     {
-        return DB::transaction(function () use ($payrollRun) {
-            $payrollRun = HrPayrollRun::query()
-                ->whereKey($payrollRun->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        if (DB::transactionLevel() < 1) {
+            throw new RuntimeException('Accepted net pay must be posted inside the external-settlement transaction.');
+        }
+        if ($settlement->purpose !== ExternalSettlementService::PAYROLL_NET_PAY
+            || $settlement->status !== 'accepted'
+            || $settlement->source_type !== $payrollRun->getMorphClass()
+            || (int) $settlement->source_id !== (int) $payrollRun->id) {
+            throw new RuntimeException('Payroll net pay is missing canonical bank-acceptance evidence.');
+        }
+        if ($payrollRun->journal_id === null) {
+            throw new RuntimeException(
+                "Payroll run #{$payrollRun->id} must be posted to the GL before net pay can be paid."
+            );
+        }
+        if ($payrollRun->payment_journal_id !== null) {
+            throw new RuntimeException('The payroll run is already linked to a net-pay journal.');
+        }
 
-            if ($payrollRun->payment_journal_id !== null) {
-                return FinJournal::query()->findOrFail($payrollRun->payment_journal_id);
-            }
+        $this->assertReleasablePayrollRun($payrollRun);
 
-            $this->assertReleasablePayrollRun($payrollRun);
+        $orgId = $payrollRun->tenant_id;
+        $bankAccount = FinBankAccount::query()
+            ->where('organization_id', $orgId)
+            ->whereKey($settlement->bank_account_id)
+            ->where('is_active', true)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $bankAccount->loadMissing('glAccount');
+        if (! $bankAccount->glAccount?->is_active
+            || (int) $bankAccount->glAccount?->organization_id !== (int) $orgId) {
+            throw new RuntimeException('The accepted payroll bank account no longer has an active organisation GL account.');
+        }
+        $payslips = HrPayslip::query()
+            ->where('payroll_run_id', $payrollRun->id)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
 
-            if ($payrollRun->journal_id === null) {
-                throw new RuntimeException(
-                    "Payroll run #{$payrollRun->id} must be posted to the GL before net pay can be paid."
-                );
-            }
+        if ($payslips->isEmpty()) {
+            throw new RuntimeException(
+                "Payroll run #{$payrollRun->id} has no payslips to pay."
+            );
+        }
 
-            $orgId = $payrollRun->tenant_id;
+        $totalNet = '0';
+        foreach ($payslips as $payslip) {
+            $totalNet = bcadd($totalNet, (string) $payslip->net_pay, 2);
+        }
 
-            $payslips = HrPayslip::where('payroll_run_id', $payrollRun->id)->get();
+        if (bccomp($totalNet, '0', 2) <= 0
+            || bccomp($totalNet, (string) $settlement->amount, 2) !== 0) {
+            throw new RuntimeException(
+                "Payroll run #{$payrollRun->id} no longer matches its accepted net-pay file."
+            );
+        }
 
-            if ($payslips->isEmpty()) {
-                throw new RuntimeException(
-                    "Payroll run #{$payrollRun->id} has no payslips to pay."
-                );
-            }
+        $accruedWagesAccountId = $this->findAccountByCode($orgId, '2300')->id;
+        $bankAccountId = (int) $bankAccount->gl_account_id;
 
-            $totalNet = '0';
-            foreach ($payslips as $payslip) {
-                $totalNet = bcadd($totalNet, (string) $payslip->net_pay, 2);
-            }
+        $lines = [
+            [
+                'account_id' => $accruedWagesAccountId,
+                'description' => 'Net pay disbursement',
+                'debit' => $totalNet,
+                'credit' => 0,
+            ],
+            [
+                'account_id' => $bankAccountId,
+                'description' => 'Net pay disbursement',
+                'debit' => 0,
+                'credit' => $totalNet,
+            ],
+        ];
 
-            if (bccomp($totalNet, '0', 2) <= 0) {
-                throw new RuntimeException(
-                    "Payroll run #{$payrollRun->id} has no positive net pay to disburse."
-                );
-            }
+        $periodStart = $payrollRun->period_start->toDateString();
+        $periodEnd = $payrollRun->period_end->toDateString();
 
-            $accruedWagesAccountId = $this->findAccountByCode($orgId, '2300')->id;
-            $bankAccountId = $this->resolveBankGlAccountId($orgId);
+        $journal = $this->journalPostingService->createAndPost($orgId, [
+            'journal_date' => $periodEnd,
+            'type' => 'payroll',
+            'source_type' => FinExternalSettlement::class,
+            'source_id' => $settlement->id,
+            'description' => "Payroll net pay - {$periodStart} to {$periodEnd}",
+            'actor_id' => $actor->id,
+            'lines' => $lines,
+        ]);
 
-            $lines = [
-                [
-                    'account_id' => $accruedWagesAccountId,
-                    'description' => 'Net pay disbursement',
-                    'debit' => $totalNet,
-                    'credit' => 0,
-                ],
-                [
-                    'account_id' => $bankAccountId,
-                    'description' => 'Net pay disbursement',
-                    'debit' => 0,
-                    'credit' => $totalNet,
-                ],
-            ];
+        HrPayslip::where('payroll_run_id', $payrollRun->id)->update([
+            'status' => 'paid',
+            'payment_date' => now()->toDateString(),
+        ]);
 
-            $periodStart = $payrollRun->period_start->toDateString();
-            $periodEnd = $payrollRun->period_end->toDateString();
+        $payrollRun->update([
+            'net_paid_at' => now(),
+            'payment_journal_id' => $journal->id,
+        ]);
 
-            $journal = $this->journalPostingService->createAndPost($orgId, [
-                'journal_date' => $periodEnd,
-                'type' => 'payroll',
-                'source_type' => 'payroll_net_pay',
-                'source_id' => $payrollRun->id,
-                'description' => "Payroll net pay - {$periodStart} to {$periodEnd}",
-                'lines' => $lines,
-            ]);
-
-            HrPayslip::where('payroll_run_id', $payrollRun->id)->update([
-                'status' => 'paid',
-                'payment_date' => now()->toDateString(),
-            ]);
-
-            $payrollRun->update([
-                'net_paid_at' => now(),
-                'payment_journal_id' => $journal->id,
-            ]);
-
-            return $journal;
-        });
+        return $journal;
     }
 
     private function assertReleasablePayrollRun(HrPayrollRun $payrollRun): void
@@ -357,7 +388,7 @@ class PayrollJournalService
             $this->putCsv($handle, [
                 $slip->user?->name ?? 'Employee',
                 $slip->employeeProfile?->bank_account ?? '',
-                number_format((float) $slip->net_pay, 2, '.', ''),
+                bcadd((string) $slip->net_pay, '0.00', 2),
                 "Net pay {$period}",
             ]);
         }
@@ -371,27 +402,6 @@ class PayrollJournalService
         }
 
         return $csv;
-    }
-
-    /**
-     * Resolve the GL account to credit for a net-pay disbursement: the org's
-     * primary active bank account, else any active bank account.
-     */
-    private function resolveBankGlAccountId(?int $orgId): int
-    {
-        $bank = FinBankAccount::query()
-            ->where('organization_id', $orgId)
-            ->where('is_active', true)
-            ->orderByDesc('is_primary')
-            ->first();
-
-        if (! $bank || ! $bank->gl_account_id) {
-            throw new RuntimeException(
-                "No active bank account with a linked GL account is configured for organisation #{$orgId}."
-            );
-        }
-
-        return (int) $bank->gl_account_id;
     }
 
     /* ------------------------------------------------------------------

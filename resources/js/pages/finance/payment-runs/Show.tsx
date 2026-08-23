@@ -14,7 +14,14 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, CheckCircle, Download, FileText, Play } from 'lucide-react';
+import {
+    Banknote,
+    CheckCircle,
+    Download,
+    FileText,
+    Play,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type PaymentRunItem = {
@@ -42,6 +49,17 @@ type PaymentRun = {
     journal: { id: number; journal_number: string } | null;
     approved_by: { id: number; name: string } | null;
     processed_by: { id: number; name: string } | null;
+    settlement: {
+        status: string;
+        artifact_sha256: string;
+        exported_at: string | null;
+        accepted_at: string | null;
+        acceptance_reference: string | null;
+        rejected_at: string | null;
+        rejection_reason: string | null;
+        settled_at: string | null;
+        reconciled_at: string | null;
+    } | null;
     items: PaymentRunItem[];
 };
 
@@ -91,6 +109,72 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         );
     };
 
+    const handleAccept = () => {
+        const reference = window.prompt('Bank acceptance reference');
+        const confirmationDigest = window.prompt(
+            'Bank confirmation digest or immutable evidence reference',
+        );
+        if (!reference || !confirmationDigest) return;
+
+        router.post(`/finance/payment-runs/${paymentRun.id}/accept`, {
+            idempotency_key: `accept:${paymentRun.id}:${reference}:${confirmationDigest}`.slice(
+                0,
+                128,
+            ),
+            reference,
+            evidence: { confirmation_digest: confirmationDigest },
+        });
+    };
+
+    const handleSettle = () => {
+        const acceptanceReference = paymentRun.settlement?.acceptance_reference;
+        if (!acceptanceReference) return;
+        router.post(`/finance/payment-runs/${paymentRun.id}/settle`, {
+            idempotency_key: `settle:${paymentRun.id}:${acceptanceReference}`,
+        });
+    };
+
+    const handleReject = () => {
+        const reference = window.prompt('Bank rejection reference');
+        const reason = window.prompt('Bank rejection reason');
+        const evidenceReference = window.prompt(
+            'Bank rejection digest or immutable evidence reference',
+        );
+        if (!reference || !reason || !evidenceReference) return;
+
+        router.post(`/finance/payment-runs/${paymentRun.id}/reject`, {
+            idempotency_key: `reject:${paymentRun.id}:${reference}:${evidenceReference}`.slice(
+                0,
+                128,
+            ),
+            reference,
+            reason,
+            evidence: { rejection_digest: evidenceReference },
+        });
+    };
+
+    const handleReconcile = () => {
+        const bankTransactionInput = window.prompt(
+            'Cleared bank transaction ID',
+        );
+        const reference = window.prompt('Bank reconciliation reference');
+        const evidenceReference = window.prompt(
+            'Bank reconciliation digest or immutable evidence reference',
+        );
+        if (!bankTransactionInput || !reference || !evidenceReference) return;
+
+        const bankTransactionId = Number(bankTransactionInput);
+        if (!Number.isSafeInteger(bankTransactionId) || bankTransactionId < 1)
+            return;
+
+        router.post(`/finance/payment-runs/${paymentRun.id}/reconcile`, {
+            idempotency_key: `payment-run-reconcile:${paymentRun.id}:${bankTransactionId}`,
+            bank_transaction_id: bankTransactionId,
+            reference,
+            evidence: { reconciliation_digest: evidenceReference },
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Payment Run ${paymentRun.run_number}`} />
@@ -126,11 +210,17 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                     >
                                         <Play className="mr-2 h-4 w-4" />
                                         {processingRun
-                                            ? 'Processing...'
-                                            : 'Process'}
+                                            ? 'Preparing...'
+                                            : 'Prepare Bank File'}
                                     </Button>
                                 )}
-                                {paymentRun.status === 'completed' &&
+                                {[
+                                    'prepared',
+                                    'exported',
+                                    'accepted',
+                                    'settled',
+                                    'reconciled',
+                                ].includes(paymentRun.status) &&
                                     paymentRun.file_path && (
                                         <a
                                             href={`/finance/payment-runs/${paymentRun.id}/download`}
@@ -141,6 +231,35 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                             </Button>
                                         </a>
                                     )}
+                                {paymentRun.status === 'exported' && (
+                                    <Button onClick={handleAccept}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Record Bank Acceptance
+                                    </Button>
+                                )}
+                                {paymentRun.status === 'accepted' && (
+                                    <Button onClick={handleSettle}>
+                                        <Banknote className="mr-2 h-4 w-4" />
+                                        Settle Accepted Run
+                                    </Button>
+                                )}
+                                {paymentRun.status === 'settled' && (
+                                    <Button onClick={handleReconcile}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Record Bank Reconciliation
+                                    </Button>
+                                )}
+                                {['exported', 'accepted'].includes(
+                                    paymentRun.status,
+                                ) && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleReject}
+                                    >
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        Record Bank Rejection
+                                    </Button>
+                                )}
                             </>
                         }
                     />
@@ -258,6 +377,21 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                 </Link>
                             </div>
                         )}
+                        {paymentRun.settlement && (
+                            <div className="mt-4 border-t pt-4">
+                                <p className="text-sm text-muted-foreground">
+                                    External settlement
+                                </p>
+                                <div className="mt-1 flex items-center gap-2">
+                                    <StatusBadge
+                                        status={paymentRun.settlement.status}
+                                    />
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        {paymentRun.settlement.artifact_sha256}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -343,7 +477,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                 open={confirmAction === 'approve'}
                 onOpenChange={(open) => !open && setConfirmAction(null)}
                 title="Approve payment run?"
-                description="This approves the payment run so it can be processed. You can still process or cancel it afterwards."
+                description="This approves the payment run so an immutable bank file can be prepared. No bill is paid until a separate bank-accepted settlement."
                 confirmLabel="Approve run"
                 processing={approving}
                 onConfirm={handleApprove}
@@ -351,9 +485,9 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
             <ConfirmDialog
                 open={confirmAction === 'process'}
                 onOpenChange={(open) => !open && setConfirmAction(null)}
-                title="Process payment run?"
-                description="This posts the payment run to the general ledger and generates the bank payment file. This can't be undone."
-                confirmLabel="Process run"
+                title="Prepare bank file?"
+                description="This prepares the payment instruction only. It does not pay bills or post the bank journal."
+                confirmLabel="Prepare file"
                 processing={processingRun}
                 onConfirm={handleProcess}
             />

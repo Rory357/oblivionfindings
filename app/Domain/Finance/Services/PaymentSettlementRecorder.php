@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinExternalSettlement;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinPaymentAllocation;
@@ -133,8 +134,13 @@ final class PaymentSettlementRecorder
             $source instanceof FinPaymentRunItem => (int) $source->paymentRun?->organization_id === $organizationId
                 && (int) $source->settlement_bill_id === (int) $target->getKey()
                 && $target instanceof FinBill
-                && $journal->source_type === $source->paymentRun->getMorphClass()
-                && (int) $journal->source_id === (int) $source->paymentRun->getKey(),
+                && $journal->source_type === FinExternalSettlement::class
+                && FinExternalSettlement::query()
+                    ->whereKey($journal->source_id)
+                    ->where('source_type', $source->paymentRun->getMorphClass())
+                    ->where('source_id', $source->paymentRun->getKey())
+                    ->where('purpose', ExternalSettlementService::PAYMENT_RUN)
+                    ->exists(),
             default => false,
         };
 

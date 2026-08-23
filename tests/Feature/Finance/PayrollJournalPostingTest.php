@@ -3,9 +3,13 @@
 use App\Domain\Finance\Jobs\PostPayrollJournalJob;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinCostAllocation;
+use App\Domain\Finance\Models\FinExternalSettlement;
+use App\Domain\Finance\Models\FinExternalSettlementEvent;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Services\ExternalSettlementService;
 use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayslip;
@@ -19,6 +23,10 @@ use App\Models\Timesheet;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -104,6 +112,7 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
 });
 
 it('pays employee net pay, clearing accrued wages against the bank (idempotently)', function () {
+    Storage::fake('private');
     createPayrollJournalPostingAccounts();
     createPayrollJournalPostingOpenPeriod();
 
@@ -115,7 +124,7 @@ it('pays employee net pay, clearing accrued wages against the bank (idempotently
         'opening_balance' => 0,
         'is_active' => true,
     ]);
-    FinBankAccount::factory()->create([
+    $bankAccount = FinBankAccount::factory()->create([
         'organization_id' => 1,
         'gl_account_id' => $bankGl->id,
         'is_primary' => true,
@@ -123,6 +132,7 @@ it('pays employee net pay, clearing accrued wages against the bank (idempotently
     ]);
 
     $hr = createPayrollJournalPostingUser('hr');
+    $checker = createPayrollJournalPostingUser('hr');
     createPayrollJournalPostingTimesheet($hr, 'EMP-NP-001', '2026-04-03 06:00:00');
     createPayrollJournalPostingTimesheet($hr, 'EMP-NP-002', '2026-04-04 06:00:00');
 
@@ -137,9 +147,144 @@ it('pays employee net pay, clearing accrued wages against the bank (idempotently
     $run->refresh();
     expect($run->journal_id)->not->toBeNull(); // accrual journal posted on lock
 
-    $totalNet = (float) HrPayslip::where('payroll_run_id', $run->id)->sum('net_pay');
+    $unauthorized = createPayrollJournalPostingUser('support_worker');
+    expect(fn () => app(ExternalSettlementService::class)->preparePayrollNetPay($run, $unauthorized))
+        ->toThrow(HttpException::class);
+    $foreignHr = createPayrollJournalPostingUser('hr');
+    $foreignHr->forceFill(['organization_id' => 2])->save();
+    expect(fn () => app(ExternalSettlementService::class)->preparePayrollNetPay($run, $foreignHr))
+        ->toThrow(NotFoundHttpException::class);
 
-    $this->post(route('hr.payroll.runs.pay', $run))->assertRedirect();
+    $totalNet = HrPayslip::query()
+        ->where('payroll_run_id', $run->id)
+        ->pluck('net_pay')
+        ->reduce(fn (string $total, $amount): string => bcadd($total, (string) $amount, 2), '0.00');
+
+    $this->post(route('hr.payroll.runs.prepare-net-pay', $run))->assertRedirect();
+    $run->refresh();
+    expect($run->net_paid_at)->toBeNull()
+        ->and($run->payment_journal_id)->toBeNull()
+        ->and(HrPayslip::where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(0);
+
+    $settlement = $run->externalSettlement()->firstOrFail();
+    $path = $settlement->artifact_path;
+    $original = Storage::disk('private')->get($path);
+    Storage::disk('private')->put($path, 'tampered payroll instruction');
+    $this->post(route('hr.payroll.runs.prepare-net-pay', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('net_pay');
+    $this->get(route('hr.payroll.runs.net-pay-file', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('net_pay');
+    expect($settlement->fresh()->status)->toBe('prepared')
+        ->and($run->fresh()->net_paid_at)->toBeNull()
+        ->and($run->fresh()->payment_journal_id)->toBeNull()
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'exported')->count())->toBe(0)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(HrPayslip::query()->where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(0);
+
+    Storage::disk('private')->put($path, $original);
+    $this->get(route('hr.payroll.runs.net-pay-file', $run))
+        ->assertOk()
+        ->assertDownload("net-pay-run-{$run->id}.csv");
+    expect($settlement->fresh()->status)->toBe('exported');
+
+    Storage::disk('private')->delete($path);
+    $this->get(route('hr.payroll.runs.net-pay-file', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('net_pay');
+    expect($settlement->fresh()->status)->toBe('exported')
+        ->and($run->fresh()->net_paid_at)->toBeNull()
+        ->and($run->fresh()->payment_journal_id)->toBeNull()
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'exported')->count())->toBe(1)
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(HrPayslip::query()->where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(0);
+    Storage::disk('private')->put($path, $original);
+
+    $this->actingAs($checker)->post(route('hr.payroll.runs.reject-net-pay', $run), [
+        'idempotency_key' => 'payroll-net-pay-rejected-1',
+        'reference' => 'BANK-PAYROLL-REJECTED-1',
+        'reason' => 'Correct employee bank details and generate a new instruction.',
+        'evidence' => [
+            'rejection_digest' => hash('sha256', 'bank-payroll-rejection-1'),
+        ],
+    ])->assertRedirect()->assertSessionHas('success');
+    expect($settlement->fresh()->status)->toBe('rejected')
+        ->and($settlement->fresh()->active_source_key)->toBeNull()
+        ->and($run->fresh()->net_paid_at)->toBeNull()
+        ->and($run->fresh()->payment_journal_id)->toBeNull()
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(HrPayslip::query()->where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(0)
+        ->and(Timesheet::query()->where('status', 'paid')->count())->toBe(0);
+
+    Storage::disk('private')->delete($path);
+    $this->actingAs($hr)->post(route('hr.payroll.runs.prepare-net-pay', $run))
+        ->assertRedirect()
+        ->assertSessionHasErrors('net_pay');
+    expect(FinExternalSettlement::query()
+        ->where('source_type', $run->getMorphClass())
+        ->where('source_id', $run->id)
+        ->where('purpose', 'payroll_net_pay')
+        ->count())->toBe(1)
+        ->and($run->fresh()->net_paid_at)->toBeNull()
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0);
+    Storage::disk('private')->put($path, $original);
+
+    $this->actingAs($hr)->post(route('hr.payroll.runs.prepare-net-pay', $run))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+    $correctedSettlement = $run->fresh()->externalSettlement()->firstOrFail();
+    expect($correctedSettlement->attempt_number)->toBe(2)
+        ->and($correctedSettlement->status)->toBe('prepared')
+        ->and($correctedSettlement->artifact_path)->not->toBe($path)
+        ->and(FinExternalSettlement::query()
+            ->where('source_type', $run->getMorphClass())
+            ->where('source_id', $run->id)
+            ->where('purpose', 'payroll_net_pay')
+            ->count())->toBe(2)
+        ->and(Storage::disk('private')->exists($path))->toBeTrue()
+        ->and(Storage::disk('private')->exists($correctedSettlement->artifact_path))->toBeTrue();
+    expect(fn () => app(ExternalSettlementService::class)->reject(
+        $run->fresh(),
+        ExternalSettlementService::PAYROLL_NET_PAY,
+        $checker,
+        'payroll-net-pay-rejected-1',
+        'BANK-PAYROLL-REJECTED-1',
+        'Correct employee bank details and generate a new instruction.',
+        ['rejection_digest' => hash('sha256', 'bank-payroll-rejection-1')],
+    ))->toThrow(InvalidArgumentException::class, 'prior settlement attempt');
+    expect($correctedSettlement->fresh()->status)->toBe('prepared');
+    $this->get(route('hr.payroll.runs.net-pay-file', $run))
+        ->assertOk()
+        ->assertDownload("net-pay-run-{$run->id}.csv");
+    expect($correctedSettlement->fresh()->status)->toBe('exported');
+
+    $blockPayrollSettlementAudit = true;
+    DB::listen(function ($query) use (&$blockPayrollSettlementAudit): void {
+        if ($blockPayrollSettlementAudit
+            && str_contains(strtolower($query->sql), 'insert into `audit_logs`')
+            && in_array('hr.payroll_net_pay.settled', $query->bindings, true)) {
+            throw new RuntimeException('Forced post-journal payroll settlement audit failure.');
+        }
+    });
+    $this->actingAs($checker)->post(route('hr.payroll.runs.pay', $run), [
+        'idempotency_key' => 'payroll-net-pay-accepted-1',
+        'acceptance_reference' => 'BANK-PAYROLL-ACCEPTED-1',
+        'acceptance_evidence' => [
+            'confirmation_digest' => hash('sha256', 'bank-payroll-confirmation-1'),
+        ],
+    ])->assertRedirect()->assertSessionHas('error');
+    expect($correctedSettlement->fresh()->status)->toBe('accepted')
+        ->and($run->fresh()->net_paid_at)->toBeNull()
+        ->and($run->fresh()->payment_journal_id)->toBeNull()
+        ->and(FinJournal::query()->where('source_type', FinExternalSettlement::class)->count())->toBe(0)
+        ->and(HrPayslip::query()->where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(0)
+        ->and(Timesheet::query()->where('status', 'paid')->count())->toBe(0);
+
+    $blockPayrollSettlementAudit = false;
+    $this->post(route('hr.payroll.runs.pay', $run), [
+        'idempotency_key' => 'payroll-net-pay-accepted-1',
+    ])->assertRedirect()->assertSessionHas('success');
     $run->refresh();
 
     expect($run->net_paid_at)->not->toBeNull()
@@ -150,23 +295,54 @@ it('pays employee net pay, clearing accrued wages against the bank (idempotently
     $credits = $payJournal->lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->credit, 2), '0');
 
     expect(bccomp($debits, $credits, 2))->toBe(0)
-        ->and(bccomp($debits, (string) round($totalNet, 2), 2))->toBe(0);
+        ->and(bccomp($debits, $totalNet, 2))->toBe(0);
 
     // DR 2300 Accrued Wages, CR 1000 Bank
     expect((float) $payJournal->lines->firstWhere('account.code', '2300')->debit)->toBeGreaterThan(0)
         ->and((float) $payJournal->lines->firstWhere('account.code', '1000')->credit)->toBeGreaterThan(0);
 
     // Every payslip flipped to paid.
-    expect(HrPayslip::where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(2);
+    expect(HrPayslip::where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(2)
+        ->and(Timesheet::query()->where('status', 'paid')->count())->toBe(2);
 
-    // Idempotent: a second pay is blocked and posts no second journal.
-    $this->post(route('hr.payroll.runs.pay', $run))->assertRedirect();
+    // Idempotent: the same evidence replays successfully without a second journal.
+    $this->post(route('hr.payroll.runs.pay', $run), [
+        'idempotency_key' => 'payroll-net-pay-accepted-1',
+    ])->assertRedirect()->assertSessionHas('success');
     expect(
         FinJournal::where('type', 'payroll')
-            ->where('source_type', 'payroll_net_pay')
-            ->where('source_id', $run->id)
+            ->where('source_type', FinExternalSettlement::class)
             ->count()
     )->toBe(1);
+
+    $bankLine = $payJournal->lines->firstWhere('account.code', '1000');
+    $clearedTransaction = FinBankTransaction::query()->create([
+        'organization_id' => 1,
+        'bank_account_id' => $bankAccount->id,
+        'transaction_date' => now()->toDateString(),
+        'amount' => bcsub('0.00', $totalNet, 2),
+        'description' => 'Cleared payroll net-pay instruction',
+        'reference' => 'BANK-PAYROLL-CLEARED-1',
+        'source' => 'manual',
+        'matched_journal_line_id' => $bankLine->id,
+        'status' => 'reconciled',
+    ]);
+    $reconciliationPayload = [
+        'idempotency_key' => 'payroll-net-pay-reconciled-1',
+        'reference' => 'BANK-PAYROLL-CLEARED-1',
+        'evidence' => ['digest' => hash('sha256', 'payroll-cleared-1')],
+        'bank_transaction_id' => $clearedTransaction->id,
+    ];
+    $this->actingAs($checker)
+        ->post(route('hr.payroll.runs.reconcile-net-pay', $run), $reconciliationPayload)
+        ->assertRedirect()
+        ->assertSessionHas('success');
+    $this->post(route('hr.payroll.runs.reconcile-net-pay', $run), $reconciliationPayload)
+        ->assertRedirect()
+        ->assertSessionHas('success');
+    expect($correctedSettlement->fresh()->status)->toBe('reconciled')
+        ->and($correctedSettlement->fresh()->reconciled_bank_transaction_id)->toBe($clearedTransaction->id)
+        ->and(FinExternalSettlementEvent::query()->where('event_type', 'reconciled')->count())->toBe(1);
 });
 
 function createPayrollJournalPostingAccounts(): void

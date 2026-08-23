@@ -31,6 +31,7 @@ import {
     LockKeyhole,
     Plus,
     RefreshCw,
+    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -48,6 +49,20 @@ interface PayrollRun {
     gl_posted_at: string | null;
     gl_error: string | null;
     net_paid_at: string | null;
+    net_settlement: {
+        status:
+            | 'prepared'
+            | 'exported'
+            | 'accepted'
+            | 'rejected'
+            | 'settled'
+            | 'reconciled';
+        artifact_sha256: string;
+        exported_at: string | null;
+        accepted_at: string | null;
+        acceptance_reference: string | null;
+        rejection_reason: string | null;
+    } | null;
     export_profile: {
         id: number;
         name: string;
@@ -161,6 +176,88 @@ export default function PayrollIndex({
         );
     }
 
+    function handlePrepareNetPay(runId: number) {
+        router.post(
+            `/hr/payroll/runs/${runId}/prepare-net-pay`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    function handleSettleNetPay(run: PayrollRun) {
+        const existingReference = run.net_settlement?.acceptance_reference;
+        const reference =
+            existingReference || window.prompt('Bank acceptance reference');
+        if (!reference) return;
+        const confirmationDigest = existingReference
+            ? null
+            : window.prompt(
+                  'Bank confirmation digest or immutable evidence reference',
+              );
+        if (!existingReference && !confirmationDigest) return;
+
+        router.post(
+            `/hr/payroll/runs/${run.id}/pay`,
+            {
+                idempotency_key: `payroll-net:${run.id}:${reference}`,
+                acceptance_reference: reference,
+                acceptance_evidence: confirmationDigest
+                    ? { confirmation_digest: confirmationDigest }
+                    : undefined,
+            },
+            { preserveScroll: true },
+        );
+    }
+
+    function handleRejectNetPay(run: PayrollRun) {
+        const reference = window.prompt('Bank rejection reference');
+        const reason = window.prompt('Bank rejection reason');
+        const evidenceReference = window.prompt(
+            'Bank rejection digest or immutable evidence reference',
+        );
+        if (!reference || !reason || !evidenceReference) return;
+
+        router.post(
+            `/hr/payroll/runs/${run.id}/reject-net-pay`,
+            {
+                idempotency_key: `payroll-reject:${run.id}:${reference}:${evidenceReference}`.slice(
+                    0,
+                    128,
+                ),
+                reference,
+                reason,
+                evidence: { rejection_digest: evidenceReference },
+            },
+            { preserveScroll: true },
+        );
+    }
+
+    function handleReconcileNetPay(run: PayrollRun) {
+        const bankTransactionInput = window.prompt(
+            'Cleared bank transaction ID',
+        );
+        const reference = window.prompt('Bank reconciliation reference');
+        const evidenceReference = window.prompt(
+            'Bank reconciliation digest or immutable evidence reference',
+        );
+        if (!bankTransactionInput || !reference || !evidenceReference) return;
+
+        const bankTransactionId = Number(bankTransactionInput);
+        if (!Number.isSafeInteger(bankTransactionId) || bankTransactionId < 1)
+            return;
+
+        router.post(
+            `/hr/payroll/runs/${run.id}/reconcile-net-pay`,
+            {
+                idempotency_key: `payroll-reconcile:${run.id}:${bankTransactionId}`,
+                bank_transaction_id: bankTransactionId,
+                reference,
+                evidence: { reconciliation_digest: evidenceReference },
+            },
+            { preserveScroll: true },
+        );
+    }
+
     function handleSetDefaultProfile(profileId: number) {
         router.post(
             `/hr/payroll/export-profiles/${profileId}/set-default`,
@@ -187,19 +284,52 @@ export default function PayrollIndex({
                         Lock
                     </Button>
                 ) : null}
-                {can.manage && run.gl_posted_at && !run.net_paid_at ? (
+                {can.manage &&
+                run.gl_posted_at &&
+                !run.net_paid_at &&
+                (!run.net_settlement ||
+                    run.net_settlement.status === 'rejected') ? (
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                            router.post(
-                                `/hr/payroll/runs/${run.id}/pay`,
-                                {},
-                                { preserveScroll: true },
-                            )
-                        }
+                        onClick={() => handlePrepareNetPay(run.id)}
                     >
-                        Pay net
+                        Prepare bank file
+                    </Button>
+                ) : null}
+                {can.manage &&
+                ['exported', 'accepted'].includes(
+                    run.net_settlement?.status || '',
+                ) &&
+                !run.net_paid_at ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSettleNetPay(run)}
+                    >
+                        Record acceptance &amp; settle
+                    </Button>
+                ) : null}
+                {can.manage && run.net_settlement?.status === 'settled' ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReconcileNetPay(run)}
+                    >
+                        Record reconciliation
+                    </Button>
+                ) : null}
+                {can.manage &&
+                ['exported', 'accepted'].includes(
+                    run.net_settlement?.status || '',
+                ) ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRejectNetPay(run)}
+                    >
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Record rejection
                     </Button>
                 ) : null}
                 {run.net_paid_at ? (
@@ -232,7 +362,11 @@ export default function PayrollIndex({
                         ) : null}
                     </>
                 ) : null}
-                {can.export_data && run.net_paid_at ? (
+                {can.export_data &&
+                run.net_settlement &&
+                ['prepared', 'exported', 'accepted'].includes(
+                    run.net_settlement.status,
+                ) ? (
                     <Button variant="outline" size="sm" asChild>
                         <a href={`/hr/payroll/runs/${run.id}/net-pay-file`}>
                             <Download className="mr-1 h-3 w-3" />
@@ -300,17 +434,45 @@ export default function PayrollIndex({
                         { preserveScroll: true },
                     ),
             });
-        if (can.manage && run.gl_posted_at && !run.net_paid_at)
+        if (
+            can.manage &&
+            run.gl_posted_at &&
+            !run.net_paid_at &&
+            (!run.net_settlement || run.net_settlement.status === 'rejected')
+        )
             items.push({
                 kind: 'item',
-                label: 'Pay net',
+                label: 'Prepare net-pay bank file',
                 icon: CircleDollarSign,
-                onSelect: () =>
-                    router.post(
-                        `/hr/payroll/runs/${run.id}/pay`,
-                        {},
-                        { preserveScroll: true },
-                    ),
+                onSelect: () => handlePrepareNetPay(run.id),
+            });
+        if (
+            can.manage &&
+            ['exported', 'accepted'].includes(run.net_settlement?.status || '') &&
+            !run.net_paid_at
+        )
+            items.push({
+                kind: 'item',
+                label: 'Record acceptance and settle',
+                icon: CircleDollarSign,
+                onSelect: () => handleSettleNetPay(run),
+            });
+        if (
+            can.manage &&
+            ['exported', 'accepted'].includes(run.net_settlement?.status || '')
+        )
+            items.push({
+                kind: 'item',
+                label: 'Record bank rejection',
+                icon: XCircle,
+                onSelect: () => handleRejectNetPay(run),
+            });
+        if (can.manage && run.net_settlement?.status === 'settled')
+            items.push({
+                kind: 'item',
+                label: 'Record bank reconciliation',
+                icon: CircleDollarSign,
+                onSelect: () => handleReconcileNetPay(run),
             });
         if (can.manage && run.gl_error && !run.gl_posted_at)
             items.push({
@@ -331,7 +493,13 @@ export default function PayrollIndex({
                 icon: Download,
                 onSelect: () => handleExport(run.id),
             });
-        if (can.export_data && run.net_paid_at)
+        if (
+            can.export_data &&
+            run.net_settlement &&
+            ['prepared', 'exported', 'accepted'].includes(
+                run.net_settlement.status,
+            )
+        )
             items.push({
                 kind: 'item',
                 label: 'Download bank file',
@@ -557,14 +725,25 @@ export default function PayrollIndex({
                                                     ) : null}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            config.className
-                                                        }
-                                                    >
-                                                        {config.label}
-                                                    </Badge>
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                config.className
+                                                            }
+                                                        >
+                                                            {config.label}
+                                                        </Badge>
+                                                        {run.net_settlement ? (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Net pay:{' '}
+                                                                {run.net_settlement.status.replace(
+                                                                    '_',
+                                                                    ' ',
+                                                                )}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-muted-foreground">
                                                     {run.total_hours.toFixed(1)}
@@ -604,21 +783,37 @@ export default function PayrollIndex({
                                                             )}
                                                         {can.manage &&
                                                             run.gl_posted_at &&
+                                                            !run.net_paid_at &&
+                                                            !run.net_settlement && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        handlePrepareNetPay(
+                                                                            run.id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Prepare
+                                                                    bank file
+                                                                </Button>
+                                                            )}
+                                                        {can.manage &&
+                                                            ['exported', 'accepted'].includes(
+                                                                run.net_settlement?.status || '',
+                                                            ) &&
                                                             !run.net_paid_at && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        router.post(
-                                                                            `/hr/payroll/runs/${run.id}/pay`,
-                                                                            {},
-                                                                            {
-                                                                                preserveScroll: true,
-                                                                            },
+                                                                        handleSettleNetPay(
+                                                                            run,
                                                                         )
                                                                     }
                                                                 >
-                                                                    Pay net
+                                                                    Accept &amp;
+                                                                    settle
                                                                 </Button>
                                                             )}
                                                         {run.net_paid_at && (
@@ -626,6 +821,22 @@ export default function PayrollIndex({
                                                                 Paid
                                                             </span>
                                                         )}
+                                                        {can.manage &&
+                                                            run.net_settlement
+                                                                ?.status ===
+                                                                'settled' && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        handleReconcileNetPay(
+                                                                            run,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Reconcile
+                                                                </Button>
+                                                            )}
                                                         {run.gl_error &&
                                                             !run.gl_posted_at && (
                                                                 <>
@@ -659,7 +870,10 @@ export default function PayrollIndex({
                                                                 </>
                                                             )}
                                                         {can.export_data &&
-                                                            run.net_paid_at && (
+                                                            run.net_settlement &&
+                                                            ['prepared', 'exported', 'accepted'].includes(
+                                                                run.net_settlement.status,
+                                                            ) && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
@@ -799,6 +1013,15 @@ export default function PayrollIndex({
                                                 {config.label}
                                             </Badge>
                                         </div>
+                                        {run.net_settlement ? (
+                                            <p className="text-xs text-muted-foreground">
+                                                Net pay:{' '}
+                                                {run.net_settlement.status.replace(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </p>
+                                        ) : null}
                                         <p className="text-lg font-semibold">
                                             {formatCurrency(run.total_gross)}
                                         </p>

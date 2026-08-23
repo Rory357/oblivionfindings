@@ -351,11 +351,20 @@ class PaymentMatchingService
 
     private function confirmAndPost(FinPaymentMatch $match, User $actor): FinPaymentMatch
     {
-        return DB::transaction(function () use ($match, $actor) {
+        $organizationId = (int) FinPaymentMatch::query()
+            ->whereKey($match->id)
+            ->firstOrFail(['organization_id'])
+            ->organization_id;
+
+        return DB::transaction(function () use ($match, $actor, $organizationId) {
+            // Shared journal order: 000080 sequence before match, bank
+            // transaction and canonical bill/invoice locks.
+            $this->journalPostingService->lockJournalSequence($organizationId);
             $match = FinPaymentMatch::query()
                 ->lockForUpdate()
                 ->findOrFail($match->id);
 
+            abort_unless((int) $match->organization_id === $organizationId, 404);
             abort_unless((int) $match->organization_id === (int) $actor->organization_id, 404);
 
             if (in_array($match->status, ['confirmed', 'auto_confirmed'], true)) {
@@ -478,7 +487,7 @@ class PaymentMatchingService
             ],
         ]);
 
-        $this->accountsPayableService->recordPayment($bill, (float) $amount);
+        $this->accountsPayableService->recordPayment($bill, $amount);
 
         $this->settlementRecorder->record(
             target: $bill,

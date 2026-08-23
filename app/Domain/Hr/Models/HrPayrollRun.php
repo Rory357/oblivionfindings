@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Finance\Models\FinExternalSettlement;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class HrPayrollRun extends Model
 {
@@ -104,6 +106,13 @@ class HrPayrollRun extends Model
     public function correction(): HasOne
     {
         return $this->hasOne(self::class, 'correction_of_run_id');
+    }
+
+    public function externalSettlement(): MorphOne
+    {
+        return $this->morphOne(FinExternalSettlement::class, 'source')
+            ->where('purpose', 'payroll_net_pay')
+            ->latestOfMany('attempt_number');
     }
 
     public function lockedBy(): BelongsTo

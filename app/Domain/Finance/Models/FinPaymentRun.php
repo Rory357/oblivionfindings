@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class FinPaymentRun extends Model
 {
@@ -69,6 +70,13 @@ class FinPaymentRun extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(FinJournal::class, 'journal_id');
+    }
+
+    public function externalSettlement(): MorphOne
+    {
+        return $this->morphOne(FinExternalSettlement::class, 'source')
+            ->where('purpose', 'vendor_payment_run')
+            ->latestOfMany('attempt_number');
     }
 
     public function createdBy(): BelongsTo

@@ -676,13 +676,16 @@ class AccountsPayableService
     /**
      * Record a payment against a bill.
      */
-    public function recordPayment(FinBill $bill, float $amount): FinBill
+    public function recordPayment(FinBill $bill, string|int|float $amount): FinBill
     {
-        if (! is_finite($amount)) {
+        if ((is_float($amount) && ! is_finite($amount))
+            || (is_string($amount) && ! preg_match('/\A-?\d+(?:\.\d{1,2})?\z/D', trim($amount)))) {
             throw new InvalidArgumentException('Payment amount must be a positive finite value.');
         }
 
-        $paymentAmount = number_format($amount, 2, '.', '');
+        $paymentAmount = is_float($amount)
+            ? number_format($amount, 2, '.', '')
+            : bcadd(trim((string) $amount), '0.00', 2);
         if (bccomp($paymentAmount, '0.00', 2) <= 0) {
             throw new InvalidArgumentException('Payment amount must be greater than zero.');
         }

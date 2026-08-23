@@ -453,8 +453,6 @@ class PayrollExportService
             // already created them.
             $this->payslipService->generateBulkPayslips($lockedRun->fresh('items'));
 
-            $this->markRunTimesheetsPaid($lockedRun);
-
             return [
                 'run' => $lockedRun->fresh(),
                 'validation_errors' => [],
@@ -500,9 +498,9 @@ class PayrollExportService
     }
 
     /**
-     * Cascade: flip every still-approved timesheet linked to this run to 'paid'.
-     * Idempotent and safe to call repeatedly. 'paid' is terminal — the system has
-     * no reverse-run path, so this is a one-way transition. Returns count newly paid.
+     * Settlement-only cascade: flip every still-approved linked timesheet to
+     * paid. ExternalSettlementService calls this in the same transaction as the
+     * accepted net-pay journal; locking/exporting alone must never call it.
      */
     public function markRunTimesheetsPaid(HrPayrollRun $run): int
     {
