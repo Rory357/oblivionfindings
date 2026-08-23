@@ -63,6 +63,24 @@ class UsersControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_zero_result_role_filter_retains_organisation_wide_summary_counts(): void
+    {
+        $clinicalLead = Role::where('name', 'clinical_lead')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->get("/system/users?role={$clinicalLead->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('settings/users/index')
+                ->where('users.total', 0)
+                ->where('filters.role', (string) $clinicalLead->id)
+                ->where('stats.total', 2)
+                ->where('stats.active', 2)
+                ->where('stats.pending', 0)
+                ->where('stats.staff', 0)
+            );
+    }
+
     public function test_store_fails_closed_for_staff_and_directs_creation_to_canonical_hr_intake(): void
     {
         $role = Role::where('name', 'support_worker')->firstOrFail();

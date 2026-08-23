@@ -5,6 +5,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
 export type StatTileTone =
     | 'primary'
     | 'success'
@@ -111,6 +113,45 @@ const TONE: Record<StatTileTone, { bg: string; text: string; iconBg: string }> =
         },
     };
 
+export function clampCountUpProgress(
+    now: number,
+    start: number,
+    duration: number,
+): number {
+    if (duration <= 0) return 1;
+
+    return Math.min(Math.max((now - start) / duration, 0), 1);
+}
+
+function usePrefersReducedMotion(): boolean {
+    const getPreference = () =>
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia(REDUCED_MOTION_QUERY).matches;
+    const [prefersReducedMotion, setPrefersReducedMotion] =
+        useState(getPreference);
+
+    useEffect(() => {
+        if (
+            typeof window === 'undefined' ||
+            typeof window.matchMedia !== 'function'
+        ) {
+            return;
+        }
+
+        const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+        const updatePreference = () =>
+            setPrefersReducedMotion(mediaQuery.matches);
+
+        updatePreference();
+        mediaQuery.addEventListener('change', updatePreference);
+
+        return () => mediaQuery.removeEventListener('change', updatePreference);
+    }, []);
+
+    return prefersReducedMotion;
+}
+
 function useCountUp(target: number | null, enabled: boolean): number {
     const [displayValue, setDisplayValue] = useState(target ?? 0);
     useEffect(() => {
@@ -126,7 +167,7 @@ function useCountUp(target: number | null, enabled: boolean): number {
         const start = performance.now();
         let frame = 0;
         const animate = (now: number) => {
-            const progress = Math.min((now - start) / duration, 1);
+            const progress = clampCountUpProgress(now, start, duration);
             const eased = 1 - Math.pow(1 - progress, 3);
             setDisplayValue(Math.round(target * eased));
             if (progress < 1) frame = requestAnimationFrame(animate);
@@ -134,7 +175,7 @@ function useCountUp(target: number | null, enabled: boolean): number {
         frame = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(frame);
     }, [target, enabled]);
-    return displayValue;
+    return enabled ? displayValue : (target ?? 0);
 }
 
 function MiniSparkline({
@@ -187,7 +228,11 @@ export function StatTile({
     valueClassName,
 }: StatTileProps) {
     const numericValue = typeof value === 'number' ? value : null;
-    const animated = useCountUp(numericValue, !staticValue);
+    const prefersReducedMotion = usePrefersReducedMotion();
+    const animated = useCountUp(
+        numericValue,
+        !staticValue && !prefersReducedMotion,
+    );
     const renderedValue =
         numericValue !== null && !staticValue ? animated : value;
     const palette = TONE[tone];
@@ -197,13 +242,13 @@ export function StatTile({
             <div className="min-w-0 text-center">
                 <p
                     className={cn(
-                        'text-2xl font-bold text-primary-foreground tabular-nums',
+                        'text-primary-foreground text-2xl font-bold tabular-nums',
                         valueClassName,
                     )}
                 >
                     {renderedValue}
                 </p>
-                <p className="text-xs text-primary-foreground/60">{label}</p>
+                <p className="text-primary-foreground/60 text-xs">{label}</p>
             </div>
         );
         return href ? <Link href={href}>{content}</Link> : content;
@@ -220,7 +265,7 @@ export function StatTile({
             <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                        <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
                             {label}
                         </p>
                         <p
@@ -247,7 +292,7 @@ export function StatTile({
                 {(subtitle || (trend && trend.length > 1)) && (
                     <div className="mt-2 flex items-center justify-between gap-2">
                         {subtitle ? (
-                            <span className="truncate text-[10px] text-muted-foreground">
+                            <span className="text-muted-foreground truncate text-[10px]">
                                 {subtitle}
                             </span>
                         ) : (

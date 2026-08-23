@@ -40,6 +40,7 @@ interface OpsStatCardProps {
     trend?: number[];
     href?: string;
     valueClassName?: string;
+    staticValue?: boolean;
 }
 
 export function OpsStatCard({
@@ -51,6 +52,7 @@ export function OpsStatCard({
     trend,
     href,
     valueClassName,
+    staticValue,
 }: OpsStatCardProps) {
     const tone = COLOR_TO_TONE[color] ?? 'primary';
     return (
@@ -63,6 +65,7 @@ export function OpsStatCard({
             trend={trend}
             href={href}
             valueClassName={valueClassName}
+            staticValue={staticValue}
         />
     );
 }
