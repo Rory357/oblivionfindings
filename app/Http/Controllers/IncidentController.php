@@ -21,6 +21,7 @@ use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Incidents\IncidentReportDraftService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
@@ -41,6 +42,7 @@ class IncidentController extends Controller
         private readonly IncidentJourneyService $journeys,
         private readonly IncidentJourneyPresenter $journeyPresenter,
         private readonly IncidentAlertLifecycleSignalService $incidentAlertSignals,
+        private readonly IncidentReportDraftService $incidentReportDrafts,
     ) {}
 
     /**
@@ -1012,6 +1014,12 @@ class IncidentController extends Controller
                     if ($incident->status === 'submitted' && $isSubmit) {
                         $this->recordMissingImmediateActionForSubmission($incident, $data);
                         $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
+                        $this->incidentReportDrafts->consumeOwned(
+                            $actor,
+                            $data['report_request_uuid'] ?? null,
+                            (int) $client->id,
+                            (int) $siteId,
+                        );
 
                         return [$journey->incident, $journey, false, false];
                     }
@@ -1065,6 +1073,15 @@ class IncidentController extends Controller
                 if ($isSubmit) {
                     $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
                     $incident = $journey->incident;
+                }
+
+                if ($isSubmit) {
+                    $this->incidentReportDrafts->consumeOwned(
+                        $actor,
+                        $data['report_request_uuid'] ?? null,
+                        (int) $client->id,
+                        (int) $siteId,
+                    );
                 }
 
                 return [$incident->fresh(), $journey, $created, $submittedNow];

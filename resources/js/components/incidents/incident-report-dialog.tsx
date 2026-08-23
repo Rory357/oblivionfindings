@@ -1,3 +1,13 @@
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,17 +27,21 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
-import { useForm } from '@inertiajs/react';
+import { useIncidentReportDraft } from '@/hooks/use-incident-report-draft';
+import { formatTime } from '@/lib/datetime';
+import { useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
     CheckCircle2,
     ClipboardList,
     Clock3,
+    CloudOff,
     Eye,
     HeartPulse,
     HelpCircle,
     ListTodo,
+    LoaderCircle,
     type LucideIcon,
     Pill,
     Plus,
@@ -38,7 +52,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export type IncidentReportEntryContext =
     | 'incidents'
@@ -142,27 +156,6 @@ function firstInvalidStepIndex(
         : steps.length - 1;
 }
 
-function createReportRequestUuid(): string {
-    const cryptoApi = globalThis.crypto;
-
-    if (typeof cryptoApi?.randomUUID === 'function') {
-        return cryptoApi.randomUUID();
-    }
-
-    if (typeof cryptoApi?.getRandomValues !== 'function') {
-        throw new Error('Secure UUID generation is not available.');
-    }
-
-    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = Array.from(bytes, (byte) =>
-        byte.toString(16).padStart(2, '0'),
-    ).join('');
-
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 function splitOccurredAt(value?: string | null): {
     occurred_date: string;
     occurred_time: string;
@@ -239,6 +232,7 @@ export function IncidentReportDialog({
     open,
     onClose,
     mode,
+    entryContext = 'incidents',
     clients,
     sites = [],
     staff,
@@ -258,12 +252,16 @@ export function IncidentReportDialog({
     onOpenIncident?: (url: string) => void;
 }) {
     const isNearMiss = mode === 'near_miss';
+    const page = usePage();
+    const userId = Number(
+        (page.props as { auth?: { user?: { id?: number } } }).auth?.user?.id ??
+            0,
+    );
     const occurrence = splitOccurredAt(defaults?.occurred_at);
     const [stepIndex, setStepIndex] = useState(0);
     const [result, setResult] = useState<IncidentReportResult | null>(null);
-    const [reportRequestUuid, setReportRequestUuid] = useState(
-        createReportRequestUuid,
-    );
+    const [closePrompt, setClosePrompt] = useState(false);
+    const [closeBusy, setCloseBusy] = useState(false);
 
     const form = useForm<ReportForm>({
         type: isNearMiss ? 'near_miss' : (defaults?.type ?? ''),
@@ -397,6 +395,48 @@ export function IncidentReportDialog({
     );
     const stepKey = steps[stepIndex].key;
     const lastIndex = steps.length - 1;
+    const hasReportContent = Boolean(
+        (!isNearMiss && d.type) ||
+        d.client_id ||
+        d.site_id ||
+        d.shift_id ||
+        d.occurred_date !== occurrence.occurred_date ||
+        d.occurred_time !== occurrence.occurred_time ||
+        d.description.trim() ||
+        d.potential_severity ||
+        d.potential_consequence.trim() ||
+        d.hazard.trim() ||
+        d.immediate_action_taken.trim() ||
+        d.witnesses.trim() ||
+        d.harm_or_injury.trim() ||
+        d.consequence.trim() ||
+        d.is_notifiable ||
+        d.worksafe_reference.trim() ||
+        d.followups.length > 0,
+    );
+    const hasDraftScope = Boolean(d.client_id || d.site_id || d.shift_id);
+    const draftRecovery = useIncidentReportDraft<ReportForm>({
+        userId,
+        open,
+        enabled: !result && userId > 0 && hasReportContent && hasDraftScope,
+        mode,
+        entryContext,
+        stepIndex,
+        form: d,
+        onRestore: (draft) => {
+            for (const key of Object.keys(d) as Array<keyof ReportForm>) {
+                const savedValue = draft.form[key];
+                const fallbackValue = d[key];
+                const restoredValue =
+                    savedValue === null && typeof fallbackValue === 'string'
+                        ? ''
+                        : (savedValue ?? fallbackValue);
+                form.setData(key, restoredValue as ReportForm[typeof key]);
+            }
+            form.clearErrors();
+            setStepIndex(Math.min(lastIndex, Math.max(0, draft.step_index)));
+        },
+    });
 
     /* ---- completeness ---- */
     const pct = useMemo(() => {
@@ -428,7 +468,7 @@ export function IncidentReportDialog({
         }
     };
 
-    const submit = (intent: 'draft' | 'submit') => {
+    const postReport = (intent: 'draft' | 'submit') => {
         form.transform((data) => {
             const {
                 occurred_date: occurredDate,
@@ -455,7 +495,7 @@ export function IncidentReportDialog({
             return {
                 ...payload,
                 intent,
-                report_request_uuid: reportRequestUuid,
+                report_request_uuid: draftRecovery.requestUuid,
                 client_id: data.client_id ? Number(data.client_id) : null,
                 site_id: data.site_id ? Number(data.site_id) : null,
                 shift_id: data.shift_id ? Number(data.shift_id) : null,
@@ -490,10 +530,24 @@ export function IncidentReportDialog({
                     }
                 ).flash;
                 if (!flash?.error && flash?.incident_report_result) {
+                    if (flash.incident_report_result.result === 'submitted') {
+                        draftRecovery.consume();
+                    }
                     setResult(flash.incident_report_result);
                 }
             },
         });
+    };
+
+    const submit = (intent: 'draft' | 'submit') => {
+        if (intent === 'draft' && userId > 0) {
+            void draftRecovery.saveNow().then((saved) => {
+                if (saved) postReport(intent);
+            });
+            return;
+        }
+
+        postReport(intent);
     };
 
     const reset = () => {
@@ -501,8 +555,109 @@ export function IncidentReportDialog({
         form.clearErrors();
         setStepIndex(0);
         setResult(null);
-        setReportRequestUuid(createReportRequestUuid());
+        draftRecovery.beginNew();
     };
+
+    const requestClose = () => {
+        if (result) {
+            onClose();
+            return;
+        }
+
+        if (draftRecovery.resumeAvailable || draftRecovery.recoveryBlocked) {
+            onClose();
+            return;
+        }
+
+        if (
+            draftRecovery.status === 'loading' ||
+            draftRecovery.hasSavedDraft ||
+            (hasReportContent && draftRecovery.hasUnsavedChanges)
+        ) {
+            setClosePrompt(true);
+            return;
+        }
+
+        onClose();
+    };
+
+    const saveAndClose = async () => {
+        setCloseBusy(true);
+        const saved = await draftRecovery.saveNow();
+        setCloseBusy(false);
+        if (!saved) return;
+
+        setClosePrompt(false);
+        onClose();
+    };
+
+    const discardAndClose = async () => {
+        setCloseBusy(true);
+        const discarded = await draftRecovery.discard();
+        setCloseBusy(false);
+        if (!discarded) return;
+
+        setClosePrompt(false);
+        onClose();
+        draftRecovery.beginNew();
+    };
+
+    const discardRecoveredDraft = async () => {
+        const discarded = await draftRecovery.discard();
+        if (!discarded) return;
+
+        if (draftRecovery.recoveryBlocked) {
+            form.reset();
+            form.clearErrors();
+            setStepIndex(0);
+        }
+        draftRecovery.beginNew();
+    };
+
+    const draftStatus = !draftRecovery.loaded ? (
+        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Checking for a saved draft…
+        </span>
+    ) : draftRecovery.status === 'saving' ? (
+        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Saving securely…
+        </span>
+    ) : draftRecovery.status === 'saved' && draftRecovery.savedAt ? (
+        <span className="text-status-success flex items-center gap-2 text-xs">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+            Saved securely at {formatTime(draftRecovery.savedAt)}
+        </span>
+    ) : draftRecovery.resumeAvailable ? (
+        <span className="text-status-warning flex items-center gap-2 text-xs">
+            <Clock3 className="h-4 w-4" aria-hidden="true" />
+            Saved report found
+        </span>
+    ) : draftRecovery.recoveryBlocked ? (
+        <span className="text-status-warning flex items-center gap-2 text-xs">
+            <CloudOff className="h-4 w-4" aria-hidden="true" />
+            Recovery paused
+        </span>
+    ) : draftRecovery.status === 'error' ||
+      draftRecovery.status === 'session_expired' ? (
+        <span className="text-status-critical flex items-center gap-2 text-xs">
+            <CloudOff className="h-4 w-4" aria-hidden="true" />
+            Not saved yet
+        </span>
+    ) : draftRecovery.status === 'dirty' ? (
+        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+            <Clock3 className="h-4 w-4" aria-hidden="true" />
+            Waiting to save…
+        </span>
+    ) : null;
+
+    useEffect(() => {
+        if (!open) {
+            setClosePrompt(false);
+            setCloseBusy(false);
+        }
+    }, [open]);
 
     /* ---- follow-up rows ---- */
     const addFollowup = () =>
@@ -540,7 +695,7 @@ export function IncidentReportDialog({
                             {result.incident_reference ? (
                                 <>
                                     Reference{' '}
-                                    <span className="font-semibold text-foreground">
+                                    <span className="text-foreground font-semibold">
                                         {result.incident_reference}
                                     </span>
                                     .{' '}
@@ -554,7 +709,7 @@ export function IncidentReportDialog({
                                 {result.incident_reference ? (
                                     <>
                                         Incident{' '}
-                                        <span className="font-semibold text-foreground">
+                                        <span className="text-foreground font-semibold">
                                             {result.incident_reference}
                                         </span>
                                     </>
@@ -566,7 +721,7 @@ export function IncidentReportDialog({
                                     <>
                                         {' '}
                                         H&amp;S reference{' '}
-                                        <span className="font-semibold text-foreground">
+                                        <span className="text-foreground font-semibold">
                                             {result.hs_reference}
                                         </span>
                                         .
@@ -574,7 +729,7 @@ export function IncidentReportDialog({
                                 ) : null}
                             </span>
                             {isAwaitingHsAcceptance ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-status-warning-bg px-3 py-1 font-semibold text-status-warning">
+                                <span className="bg-status-warning-bg text-status-warning inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold">
                                     <Clock3
                                         className="h-4 w-4"
                                         aria-hidden="true"
@@ -606,7 +761,7 @@ export function IncidentReportDialog({
                     <Button variant="outline" onClick={reset}>
                         Report another
                     </Button>
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="ghost" onClick={requestClose}>
                         Done
                     </Button>
                 </>
@@ -615,136 +770,268 @@ export function IncidentReportDialog({
     ) : undefined;
 
     return (
-        <WizardShell
-            open={open}
-            onClose={onClose}
-            title={isNearMiss ? 'Report a near miss' : 'Report an incident'}
-            description={
-                isNearMiss
-                    ? 'A blame-free, under-a-minute near-miss report.'
-                    : 'Report an incident for review.'
-            }
-            railIcon={isNearMiss ? Eye : ShieldAlert}
-            railTitle={isNearMiss ? 'Near miss' : 'Incident report'}
-            railSub={
-                isNearMiss ? 'Leading safety indicator' : 'System of record'
-            }
-            steps={steps}
-            stepIndex={stepIndex}
-            onStepClick={(i) => setStepIndex(i)}
-            pct={pct}
-            footerStart={!result ? <Ring pct={pct} size={40} /> : undefined}
-            footerEnd={
-                result ? undefined : (
-                    <div className="flex items-center gap-2">
-                        {stepIndex > 0 ? (
-                            <Button
-                                variant="outline"
-                                onClick={() =>
-                                    setStepIndex((i) => Math.max(0, i - 1))
-                                }
-                            >
-                                Back
-                            </Button>
-                        ) : null}
-                        {stepIndex < lastIndex ? (
-                            <Button
-                                onClick={() =>
-                                    setStepIndex((i) =>
-                                        Math.min(lastIndex, i + 1),
-                                    )
-                                }
-                                disabled={!stepValid(stepKey)}
-                            >
-                                Next
-                            </Button>
-                        ) : (
-                            <>
+        <>
+            <WizardShell
+                open={open}
+                onClose={requestClose}
+                title={isNearMiss ? 'Report a near miss' : 'Report an incident'}
+                description={
+                    isNearMiss
+                        ? 'A blame-free, under-a-minute near-miss report.'
+                        : 'Report an incident for review.'
+                }
+                railIcon={isNearMiss ? Eye : ShieldAlert}
+                railTitle={isNearMiss ? 'Near miss' : 'Incident report'}
+                railSub={
+                    isNearMiss ? 'Leading safety indicator' : 'System of record'
+                }
+                steps={steps}
+                stepIndex={stepIndex}
+                onStepClick={(i) => setStepIndex(i)}
+                pct={pct}
+                footerStart={
+                    !result ? (
+                        <div
+                            className="flex items-center gap-3"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <Ring pct={pct} size={40} />
+                            {draftStatus}
+                        </div>
+                    ) : undefined
+                }
+                footerEnd={
+                    result ? undefined : (
+                        <div className="flex items-center gap-2">
+                            {stepIndex > 0 ? (
                                 <Button
                                     variant="outline"
-                                    onClick={() => submit('draft')}
-                                    disabled={
-                                        form.processing ||
-                                        !d.client_id ||
-                                        !d.description.trim()
+                                    onClick={() =>
+                                        setStepIndex((i) => Math.max(0, i - 1))
                                     }
                                 >
-                                    Save draft
+                                    Back
                                 </Button>
+                            ) : null}
+                            {stepIndex < lastIndex ? (
                                 <Button
-                                    onClick={() => submit('submit')}
+                                    onClick={() =>
+                                        setStepIndex((i) =>
+                                            Math.min(lastIndex, i + 1),
+                                        )
+                                    }
                                     disabled={
-                                        form.processing ||
-                                        !d.client_id ||
-                                        !d.description.trim()
+                                        !draftRecovery.loaded ||
+                                        draftRecovery.resumeAvailable ||
+                                        draftRecovery.recoveryBlocked ||
+                                        !stepValid(stepKey)
                                     }
                                 >
-                                    Submit incident
+                                    Next
                                 </Button>
-                            </>
-                        )}
-                    </div>
-                )
-            }
-            success={success}
-        >
-            <WizardStepPane>
-                <ValidationSummary messages={validationMessages} />
-                {stepKey === 'people' ? (
-                    <PeopleStep
-                        d={d}
-                        setData={form.setData}
-                        errors={form.errors}
-                        clients={clients}
-                        clientOptions={clientOptions}
-                        siteOptions={siteOptions}
-                        isNearMiss={isNearMiss}
-                    />
-                ) : null}
-                {stepKey === 'what' ? (
-                    <WhatStep
-                        d={d}
-                        setData={form.setData}
-                        errors={form.errors}
-                        isNearMiss={isNearMiss}
-                    />
-                ) : null}
-                {stepKey === 'severity' ? (
-                    <SeverityStep d={d} setData={form.setData} />
-                ) : null}
-                {stepKey === 'could' ? (
-                    <CouldStep d={d} setData={form.setData} />
-                ) : null}
-                {stepKey === 'notifiable' ? (
-                    <NotifiableStep
-                        d={d}
-                        setData={form.setData}
-                        isNearMiss={isNearMiss}
-                    />
-                ) : null}
-                {stepKey === 'followups' ? (
-                    <FollowupsStep
-                        d={d}
-                        staff={staff}
-                        canManageFollowups={canManageFollowups}
-                        errors={form.errors}
-                        onAdd={addFollowup}
-                        onUpdate={updateFollowup}
-                        onRemove={removeFollowup}
-                    />
-                ) : null}
-                {stepKey === 'review' ? (
-                    <ReviewStep
-                        d={d}
-                        isNearMiss={isNearMiss}
-                        clients={clients}
-                        staff={staff}
-                        canManageFollowups={canManageFollowups}
-                        goto={setStepIndex}
-                    />
-                ) : null}
-            </WizardStepPane>
-        </WizardShell>
+                            ) : (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => submit('draft')}
+                                        disabled={
+                                            !draftRecovery.loaded ||
+                                            draftRecovery.resumeAvailable ||
+                                            draftRecovery.recoveryBlocked ||
+                                            draftRecovery.status === 'saving' ||
+                                            form.processing ||
+                                            !d.client_id ||
+                                            !d.description.trim()
+                                        }
+                                    >
+                                        Save draft
+                                    </Button>
+                                    <Button
+                                        onClick={() => submit('submit')}
+                                        disabled={
+                                            !draftRecovery.loaded ||
+                                            draftRecovery.resumeAvailable ||
+                                            draftRecovery.recoveryBlocked ||
+                                            form.processing ||
+                                            !d.client_id ||
+                                            !d.description.trim()
+                                        }
+                                    >
+                                        Submit incident
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    )
+                }
+                success={success}
+            >
+                <WizardStepPane>
+                    {!draftRecovery.loaded ? (
+                        <InfoCard icon={LoaderCircle}>
+                            Checking for your saved incident report. This keeps
+                            an earlier report from being overwritten.
+                        </InfoCard>
+                    ) : null}
+                    {draftRecovery.resumeAvailable ? (
+                        <DraftResumePrompt
+                            savedAt={draftRecovery.savedAt}
+                            onResume={draftRecovery.resume}
+                            onDiscard={() => void discardRecoveredDraft()}
+                            title="Resume your incident report?"
+                            description="We found your unfinished incident report. Continue it or discard it before starting again."
+                            className="[&_button]:min-h-11 [&_button]:min-w-11"
+                        />
+                    ) : null}
+                    {draftRecovery.message && !draftRecovery.resumeAvailable ? (
+                        <InfoCard
+                            icon={CloudOff}
+                            tone={
+                                draftRecovery.status === 'session_expired'
+                                    ? 'crit'
+                                    : 'warn'
+                            }
+                        >
+                            <div className="space-y-3">
+                                <p>{draftRecovery.message}</p>
+                                {draftRecovery.recoveryBlocked ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="frontline-tap frontline-focus"
+                                        onClick={() =>
+                                            void discardRecoveredDraft()
+                                        }
+                                    >
+                                        Discard saved report
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </InfoCard>
+                    ) : null}
+                    {draftRecovery.loaded &&
+                    !draftRecovery.resumeAvailable &&
+                    !draftRecovery.recoveryBlocked ? (
+                        <>
+                            <ValidationSummary messages={validationMessages} />
+                            {stepKey === 'people' ? (
+                                <PeopleStep
+                                    d={d}
+                                    setData={form.setData}
+                                    errors={form.errors}
+                                    clients={clients}
+                                    clientOptions={clientOptions}
+                                    siteOptions={siteOptions}
+                                    isNearMiss={isNearMiss}
+                                />
+                            ) : null}
+                            {stepKey === 'what' ? (
+                                <WhatStep
+                                    d={d}
+                                    setData={form.setData}
+                                    errors={form.errors}
+                                    isNearMiss={isNearMiss}
+                                />
+                            ) : null}
+                            {stepKey === 'severity' ? (
+                                <SeverityStep d={d} setData={form.setData} />
+                            ) : null}
+                            {stepKey === 'could' ? (
+                                <CouldStep d={d} setData={form.setData} />
+                            ) : null}
+                            {stepKey === 'notifiable' ? (
+                                <NotifiableStep
+                                    d={d}
+                                    setData={form.setData}
+                                    isNearMiss={isNearMiss}
+                                />
+                            ) : null}
+                            {stepKey === 'followups' ? (
+                                <FollowupsStep
+                                    d={d}
+                                    staff={staff}
+                                    canManageFollowups={canManageFollowups}
+                                    errors={form.errors}
+                                    onAdd={addFollowup}
+                                    onUpdate={updateFollowup}
+                                    onRemove={removeFollowup}
+                                />
+                            ) : null}
+                            {stepKey === 'review' ? (
+                                <ReviewStep
+                                    d={d}
+                                    isNearMiss={isNearMiss}
+                                    clients={clients}
+                                    staff={staff}
+                                    canManageFollowups={canManageFollowups}
+                                    goto={setStepIndex}
+                                />
+                            ) : null}
+                        </>
+                    ) : null}
+                </WizardStepPane>
+            </WizardShell>
+
+            <AlertDialog
+                open={closePrompt}
+                onOpenChange={(nextOpen) => {
+                    if (!closeBusy) setClosePrompt(nextOpen);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Keep this incident report?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <span className="block">
+                                {draftRecovery.savedAt
+                                    ? `Your last secure save was at ${formatTime(draftRecovery.savedAt)}.`
+                                    : 'Your report has not been saved securely yet.'}{' '}
+                                Save and close to continue later, or discard it
+                                permanently.
+                            </span>
+                            {draftRecovery.message ? (
+                                <span className="text-status-critical mt-2 block font-medium">
+                                    {draftRecovery.message}
+                                </span>
+                            ) : null}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            className="frontline-tap frontline-focus"
+                            disabled={closeBusy}
+                        >
+                            Keep editing
+                        </AlertDialogCancel>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            className="frontline-tap frontline-focus"
+                            onClick={() => void discardAndClose()}
+                            disabled={closeBusy}
+                        >
+                            Discard draft
+                        </Button>
+                        <Button
+                            type="button"
+                            className="frontline-tap frontline-focus"
+                            onClick={() => void saveAndClose()}
+                            disabled={
+                                closeBusy ||
+                                !draftRecovery.loaded ||
+                                draftRecovery.resumeAvailable ||
+                                draftRecovery.recoveryBlocked
+                            }
+                        >
+                            {closeBusy ? 'Working…' : 'Save and close'}
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
 
@@ -756,14 +1043,14 @@ function ValidationSummary({ messages }: { messages: string[] }) {
     return (
         <div
             role="alert"
-            className="flex gap-2.5 rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-sm text-foreground"
+            className="border-status-critical/35 bg-status-critical-bg text-foreground flex gap-2.5 rounded-lg border p-3 text-sm"
         >
             <AlertTriangle
-                className="mt-0.5 h-4 w-4 shrink-0 text-status-critical"
+                className="text-status-critical mt-0.5 h-4 w-4 shrink-0"
                 aria-hidden="true"
             />
             <div>
-                <p className="font-semibold text-status-critical">
+                <p className="text-status-critical font-semibold">
                     Some details need attention
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-4">
@@ -1178,7 +1465,7 @@ function NotifiableStep({
                     </>
                 )}
             </InfoCard>
-            <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-sm">
+            <label className="border-border flex items-center gap-2.5 rounded-lg border p-3 text-sm">
                 <input
                     type="checkbox"
                     aria-label="Potentially notifiable"
@@ -1192,9 +1479,9 @@ function NotifiableStep({
                             setData('worksafe_notification_status', 'pending');
                         }
                     }}
-                    className="h-4 w-4 rounded border-border"
+                    className="border-border h-4 w-4 rounded"
                 />
-                <span className="font-medium text-foreground">
+                <span className="text-foreground font-medium">
                     This may be WorkSafe NZ–notifiable — flag it for H&amp;S to
                     confirm.
                 </span>
@@ -1227,7 +1514,7 @@ function NotifiableStep({
                     </Field>
                 </div>
             ) : null}
-            <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-sm">
+            <label className="border-border flex items-center gap-2.5 rounded-lg border p-3 text-sm">
                 <input
                     type="checkbox"
                     aria-label="Site preserved"
@@ -1235,9 +1522,9 @@ function NotifiableStep({
                     onChange={(event) =>
                         setData('site_preserved', event.target.checked)
                     }
-                    className="h-4 w-4 rounded border-border"
+                    className="border-border h-4 w-4 rounded"
                 />
-                <span className="font-medium text-foreground">
+                <span className="text-foreground font-medium">
                     The incident site has been preserved pending H&amp;S
                     direction.
                 </span>
@@ -1284,7 +1571,7 @@ function FollowupsStep({
                 return (
                     <div
                         key={i}
-                        className="flex flex-col gap-2 rounded-xl border border-border p-3"
+                        className="border-border flex flex-col gap-2 rounded-xl border p-3"
                     >
                         <Field label={`Task ${i + 1}`} error={notesError}>
                             <Textarea
@@ -1332,7 +1619,7 @@ function FollowupsStep({
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="self-end text-status-critical hover:text-status-critical"
+                            className="text-status-critical hover:text-status-critical self-end"
                             onClick={() => onRemove(i)}
                         >
                             <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove

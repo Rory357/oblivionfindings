@@ -1,8 +1,10 @@
 import {
+    act,
     cleanup,
     fireEvent,
     render,
     screen,
+    waitFor,
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +19,16 @@ const inertia = vi.hoisted(() => ({
         unknown
     >,
 }));
+
+const http = vi.hoisted(() => ({
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    isAxiosError: (error: unknown) =>
+        Boolean((error as { isAxiosError?: boolean } | null)?.isAxiosError),
+}));
+
+vi.mock('axios', () => ({ default: http }));
 
 vi.mock('@inertiajs/react', async () => {
     const ReactModule = await import('react');
@@ -105,6 +117,7 @@ function renderDialog(
         defaults?: IncidentReportDefaults;
         canManageFollowups?: boolean;
         staff?: Array<{ id: number; name: string }>;
+        onClose?: () => void;
     } = {},
 ) {
     return render(
@@ -117,7 +130,7 @@ function renderDialog(
             staff={overrides.staff ?? []}
             defaults={overrides.defaults ?? defaults}
             canManageFollowups={overrides.canManageFollowups}
-            onClose={() => {}}
+            onClose={overrides.onClose ?? (() => {})}
             onOpenIncident={() => {}}
         />,
     );
@@ -160,11 +173,391 @@ beforeEach(() => {
     inertia.nextError = null;
     inertia.nextResult = null;
     inertia.pageProps = { flash: { created_incident_id: 42 } };
+    http.get.mockReset();
+    http.put.mockReset();
+    http.delete.mockReset();
+    window.localStorage.clear();
 });
 
 afterEach(() => cleanup());
 
 describe('IncidentReportDialog truthful incident intent', () => {
+    it('closes an untouched report without pretending the default clock is draft content', () => {
+        const onClose = vi.fn();
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        renderDialog('incidents', { defaults: {}, onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(
+            screen.queryByRole('heading', {
+                name: 'Keep this incident report?',
+            }),
+        ).not.toBeInTheDocument();
+        expect(http.put).not.toHaveBeenCalled();
+    });
+
+    it('saves securely before closing and shows the last-saved state', async () => {
+        const onClose = vi.fn();
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        http.put.mockResolvedValue({
+            data: {
+                request_uuid: '11111111-1111-4111-8111-111111111111',
+                revision: 1,
+                saved_at: '2026-08-23T08:15:00+12:00',
+                expires_at: '2026-09-06T08:15:00+12:00',
+            },
+        });
+        renderDialog('incidents', { onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(
+            screen.getByRole('heading', {
+                name: 'Keep this incident report?',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Save and close' }));
+
+        await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
+        expect(http.put.mock.calls[0]?.[1]).toEqual(
+            expect.objectContaining({
+                expected_revision: 0,
+                mode: 'incident',
+                entry_context: 'incidents',
+                form: expect.objectContaining({
+                    description: 'Aroha slipped beside the dining table.',
+                }),
+            }),
+        );
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        const opaquePointer = window.localStorage.getItem(
+            'oblivion:incident-report-draft:v1:11:incidents:incident',
+        );
+        expect(opaquePointer).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
+        expect(
+            Array.from({ length: window.localStorage.length }, (_, index) =>
+                window.localStorage.getItem(
+                    window.localStorage.key(index) ?? '',
+                ),
+            ).join(' '),
+        ).not.toContain('Aroha slipped beside the dining table.');
+    });
+
+    it('restores the actor-owned saved draft and wizard step after reload', async () => {
+        const requestUuid = '22222222-2222-4222-8222-222222222222';
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        window.localStorage.setItem(
+            'oblivion:incident-report-draft:v1:11:incidents:incident',
+            requestUuid,
+        );
+        http.get.mockResolvedValue({
+            data: {
+                request_uuid: requestUuid,
+                revision: 4,
+                saved_at: '2026-08-23T08:15:00+12:00',
+                expires_at: '2026-09-06T08:15:00+12:00',
+                draft: {
+                    mode: 'incident',
+                    entry_context: 'incidents',
+                    step_index: 1,
+                    form: {
+                        type: 'fall',
+                        client_id: '7',
+                        site_id: '3',
+                        shift_id: '19',
+                        occurred_date: '2026-07-12',
+                        occurred_time: '09:15',
+                        description: 'Restored safety-critical detail.',
+                        severity: 'medium',
+                        potential_severity: '',
+                        potential_consequence: '',
+                        hazard: '',
+                        immediate_action_taken: '',
+                        witnesses: '',
+                        harm_or_injury: '',
+                        consequence: '',
+                        is_notifiable: false,
+                        worksafe_reference: '',
+                        worksafe_notification_status: '',
+                        site_preserved: false,
+                        followups: [],
+                        stay: true,
+                    },
+                },
+            },
+        });
+
+        renderDialog();
+
+        const recoveryPrompt = await screen.findByRole('alertdialog', {
+            name: 'Resume your incident report?',
+        });
+        expect(
+            screen.queryByRole('textbox', { name: 'Description' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            within(recoveryPrompt).getByRole('button', {
+                name: 'Continue draft',
+            }),
+        );
+
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: 'Description' }),
+            ).toHaveValue('Restored safety-critical detail.'),
+        );
+        expect(
+            screen.getByRole('heading', { name: 'What happened' }),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Saved securely at/)).toBeInTheDocument();
+    });
+
+    it('discards a recovered server draft only after the explicit recovery choice', async () => {
+        const requestUuid = '55555555-5555-4555-8555-555555555555';
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        window.localStorage.setItem(
+            'oblivion:incident-report-draft:v1:11:incidents:incident',
+            requestUuid,
+        );
+        http.get.mockResolvedValue({
+            data: {
+                request_uuid: requestUuid,
+                revision: 2,
+                saved_at: '2026-08-23T08:15:00+12:00',
+                expires_at: '2026-09-06T08:15:00+12:00',
+                draft: {
+                    mode: 'incident',
+                    entry_context: 'incidents',
+                    step_index: 1,
+                    form: {
+                        ...defaults,
+                        client_id: '7',
+                        site_id: '3',
+                        shift_id: '19',
+                        occurred_date: '2026-07-12',
+                        occurred_time: '09:15',
+                        followups: [],
+                        stay: true,
+                    },
+                },
+            },
+        });
+        http.delete.mockResolvedValue({ data: null });
+
+        renderDialog();
+
+        const recoveryPrompt = await screen.findByRole('alertdialog', {
+            name: 'Resume your incident report?',
+        });
+        fireEvent.click(
+            within(recoveryPrompt).getByRole('button', { name: 'Discard' }),
+        );
+
+        await waitFor(() =>
+            expect(http.delete).toHaveBeenCalledWith(
+                `/incidents/drafts/${requestUuid}`,
+                expect.any(Object),
+            ),
+        );
+        expect(
+            await screen.findByRole('heading', { name: 'Type & people' }),
+        ).toBeInTheDocument();
+    });
+
+    it('replaces a stale opaque pointer after a concealed missing-draft response', async () => {
+        const requestUuid = '66666666-6666-4666-8666-666666666666';
+        const key = 'oblivion:incident-report-draft:v1:11:incidents:incident';
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        window.localStorage.setItem(key, requestUuid);
+        http.get.mockRejectedValue({
+            isAxiosError: true,
+            response: { status: 404 },
+        });
+
+        renderDialog();
+
+        await screen.findByRole('heading', { name: 'Type & people' });
+        await waitFor(() =>
+            expect(window.localStorage.getItem(key)).not.toBe(requestUuid),
+        );
+        expect(window.localStorage.getItem(key)).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
+    });
+
+    it('requires explicit confirmation before permanently discarding a draft', async () => {
+        const onClose = vi.fn();
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        http.delete.mockResolvedValue({ data: null });
+        renderDialog('incidents', { onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+
+        await waitFor(() => expect(http.delete).toHaveBeenCalledTimes(1));
+        expect(http.delete.mock.calls[0]?.[0]).toMatch(
+            /^\/incidents\/drafts\/[0-9a-f-]{36}$/i,
+        );
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    });
+
+    it('confirms the recovery snapshot before creating the canonical incident draft', async () => {
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        inertia.nextResult = {
+            result: 'draft',
+            incident_reference: 'INC-2026-0042',
+        };
+        http.put.mockImplementation(async () => {
+            expect(inertia.post).not.toHaveBeenCalled();
+            return {
+                data: {
+                    request_uuid: '44444444-4444-4444-8444-444444444444',
+                    revision: 1,
+                    saved_at: '2026-08-23T08:15:00+12:00',
+                    expires_at: '2026-09-06T08:15:00+12:00',
+                },
+            };
+        });
+        renderDialog();
+        openReviewStep();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+        await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(inertia.post).toHaveBeenCalledTimes(1));
+        expect(postedPayload().intent).toBe('draft');
+    });
+
+    it('ignores a late autosave result after the incident is submitted', async () => {
+        let finishAutosave!: (value: {
+            data: {
+                request_uuid: string;
+                revision: number;
+                saved_at: string;
+                expires_at: string;
+            };
+        }) => void;
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        inertia.nextResult = {
+            result: 'submitted',
+            incident_reference: 'INC-2026-0042',
+        };
+        http.put.mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    finishAutosave = resolve;
+                }),
+        );
+        renderDialog();
+        openReviewStep();
+        await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1), {
+            timeout: 2500,
+        });
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Incident submitted' }),
+        ).toBeInTheDocument();
+
+        await act(async () => {
+            finishAutosave({
+                data: {
+                    request_uuid: '77777777-7777-4777-8777-777777777777',
+                    revision: 1,
+                    saved_at: '2026-08-23T08:15:00+12:00',
+                    expires_at: '2026-09-06T08:15:00+12:00',
+                },
+            });
+            await Promise.resolve();
+        });
+
+        expect(screen.queryByText(/Saved securely at/)).not.toBeInTheDocument();
+        expect(window.localStorage.length).toBe(0);
+    });
+
+    it('keeps entered details visible when a network save fails', async () => {
+        const onClose = vi.fn();
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        http.put.mockRejectedValue({ isAxiosError: true });
+        renderDialog('incidents', { onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save and close' }));
+
+        await waitFor(() =>
+            expect(
+                screen.getAllByText(
+                    'Not saved yet. Keep this report open, reconnect, then retry.',
+                ),
+            ).not.toHaveLength(0),
+        );
+        expect(onClose).not.toHaveBeenCalled();
+        expect(
+            screen.getByRole('textbox', { name: 'Description' }),
+        ).toHaveValue('Aroha slipped beside the dining table.');
+    });
+
+    it('gives explicit sign-in guidance without replacing the restored fields', async () => {
+        const requestUuid = '33333333-3333-4333-8333-333333333333';
+        inertia.pageProps = {
+            auth: { user: { id: 11 } },
+            flash: { created_incident_id: 42 },
+        };
+        window.localStorage.setItem(
+            'oblivion:incident-report-draft:v1:11:incidents:incident',
+            requestUuid,
+        );
+        http.get.mockRejectedValue({
+            isAxiosError: true,
+            response: { status: 401 },
+        });
+
+        renderDialog();
+
+        await waitFor(() =>
+            expect(
+                screen.getByText(
+                    'Sign in again to recover this incident draft. No new changes were sent.',
+                ),
+            ).toBeInTheDocument(),
+        );
+        expect(
+            screen.queryByRole('textbox', { name: 'Description' }),
+        ).not.toBeInTheDocument();
+    });
+
     it('renders exactly one Save draft action and one Submit incident action', () => {
         renderDialog();
         openReviewStep();

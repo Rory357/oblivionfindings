@@ -63,6 +63,7 @@ use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
+use App\Jobs\PruneIncidentReportDrafts;
 use App\Jobs\PrunePersonalTrackingTelemetry;
 use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
@@ -199,6 +200,14 @@ app(Schedule::class)
 app(Schedule::class)
     ->job(new RecoverIncidentGovernanceEscalationsJob)
     ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+// Incident wizard recovery payloads are encrypted, owner-scoped and short-lived.
+app(Schedule::class)
+    ->job(new PruneIncidentReportDrafts)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:20')
+    ->onOneServer()
     ->withoutOverlapping();
 
 // Daily break-glass summary (internal ops): 08:00 NZ time

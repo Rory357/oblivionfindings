@@ -3,6 +3,7 @@
 use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\IncidentFollowupController;
 use App\Http\Controllers\IncidentReportController;
+use App\Http\Controllers\IncidentReportDraftController;
 use App\Http\Controllers\IncidentTemplateController;
 use App\Http\Controllers\ShiftIncidentController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Incident creation (must come before /incidents/{incident})
     Route::middleware('permission:incidents.create')->group(function () {
         Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
+        Route::get('/incidents/drafts/{requestUuid}', [IncidentReportDraftController::class, 'show'])
+            ->whereUuid('requestUuid')
+            ->name('incidents.drafts.show');
+        Route::put('/incidents/drafts/{requestUuid}', [IncidentReportDraftController::class, 'update'])
+            ->whereUuid('requestUuid')
+            ->name('incidents.drafts.update');
+        Route::delete('/incidents/drafts/{requestUuid}', [IncidentReportDraftController::class, 'destroy'])
+            ->whereUuid('requestUuid')
+            ->name('incidents.drafts.destroy');
         Route::post('/incidents', [IncidentController::class, 'store'])->name('incidents.store');
     });
 
