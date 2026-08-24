@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-034",
+  "status": "THREE_DISJOINT_UPSTREAM_OBSERVER_PARTITIONS_INTEGRATED",
+  "generated_at": "2026-08-24T21:35:00+12:00",
+  "agents": [
+    {
+      "role": "upstream_project_observer_partition_1",
+      "run_id": "RUN-031",
+      "raw_file": "evidence/benchmark/raw-run-031-upstream-project-triage-partition-01.json",
+      "raw_sha256": "e6b8e4c9ef95f546397ea0a4e640840503d24fd42aac09abe688f952313032be",
+      "selection_sha256": "081f1591b78f127b9264283b08e9f828c40c58c63c04da9ba8d95ea18c66bf3e",
+      "repository_count": 32,
+      "occurrence_weight": 33,
+      "reported_statuses": {
+        "COMPLETE_OBSERVER_REPORTED": 26,
+        "PARTIAL_BLOCKED_REPORTED": 6
+      },
+      "computed_statuses": {
+        "COMPLETE_OBSERVER_TRIAGE": 26,
+        "PARTIAL_BLOCKED": 6
+      },
+      "metadata_head_relationships": {
+        "DIFFERENT_LATER_OBSERVATION_NO_ANCESTRY_INFERENCE": 6,
+        "SAME_AS_BASELINE": 26
+      },
+      "agent_status": "PARTITION_COMPLETE_OBSERVER_ONLY_WITH_PARTIAL_BLOCKERS",
+      "external_mutations_attestation": "NOT_RECORDED_IN_RAW_ARTIFACT",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    },
+    {
+      "role": "upstream_project_observer_partition_2",
+      "run_id": "RUN-032",
+      "raw_file": "evidence/benchmark/raw-run-032-upstream-project-triage-partition-02.json",
+      "raw_sha256": "dc6006728e0ebbaf40febb3139619e9e01f9b6e8a5d46ef12f0667a885f9cc49",
+      "selection_sha256": "67130520a61bea1c16be5d65b0972f362850245eb4cae3da6f7ad1127f444c28",
+      "repository_count": 32,
+      "occurrence_weight": 33,
+      "reported_statuses": {
+        "COMPLETE_OBSERVER_REPORTED": 28,
+        "PARTIAL_BLOCKED_REPORTED": 4
+      },
+      "computed_statuses": {
+        "COMPLETE_OBSERVER_TRIAGE": 28,
+        "PARTIAL_BLOCKED": 4
+      },
+      "metadata_head_relationships": {
+        "SAME_AS_BASELINE": 32
+      },
+      "agent_status": "PARTITION_COMPLETE_OBSERVER_ONLY_NO_CREDIT",
+      "external_mutations_attestation": "NOT_RECORDED_IN_RAW_ARTIFACT",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    },
+    {
+      "role": "upstream_project_observer_partition_3",
+      "run_id": "RUN-033",
+      "raw_file": "evidence/benchmark/raw-run-033-upstream-project-triage-partition-03.json",
+      "raw_sha256": "f58f77c34136c4dfdc93e83aaa741a79ca067c709bbe8d0b15e646bfc7ab3a16",
+      "selection_sha256": "36150aefa2634ec3cb4833f29f03c67a33578953578479fb96c6a233a827935d",
+      "repository_count": 31,
+      "occurrence_weight": 32,
+      "reported_statuses": {
+        "COMPLETE_OBSERVER_REPORTED": 25,
+        "PARTIAL_BLOCKED_REPORTED": 6
+      },
+      "computed_statuses": {
+        "COMPLETE_OBSERVER_TRIAGE": 25,
+        "PARTIAL_BLOCKED": 6
+      },
+      "metadata_head_relationships": {
+        "DIFFERENT_LATER_OBSERVATION_NO_ANCESTRY_INFERENCE": 11,
+        "SAME_AS_BASELINE": 20
+      },
+      "agent_status": "COMPLETE_OBSERVER_ONLY_WITH_EXPLICIT_BLOCKERS",
+      "external_mutations_attestation": "NOT_RECORDED_IN_RAW_ARTIFACT",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    }
+  ],
+  "agreement": {
+    "disjoint_union_repositories": 95,
+    "prompt_occurrence_weight": 98,
+    "project_universe_sha256": "2db4c952e46f4f30fb3b063b8bc6d365a793bf6b3b2c901e589430307db33b1e",
+    "remaining_partition_collisions": 0
+  },
+  "credit_boundary": {
+    "observer_project_evidence_materialized": 95,
+    "upstream_full_triage_credit": 0,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_completion_credit": 0,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "ease_credit": 0,
+    "release_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}
