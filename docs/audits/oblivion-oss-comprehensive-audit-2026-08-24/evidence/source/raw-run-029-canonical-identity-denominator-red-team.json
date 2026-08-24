@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-029",
+  "status": "COMPLETE_READ_ONLY_INDEPENDENT_DENOMINATOR_RED_TEAM_RECONCILED",
+  "head_reviewed": "df8bf3848b1b068f3fe3d3c49ddefa2051c7d8d2",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "precedence": [
+    "RUN-017 and RUN-018 discovery mappings",
+    "RUN-020 and RUN-021 reconciliations",
+    "RUN-022 and RUN-023 arbitration",
+    "RUN-024, RUN-025 and RUN-026 completion waves",
+    "RUN-027 medical-owner arbitration"
+  ],
+  "input_file_sha256": {
+    "RUN-017": "f503ce331a80457e04caf5859c69feecc8ccb9ac3f345ff81bf5b3d2fc3d5e4e",
+    "RUN-018": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629",
+    "RUN-019": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64",
+    "RUN-020": "5720eee0e0677585bb960f8d7209e469d13a6d3d1087f2475659c7c514c2ee70",
+    "RUN-021": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20",
+    "RUN-022": "05553c6e66bfae73a540302a38b121e61cd7573f628a5e89e3643b0fda0e261f",
+    "RUN-023": "1fb344ce088abb9c92d6f2d0d83835fed95555e0a38fb485e69170d20c2c85a9",
+    "RUN-024": "7abd8eebc24593f8980e32bd5a6e0e50b3271e57a6195734447d70336a8c5a38",
+    "RUN-025": "a5f89f5f4cabbc5ef442991079abf95e6da7ab71f5538dd2a29f6edb0b7bc72d",
+    "RUN-026": "b8e421b5083e9e14f8954bfd4cf36cfee6e492d08e466ce8ab1668ee71a1dc4d",
+    "RUN-027": "b79a7c5db3e957db82f972117b32f259d8b517ebea5534d48a8bea0b8f57a2dd"
+  },
+  "graph": {
+    "discovery_sources": 186,
+    "run_017_sources": 95,
+    "run_018_sources": 91,
+    "cross_scope_source_overlap": 0,
+    "source_mapping_edges": 362,
+    "source_mapping_unique_targets": 338,
+    "source_mapping_target_classes": {"H": 300, "D": 38, "M": 0},
+    "run_026_supplemental_catalog_relations": 14,
+    "run_026_unique_catalog_targets": 9,
+    "run_026_existing_target_aliases": 7,
+    "run_026_new_targets": 2,
+    "combined_typed_relations": 376,
+    "final_unique_denominator": 340,
+    "final_class_counts": {"H": 300, "D": 40, "M": 0}
+  },
+  "source_mapping_shapes": {
+    "single_self_target": 95,
+    "multi_target": 83,
+    "single_renamed_or_merged_target": 7,
+    "excluded_source": 1
+  },
+  "collapses": {
+    "source_targets_shared_by_two_sources": 24,
+    "duplicate_source_edges_collapsed": 24,
+    "explicit_merge_or_alias_sources": [
+      "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF",
+      "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "CAP-MED-API-CURRENT-SURFACES",
+      "CAP-SEC-PROVIDER-INTEGRATIONS",
+      "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL",
+      "CAP-COMPLAINT-HR-CASEWORK"
+    ],
+    "catalog_instance_relations_collapsed": 5
+  },
+  "exclusions": {
+    "whole_source_count": 1,
+    "whole_sources": ["CAP-WHISTLE-PROTECTED-DISCLOSURE"],
+    "component_or_proposal_count": 4,
+    "components_or_proposals": [
+      "CAP-SAFE-REPORT-AUDIT-EXPORT",
+      "generic incident/safeguarding audit-evidence export",
+      "CAP-FIN-CONSOLIDATION",
+      "CAP-FIN-INTERCOMPANY"
+    ],
+    "negative_non_denominator_relation": ["Queclink cloud-provider connection and sync"]
+  },
+  "normalizations": [
+    {
+      "target": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "resolution": "KEEP H/Clients; remove the RUN-020 CAP-MED-API-CURRENT-SURFACES edge",
+      "count_effect": "No target change; source edges 363 -> 362",
+      "reason": "MedicationAllergy is a separate store. Its GET is component evidence for the eMAR order workflow and POST has no source-visible UI caller or dedicated test."
+    },
+    {
+      "target": "CAP-INC-INCIDENT-REPORT-CSV-EXPORT",
+      "resolution": "Normalize module to Incidents",
+      "count_effect": "None",
+      "reason": "The dedicated IncidentReportController and CSV owner survive; safeguarding and generic audit-export components were excluded."
+    },
+    {
+      "run_026_target": "CAP-HR-REPORTING-EXPORT",
+      "resolution": "Alias to CAP-HR-WORKFORCE-REPORT-EXPORT",
+      "count_effect": "Prevents resurrection of an obsolete umbrella ID",
+      "reason": "RUN-024 had already split the broad HR reporting candidate into exact report-run/export/subscription identities."
+    },
+    {
+      "target": "CAP-DAY-TASK-CSV-EXPORT",
+      "resolution": "Own the export under CAP-DAY-ALL-TASKS-WORKBENCH, not CAP-DAY-TASK-REPORT",
+      "count_effect": "One source-edge substitution; denominator and class counts unchanged",
+      "reason": "GET /tasks?format=csv branches from AllTasksController::index into exportCsv and is triggered by resources/js/pages/tasks/index.tsx. The /tasks/reports route and reports.tsx are a distinct read-only analytics surface."
+    }
+  ],
+  "normalized_hashes": {
+    "source_scope_sha256": {"value": "7b5ea92ea06025118deb15479382cff5606849215de099d5f3efca7daa38c0a1", "rule": "Sorted source IDs, UTF-8 LF joined, no trailing LF"},
+    "source_target_edge_sha256": {"value": "131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0", "rule": "Sorted source_id|target_id lines, UTF-8 LF joined, no trailing LF"},
+    "target_class_sha256": {"value": "ce8d845a5d40d9080afb7e54bdbec5549290b5d472a4f10a464eed0e375ed39f", "rule": "Targets sorted by ID; class|target_id lines, UTF-8 LF joined, no trailing LF"},
+    "target_class_module_sha256": {"value": "f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac", "rule": "Targets sorted by ID; target_id|class|module lines, UTF-8 LF joined, no trailing LF"},
+    "catalog_relation_sha256": {"value": "a2d0d398ad1520e7a1651ecd78ec45cfa732ad47d53e9ead2a620df593ea5ff5", "rule": "Sorted catalog_key|normalized_target_id|D lines, UTF-8 LF joined, no trailing LF"}
+  },
+  "adversary_challenge": {
+    "run_019_original_adversary_only_targets": 138,
+    "promoted_solely_from_run_019": 0,
+    "later_promoted_with_typed_RUN_020_or_RUN_021_anchors": 19,
+    "remaining_unpromoted": 119,
+    "typed_later_promotions": [
+      "CAP-CR-LIVE-DEVICE-MAP",
+      "CAP-FIN-BUDGET-ACTUAL-VARIANCE",
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "CAP-FIN-VENDOR-MASTER",
+      "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "CAP-GOV-BOARD-MEMBERSHIP",
+      "CAP-GOV-DASHBOARD-READ-LENS",
+      "CAP-HR-DOCUMENT-SIGNATURE",
+      "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+      "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE",
+      "CAP-PORT-FAMILY-CALENDAR",
+      "CAP-PORT-FAMILY-HEALTH-LENS",
+      "CAP-PORT-FAMILY-LOCATION-LENS",
+      "CAP-SET-PERSONAL-PASSWORD",
+      "CAP-SET-PERSONAL-PREFERENCES",
+      "CAP-SET-PERSONAL-PROFILE",
+      "CAP-SET-PERSONAL-TWO-FACTOR",
+      "CAP-SITE-CONTACTS",
+      "CAP-SITE-VENDOR-REGISTER"
+    ]
+  },
+  "run_023_gap_reconciliation": {
+    "GLOBAL_RUN018_ANCHOR_GAP": {"prior_count": 120, "current_identity_gap_count": 0, "basis": "RUN-021 reconciled 38 unsupported candidates covering 104 raw target names; RUN-024 and RUN-025 reconciled the remaining 13 candidates and 19 raw target names."},
+    "GLOBAL_ADVERSARY_NAMING_GAP": {"prior_count": 138, "current_identity_gap_count": 0, "basis": "No name was promoted solely from adversary edges; 19 gained later typed definitions and 119 remain outside the denominator."},
+    "GLOBAL_REPORT_CATALOG_DEDUPE": {"prior_count": 14, "current_identity_gap_count": 0, "basis": "RUN-026 mapped all 14 catalog instances to nine canonical D targets."},
+    "GLOBAL_DENOMINATOR_FREEZE": {"prior_status": "BLOCKED", "current_status": "STATIC_FREEZE_DEFENSIBLE"}
+  },
+  "remaining_identity_conflicts": 0,
+  "remaining_class_conflicts": 0,
+  "remaining_module_conflicts": 0,
+  "retained_targets_without_static_owner_or_anchor": 0,
+  "non_identity_gaps_preserved": [
+    "RUN-025 records three static authority defects.",
+    "RUN-027 preserves the dual ClientMedicalProfile/MedicationAllergy store warning and unverified allergy POST reachability.",
+    "Recurring-journal user-facing schedule-administration reachability remains unestablished.",
+    "RUN-026 catalog mappings remain static-only and award no runtime, browser, test-execution, benchmark, ease or completion credit."
+  ],
+  "run_028_comparison": {
+    "denominator_and_class_counts": "AGREE: 340 = H300 + D40",
+    "initial_red_team_edge_hash": "fb138b292d3584a062bf88b36679dd255d06ce87cde1eb01a44a2255c11e1d3a",
+    "exact_edge_reconciliation": {
+      "remove": "CAP-DAY-TASK-REPORT|CAP-DAY-TASK-CSV-EXPORT",
+      "add": "CAP-DAY-ALL-TASKS-WORKBENCH|CAP-DAY-TASK-CSV-EXPORT",
+      "authoritative_hash": "131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0",
+      "verdict": "RUN-028 source ownership is correct"
+    },
+    "medical_edge_correction": "RUN-027 removes CAP-MED-API-CURRENT-SURFACES -> CAP-MED-CLIENT-MEDICAL-PROFILE; exact source edge count remains 362 after the task-export source substitution.",
+    "required_metadata_correction": "Normalize CAP-INC-INCIDENT-REPORT-CSV-EXPORT to module Incidents.",
+    "count_disagreement_after_corrections": 0
+  },
+  "freeze_verdict": {"static_canonical_denominator_freeze_defensible": true, "denominator": 340, "scope": "Static canonical feature identity only", "audit_complete": false},
+  "credits": {"runtime": 0, "browser": 0, "test_execution": 0, "build": 0, "database": 0, "network": 0, "benchmark": 0, "ease": 0, "release": 0, "completion": 0},
+  "wrote_files": false
+}

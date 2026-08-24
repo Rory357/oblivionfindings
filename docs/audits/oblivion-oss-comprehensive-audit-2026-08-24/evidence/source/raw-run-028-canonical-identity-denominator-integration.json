@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-028",
+  "status": "COMPLETE_READ_ONLY_CANONICAL_IDENTITY_INTEGRATION_RECONCILED",
+  "head_reviewed": "df8bf3848b1b068f3fe3d3c49ddefa2051c7d8d2",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "discovery_input_sha256": {
+    "current-feature-discovery-wave-01.json": "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb",
+    "current-feature-discovery-wave-02.json": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
+    "current-feature-discovery-wave-03.json": "7eec5a50d8f38184696a827bafb35c4e1c1f94fc8104abc7d075f502ce7f4c42"
+  },
+  "adjudication_input_sha256": {
+    "RUN-017": "f503ce331a80457e04caf5859c69feecc8ccb9ac3f345ff81bf5b3d2fc3d5e4e",
+    "RUN-018": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629",
+    "RUN-019": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64",
+    "RUN-020": "5720eee0e0677585bb960f8d7209e469d13a6d3d1087f2475659c7c514c2ee70",
+    "RUN-021": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20",
+    "RUN-022": "05553c6e66bfae73a540302a38b121e61cd7573f628a5e89e3643b0fda0e261f",
+    "RUN-023": "1fb344ce088abb9c92d6f2d0d83835fed95555e0a38fb485e69170d20c2c85a9",
+    "RUN-024": "7abd8eebc24593f8980e32bd5a6e0e50b3271e57a6195734447d70336a8c5a38",
+    "RUN-025": "a5f89f5f4cabbc5ef442991079abf95e6da7ab71f5538dd2a29f6edb0b7bc72d",
+    "RUN-026": "b8e421b5083e9e14f8954bfd4cf36cfee6e492d08e466ce8ab1668ee71a1dc4d",
+    "RUN-027": "b79a7c5db3e957db82f972117b32f259d8b517ebea5534d48a8bea0b8f57a2dd"
+  },
+  "precedence": [
+    "RUN-017 and RUN-018 typed discovery mappings",
+    "RUN-020 and RUN-021 source-owner reconciliations",
+    "RUN-022 blocked-owner decisions",
+    "RUN-023 cross-scope arbitration",
+    "RUN-024 and RUN-025 remaining source-owner decisions",
+    "RUN-026 report-catalog Layer-B normalization",
+    "RUN-027 medical-profile owner arbitration"
+  ],
+  "layer_a_source_graph": {
+    "sources": 186,
+    "mapped_sources": 185,
+    "excluded_sources": 1,
+    "excluded_source_ids": [
+      "CAP-WHISTLE-PROTECTED-DISCLOSURE"
+    ],
+    "source_target_edges": 362,
+    "unique_targets": 338,
+    "classes": {
+      "H": 300,
+      "D": 38,
+      "M": 0
+    },
+    "hashes": {
+      "edge_lines": {
+        "value": "131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0",
+        "rule": "Sorted source_id|target_id lines, UTF-8 LF joined, no trailing LF"
+      },
+      "target_ids": "19d278e7a56a7ae2cd0e233884e9e2e1f8d248728ca2f87d0b79e3f247b84abc",
+      "target_rows": "fa7045d5e5fba51fc2761cc1121549b24f18487555e79674c8b41abb12714173"
+    }
+  },
+  "layer_b_report_catalog": {
+    "catalog_instance_relations": 14,
+    "unique_targets": 9,
+    "existing_or_concurrent_targets": 7,
+    "new_targets": 2,
+    "new_target_ids": [
+      "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT"
+    ],
+    "normalized_mappings": {
+      "clients": "CAP-OPS-REPORTING-EXPORT",
+      "staff": "CAP-HR-WORKFORCE-REPORT-EXPORT",
+      "sites": "CAP-SITE-REPORTING-EXPORT",
+      "shifts": "CAP-OPS-REPORTING-EXPORT",
+      "timesheets": "CAP-OPS-REPORTING-EXPORT",
+      "incidents": "CAP-INC-INCIDENT-REPORT-CSV-EXPORT",
+      "safeguarding": "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "assets": "CAP-FLEET-REPORTING-EXPORT",
+      "medication_administrations": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "controlled_drug_discrepancies": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "fleet_trips": "CAP-FLEET-REPORTING-EXPORT",
+      "respite_bookings": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "respite_requests": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "audit_logs": "CAP-SET-AUDIT-HISTORY-EXPORT"
+    },
+    "hashes": {
+      "mapping_rows": "01bf2271d4398a3e3a5cc1ec9f3a5d62a69397819ac8d001d06a5d3acf224e85",
+      "target_ids": "5c1329dc5372d206c98e4938da7f96895973dbd6602e575823b3ae5b073791f0",
+      "target_rows": "ddff9bd47a9f86a640e3de0864e29b230476fcfd321ffccda225f55e2f66adc3"
+    }
+  },
+  "supplemental_relation_ledger": {
+    "typed_relations": 9,
+    "excluded_non_edge_relations": 1,
+    "relations": [
+      {"source": "CAP-OPS-ATTENDANCE-CLOCK-SESSION", "target": "CAP-OPS-SHIFT-HANDOVER", "disposition": "RELATED_DISTINCT"},
+      {"source": "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL", "target": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "disposition": "MERGE_GUARD"},
+      {"source": "CAP-SEC-PROVIDER-INTEGRATIONS", "target": "CAP-INT-SITE-PROVIDER-CONNECTION", "disposition": "CROSS_MODULE_ALIAS"},
+      {"source": "CAP-SEC-PROVIDER-INTEGRATIONS", "target": "CAP-INT-SITE-PROVIDER-SYNC", "disposition": "CROSS_MODULE_ALIAS"},
+      {"source": "CAP-SET-DATA-PRIVACY-AUDIT", "target": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE", "disposition": "COMPONENT_ANCHOR"},
+      {"source": "CAP-SET-DATA-PRIVACY-AUDIT", "target": "CAP-PRIV-DSR-LIFECYCLE", "disposition": "COMPONENT_ANCHOR"},
+      {"source": "CAP-SET-DATA-PRIVACY-AUDIT", "target": "CAP-PRIV-BREACH-LIFECYCLE", "disposition": "COMPONENT_ANCHOR"},
+      {"source": "CAP-REP-CROSS-MODULE-REPORT-HUB", "target": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT", "disposition": "NAVIGATION_ONLY"},
+      {"source": "CAP-SET-DATA-PRIVACY-AUDIT", "target": "CAP-GOV-AUDIT-LOG-EXPORT", "disposition": "RELATED_DISTINCT"}
+    ],
+    "excluded_non_edge": {
+      "source": "Queclink cloud-provider connection and sync",
+      "disposition": "EXCLUDE_NO_CURRENT_PRODUCT_OWNER"
+    },
+    "relation_rows_sha256": "319c797fb893a6095b62ecb74d6edfec4443dd117601a6c2047aa8fdd40224ff"
+  },
+  "global_denominator": {
+    "unique_targets": 340,
+    "classes": {
+      "H": 300,
+      "D": 40,
+      "M": 0
+    },
+    "target_ids_sha256": "da93e647664016d275ab1d2e7b2aad9ca15f055ebf2cd56630c22ad427afee53",
+    "target_class_module_sha256": "f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac",
+    "module_counts": {
+      "Care & Clinical": 11,
+      "Catering": 6,
+      "Clients": 9,
+      "Compliance": 1,
+      "Control Room": 15,
+      "Finance": 42,
+      "Fleet & Assets": 17,
+      "Frontline Workspaces": 7,
+      "Governance": 24,
+      "HR": 29,
+      "Health & Safety": 18,
+      "IT & Support": 9,
+      "Incidents": 6,
+      "Integrations": 8,
+      "Notifications": 1,
+      "Operations": 8,
+      "Platform Dashboards": 1,
+      "Portal": 11,
+      "Privacy": 10,
+      "Public & Settings Platform": 18,
+      "Quality/Internal": 1,
+      "Reporting": 2,
+      "Respite": 14,
+      "Roadmap": 4,
+      "Safeguarding": 10,
+      "Security Devices": 12,
+      "Sites & Locations": 16,
+      "Workforce": 13,
+      "eMAR": 17
+    }
+  },
+  "required_absences": [
+    "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+    "CAP-FIN-DASHBOARD-INSIGHTS",
+    "CAP-FIN-ACCOUNTING-SYNC-FX-CONSOLIDATION",
+    "CAP-FIN-CONSOLIDATION",
+    "CAP-FIN-INTERCOMPANY",
+    "CAP-HR-RECRUITMENT-CANDIDATE-HIRE",
+    "CAP-HR-REPORTING-EXPORT",
+    "CAP-OPS-ROSTER-PLAN-PUBLISH",
+    "CAP-INT-CALENDAR-CONNECTION",
+    "CAP-OPS-CALENDAR-SYNC",
+    "CAP-COMPLAINT-HR-CASEWORK",
+    "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+    "CAP-INC-INCIDENT-REPORT-AUDIT-EXPORT",
+    "CAP-MED-ALLERGY-REGISTER"
+  ],
+  "reconciliation": {
+    "run_029_initial_edge_sha256": "fb138b292d3584a062bf88b36679dd255d06ce87cde1eb01a44a2255c11e1d3a",
+    "remove": "CAP-DAY-TASK-REPORT|CAP-DAY-TASK-CSV-EXPORT",
+    "add": "CAP-DAY-ALL-TASKS-WORKBENCH|CAP-DAY-TASK-CSV-EXPORT",
+    "authoritative_edge_sha256": "131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0",
+    "basis": "The CSV branches from AllTasksController::index and is triggered from tasks/index.tsx; /tasks/reports is a distinct H analytics surface."
+  },
+  "static_evidence_gaps": {
+    "targets_missing_route_anchor": 120,
+    "targets_missing_page_anchor": 226,
+    "targets_missing_both_route_and_page_anchor": 116,
+    "route_gap_sha256": "38ee1617e5e7f781236b7a9d13f0723f369d671942defc0b6fcfa021d8136d8c",
+    "page_gap_sha256": "927a86b3122228849bf6a12b565d9194c2ca9315ac5d8ba88d674180c43e6768",
+    "both_gap_sha256": "58148201b144327f097ba47aca8bbff8860cfb063221d7e26a0cbafc662eac12"
+  },
+  "freeze_verdict": {
+    "static_canonical_feature_identity_defensible": true,
+    "audit_complete": false,
+    "scope": "Static identity, class, module, source ownership, and report-catalog normalization only"
+  },
+  "credits": {
+    "runtime": 0,
+    "browser": 0,
+    "test_execution": 0,
+    "build": 0,
+    "database": 0,
+    "network": 0,
+    "benchmark": 0,
+    "ease": 0,
+    "release": 0,
+    "completion": 0
+  },
+  "original_run_wrote_files": false,
+  "materialization": {
+    "wrote_files": true,
+    "path": "evidence/source/raw-run-028-canonical-identity-denominator-integration.json"
+  }
+}
