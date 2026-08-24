@@ -1,0 +1,2247 @@
+{
+  "schema_version": "RUN-056-D-ADJUDICATION-1",
+  "status": "PASS_WITH_ONE_BOUNDED_SEMANTIC_CORRECTION_ZERO_CREDIT",
+  "seal_validation": {
+    "allowed_file": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\oblivion-oss-comprehensive-audit-2026-08-24\\evidence\\benchmark\\raw-run-056-independent-adjudicator-input-wave-02.json",
+    "expected_sha256": "b611f1e513f1eb8153a6832d179e4708c6b17ae2e326abe6c74e5a0b8746cbc7",
+    "actual_sha256": "b611f1e513f1eb8153a6832d179e4708c6b17ae2e326abe6c74e5a0b8746cbc7",
+    "file_hash_match": true,
+    "declared_manifest_sha256": "4f5edf1e554bfd6d07610c6663c2478d19069d5e880715a2aff08cb5c64b5264",
+    "recomputed_sorted_canonical_manifest_sha256": "4f5edf1e554bfd6d07610c6663c2478d19069d5e880715a2aff08cb5c64b5264",
+    "manifest_hash_match": true,
+    "manifest_entries_present": 7,
+    "referenced_files_reopened": false,
+    "manifest_verdict": "PASS_WITHIN_SEALED_INPUT"
+  },
+  "chain_validation": {
+    "a53_reattachments": {
+      "verdict": "PASS",
+      "checked": 24,
+      "unique": 24,
+      "reason": "Every opaque ID agrees across reattached identity, blind Agent A packet, source-atom crosswalk, neutral specification, target packet, and Agent C row; all feature/facet identities and facet hashes agree."
+    },
+    "agent_a_to_b_atoms": {
+      "verdict": "PASS",
+      "blind_atoms": 252,
+      "consumed": 165,
+      "retained_unknown_atoms": 87,
+      "invented_atom_ids": 0,
+      "reason": "Every blind atom has exactly one crosswalk and disposition; all neutral atom references resolve, including explicitly delimited sibling-facet references."
+    },
+    "run_054_provenance_only_correction": {
+      "verdict": "PASS_WITHIN_SEAL",
+      "manifest_entry_sha256": "1f197b817e5e184efbcf4e7549664008aa3fe331d1b4d4ab5470a3a214364b8b",
+      "canonical_agent_payload_sha256": "6cd60a87324025e4e63586dd75a5262f5ed06d9081d051882b0d9ad338895b5e",
+      "neutral_payload_unchanged_across_24_embedded_copies": true,
+      "reason": "The correction is manifest-bound as provenance-only and every duplicated neutral packet is byte-semantically identical inside the seal; the prohibited external correction file was not reopened."
+    },
+    "fresh_agent_c_boundary": {
+      "verdict": "PASS_WITHIN_SEAL",
+      "sealed_input_sha256": "5422d3b25795189be5fd5070bb18d3e82af17b718fd821f735b5bc0d9c9a57e7",
+      "sealed_output_sha256": "666c6de668cc8f1db3661e55da309034992d1e27d904c740159bc4f3039fb275",
+      "exact_agent_message_sha256": "24da489b1b10032265ee4b4dca9e3b98b07d4b2bf603c9bceb8e637c34dcd2a1",
+      "canonical_row_set_sha256": "b4e4b410e9a53884a4dbfb9149c86279ecbb9fbdb76d2a4e66066ef81699f204",
+      "same_packet_anchor_catalogs": 24,
+      "foreign_anchor_values": 0,
+      "invalid_citation_keys": 0,
+      "reason": "Every Agent C citation resolves through its own row's supplied anchor catalogue, and every catalogue value belongs to that row's sealed current-source packet."
+    },
+    "drift_unknowns_and_adjacency": {
+      "verdict": "PASS",
+      "explicit_unknowns": 85,
+      "rows_preserving_drift": 24,
+      "partial_adjacent_non_promotable": 4,
+      "insufficient_adjacent_non_promotable": 12,
+      "adjacent_non_promotable_total": 16,
+      "reason": "All explicit unknowns and target/object exclusions remain bounded; no adjacent unit or outcome is promotable."
+    },
+    "single_tenant_multi_site_boundary": {
+      "verdict": "PASS",
+      "reason": "Current comparisons retain Site access, action capability, canonical ownership, direct-object behavior, and privacy boundaries without introducing tenant semantics."
+    }
+  },
+  "row_adjudications": [
+    {
+      "opaque_id": "A53-001",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "rehire"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Distinct re-engagement authority is unknown; current HR gates cannot backfill it."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Current rehire activates the existing profile and restores linked access."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Service-period and downstream provenance are explicit unknowns."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay rule exists and current repetition is state-rejected."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site rule exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Activation overlaps, but current rehire is a broader transaction."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Activate-and-restore aligns while distinct rehire semantics remain outside the adjacent unit."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-001-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Activation restores linked access."
+        },
+        {
+          "id": "AO-A53-001-02",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "This is an explicit non-claim."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Existing-record activation remains adjacent to rehire and three explicit unknowns remain non-requirements.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-002",
+      "identity_pair": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "confirm"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, thirteen atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Neutral actor authority is unknown."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Eligible valid proposals transition to confirmed and invalid input is rejected."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Actor attribution and retained decision history remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Evidence-conditioned replay is not the unknown original-result contract."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site/privacy criterion exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Link validation overlaps while allocation and settlement equivalence remain excluded."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Eligibility and total checks align within the retained scope limitation."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-002-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Valid eligible sources and references can be confirmed."
+        },
+        {
+          "id": "AO-A53-002-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Invalid confirmation is rejected before a confirmed outcome."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "The comparison remains about link validation, not allocation equivalence; three explicit unknown entries remain bounded.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-003",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "balance_check"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eight atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "The adjacent listing establishes neither authority nor controlled-medication context."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "The current packet concerns a balance command, not active-lot listing."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Physical count, checker, and reconciliation semantics are unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral concurrency requirement exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site/direct-object rule exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Generic inventory listing and controlled balance command are different objects."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "No supplied current evidence establishes the adjacent active-lot listing."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-003-01",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Per-lot quantity display and ordering are absent from the current packet."
+        },
+        {
+          "id": "AO-A53-003-02",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Destroyed-lot omission from an active list is not supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Generic lot visibility remains distinct from physical controlled-medication balance checking.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-004",
+      "identity_pair": {
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "facet_key": "amendment"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, twelve atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "A seeded capability exists without a routed amendment command."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Correction fields exist without a replacement-row lifecycle writer."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Model audit hooks cannot supply amendment provenance without a writer."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No amendment transaction or replay behavior exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No amendment direct object is resolved."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Unrelated medication and behaviour corrections remain excluded."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "Schema-only evidence does not implement linked-replacement amendment."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-004-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No production action creates the linked replacement and retained history."
+        },
+        {
+          "id": "AO-A53-004-02",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No amendment submission enforces a change explanation."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "The exact observation-amendment boundary and four unknowns remain intact.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-005",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "invite"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eight atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "HR and Site gates govern a different invite action."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current invite sends a token to an existing User rather than creating the neutral enabled account."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Delivery, acceptance, expiry, and recovery remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral repeat rule exists and current resend can replace tokens."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site criterion exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Direct account creation and tokenized invitation have different action/object boundaries."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent direct-account behavior differs from current invitation."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-005-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "The invite packet does not create a new enabled linked account."
+        },
+        {
+          "id": "AO-A53-005-02",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "This is an explicit non-claim."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Direct access creation is not reinterpreted as invitation delivery.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-006",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "view"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eight atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "A view capability exists but current Client-derived scope differs from facility/storage scope."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current source joins controlled register data instead of preserving generic/classification separation."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Chronological balance and joined provenance remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "Both sides are read projections."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "The supplied Site filter lacks explicit Site-authority validation."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Separated generic stock conflicts with the current joined controlled page."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent generic projection and current controlled-register projection are different objects."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-006-01",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Exact lot identity, expiry, and quantity presentation is not supplied."
+        },
+        {
+          "id": "AO-A53-006-02",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current controlled classification is joined to register and balance data."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Generic inventory viewing remains separate from controlled-register viewing.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-007",
+      "identity_pair": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "settlement_replay_and_provenance"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eleven atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral target-wide authority rule exists."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Producer settlement evidence does not own link inspection or removal."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Producer provenance cannot be credited as history-review behavior."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Producer replay varies rather than universally rejecting already-matched attempts."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site criterion exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Producer integrity remains explicitly excluded from history-review ownership."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "The current packet is a producer dependency, not current-link inspection/removal."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-007-01",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current replay behavior is producer-dependent."
+        },
+        {
+          "id": "AO-A53-007-02",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No current-link removal returning the source to unmatched is supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Producer settlement evidence is not reassigned to history review or removal.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-008",
+      "identity_pair": {
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "facet_key": "incident_closure"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, sixteen atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Closure requires exact action authority, reviewed state, and Site access."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Closed/locked state is supplied but reopen/unlock is not."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Closure evidence and immutable sequenced lifecycle signals are supplied."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Same-result replay remains unknown and current repeat is state-rejected."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Site access is asserted before and under lock with explicit foreign-Site denial."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Investigation, follow-ups, H&S governance, and Control Room work remain separate owners."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Authorized close/lock is met while reopen/unlock is absent."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-008-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "The supplied closure command reaches closed/locked state and lifecycle signaling."
+        },
+        {
+          "id": "AO-A53-008-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Closure actor/time/outcome/notes, status, and activity evidence are retained."
+        },
+        {
+          "id": "AO-A53-008-03",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No reopen or separate unlock behavior is supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Stricter current closure prerequisites do not infer the missing reopen path or unknown decisions.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-009",
+      "identity_pair": {
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "facet_key": "create_register"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, fourteen atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current record capabilities do not establish grouped form/active-request authority."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Current creation lacks a primary/immediate-child hierarchy."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "A single observation transaction does not establish grouped parent-child atomicity."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Repeat and retry semantics remain unknown."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Location scope is an explicit neutral unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "A single typed observation is not a grouped parent-child object."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "Current source creates one typed observation rather than the grouped outcome."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-009-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No grouped primary-and-child save is supplied."
+        },
+        {
+          "id": "AO-A53-009-02",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No atomic grouped validation outcome is supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Register, schedule, template, and timeline behavior are not substituted for child hierarchy.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-010",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "discrepancy_resolution"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, seven atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current manage authority governs a different discrepancy action."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current source overwrites discrepancy resolution evidence rather than lot quantity."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Preserved balance, investigation, and governance remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay rule exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Controlled-specific scope is unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Generic stock adjustment and discrepancy resolution are different objects."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent quantity action differs from current discrepancy resolution."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-010-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No generic lot quantity change is supplied."
+        },
+        {
+          "id": "AO-A53-010-02",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "This is an explicit non-claim."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Generic mutation remains distinct from governed controlled-discrepancy resolution.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-011",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "create"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eleven atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "HR view/manage and additional role-assignment gates govern create-or-link."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Profile, optional User, roles, and Sites are coordinated."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "User, profile, roles, Sites, and fail-closed intake audit are atomic."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Mutexes do not establish the unknown same-result replay contract."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Complete record, location, and sensitive-field privacy remain unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current ownership is create-or-link rather than pure creation."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_MET",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_MET",
+        "rationale": "The supplied create-or-link path covers validated profile creation and optional linked access."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-011-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "The supplied create path yields a profile and generated staff identity."
+        },
+        {
+          "id": "AO-A53-011-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Optional User creation/linking coordinates roles and Sites."
+        },
+        {
+          "id": "AO-A53-011-03",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "The supplied validation boundary prevents invalid completion."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Create-or-link expansion is recorded without broadening the exact requirement.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-012",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "update"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, eleven atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "HR/financial gates exist but request/controller Site bypass differs."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Profile/Site/manager updates exist without complete named User synchronization."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Complete durable history remains unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No version, request key, or stale-write precondition exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Sensitive-field and location authority remain unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Generic PUT can change active state without dedicated effects."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Validated update exists while complete linked-access synchronization is not supplied."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-012-01",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Selected profile coordination is supplied but full linked-access synchronization is not."
+        },
+        {
+          "id": "AO-A53-012-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Request validation prevents invalid profile/relationship updates."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Set-active effects and mixed-Site behavior remain separately bounded.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-013",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "witness_authority"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, nine atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Manage and witness permissions exist without competency or independence."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Selected identity storage does not evidence destruction text/reporting."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Identity is retained without a durable eligibility snapshot."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay requirement exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Witness Site overlap and Client relationship remain unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Free-form destruction text and selected witness identity are different objects."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent descriptive-text behavior differs from current selected-identity handling."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-013-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Free-form destruction witness text repeated in reporting is not supplied."
+        },
+        {
+          "id": "AO-A53-013-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Separate witness permission supports the boundary that text alone is insufficient."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Free-form text remains neither authenticated attestation nor the current witness command.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-014",
+      "identity_pair": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "allocation_history_review"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, nine atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "The adjacent unit supplies no authority criterion."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Traceable history is projected while current-match removal is absent."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Durable history and actor/reason provenance remain neutral unknowns."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "The current owner is read-only."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site rule exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "A removable current match is not immutable allocation-history review."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Inspection overlaps while removal conflicts with immutable read ownership."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-014-01",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Source/target evidence is exposed as durable history rather than only a current match."
+        },
+        {
+          "id": "AO-A53-014-02",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "The model blocks update/delete and has no removal route."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Current-match inspection/removal is not promoted into allocation-history review.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-015",
+      "identity_pair": {
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "facet_key": "incident_review"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, twelve atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "The neutral unit supplies no authority criterion."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Submitted-to-reviewed persistence exists without the joint presentation or reopen state."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Formal outcome, approval, signature, and effectiveness remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Repeat semantics remain unknown."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site criterion exists and current review lacks a Site assertion."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Investigation, corrective actions, H&S governance, notification, and closure remain separate."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "A review transition exists without the joint presentation and reopen outcomes."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-015-01",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No single joined investigation/review presentation is supplied."
+        },
+        {
+          "id": "AO-A53-015-02",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "A dedicated submitted-to-reviewed action is narrower than arbitrary lifecycle selection."
+        },
+        {
+          "id": "AO-A53-015-03",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Closed-to-reopened is not supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Current review remains narrower and does not inherit other incident owners.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-016",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "set_active"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, thirteen atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "HR view/manage and all-assigned-Site access govern the command."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Activation restores approval but deactivation does not disable login."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Durable lifecycle history remains unknown and no status journal is supplied."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Opposing commands remain last-writer-wins."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "The neutral unit supplies no Site criterion."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Generic update can bypass dedicated active-state effects."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "Required bidirectional worker/access coupling fails on deactivation."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-016-01",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Non-active transition does not disable linked login."
+        },
+        {
+          "id": "AO-A53-016-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Activation restores missing User approval."
+        },
+        {
+          "id": "AO-A53-016-03",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Departure-date and reporting-relationship rejection are not supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "The exact worker/access boundary remains intact and the generic-update collision is retained.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-017",
+      "identity_pair": {
+        "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "facet_key": "initial_event_record"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, nine atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current initial-record capabilities differ from compound create/edit access."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current state is a standalone event, not a compound care interaction."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Standalone provenance and completion remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay requirement exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Location/privacy remain unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Compound interaction content cannot become a standalone event."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent compound object differs from current standalone event creation."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-017-01",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current creation does not group the specified compound clinical content."
+        },
+        {
+          "id": "AO-A53-017-02",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current capabilities differ by stage but do not establish compound new-versus-edit authority."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Compound interaction behavior remains non-promotable and distinct from initial-event recording.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-018",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "destruction_projection"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, sibling balance reference, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Current projection and external write split the neutral administrator action."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Destruction evidence is projected without complete void and unconditional register effects."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Correction, balance, and authenticated-witness semantics remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay contract exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral ownership/Site rule exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Projection depends on the separate destruction owner."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Recording/projection overlaps while linkage and void gaps prevent full coverage."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-018-01",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Destruction evidence is recorded but stock/register effects are conditional."
+        },
+        {
+          "id": "AO-A53-018-02",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Projection lacks complete void and date-bounded reporting semantics."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Generic destruction/reporting remains adjacent to controlled-register projection.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-019",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "longitudinal_history"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, nine atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No production history command or exact authority is supplied."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Tables/models exist without writer or required read contexts."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No production activity-entry writer establishes history integrity."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No production transaction or neutral replay rule exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Location filtering remains unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Rehire JSON and generic audit logs remain excluded."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "Schemas exist without writer or review surface."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-019-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No production writer adds work-information entries."
+        },
+        {
+          "id": "AO-A53-019-02",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Individual and list history contexts are absent."
+        },
+        {
+          "id": "AO-A53-019-03",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No explicit empty-history outcome exists."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Bounded work-information history remains non-promotable and other stores are not substitutes.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-020",
+      "identity_pair": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "reject"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "The neutral adjacent unit supplies no rejection authority."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current suggested-to-rejected differs from confirmed-link removal."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Rejected-state provenance remains a neutral unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral repeat rule exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral Site/privacy rule exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Confirmed-link removal is explicitly not proposal rejection."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_CONTRADICTED",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_CONTRADICTED",
+        "rationale": "The adjacent unit excludes the proposal-rejection object implemented by current source."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-020-01",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Candidate presentation is not established by the reject packet."
+        },
+        {
+          "id": "AO-A53-020-02",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Reject acts on an unsettled suggestion, not a confirmed relationship."
+        },
+        {
+          "id": "AO-A53-020-03",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "This is an explicit non-claim."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Confirmed-link removal is not reidentified as candidate rejection.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-021",
+      "identity_pair": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "view"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "These routes require viewAny while worker self-read is separately owned."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Lifecycle-oriented list and grouped detail are read-only."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "The compared behavior is read-only."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "The compared behavior is a read projection."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Field privacy, complete authorization, and location scope remain neutral unknowns."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Self-profile reading remains a separate route."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "List/detail reading aligns while broad general-worker access only partly aligns."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-021-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "The index supplies active-work emphasis and lifecycle indicators."
+        },
+        {
+          "id": "AO-A53-021-02",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Selecting a permitted worker exposes grouped details without mutation."
+        },
+        {
+          "id": "AO-A53-021-03",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "General route reading requires viewAny and self-read is separate."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Self-profile ownership and privacy gates do not broaden the neutral role claim.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_EXACT_COMPARISON",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-022",
+      "identity_pair": {
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "facet_key": "care_context_template_hierarchy_filtering"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, twelve atoms, nested eligibility references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral authority criterion or current context/template capability exists."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "Fixed types and static wizard do not supply context templates or hierarchy."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No template-selection or care-context decision exists to audit."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_APPLICABLE",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_APPLICABLE",
+          "rationale": "The requested behavior is a read/resolution projection."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Location/privacy are unknown and no template direct object exists."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Protocol schedule and the wizard Context label remain excluded."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_GAP",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_GAP",
+        "rationale": "No care-context/form-template object, empty template, or parent-child hierarchy exists."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-022-01",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No active care-context and selected-form resolution exists."
+        },
+        {
+          "id": "AO-A53-022-02",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "The static wizard does not establish an unresolved empty template."
+        },
+        {
+          "id": "AO-A53-022-03",
+          "c_rating": "EVIDENCED_GAP",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_GAP",
+          "rationale": "No newest-first parent-child hierarchy is supplied."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Depth, configurability, universal context scope, and privacy are not inferred.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-023",
+      "identity_pair": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "register_movement"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, crosswalk, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Route manage and witness gates overlap movement but omit the controlled-entry policy."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Register arithmetic exists while nullable medication makes stock/schedule effects conditional."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Joined provenance, correction, and atomicity remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "No neutral replay rule exists and current writes lack durable idempotency."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Location ownership remains unknown."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Neutral generic inventory plus separate classification conflicts with the controlled-register command."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Conditional stock mutation overlaps generic quantity change while controlled-ledger creation contradicts separation."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-023-01",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Stock changes only when medication resolution succeeds."
+        },
+        {
+          "id": "AO-A53-023-02",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Unavailable-inventory dispensing prevention is not supplied."
+        },
+        {
+          "id": "AO-A53-023-03",
+          "c_rating": "EVIDENCED_CONTRADICTED",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_CONTRADICTED",
+          "rationale": "Current source creates a controlled-drug entry rather than preserving separation."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Generic quantity change is not promoted into append-only controlled-ledger behavior.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    },
+    {
+      "opaque_id": "A53-024",
+      "identity_pair": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "suggested_match_review"
+      },
+      "lineage_verdict": "PASS",
+      "lineage_reason": "Identity, facet hash, ten atoms, sibling-confirm references, dispositions, neutral copy, and C row reconcile.",
+      "lens_reviews": [
+        {
+          "lens": "authorization_scope",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Role authority remains an explicit neutral unknown."
+        },
+        {
+          "lens": "state_read_projection",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Suggestion and separate confirmation exist while exact ordering/rationale is not supplied."
+        },
+        {
+          "lens": "integrity_audit_provenance",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Rule provenance and reviewer history remain unknown."
+        },
+        {
+          "lens": "replay_concurrency",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Proposal/version keys are not request idempotency and no neutral replay rule exists."
+        },
+        {
+          "lens": "privacy_direct_object",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Privacy remains unknown and stale target-Site reproof is current-specific."
+        },
+        {
+          "lens": "collision_exclusions",
+          "c_rating": "EVIDENCED_PARTIAL",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "Suggested-match review remains distinct from allocation review and retains the UI capability collision."
+        }
+      ],
+      "unit_review": {
+        "c_rating": "EVIDENCED_PARTIAL",
+        "decision": "ACCEPT",
+        "final_rating": "EVIDENCED_PARTIAL",
+        "rationale": "Suggestion review and unmatched-until-confirmed align while ordering/rationale remain absent."
+      },
+      "acceptance_outcome_reviews": [
+        {
+          "id": "AO-A53-024-01",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "CORRECT",
+          "final_rating": "EVIDENCED_PARTIAL",
+          "rationale": "The sealed current packet establishes proposal creation for selected bank transactions but does not establish coverage of all observed financial candidate categories."
+        },
+        {
+          "id": "AO-A53-024-02",
+          "c_rating": "NOT_EVIDENCED",
+          "decision": "ACCEPT",
+          "final_rating": "NOT_EVIDENCED",
+          "rationale": "Exact same-amount/same-day ordering and amount/date-only rationale are not supplied."
+        },
+        {
+          "id": "AO-A53-024-03",
+          "c_rating": "EVIDENCED_MET",
+          "decision": "ACCEPT",
+          "final_rating": "EVIDENCED_MET",
+          "rationale": "Suggested and confirmed are distinct states."
+        }
+      ],
+      "drift_and_unknowns_preserved": true,
+      "drift_reason": "Candidate review remains distinct from allocation review; authority, privacy, richer confidence, and reviewer history remain unknown.",
+      "promotion_disposition": "NON_PROMOTED_STATIC_ONLY_ADJACENT",
+      "credit": false
+    }
+  ],
+  "feature_summaries": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "packet_ids": [
+        "A53-001",
+        "A53-005",
+        "A53-011",
+        "A53-012",
+        "A53-016",
+        "A53-019",
+        "A53-021"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "MIXED_STATIC_ONLY_CREATE_MET_UPDATE_VIEW_PARTIAL_SET_ACTIVE_CONTRADICTED_ADJACENT_NON_PROMOTABLE",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "packet_ids": [
+        "A53-002",
+        "A53-007",
+        "A53-014",
+        "A53-020",
+        "A53-024"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "MIXED_STATIC_ONLY_PARTIAL_GAP_AND_CONTRADICTION_WITH_A53_024_OUTCOME_CORRECTED",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "packet_ids": [
+        "A53-003",
+        "A53-006",
+        "A53-010",
+        "A53-013",
+        "A53-018",
+        "A53-023"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "ADJACENT_ONLY_MIXED_GAP_PARTIAL_AND_CONTRADICTION_ALL_NON_PROMOTABLE",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "packet_ids": [
+        "A53-004",
+        "A53-009",
+        "A53-022"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "STATIC_GAPS_FOR_AMENDMENT_GROUPED_CREATE_AND_CONTEXT_TEMPLATE_HIERARCHY",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "packet_ids": [
+        "A53-008",
+        "A53-015"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "EXACT_STATIC_COMPARISONS_PARTIAL_FOR_CLOSURE_AND_REVIEW",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "packet_ids": [
+        "A53-017"
+      ],
+      "lineage_status": "PASS",
+      "semantic_status": "ADJACENT_COMPOUND_INTERACTION_CONTRADICTS_STANDALONE_EVENT_AND_REMAINS_NON_PROMOTABLE",
+      "formal_edges": 0,
+      "final_no_matches": 0,
+      "credit": false
+    }
+  ],
+  "counts_and_validation": {
+    "features": {
+      "expected": 6,
+      "actual": 6,
+      "disjoint": true
+    },
+    "rows": {
+      "expected": 24,
+      "actual": 24,
+      "unique": 24
+    },
+    "sufficiency_split": {
+      "exact": {
+        "expected": 8,
+        "actual": 8
+      },
+      "partial_adjacent": {
+        "expected": 4,
+        "actual": 4
+      },
+      "insufficient_adjacent": {
+        "expected": 12,
+        "actual": 12
+      }
+    },
+    "neutral_atoms": {
+      "expected": 252,
+      "actual": 252,
+      "consumed_expected": 165,
+      "consumed_actual": 165,
+      "retained_unknown_expected": 87,
+      "retained_unknown_actual": 87,
+      "invented": 0
+    },
+    "explicit_unknowns": {
+      "expected": 85,
+      "actual": 85
+    },
+    "specification_units": {
+      "expected": 24,
+      "actual": 24,
+      "reviewed": 24,
+      "decision_counts": {
+        "ACCEPT": 24,
+        "CORRECT": 0,
+        "REJECT": 0
+      }
+    },
+    "acceptance_outcomes": {
+      "expected": 58,
+      "actual": 58,
+      "reviewed": 58,
+      "decision_counts": {
+        "ACCEPT": 57,
+        "CORRECT": 1,
+        "REJECT": 0
+      }
+    },
+    "lens_cells": {
+      "expected": 144,
+      "actual": 144,
+      "reviewed": 144,
+      "decision_counts": {
+        "ACCEPT": 144,
+        "CORRECT": 0,
+        "REJECT": 0
+      },
+      "sealed_c_rating_counts": {
+        "NOT_EVIDENCED": 67,
+        "EVIDENCED_MET": 17,
+        "EVIDENCED_PARTIAL": 24,
+        "EVIDENCED_GAP": 14,
+        "EVIDENCED_CONTRADICTED": 17,
+        "NOT_APPLICABLE": 5
+      }
+    },
+    "total_semantic_reviews": 226,
+    "source_anchor_occurrences": {
+      "expected": 155,
+      "actual": 155
+    },
+    "same_packet_anchor_validation": {
+      "foreign_catalog_values": 0,
+      "invalid_citation_keys": 0
+    },
+    "rows_with_corrections": [
+      "A53-024"
+    ],
+    "adjacent_rows_promoted": 0,
+    "formal_edges": 0,
+    "final_no_matches": 0,
+    "canonical_targets": 340,
+    "credited_targets": 0
+  },
+  "credit_boundary": {
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "mapping_credit": false,
+    "target_specific_mapping_credit": false,
+    "formal_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "no_credit_reason": "This sealed static correction validates lineage and bounded comparison only. It supplies no formal full-project triage, exhaustive no-match search, runtime, browser, executed-test, ease, release, Pass 8, or completion evidence.",
+  "file_access_attestation": {
+    "files_read": [
+      "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\oblivion-oss-comprehensive-audit-2026-08-24\\evidence\\benchmark\\raw-run-056-independent-adjudicator-input-wave-02.json"
+    ],
+    "other_repository_or_audit_files_read": 0,
+    "source_files_read": 0,
+    "history_files_read": 0,
+    "internet_used": false,
+    "application_runtime_used": false,
+    "browser_used": false,
+    "tests_run": false,
+    "build_run": false,
+    "database_used": false,
+    "vcs_used": false,
+    "writes_or_mutations": false
+  }
+}
+

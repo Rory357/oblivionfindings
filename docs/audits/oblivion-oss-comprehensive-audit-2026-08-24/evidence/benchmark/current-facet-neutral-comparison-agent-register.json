@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "run_id": "RUN-052",
-  "generated_at": "2026-08-25T01:45:00+12:00",
-  "status": "FIVE_STAGE_FACET_REGISTER_COMPLETE_LINEAGE_NO_GO_ZERO_CREDIT",
+  "run_id": "RUN-057",
+  "generated_at": "2026-08-25T03:47:00+12:00",
+  "status": "CORRECTED_A_B_C_D_CHAIN_REGISTER_COMPLETE_ZERO_CREDIT",
   "governing_pins": {
     "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
     "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
@@ -13,158 +13,227 @@
     "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
     "parent_run_046_sha256": "648fd95c9291a094a60bf1dfb007e1da9f58eb9b9889ffaad4fa5d542ecbf1f4"
   },
-  "inputs": [
+  "historical_checkpoints": [
     {
-      "run_id": "RUN-047-P1",
-      "path": "raw-run-047-upstream-facet-refinement-clinical-incident-wave-02.json",
-      "sha256": "517be316ad4ac47bc029799736ce7f648d06ff39b7cbefd360685bf6240a99c8"
-    },
+      "run_id": "RUN-052",
+      "status": "SUPERSEDED_HISTORICAL_LINEAGE_NO_GO_ZERO_CREDIT",
+      "commit": "93e3036055ea24dc71a7e49afd40c08fd8cf0830",
+      "tree": "e3ac56dbc0082f8759997ddc210a88fd9aa6638c",
+      "parent": "4155fb506c5f511ba50a0f8a1c453f872653e0e9",
+      "artifacts": [
+        {
+          "kind": "comparison",
+          "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/current-facet-neutral-comparison-wave-02.json",
+          "blob_sha1": "d573330ba15bdd78ce3f87792ed13f0eb8e482ef",
+          "bytes": 256084,
+          "sha256": "4dc66b8c7c11bd4d89e361d2f5b8bb8b91fda3cb1f05ed1c1ddc464dbf563b6e",
+          "status": "TWENTY_FOUR_FACET_WAVE_INTEGRATED_LINEAGE_NO_GO_ZERO_FORMAL_EDGES"
+        },
+        {
+          "kind": "register",
+          "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/current-facet-neutral-comparison-agent-register.json",
+          "blob_sha1": "18c49397407b47f3a2d34566166b51fc214d5ecd",
+          "bytes": 7804,
+          "sha256": "d5e6587a1125ffb2456c2b8f20b26f5d602b7282bbe001055cedb6b48ca18633",
+          "status": "FIVE_STAGE_FACET_REGISTER_COMPLETE_LINEAGE_NO_GO_ZERO_CREDIT"
+        }
+      ],
+      "historical_disposition": {
+        "lineage_status": "NO_GO_AGENT_A_TO_B_SANITIZED_BEHAVIOUR_PACKET_MISSING",
+        "formal_edges": 0,
+        "canonical_mapping_credit_fraction": "0/340"
+      },
+      "current_use": "PROVENANCE_ONLY_NOT_A_CORRECTED_COMPARISON_INPUT"
+    }
+  ],
+  "historical_diagnostic_inputs": [
     {
-      "run_id": "RUN-047-P2",
-      "path": "raw-run-047-upstream-facet-refinement-composites-wave-02.json",
-      "sha256": "978fad489512c4498140bdec02bda59a36b9e0cefcb073316c59a3be6efcac99"
-    },
-    {
-      "run_id": "RUN-047",
-      "path": "current-upstream-facet-refinement-wave-02.json",
-      "sha256": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e"
-    },
-    {
-      "run_id": "RUN-047-REGISTER",
-      "path": "current-upstream-facet-refinement-agent-register.json",
-      "sha256": "bc8265ee896a04335b9c36a077f09bb7c0d7d8e5892200542601f682f05e076b"
-    },
-    {
-      "run_id": "RUN-048",
+      "logical_id": "RUN-048",
       "path": "raw-run-048-blind-neutral-facet-requirements-wave-02.json",
       "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6"
     },
     {
-      "run_id": "RUN-049",
-      "path": "raw-run-049-current-source-facet-refinement-wave-02.json",
-      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a"
-    },
-    {
-      "run_id": "RUN-050-P1",
-      "path": "raw-run-050-clean-facet-comparison-clinical-incident-hr-wave-02.json",
-      "sha256": "49dc874e7b66fa40701e96e8fd08dc9bb20c6bf7b72850220068591f69e03586"
-    },
-    {
-      "run_id": "RUN-050-P2",
-      "path": "raw-run-050-clean-facet-comparison-medication-finance-wave-02.json",
-      "sha256": "82e89513aa387301dccede26b833dc472cc30c8950bf410b0d285b8caece6b73"
-    },
-    {
-      "run_id": "RUN-050-X",
-      "path": "raw-run-050-clean-facet-comparison-full-crosscheck-wave-02.json",
-      "sha256": "64a5777dfd17345969a22ad63d03348089dd699147e3448e750425f795258b4f"
-    },
-    {
-      "run_id": "RUN-050-T",
-      "path": "raw-run-050-witness-authority-tiebreak-wave-02.json",
-      "sha256": "748e9dafa9177b8eb71425db7cf2701174a93edb28e0e283344a07be69b3d747"
-    },
-    {
-      "run_id": "RUN-050",
+      "logical_id": "RUN-050",
       "path": "raw-run-050-clean-facet-comparison-reconciled-wave-02.json",
       "sha256": "fa5248dd88b3a43334e9f181bba2f8459274c2c404d984189c39a54d74988159"
     },
     {
-      "run_id": "RUN-051",
+      "logical_id": "RUN-051",
       "path": "raw-run-051-independent-facet-adjudication-wave-02.json",
       "sha256": "983ef988f61523d7b76e7e6c91141cd1321fb61082990e9b54481ea5a2080acb"
     }
   ],
+  "inputs": [
+    {
+      "logical_id": "RUN-047",
+      "path": "current-upstream-facet-refinement-wave-02.json",
+      "sha256": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e",
+      "bytes": 70981
+    },
+    {
+      "logical_id": "RUN-053",
+      "path": "raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json",
+      "sha256": "835ec0755a5a4b5543f317969e9ba557bc156b137083df925f05d4b753ccde6b",
+      "bytes": 37799
+    },
+    {
+      "logical_id": "RUN-053-CROSSWALK",
+      "path": "root-run-053-agent-a-source-atom-crosswalk-wave-02.json",
+      "sha256": "78f1e5c77c3dda80048a7b2d6d03859bc22bfe01afba5547ae20ffe797839dfe",
+      "bytes": 69666
+    },
+    {
+      "logical_id": "RUN-054",
+      "path": "raw-run-054-fresh-agent-b-neutral-requirements-wave-02.json",
+      "sha256": "7e1e2203dd5af9852f69b1ff5ad05a5d031e4d8d12096ee39055129954f01a68",
+      "bytes": 147260
+    },
+    {
+      "logical_id": "RUN-054-CORRECTION",
+      "path": "raw-run-054-agent-b-input-boundary-correction-wave-02.json",
+      "sha256": "1f197b817e5e184efbcf4e7549664008aa3fe331d1b4d4ab5470a3a214364b8b",
+      "bytes": 2672
+    },
+    {
+      "logical_id": "RUN-055-INPUT",
+      "path": "raw-run-055-agent-c-comparison-input-wave-02.json",
+      "sha256": "5422d3b25795189be5fd5070bb18d3e82af17b718fd821f735b5bc0d9c9a57e7",
+      "bytes": 232684
+    },
+    {
+      "logical_id": "RUN-055-OUTPUT",
+      "path": "raw-run-055-fresh-agent-c-current-comparison-wave-02.json",
+      "sha256": "666c6de668cc8f1db3661e55da309034992d1e27d904c740159bc4f3039fb275",
+      "bytes": 71099
+    },
+    {
+      "logical_id": "RUN-056-INPUT",
+      "path": "raw-run-056-independent-adjudicator-input-wave-02.json",
+      "sha256": "b611f1e513f1eb8153a6832d179e4708c6b17ae2e326abe6c74e5a0b8746cbc7",
+      "bytes": 688139
+    },
+    {
+      "logical_id": "RUN-056-OUTPUT",
+      "path": "raw-run-056-fresh-independent-corrected-chain-adjudication-wave-02.json",
+      "sha256": "f1a8fe263ffcf94ea32972a74365ff9f58b32ec0021e50b7f37a3340d02a92dd",
+      "bytes": 85350
+    }
+  ],
   "agents": [
     {
-      "stage": "A_OFFICIAL_UPSTREAM_OBSERVATION",
-      "raw_runs": [
-        "RUN-047-P1",
-        "RUN-047-P2"
-      ],
-      "responsible_agent_identity": "/root/run047_upstream_clinical_incident and /root/run047_upstream_composites",
-      "scope": "24 exact feature/facet upstream observations: 12 candidates and 12 bounded no-candidates.",
+      "stage": "UPSTREAM_OBSERVATION",
+      "raw_run": "RUN-047",
+      "responsible_agent_identity": "/root",
+      "scope": "24 selected feature-facet observations: 12 candidate locators and 12 bounded no-candidates.",
       "boundary": "Official upstream evidence only; current Oblivion source withheld.",
       "status": "PASS_STATIC_OBSERVATION_ONLY",
       "credit": false
     },
     {
-      "stage": "B_BLIND_NEUTRAL_REQUIREMENTS",
-      "raw_run": "RUN-048",
-      "responsible_agent_identity": "/root/run048_blind_neutral_requirements",
-      "scope": "24 source-independent normative facet requirement packets.",
-      "boundary": "No filesystem, audit, upstream, current-product, benchmark-code, or web evidence was received.",
-      "status": "NO_GO_AGENT_A_TO_B_SANITIZED_BEHAVIOUR_PACKET_MISSING",
-      "reason": "The packets are source-independent requirements, not neutral rewrites derived from sanitized RUN-047 behavior as required by the Agent A to Agent B clean specification boundary.",
-      "next_action": "Create identity-stripped sanitized RUN-047 behavior packets, provide only those packets to a fresh Agent B, then rerun clean comparison and independent adjudication before reconsidering any formal edge.",
-      "credit": false
-    },
-    {
-      "stage": "C_PINNED_CURRENT_SOURCE_AND_CLEAN_COMPARISON",
+      "stage": "A_IDENTITY_STRIPPED_BEHAVIOUR_PACKETS",
       "raw_runs": [
-        "RUN-049",
-        "RUN-050-P1",
-        "RUN-050-P2",
-        "RUN-050-X",
-        "RUN-050-T",
-        "RUN-050"
+        "RUN-053",
+        "RUN-053-CROSSWALK"
       ],
-      "responsible_agent_identity": "/root/run049_current_source_refinement; /root/run050_comparison_reconciler",
-      "scope": "24 pinned source packets, 155 validated anchors, and 144 reconciled six-lens ratings.",
-      "boundary": "Pinned static Git-object source and named comparison packets only; no application runtime, tests, browser, database, or source mutation.",
-      "status": "PASS_MECHANICAL_STATIC_COMPARISON_ONLY",
+      "responsible_agent_identity": "/root/run053_agent_a_sanitizer",
+      "scope": "24 blind packets with a root-held 252-atom identity crosswalk: 8 exact, 4 partial-adjacent, and 12 insufficient-adjacent.",
+      "boundary": "Agent-facing packets withheld feature/facet identity, upstream refs, current source, old comparison, and credit.",
+      "status": "PASS_SANITIZED_PACKET_AND_ATOM_LINEAGE",
       "credit": false
     },
     {
-      "stage": "D_INDEPENDENT_ADJUDICATION",
-      "raw_run": "RUN-051",
-      "responsible_agent_identity": "/root/run051_independent_adjudicator",
-      "scope": "Independent lineage, pair, anchor, comparison, disagreement, and zero-credit review of all 24 facets.",
-      "boundary": "Static audit and pinned source evidence only; no runtime, tests, browser, database, web, or application mutation.",
-      "status": "NO_GO_AGENT_A_TO_B_SANITIZED_BEHAVIOUR_PACKET_MISSING",
+      "stage": "B_FRESH_NEUTRAL_REQUIREMENTS",
+      "raw_runs": [
+        "RUN-054",
+        "RUN-054-CORRECTION"
+      ],
+      "responsible_agent_identity": "/root/run054_fresh_agent_b",
+      "scope": "24 neutral units and 58 outcomes derived from 252 blind atoms: 165 consumed and 87 retained unknown.",
+      "boundary": "Fresh Agent B received only the sanitized Agent A packet; the signed correction changes provenance wording only.",
+      "status": "PASS_NEUTRALIZATION_WITH_PROVENANCE_CORRECTION",
+      "credit": false
+    },
+    {
+      "stage": "C_FRESH_PINNED_CURRENT_COMPARISON",
+      "raw_runs": [
+        "RUN-055-INPUT",
+        "RUN-055-OUTPUT"
+      ],
+      "responsible_agent_identity": "/root/run054_fresh_agent_b/run055_fresh_agent_c",
+      "scope": "24 current-source comparisons, 144 ordered six-lens ratings, 24 unit ratings, 58 outcome ratings, and 85 preserved unknowns.",
+      "boundary": "Fresh Agent C read only the sealed comparison input and cited only same-packet supplied anchors.",
+      "status": "PASS_STATIC_COMPARISON_ONLY",
+      "credit": false
+    },
+    {
+      "stage": "D_FRESH_INDEPENDENT_ADJUDICATION",
+      "raw_runs": [
+        "RUN-056-INPUT",
+        "RUN-056-OUTPUT"
+      ],
+      "responsible_agent_identity": "/root/run054_fresh_agent_b/run056_fresh_agent_d",
+      "scope": "24 lineage reviews, 144 lens reviews, 24 unit reviews, 58 outcome reviews, and six disjoint feature summaries.",
+      "boundary": "Fresh Agent D read only the sealed RUN-056 input; source, history, old comparisons, runtime, browser, tests, build, database, VCS, network, and writes were prohibited.",
+      "status": "PASS_WITH_ONE_BOUNDED_SEMANTIC_CORRECTION_ZERO_CREDIT",
       "credit": false
     },
     {
       "stage": "ROOT_DETERMINISTIC_INTEGRATION",
-      "raw_run": "RUN-052",
-      "responsible_agent_identity": "/root/run052_integration",
-      "scope": "Hash-bind RUN-047 through RUN-051, validate all 24 pairs, 155 pinned anchors, 144 ratings, six independent NO-GOs, and the unchanged 340-row matrix.",
-      "boundary": "Audit artifacts only; zero application, runtime, database, browser-application, test, upstream, or external mutation.",
-      "status": "PASS_INTEGRATION_WITH_LINEAGE_NO_GO_PRESERVED",
+      "raw_run": "RUN-057",
+      "responsible_agent_identity": "/root/run057_integration",
+      "scope": "Hash-bind the corrected chain, preserve RUN-052 as immutable history, validate 226 D reviews, and retain the unchanged 340-row zero-credit matrix.",
+      "boundary": "Audit artifacts only; zero application, runtime, database, application-browser, test, upstream, or external mutation.",
+      "status": "PASS_CORRECTED_CHAIN_INTEGRATED_ZERO_CREDIT",
       "credit": false
     }
   ],
   "agreement": {
-    "expected_feature_facet_pairs": 24,
-    "observed_feature_facet_pairs_each_stage": 24,
-    "duplicate_or_missing_pairs": 0,
-    "source_anchor_validation_status": "PASS",
+    "selected_feature_facet_packets": 24,
+    "duplicate_or_missing_opaque_ids": 0,
     "source_anchor_occurrences_checked": 155,
-    "source_anchor_files_checked": 84,
-    "comparison_dimension_ratings_checked": 144,
-    "comparison_arithmetic_status": "PASS",
-    "lineage_status": "NO_GO_AGENT_A_TO_B_SANITIZED_BEHAVIOUR_PACKET_MISSING",
-    "independent_no_go_verdicts": 6,
+    "source_unique_anchor_strings_checked": 148,
+    "source_anchor_paths_checked": 84,
+    "neutral_atoms_checked": 252,
+    "neutral_atoms_consumed": 165,
+    "neutral_atoms_retained_unknown": 87,
+    "fresh_c_lens_ratings_checked": 144,
+    "fresh_d_semantic_reviews_checked": 226,
+    "fresh_d_bounded_corrections": 1,
+    "fresh_d_corrected_outcome_ids": [
+      "AO-A53-024-01"
+    ],
+    "lineage_status": "PASS_CORRECTED_CLEAN_SPEC_CHAIN_STATIC_ONLY",
     "formal_edges": 0,
+    "final_no_matches": 0,
     "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
     "canonical_mapping_credit_fraction": "0/340",
     "all_credits_false": true
   },
   "credit_boundary": {
-    "upstream_observation_packets_materialized": 24,
-    "source_independent_requirement_packets_materialized": 24,
-    "current_source_packets_materialized": 24,
-    "clean_comparison_ratings_materialized": 144,
-    "independent_adjudications_materialized": 24,
-    "target_specific_mapping_credit": 0,
-    "benchmark_credit": 0,
-    "final_no_match_credit": 0,
-    "runtime_credit": 0,
-    "browser_credit": 0,
-    "test_execution_credit": 0,
-    "ease_credit": 0,
-    "release_credit": 0,
-    "completion_credit": 0,
+    "selected_feature_packets_materialized": 24,
+    "fresh_c_lens_ratings_materialized": 144,
+    "fresh_d_semantic_reviews_materialized": 226,
+    "fresh_d_bounded_corrections": 1,
+    "credited_targets": 0,
+    "credited_rows": 0,
+    "formal_edges": 0,
+    "final_no_matches": 0,
+    "promoted_feature_mappings_or_final_no_matches": 0,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "mapping_credit": false,
+    "formal_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
     "audit_complete": false
   },
   "external_mutations_attestation": "NONE_STATIC_AUDIT_EVIDENCE_INTEGRATION_ONLY"
