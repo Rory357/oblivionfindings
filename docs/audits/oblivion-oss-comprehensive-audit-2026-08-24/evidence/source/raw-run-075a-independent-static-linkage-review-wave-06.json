@@ -1,0 +1,3274 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-075A",
+  "review_id": "RUN-075A",
+  "reviewed_partition_id": "RUN-074B",
+  "status": "COMPLETE_INDEPENDENT_PINNED_STATIC_SOURCE_REVIEW_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "normalized_producer_sha256": "34c9d419a3b7c0383a5447372a90cf4f70b3bd4fd78eb2b56be05f4dc1d3b065"
+  },
+  "counts": {
+    "targets": 97,
+    "field_decisions": 237,
+    "dispositions": {
+      "ACCEPT": 153,
+      "CORRECT": 83,
+      "REJECT": 1
+    },
+    "invalid_or_nonexistent_anchors": 0,
+    "invalid_or_nonexistent_route_names": 0
+  },
+  "records": [
+    {
+      "matrix_ordinal": 27,
+      "feature_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/feedback/Index.tsx:185-185"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 109,
+      "feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Both pinned ranges are exact ActionItemController declarations for list/detail/completion and create/progress/block/unblock/escalate; the named handler methods exist.",
+          "verification": [
+            "git show a0493442b9e392d324055c35bf25b69421dc2d35:routes/governance.php:249-251,359-363 and ActionItemController.php:13-136"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "REJECT",
+          "rationale": "The anchor is a real list page, but it cannot own the claimed full workflow: Index only links to Show, Show only posts completion, and pinned resources contain no caller for create/progress/block/unblock/escalate.",
+          "verification": [
+            "Actions/Index.tsx:36,160 is list/detail navigation; Actions/Show.tsx:54,91-93 exposes only complete",
+            "git grep at the pin found no resources/js caller for actions.progress, actions.block, actions.unblock, actions.escalate, or POST /governance/actions"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "governance.actions.index exists, but it is only one of eight exact names in the two accepted lifecycle ranges.",
+          "verification": [
+            "routes/governance.php:249-251,359-363 declares actions.index/show/complete/store/progress/block/unblock/escalate under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.actions.index; governance.actions.show; governance.actions.complete; governance.actions.store; governance.actions.progress; governance.actions.block; governance.actions.unblock; governance.actions.escalate",
+            "anchors": [
+              "routes/governance.php:249-251",
+              "routes/governance.php:359-363"
+            ],
+            "rationale": "All exact constructed route names in the accepted action-item lifecycle declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 110,
+      "feature_id": "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "The producer range includes four unrelated report endpoints; the evidence-pack flow is exactly POST line 47 plus the GET export route at line 48 returned as its download_url.",
+          "verification": [
+            "routes/governance.php:47 invokes ReportController::evidencePack; ReportController.php:177-180 returns governance.reports.export, declared at route line 48",
+            "ReportController.php:183-192 dispatches evidence-pack-* downloads to AuditEvidencePackService::download"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/governance.php:47-48",
+            "anchors": [
+              "routes/governance.php:47-48"
+            ],
+            "rationale": "Exact generation and follow-on export declarations for the governance audit-evidence pack; adjacent board/compliance/risk report routes are excluded.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Retaining NOT_ESTABLISHED is right, but the producer inaccurately calls line 47 a POST download: it returns JSON with a download URL, and neither line 47 nor line 48 renders Inertia or has a pinned frontend caller.",
+          "verification": [
+            "ReportController.php:161-180 returns JSON; :183-192 returns the service download response",
+            "git grep at the pin found no resources/js reference to governance.reports.evidence-pack or /governance/reports/evidence-pack"
+          ],
+          "correction": {
+            "status": "RETAIN_NOT_ESTABLISHED",
+            "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+            "anchors": [],
+            "rationale": "The exact evidence-pack endpoints are headless JSON generation/export responses and render no Inertia page; no pinned frontend caller establishes an owning page.",
+            "bounded_search": [
+              "resources/js/** for governance.reports.evidence-pack or /governance/reports/evidence-pack",
+              "ReportController::evidencePack/export and AuditEvidencePackService::download"
+            ]
+          }
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "No pinned test targets this governance route, handler, service/model, or its export hand-off; similarly named Control Room, Respite, HR and other evidence-pack tests are different contracts.",
+          "verification": [
+            "git grep a049... tests for governance.reports.evidence-pack, /governance/reports/evidence-pack, AuditEvidencePack, full_governance, and ReportController::evidencePack returned no direct governance test"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied generation name exists, but the handler explicitly returns the exact export route name as the second half of the pack flow.",
+          "verification": [
+            "routes/governance.php:47-48 declares reports.evidence-pack and reports.export under governance.; ReportController.php:179 constructs governance.reports.export"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.reports.evidence-pack; governance.reports.export",
+            "anchors": [
+              "routes/governance.php:47-48"
+            ],
+            "rationale": "Exact generation and returned export route names for the audit-evidence-pack flow.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 111,
+      "feature_id": "CAP-GOV-AUDIT-LOG-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range exactly declares the audit-log read and export endpoints owned by GovernanceAuditLogController.",
+          "verification": [
+            "routes/governance.php:366-370; GovernanceAuditLogController.php:21-96 renders the log and stream-downloads CSV"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "The cited exported Inertia page is the actual audit-log owner and forms the export URL.",
+          "verification": [
+            "AuditLog/Index.tsx:51 exports the page and :109-146 builds and renders the audit-log export; controller :47 renders it"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Both supplied names exactly match the two declarations in the cited route range.",
+          "verification": [
+            "routes/governance.php:368-369 declares governance.audit-log.index and governance.audit-log.export"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 112,
+      "feature_id": "CAP-GOV-BOARD-EVALUATION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent BoardEvaluationController lifecycle: index/create/show/results/respond/store/launch/close.",
+          "verification": [
+            "routes/governance.php:300-312; BoardEvaluationController.php:14-179 owns every declared handler"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Index is real but only lists and links; conducting evaluations also uses the separately rendered Create, Show (respond/launch/close), and Results pages.",
+          "verification": [
+            "BoardEvaluationController.php:34,43,93,179 renders the four pages",
+            "Evaluations/Index.tsx:31, Create.tsx:23, Show.tsx:54, Results.tsx:41 are exported page owners; Show :66-74 posts respond/launch/close"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Evaluations/Index.tsx:31-31; resources/js/pages/Governance/Evaluations/Create.tsx:23-23; resources/js/pages/Governance/Evaluations/Show.tsx:54-54; resources/js/pages/Governance/Evaluations/Results.tsx:41-41",
+            "anchors": [
+              "resources/js/pages/Governance/Evaluations/Index.tsx:31-31",
+              "resources/js/pages/Governance/Evaluations/Create.tsx:23-23",
+              "resources/js/pages/Governance/Evaluations/Show.tsx:54-54",
+              "resources/js/pages/Governance/Evaluations/Results.tsx:41-41"
+            ],
+            "rationale": "The four actual Inertia page owners span evaluation listing, creation, response/lifecycle actions, and results.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits seven exact names in the accepted evaluation lifecycle range.",
+          "verification": [
+            "routes/governance.php:302-311 declares all eight names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.evaluations.index; governance.evaluations.create; governance.evaluations.show; governance.evaluations.results; governance.evaluations.respond; governance.evaluations.store; governance.evaluations.launch; governance.evaluations.close",
+            "anchors": [
+              "routes/governance.php:300-312"
+            ],
+            "rationale": "All exact constructed route names in the accepted board-evaluation declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 113,
+      "feature_id": "CAP-GOV-BOARD-MEMBERSHIP",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range exactly declares BoardMemberAdminController index/store/update/destroy for membership administration.",
+          "verification": [
+            "routes/governance.php:123-129; BoardMemberAdminController.php:14-87 owns all four handlers"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "The cited exported Inertia page is the actual board-member administration surface and posts appointment/removal actions.",
+          "verification": [
+            "BoardMembers.tsx:46 exports the page and :65-77 posts store/destroy; BoardMemberAdminController.php:29 renders it"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "The exact range tests page rendering plus appointment, removal, and reappointment, directly fitting board-membership administration.",
+          "verification": [
+            "GovernanceBoardMemberAdminTest.php:22-31 asserts Governance/Admin/BoardMembers; :34-70 exercises appoint/remove/reappoint"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits the store, update, and destroy declarations in the accepted range.",
+          "verification": [
+            "routes/governance.php:125-128 declares all four names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.admin.board-members.index; governance.admin.board-members.store; governance.admin.board-members.update; governance.admin.board-members.destroy",
+            "anchors": [
+              "routes/governance.php:123-129"
+            ],
+            "rationale": "All exact constructed route names in the board-membership administration declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 114,
+      "feature_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent BoardPackController read/generate/distribute/regenerate/attachment lifecycle and contains the stated generate, distribute, read, and download endpoints.",
+          "verification": [
+            "routes/governance.php:83-97; BoardPackController.php:23-379 owns the declared handlers"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Index owns listing and generation, while the separately rendered Show page owns distribution, read tracking, regeneration, and download; Index alone does not span the stated capability.",
+          "verification": [
+            "Packs/Index.tsx:54,102-116 mounts generation; Packs/Show.tsx:71,84-99,179-212 owns read/distribute/regenerate/download",
+            "BoardPackController.php:56 and :81 render Index and Show"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Packs/Index.tsx:54-54; resources/js/pages/Governance/Packs/Show.tsx:71-71",
+            "anchors": [
+              "resources/js/pages/Governance/Packs/Index.tsx:54-54",
+              "resources/js/pages/Governance/Packs/Show.tsx:71-71"
+            ],
+            "rationale": "The actual Index and Show Inertia pages jointly own board-pack generation, distribution, read, and download UI.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits nine exact names in the accepted board-pack range.",
+          "verification": [
+            "routes/governance.php:85-96 declares ten names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.packs.index; governance.packs.show; governance.packs.download; governance.packs.attachments.download; governance.packs.read; governance.packs.generate; governance.packs.distribute; governance.packs.regenerate; governance.packs.attachments.store; governance.packs.attachments.destroy",
+            "anchors": [
+              "routes/governance.php:83-97"
+            ],
+            "rationale": "All exact constructed route names in the accepted board-pack declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 115,
+      "feature_id": "CAP-GOV-BUDGET-ALLOCATIONS-ADJUSTMENTS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent BudgetController budget, line-item, actual, allocation, proposal, approval, and adjustment lifecycle.",
+          "verification": [
+            "routes/governance.php:210-245; BudgetController.php:22-376 owns every declared handler"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Index is only the register; the separately rendered Create, Show, and Edit pages own creation/update, allocations, actuals, proposals, budget approval, and adjustment actions.",
+          "verification": [
+            "BudgetController.php:37,46,76,175 renders Index/Create/Show/Edit",
+            "Budgets/Show.tsx:146 and :199-369 owns allocation, line-item actual, adjustment, proposal and approval actions"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Budgets/Index.tsx:38-38; resources/js/pages/Governance/Budgets/Create.tsx:11-11; resources/js/pages/Governance/Budgets/Show.tsx:146-146; resources/js/pages/Governance/Budgets/Edit.tsx:21-21",
+            "anchors": [
+              "resources/js/pages/Governance/Budgets/Index.tsx:38-38",
+              "resources/js/pages/Governance/Budgets/Create.tsx:11-11",
+              "resources/js/pages/Governance/Budgets/Show.tsx:146-146",
+              "resources/js/pages/Governance/Budgets/Edit.tsx:21-21"
+            ],
+            "rationale": "The four actual Inertia pages jointly own the budget register, authoring/editing, and allocation/actual/approval/adjustment workspace.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits the other exact lifecycle names in the accepted range.",
+          "verification": [
+            "routes/governance.php:212-243 declares the 18 constructed names below"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.budgets.index; governance.budgets.create; governance.budgets.show; governance.budgets.edit; governance.budgets.store; governance.budgets.update; governance.budgets.adjust; governance.budgets.line-items.store; governance.budgets.line-items.update; governance.budgets.line-items.destroy; governance.budgets.record-actuals; governance.budgets.allocations.store; governance.budgets.allocations.update; governance.budgets.allocations.destroy; governance.budgets.propose; governance.budgets.approve; governance.budgets.adjustments.approve; governance.budgets.adjustments.reject",
+            "anchors": [
+              "routes/governance.php:210-245"
+            ],
+            "rationale": "All exact constructed route names in the accepted governance-budget declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 116,
+      "feature_id": "CAP-GOV-CEO-BOARD-REPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent CeoBoardReportController register, authoring, submit/present, KPI, and attachment lifecycle.",
+          "verification": [
+            "routes/governance.php:271-286; CeoBoardReportController.php:18-209 owns every declared handler"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Index is only the register/dialog entry; the separately rendered Create and Show pages own drafting, submission, presentation, editing, KPI evidence, and attachments.",
+          "verification": [
+            "CeoBoardReportController.php:29,39,73 renders Index/Create/Show",
+            "CeoReports/Show.tsx:475,486-494,608-745 owns submit/present/edit/KPI/attachments"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/CeoReports/Index.tsx:77-77; resources/js/pages/Governance/CeoReports/Create.tsx:29-29; resources/js/pages/Governance/CeoReports/Show.tsx:475-475",
+            "anchors": [
+              "resources/js/pages/Governance/CeoReports/Index.tsx:77-77",
+              "resources/js/pages/Governance/CeoReports/Create.tsx:29-29",
+              "resources/js/pages/Governance/CeoReports/Show.tsx:475-475"
+            ],
+            "rationale": "The actual Index, Create, and Show Inertia pages jointly own the CEO board-report lifecycle and evidence UI.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits ten exact names in the accepted range.",
+          "verification": [
+            "routes/governance.php:273-285 declares all 11 names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.ceo-reports.index; governance.ceo-reports.create; governance.ceo-reports.kpi-snapshot; governance.ceo-reports.show; governance.ceo-reports.attachments.download; governance.ceo-reports.store; governance.ceo-reports.update; governance.ceo-reports.submit; governance.ceo-reports.present; governance.ceo-reports.attachments.store; governance.ceo-reports.attachments.destroy",
+            "anchors": [
+              "routes/governance.php:271-286"
+            ],
+            "rationale": "All exact constructed route names in the accepted CEO board-report declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 117,
+      "feature_id": "CAP-GOV-CLINICAL-INDICATOR-SNAPSHOT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range coherently declares clinical dashboard/trends plus indicator and snapshot writes owned by ClinicalGovernanceController.",
+          "verification": [
+            "routes/governance.php:327-335; ClinicalGovernanceController.php:20-98 owns all four handlers"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "The cited Dashboard is a real rendered page owner for current indicators/snapshot; its GET handler synchronizes the current snapshot before render, so the page is not a support component or headless locator.",
+          "verification": [
+            "Clinical/Dashboard.tsx:78 exports the page; ClinicalGovernanceController.php:20-29 calls syncCurrentSnapshot then renders Governance/Clinical/Dashboard",
+            "ClinicalGovernanceAutomationTest.php:37-119 directly exercises synchronization and the Dashboard projection"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied dashboard name exists but omits trends and the indicator/snapshot write names in the accepted range.",
+          "verification": [
+            "routes/governance.php:329-334 declares all four names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.clinical.dashboard; governance.clinical.trends; governance.clinical.indicators.store; governance.clinical.snapshots.store",
+            "anchors": [
+              "routes/governance.php:327-335"
+            ],
+            "rationale": "All exact constructed route names in the accepted clinical-indicator/snapshot declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 118,
+      "feature_id": "CAP-GOV-COMPLIANCE-OBLIGATION-EVIDENCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent ComplianceController obligation, evidence, calendar, completion, and notifiable-record lifecycle.",
+          "verification": [
+            "routes/governance.php:155-170; ComplianceController.php:29-211 owns every declared handler"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "The cited Governance index is real but not the sole owner: Create/Edit/Show/Calendar are separately rendered pages, evidence and completion live on Show, and the notifiable-record dialog is mounted by the distinct /compliance command-centre page.",
+          "verification": [
+            "ComplianceController.php:33,58,72,190,206 renders the five Governance pages; Show.tsx:94,137-175 owns evidence/completion",
+            "ComplianceDashboardController.php:45 renders compliance/index.tsx:397, which mounts LogNotifiableDialog at :1422; that support dialog posts the governance notifiable route at log-notifiable-dialog.tsx:214"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Compliance/Index.tsx:49-49; resources/js/pages/Governance/Compliance/Create.tsx:24-24; resources/js/pages/Governance/Compliance/Calendar.tsx:25-25; resources/js/pages/Governance/Compliance/Show.tsx:94-94; resources/js/pages/Governance/Compliance/Edit.tsx:28-28; resources/js/pages/compliance/index.tsx:397-397",
+            "anchors": [
+              "resources/js/pages/Governance/Compliance/Index.tsx:49-49",
+              "resources/js/pages/Governance/Compliance/Create.tsx:24-24",
+              "resources/js/pages/Governance/Compliance/Calendar.tsx:25-25",
+              "resources/js/pages/Governance/Compliance/Show.tsx:94-94",
+              "resources/js/pages/Governance/Compliance/Edit.tsx:28-28",
+              "resources/js/pages/compliance/index.tsx:397-397"
+            ],
+            "rationale": "The actual Governance obligation pages plus the compliance command-centre page jointly own obligation, evidence, completion, calendar, and notifiable-record UI; the dialog remains support code, not a page anchor.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits nine exact names in the accepted range.",
+          "verification": [
+            "routes/governance.php:157-169 declares all ten names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.compliance.index; governance.compliance.create; governance.compliance.calendar; governance.compliance.show; governance.compliance.edit; governance.compliance.store; governance.compliance.update; governance.compliance.notifiable-incident.store; governance.compliance.complete; governance.compliance.evidence.upload",
+            "anchors": [
+              "routes/governance.php:155-170"
+            ],
+            "rationale": "All exact constructed route names in the accepted compliance declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 119,
+      "feature_id": "CAP-GOV-DASHBOARD-READ-LENS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range exactly declares the dashboard page, legacy redirect, data projection, and widget read endpoints owned by DashboardController/redirect closure.",
+          "verification": [
+            "routes/governance.php:24-39; DashboardController.php:22-110 owns index/data/widget"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "The cited exported Dashboard is the actual Inertia page and directly consumes the dashboard-data endpoint.",
+          "verification": [
+            "Governance/Dashboard.tsx:45 exports the page and :54-57 fetches dashboardData; DashboardController.php:29 renders it"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "The exact range tests authentication, Inertia page rendering, and the dashboard data/cockpit projection.",
+          "verification": [
+            "GovernanceDashboardTest.php:20-35 covers auth/render; :38-60 asserts snapshot, workflow, freshness and cockpit JSON"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied dashboard page name exists but omits the legacy, data, and widget names in the accepted range.",
+          "verification": [
+            "routes/governance.php:25-38 declares all four names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.dashboard; governance.dashboard.legacy; governance.dashboard.data; governance.dashboard.widget",
+            "anchors": [
+              "routes/governance.php:24-39"
+            ],
+            "rationale": "All exact constructed route names in the accepted governance-dashboard read declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 120,
+      "feature_id": "CAP-GOV-DOCUMENT-LIBRARY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "The range is the coherent GovernanceDocumentController browse/show/download/store/destroy lifecycle.",
+          "verification": [
+            "routes/governance.php:315-324; GovernanceDocumentController.php:12-112 owns all five handlers"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Index owns upload, browse, and direct download, while the separately rendered Show page owns detail download and remove; Index alone does not span the stated library capability.",
+          "verification": [
+            "Documents/Index.tsx:39,55-61,219 owns upload/list/download; Documents/Show.tsx:38,87-91,201-236 owns detail download/remove",
+            "GovernanceDocumentController.php:32 and :81 renders Index and Show"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Documents/Index.tsx:39-39; resources/js/pages/Governance/Documents/Show.tsx:38-38",
+            "anchors": [
+              "resources/js/pages/Governance/Documents/Index.tsx:39-39",
+              "resources/js/pages/Governance/Documents/Show.tsx:38-38"
+            ],
+            "rationale": "The actual Index and Show Inertia pages jointly own storage, browsing, download, and removal UI.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "The supplied index name exists but omits four exact names in the accepted range.",
+          "verification": [
+            "routes/governance.php:317-323 declares all five names under governance."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.documents.index; governance.documents.show; governance.documents.download; governance.documents.store; governance.documents.destroy",
+            "anchors": [
+              "routes/governance.php:315-324"
+            ],
+            "rationale": "All exact constructed route names in the accepted governance-document declarations.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 121,
+      "feature_id": "CAP-GOV-INTEREST-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:289-298"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Interests/Index.tsx:43-43; resources/js/pages/Governance/Interests/MyInterests.tsx:43-43"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Interests/Index.tsx:43-43; resources/js/pages/Governance/Interests/MyInterests.tsx:43-43",
+            "anchors": [
+              "resources/js/pages/Governance/Interests/Index.tsx:43-43",
+              "resources/js/pages/Governance/Interests/MyInterests.tsx:43-43"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:289-298"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.interests.index; governance.interests.mine; governance.interests.store; governance.interests.update",
+            "anchors": [
+              "routes/governance.php:289-298"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 122,
+      "feature_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:51-80"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Meetings/Index.tsx:36-36; resources/js/pages/Governance/Meetings/Calendar.tsx:65-65; resources/js/pages/Governance/Meetings/Create.tsx:23-23; resources/js/pages/Governance/Meetings/Show.tsx:173-173; resources/js/pages/Governance/Meetings/Edit.tsx:44-44"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Meetings/Index.tsx:36-36; resources/js/pages/Governance/Meetings/Calendar.tsx:65-65; resources/js/pages/Governance/Meetings/Create.tsx:23-23; resources/js/pages/Governance/Meetings/Show.tsx:173-173; resources/js/pages/Governance/Meetings/Edit.tsx:44-44",
+            "anchors": [
+              "resources/js/pages/Governance/Meetings/Index.tsx:36-36",
+              "resources/js/pages/Governance/Meetings/Calendar.tsx:65-65",
+              "resources/js/pages/Governance/Meetings/Create.tsx:23-23",
+              "resources/js/pages/Governance/Meetings/Show.tsx:173-173",
+              "resources/js/pages/Governance/Meetings/Edit.tsx:44-44"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:51-80"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.meetings.index; governance.meetings.calendar; governance.meetings.create; governance.meetings.show; governance.meetings.edit; governance.meetings.store; governance.meetings.update; governance.meetings.destroy; governance.meetings.agenda.add; governance.meetings.agenda.update; governance.meetings.agenda.remove; governance.meetings.minutes.store; governance.meetings.minutes.update; governance.meetings.minutes.approve; governance.meetings.attendance.record; governance.meetings.lock; governance.meetings.minutes.sign",
+            "anchors": [
+              "routes/governance.php:51-80"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 123,
+      "feature_id": "CAP-GOV-PERFORMANCE-REVIEW",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:173-189"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Performance/Index.tsx:35-35; resources/js/pages/Governance/Performance/Create.tsx:30-30; resources/js/pages/Governance/Performance/Show.tsx:78-78; resources/js/pages/Governance/Performance/Edit.tsx:30-30"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Performance/Index.tsx:35-35; resources/js/pages/Governance/Performance/Create.tsx:30-30; resources/js/pages/Governance/Performance/Show.tsx:78-78; resources/js/pages/Governance/Performance/Edit.tsx:30-30",
+            "anchors": [
+              "resources/js/pages/Governance/Performance/Index.tsx:35-35",
+              "resources/js/pages/Governance/Performance/Create.tsx:30-30",
+              "resources/js/pages/Governance/Performance/Show.tsx:78-78",
+              "resources/js/pages/Governance/Performance/Edit.tsx:30-30"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:173-189"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.performance.index; governance.performance.create; governance.performance.show; governance.performance.edit; governance.performance.store; governance.performance.update; governance.performance.goals.add; governance.performance.assess; governance.performance.feedback; governance.performance.self-assessment; governance.performance.approve",
+            "anchors": [
+              "routes/governance.php:173-189"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 124,
+      "feature_id": "CAP-GOV-POLICY-ATTESTATION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/governance.php:257-257; routes/governance.php:266-266"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/governance.php:257-257; routes/governance.php:266-266",
+            "anchors": [
+              "routes/governance.php:257-257",
+              "routes/governance.php:266-266"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/Governance/Policies/Attestations.tsx:105-105"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:254-267"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 125,
+      "feature_id": "CAP-GOV-POLICY-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/governance.php:256-256; routes/governance.php:258-265; routes/governance.php:267-267"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/governance.php:256-256; routes/governance.php:258-265; routes/governance.php:267-267",
+            "anchors": [
+              "routes/governance.php:256-256",
+              "routes/governance.php:258-265",
+              "routes/governance.php:267-267"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Policies/Index.tsx:33-33; resources/js/pages/Governance/Policies/Create.tsx:20-20; resources/js/pages/Governance/Policies/Show.tsx:50-50; resources/js/pages/Governance/Policies/Edit.tsx:36-36"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Policies/Index.tsx:33-33; resources/js/pages/Governance/Policies/Create.tsx:20-20; resources/js/pages/Governance/Policies/Show.tsx:50-50; resources/js/pages/Governance/Policies/Edit.tsx:36-36",
+            "anchors": [
+              "resources/js/pages/Governance/Policies/Index.tsx:33-33",
+              "resources/js/pages/Governance/Policies/Create.tsx:20-20",
+              "resources/js/pages/Governance/Policies/Show.tsx:50-50",
+              "resources/js/pages/Governance/Policies/Edit.tsx:36-36"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:256-256; routes/governance.php:258-265; routes/governance.php:267-267"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.policies.index; governance.policies.create; governance.policies.show; governance.policies.edit; governance.policies.store; governance.policies.update; governance.policies.approve; governance.policies.version",
+            "anchors": [
+              "routes/governance.php:256-256",
+              "routes/governance.php:258-265",
+              "routes/governance.php:267-267"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 126,
+      "feature_id": "CAP-GOV-REPORTING-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/governance.php:43-46; routes/governance.php:48-48"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/governance.php:43-46; routes/governance.php:48-48",
+            "anchors": [
+              "routes/governance.php:43-46",
+              "routes/governance.php:48-48"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/Governance/Reports/BoardMonthly.tsx:64-64; resources/js/pages/Governance/Reports/Committee.tsx:80-80; resources/js/pages/Governance/Reports/ComplianceStatus.tsx:52-52; resources/js/pages/Governance/Reports/RiskNarrative.tsx:58-58"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:43-46; routes/governance.php:48-48"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.reports.board-monthly; governance.reports.committee; governance.reports.compliance-status; governance.reports.risk-narrative; governance.reports.export",
+            "anchors": [
+              "routes/governance.php:43-46",
+              "routes/governance.php:48-48"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 127,
+      "feature_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:100-121"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Resolutions/Index.tsx:44-44; resources/js/pages/Governance/Resolutions/Create.tsx:31-31; resources/js/pages/Governance/Resolutions/Show.tsx:113-113"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Resolutions/Index.tsx:44-44; resources/js/pages/Governance/Resolutions/Create.tsx:31-31; resources/js/pages/Governance/Resolutions/Show.tsx:113-113",
+            "anchors": [
+              "resources/js/pages/Governance/Resolutions/Index.tsx:44-44",
+              "resources/js/pages/Governance/Resolutions/Create.tsx:31-31",
+              "resources/js/pages/Governance/Resolutions/Show.tsx:113-113"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:100-121"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.resolutions.index; governance.resolutions.create; governance.resolutions.show; governance.resolutions.attachments.download; governance.resolutions.vote; governance.resolutions.conflict.declare; governance.resolutions.store; governance.resolutions.update; governance.resolutions.open; governance.resolutions.close; governance.resolutions.finalize; governance.resolutions.attachments.store; governance.resolutions.attachments.destroy",
+            "anchors": [
+              "routes/governance.php:100-121"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 128,
+      "feature_id": "CAP-GOV-RISK-REGISTER-TREATMENT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:131-152"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Risks/Index.tsx:60-60; resources/js/pages/Governance/Risks/Create.tsx:24-24; resources/js/pages/Governance/Risks/Show.tsx:110-110; resources/js/pages/Governance/Risks/Edit.tsx:30-30; resources/js/pages/Governance/Risks/Heatmap.tsx:32-32; resources/js/pages/Governance/Risks/Trends.tsx:48-48; resources/js/pages/Governance/Risks/Committee.tsx:37-37"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Risks/Index.tsx:60-60; resources/js/pages/Governance/Risks/Create.tsx:24-24; resources/js/pages/Governance/Risks/Show.tsx:110-110; resources/js/pages/Governance/Risks/Edit.tsx:30-30; resources/js/pages/Governance/Risks/Heatmap.tsx:32-32; resources/js/pages/Governance/Risks/Trends.tsx:48-48; resources/js/pages/Governance/Risks/Committee.tsx:37-37",
+            "anchors": [
+              "resources/js/pages/Governance/Risks/Index.tsx:60-60",
+              "resources/js/pages/Governance/Risks/Create.tsx:24-24",
+              "resources/js/pages/Governance/Risks/Show.tsx:110-110",
+              "resources/js/pages/Governance/Risks/Edit.tsx:30-30",
+              "resources/js/pages/Governance/Risks/Heatmap.tsx:32-32",
+              "resources/js/pages/Governance/Risks/Trends.tsx:48-48",
+              "resources/js/pages/Governance/Risks/Committee.tsx:37-37"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:131-152"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.risks.index; governance.risks.create; governance.risks.heatmap; governance.risks.trends; governance.risks.committee; governance.risks.show; governance.risks.edit; governance.risks.treatments.attachments.download; governance.risks.store; governance.risks.update; governance.risks.accept; governance.risks.close; governance.risks.treatments.add; governance.risks.events.link; governance.risks.treatments.attachments.store; governance.risks.treatments.attachments.destroy",
+            "anchors": [
+              "routes/governance.php:131-152"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 129,
+      "feature_id": "CAP-GOV-SETTINGS-CONTROL",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:394-400"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/Governance/Settings/Index.tsx:26-26"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:394-400"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 130,
+      "feature_id": "CAP-GOV-SPEND-APPROVAL",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:372-392"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/SpendApprovals/Index.tsx:67-67; resources/js/pages/Governance/SpendApprovals/Create.tsx:25-25; resources/js/pages/Governance/SpendApprovals/Show.tsx:58-58; resources/js/pages/Governance/SpendApprovals/Edit.tsx:40-40"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/SpendApprovals/Index.tsx:67-67; resources/js/pages/Governance/SpendApprovals/Create.tsx:25-25; resources/js/pages/Governance/SpendApprovals/Show.tsx:58-58; resources/js/pages/Governance/SpendApprovals/Edit.tsx:40-40",
+            "anchors": [
+              "resources/js/pages/Governance/SpendApprovals/Index.tsx:67-67",
+              "resources/js/pages/Governance/SpendApprovals/Create.tsx:25-25",
+              "resources/js/pages/Governance/SpendApprovals/Show.tsx:58-58",
+              "resources/js/pages/Governance/SpendApprovals/Edit.tsx:40-40"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:372-392"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.spend-approvals.index; governance.spend-approvals.create; governance.spend-approvals.show; governance.spend-approvals.attachments.download; governance.spend-approvals.edit; governance.spend-approvals.store; governance.spend-approvals.update; governance.spend-approvals.submit; governance.spend-approvals.attachments.store; governance.spend-approvals.attachments.destroy; governance.spend-approvals.approve; governance.spend-approvals.reject",
+            "anchors": [
+              "routes/governance.php:372-392"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 131,
+      "feature_id": "CAP-GOV-STRATEGY-PLAN-GOALS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:192-207"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/Governance/Strategy/Index.tsx:34-34; resources/js/pages/Governance/Strategy/Create.tsx:20-20; resources/js/pages/Governance/Strategy/Show.tsx:71-71; resources/js/pages/Governance/Strategy/Edit.tsx:29-29; resources/js/pages/Governance/Strategy/Changes.tsx:57-57"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/Governance/Strategy/Index.tsx:34-34; resources/js/pages/Governance/Strategy/Create.tsx:20-20; resources/js/pages/Governance/Strategy/Show.tsx:71-71; resources/js/pages/Governance/Strategy/Edit.tsx:29-29; resources/js/pages/Governance/Strategy/Changes.tsx:57-57",
+            "anchors": [
+              "resources/js/pages/Governance/Strategy/Index.tsx:34-34",
+              "resources/js/pages/Governance/Strategy/Create.tsx:20-20",
+              "resources/js/pages/Governance/Strategy/Show.tsx:71-71",
+              "resources/js/pages/Governance/Strategy/Edit.tsx:29-29",
+              "resources/js/pages/Governance/Strategy/Changes.tsx:57-57"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:192-207"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.strategy.index; governance.strategy.create; governance.strategy.show; governance.strategy.edit; governance.strategy.changes; governance.strategy.store; governance.strategy.update; governance.strategy.version; governance.strategy.goals.add; governance.strategy.approve",
+            "anchors": [
+              "routes/governance.php:192-207"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 132,
+      "feature_id": "CAP-GOV-TE-TIRITI-OBLIGATION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/governance.php:338-345"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/Governance/TeTiriti/Index.tsx:50-50"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/governance.php:338-345"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "governance.te-tiriti.index; governance.te-tiriti.store; governance.te-tiriti.update",
+            "anchors": [
+              "routes/governance.php:338-345"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 136,
+      "feature_id": "CAP-HR-COMPETENCY-ASSESSMENT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/hr.php:953-953; routes/hr.php:957-959; routes/hr.php:962-963"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/hr.php:953-953; routes/hr.php:957-959; routes/hr.php:962-963",
+            "anchors": [
+              "routes/hr.php:953-953",
+              "routes/hr.php:957-959",
+              "routes/hr.php:962-963"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/hr/performance/competencies/index.tsx:63-63; resources/js/pages/hr/performance/competencies/assess.tsx:49-49; resources/js/pages/hr/performance/competencies/profile.tsx:66-66"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/hr/performance/competencies/index.tsx:63-63; resources/js/pages/hr/performance/competencies/assess.tsx:49-49; resources/js/pages/hr/performance/competencies/profile.tsx:66-66",
+            "anchors": [
+              "resources/js/pages/hr/performance/competencies/index.tsx:63-63",
+              "resources/js/pages/hr/performance/competencies/assess.tsx:49-49",
+              "resources/js/pages/hr/performance/competencies/profile.tsx:66-66"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Test-to-capability mismatch.",
+          "verification": [
+            "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:133-164; tests/Feature/Hr/CompetencyCanonicalAccessTest.php:166-219"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:133-164; tests/Feature/Hr/CompetencyCanonicalAccessTest.php:166-219",
+            "anchors": [
+              "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:133-164",
+              "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:166-219"
+            ],
+            "rationale": "Direct static capability tests; not executed.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:953-953; routes/hr.php:957-959; routes/hr.php:962-963"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.competencies.assess.create; hr.competencies.assess; hr.competencies.assessments.sign-off; hr.competencies.assessments.evidence.store; hr.competencies.assessments.evidence.show; hr.competencies.profile",
+            "anchors": [
+              "routes/hr.php:953-953",
+              "routes/hr.php:957-959",
+              "routes/hr.php:962-963"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 137,
+      "feature_id": "CAP-HR-COMPLIANCE-RECORDS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/compliance/index.tsx:122-122"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 138,
+      "feature_id": "CAP-HR-DOCUMENT-LIBRARY",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/documents/index.tsx:336-336"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 139,
+      "feature_id": "CAP-HR-DOCUMENT-SIGNATURE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/hr.php:1239-1251"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/hr/documents/index.tsx:336-336; resources/js/pages/hr/signatures/pending.tsx:57-57; resources/js/pages/hr/signatures/sign.tsx:56-56"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/hr/documents/index.tsx:336-336; resources/js/pages/hr/signatures/pending.tsx:57-57; resources/js/pages/hr/signatures/sign.tsx:56-56",
+            "anchors": [
+              "resources/js/pages/hr/documents/index.tsx:336-336",
+              "resources/js/pages/hr/signatures/pending.tsx:57-57",
+              "resources/js/pages/hr/signatures/sign.tsx:56-56"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Test-to-capability mismatch.",
+          "verification": [
+            "tests/Feature/Hr/ESignatureAuthorizationTest.php:75-99; tests/Feature/Hr/ESignatureRequestTest.php:131-168; tests/Feature/Hr/ESignatureAuthorizationTest.php:215-252"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Feature/Hr/ESignatureAuthorizationTest.php:75-99; tests/Feature/Hr/ESignatureRequestTest.php:131-168; tests/Feature/Hr/ESignatureAuthorizationTest.php:215-252",
+            "anchors": [
+              "tests/Feature/Hr/ESignatureAuthorizationTest.php:75-99",
+              "tests/Feature/Hr/ESignatureRequestTest.php:131-168",
+              "tests/Feature/Hr/ESignatureAuthorizationTest.php:215-252"
+            ],
+            "rationale": "Direct static capability tests; not executed.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:1239-1251"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.signatures.pending; hr.signatures.document; hr.signatures.show; hr.signatures.sign; hr.signatures.decline; hr.signatures.request; hr.signatures.nudge; hr.signatures.resend; hr.signatures.cancel",
+            "anchors": [
+              "routes/hr.php:1239-1251"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 141,
+      "feature_id": "CAP-HR-LEAVE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/leave/index.tsx:199-199"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 142,
+      "feature_id": "CAP-HR-OFFBOARDING-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/offboarding/index.tsx:102-102"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 143,
+      "feature_id": "CAP-HR-ONBOARDING-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/onboarding/index.tsx:168-168"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 144,
+      "feature_id": "CAP-HR-PAYROLL-RUN-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/hr.php:718-730"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/hr.php:718-730",
+            "anchors": [
+              "routes/hr.php:718-730"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/payroll/index.tsx:146-146"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Hr/PayrollRunApplicationCreationTest.php:23-51"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:718-730"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.payroll.index; hr.payroll.runs.store; hr.payroll.runs.lock; hr.payroll.runs.retry-gl; hr.payroll.runs.prepare-net-pay; hr.payroll.runs.pay; hr.payroll.runs.reject-net-pay; hr.payroll.runs.reconcile-net-pay; hr.payroll.runs.export; hr.payroll.runs.net-pay-file",
+            "anchors": [
+              "routes/hr.php:718-730"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 145,
+      "feature_id": "CAP-HR-PERFORMANCE-REVIEW",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/performance/reviews.tsx:204-204"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 146,
+      "feature_id": "CAP-HR-POLICY-ATTESTATION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/hr.php:577-577; routes/hr.php:589-589; routes/hr.php:592-593"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/hr.php:577-577; routes/hr.php:589-589; routes/hr.php:592-593",
+            "anchors": [
+              "routes/hr.php:577-577",
+              "routes/hr.php:589-589",
+              "routes/hr.php:592-593"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/hr/documents/policies/attestations.tsx:62-62; resources/js/pages/hr/documents/policies/show.tsx:123-123"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/hr/documents/policies/attestations.tsx:62-62; resources/js/pages/hr/documents/policies/show.tsx:123-123",
+            "anchors": [
+              "resources/js/pages/hr/documents/policies/attestations.tsx:62-62",
+              "resources/js/pages/hr/documents/policies/show.tsx:123-123"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        },
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Test-to-capability mismatch.",
+          "verification": [
+            "tests/Feature/Hr/PolicyCanonicalAccessTest.php:148-207"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Feature/Hr/PolicyCanonicalAccessTest.php:148-207",
+            "anchors": [
+              "tests/Feature/Hr/PolicyCanonicalAccessTest.php:148-207"
+            ],
+            "rationale": "Direct static capability tests; not executed.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:577-577; routes/hr.php:589-589; routes/hr.php:592-593"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.policies.attestations.index; hr.policies.show; hr.policies.attestations.store; hr.policies.download",
+            "anchors": [
+              "routes/hr.php:577-577",
+              "routes/hr.php:589-589",
+              "routes/hr.php:592-593"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 147,
+      "feature_id": "CAP-HR-POLICY-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete direct page-owner set.",
+          "verification": [
+            "resources/js/pages/hr/documents/policies/index.tsx:129-129; resources/js/pages/hr/documents/policies/show.tsx:123-123"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/hr/documents/policies/index.tsx:129-129; resources/js/pages/hr/documents/policies/show.tsx:123-123",
+            "anchors": [
+              "resources/js/pages/hr/documents/policies/index.tsx:129-129",
+              "resources/js/pages/hr/documents/policies/show.tsx:123-123"
+            ],
+            "rationale": "Direct rendered capability pages.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 154,
+      "feature_id": "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "The cited page is a subscription configuration/status surface, not the headless scheduled execution owner.",
+          "verification": [
+            "hr/reports/index.tsx:421-558 creates/edits/pauses subscriptions; RunHrScheduledReportsJob owns due execution, persistence, and notification."
+          ],
+          "correction": {
+            "status": "RETAIN_NOT_ESTABLISHED",
+            "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+            "anchors": [],
+            "rationale": "The reports page configures and observes subscriptions but does not own due-report execution, export persistence, or notification delivery, which are headless job/service behaviour.",
+            "bounded_search": [
+              "resources/js/pages/hr/reports/index.tsx:81-100 and 421-558 reviewed as subscription configuration/status UI",
+              "app/Domain/Hr/Jobs/RunHrScheduledReportsJob.php reviewed as the execution owner",
+              "app/Http/Controllers/Hr/HrReportController.php reviewed as HTTP report/subscription support, not scheduled execution"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 155,
+      "feature_id": "CAP-HR-TIME-ENTRY-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/hr.php:1298-1318"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/time/index.tsx:95-95"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Hr/HrTimeTrackingAuthorizationTest.php:223-393"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:1298-1318"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.time.index; hr.time.clock-in; hr.time.clock-out; hr.time.entries.store; hr.time.timesheets; hr.time.export; hr.time.report.pdf; hr.time.entries.update; hr.time.entries.amendments; hr.time.entries.correct; hr.time.entries.note; hr.time.clock-on-behalf; hr.time.entries.void",
+            "anchors": [
+              "routes/hr.php:1298-1318"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 156,
+      "feature_id": "CAP-HR-TRAINING-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/hr.php:1391-1418"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/training/catalog.tsx:232-232"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Hr/TrainingHubTest.php:72-204"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/hr.php:1391-1418"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "hr.training.catalog; hr.training.courses.show; hr.training.courses.detail; hr.training.export; hr.training.certificate; hr.training.claims.store; hr.training.courses.store; hr.training.courses.update; hr.training.courses.toggle; hr.training.courses.bulk-archive; hr.training.sessions.store; hr.training.sessions.update; hr.training.sessions.cancel; hr.training.enroll; hr.training.assignments.store; hr.training.assignments.preview; hr.training.assignments.remind; hr.training.enrollments.complete; hr.training.record; hr.training.assignments.waive",
+            "anchors": [
+              "routes/hr.php:1391-1418"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 157,
+      "feature_id": "CAP-HR-VETTING-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/vetting/index.tsx:128-128"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 158,
+      "feature_id": "CAP-HR-WEBHOOK-CONFIGURATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/settings/webhooks.tsx:75-75; resources/js/pages/hr/settings/webhooks.tsx:170-497"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 159,
+      "feature_id": "CAP-HR-WEBHOOK-DELIVERY",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/hr/settings/webhooks.tsx:75-75; resources/js/pages/hr/settings/webhooks.tsx:537-611"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 224,
+      "feature_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Operations/CarePlanWorkspaceTest.php:59-109; tests/Feature/Operations/CarePlanWorkspaceTest.php:255-336; tests/Feature/Operations/CarePlanWorkspaceTest.php:338-397; tests/Feature/Operations/CarePlanWorkspaceTest.php:433-444"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 225,
+      "feature_id": "CAP-OPS-CLIENT-ONBOARDING",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/onboarding/Index.tsx:82-82"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 227,
+      "feature_id": "CAP-OPS-DASHBOARD-ACTIVITY",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/Index.tsx:94-94; resources/js/pages/operations/activity/Index.tsx:65-65"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 228,
+      "feature_id": "CAP-OPS-FUNDING-CLAIMS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/funding/claims/Index.tsx:62-62"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 229,
+      "feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Operations/CalendarSyncTriggerTest.php:9-23"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 234,
+      "feature_id": "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2832-2865"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 235,
+      "feature_id": "CAP-OPS-ROSTER-TIME-OFF",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/operations.php:960-966"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2780-2793"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Hr/LeaveProjectionSyncTest.php:113-139"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/operations.php:960-966"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 236,
+      "feature_id": "CAP-OPS-SHIFT-COVER-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2750-2769"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 237,
+      "feature_id": "CAP-OPS-SHIFT-HANDOVER",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Operations/ShiftHandoverWorkflowTest.php:80-141; tests/Feature/Operations/ShiftHandoverWorkflowTest.php:143-181"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 238,
+      "feature_id": "CAP-OPS-SHIFT-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/shifts/index.tsx:164-164"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 239,
+      "feature_id": "CAP-OPS-SHIFT-NOTES",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/operations.php:855-871"
+          ],
+          "correction": null
+        },
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "app/Http/Controllers/Operations/ShiftNoteController.php:26-170"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Operations/ShiftNoteAuthorizationTest.php:107-184"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/operations.php:855-871"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "operations.shift_notes.index; operations.shift_notes.export; operations.shift_notes.store; operations.shift_notes.update; operations.shift_notes.flag; operations.shift_notes.review",
+            "anchors": [
+              "routes/operations.php:855-871"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 240,
+      "feature_id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2750-2764"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 241,
+      "feature_id": "CAP-OPS-STAFF-AVAILABILITY",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2794-2803"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 243,
+      "feature_id": "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/operations.php:1009-1029; routes/operations.php:1060-1089"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/operations/timesheets/index.tsx:563-575; resources/js/pages/operations/timesheets/index.tsx:640-656; resources/js/pages/operations/timesheets/index.tsx:741-753"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/TimesheetControllerTest.php:941-1038"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/operations.php:1009-1029; routes/operations.php:1060-1089"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "operations.timesheets.index; operations.timesheets.approvals; operations.timesheets.payrollAdjustments; operations.timesheets.markPayrollProcessed; operations.timesheets.bulkApprove; operations.timesheets.bulkReturn; operations.timesheets.bulkReject; operations.timesheets.show; operations.timesheets.edit; operations.timesheets.update; operations.timesheets.submit; operations.timesheets.resubmit; operations.timesheets.approve; operations.timesheets.reject; operations.timesheets.return",
+            "anchors": [
+              "routes/operations.php:1009-1029",
+              "routes/operations.php:1060-1089"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 245,
+      "feature_id": "CAP-PORT-CLIENT-WORKSPACE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:273-282"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 246,
+      "feature_id": "CAP-PORT-FAMILY-CALENDAR",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/calendar.tsx:192-192"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:322-328"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 247,
+      "feature_id": "CAP-PORT-FAMILY-DASHBOARD",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/family-dashboard.tsx:340-340"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:301-312"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 248,
+      "feature_id": "CAP-PORT-FAMILY-DOCUMENTS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/documents.tsx:78-78"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalDirectRouteAuthorizationTest.php:153-207"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 249,
+      "feature_id": "CAP-PORT-FAMILY-HEALTH-LENS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/health.tsx:76-76"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:284-292"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 250,
+      "feature_id": "CAP-PORT-FAMILY-LOCATION-LENS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/location.tsx:87-87"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalSurfaceTest.php:104-134"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 251,
+      "feature_id": "CAP-PORT-FAMILY-MESSAGING",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/portal.php:147-163"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Test-to-capability mismatch.",
+          "verification": [
+            "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:251-305; tests/Feature/Portal/PortalMessageMediaSecurityTest.php:408-441"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:251-305; tests/Feature/Portal/PortalMessageMediaSecurityTest.php:408-441",
+            "anchors": [
+              "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:251-305",
+              "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:408-441"
+            ],
+            "rationale": "Direct static capability tests; not executed.",
+            "bounded_search": []
+          }
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/portal.php:147-163"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "portal.clients.messages; portal.clients.messages.start; portal.clients.messages.show; portal.clients.messages.send; portal.clients.messages.react; portal.clients.messages.pin; portal.clients.messages.search; portal.clients.messages.archive",
+            "anchors": [
+              "routes/portal.php:147-163"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 252,
+      "feature_id": "CAP-PORT-FAMILY-NOTES",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/portal.php:93-101"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:330-332"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/portal.php:93-101"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "portal.clients.family-notes; portal.clients.family-notes.store; portal.clients.family-notes.update; portal.clients.family-notes.destroy",
+            "anchors": [
+              "routes/portal.php:93-101"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 253,
+      "feature_id": "CAP-PORT-FAMILY-PHOTOS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/photos.tsx:49-49"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:375-406"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 254,
+      "feature_id": "CAP-PORT-FAMILY-SCHEDULE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/schedule.tsx:159-159"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:314-320"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 255,
+      "feature_id": "CAP-PORT-FAMILY-TIMELINE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/portal/timeline.tsx:110-110"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:294-299"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 266,
+      "feature_id": "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/careers/index.tsx:40-40; resources/js/pages/careers/apply.tsx:36-36; resources/js/pages/careers/application-status.tsx:40-40; resources/js/pages/careers/offer-response.tsx:34-34; resources/js/pages/careers/reference-questionnaire.tsx:27-27"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Hr/CareersPortalTest.php:15-103"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 267,
+      "feature_id": "CAP-PUB-CONTACT-SUBMISSION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/contact.tsx:468-468"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 268,
+      "feature_id": "CAP-PUB-MARKETING-PAGES",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/home.tsx:580-580; resources/js/pages/features.tsx:647-647; resources/js/pages/pricing.tsx:456-456; resources/js/pages/about.tsx:291-291; resources/js/pages/privacy.tsx:387-387; resources/js/pages/terms.tsx:432-432; resources/js/pages/smart-monitoring.tsx:652-652"
+          ],
+          "correction": null
+        },
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/web.php:68-106"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 313,
+      "feature_id": "CAP-SET-EMAIL-CONFIG",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/settings.php:182-191"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/email-settings.tsx:48-48"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/settings.php:182-191"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "settings.email; settings.email.update; settings.email.test",
+            "anchors": [
+              "routes/settings.php:182-191"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 314,
+      "feature_id": "CAP-SET-MODULE-CONFIG",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/settings.php:250-256"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/modules.tsx:161-161"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/settings.php:250-256"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 315,
+      "feature_id": "CAP-SET-NOTIFICATION-CONFIG",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/notifications.tsx:103-103; resources/js/pages/settings/notification-defaults.tsx:119-119"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 316,
+      "feature_id": "CAP-SET-PERSONAL-PASSWORD",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/password.tsx:80-80"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Settings/PasswordUpdateTest.php:6-33"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 317,
+      "feature_id": "CAP-SET-PERSONAL-PREFERENCES",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/appearance.tsx:143-143"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Settings/UiPreferenceTest.php:12-30"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 318,
+      "feature_id": "CAP-SET-PERSONAL-PROFILE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/profile.tsx:134-134"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Settings/ProfileUpdateTest.php:9-40"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 319,
+      "feature_id": "CAP-SET-PERSONAL-TWO-FACTOR",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/two-factor.tsx:38-38"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Settings/TwoFactorAuthenticationTest.php:7-64"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 320,
+      "feature_id": "CAP-SET-ROLE-PERMISSION-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/roles/index.tsx:79-79; resources/js/pages/settings/roles/edit.tsx:176-176"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 321,
+      "feature_id": "CAP-SET-SECURITY-POLICY",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/security.tsx:50-50"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 322,
+      "feature_id": "CAP-SET-SESSION-ADMIN",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/settings.php:262-264; routes/settings.php:274-279"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/settings.php:262-264; routes/settings.php:274-279",
+            "anchors": [
+              "routes/settings.php:262-264",
+              "routes/settings.php:274-279"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/users/show.tsx:219-219; resources/js/pages/settings/users/show.tsx:780-895"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/settings.php:262-264; routes/settings.php:274-279"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "settings.users.show; settings.users.terminate-session; settings.users.terminate-all-sessions",
+            "anchors": [
+              "routes/settings.php:262-264",
+              "routes/settings.php:274-279"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 323,
+      "feature_id": "CAP-SET-SSO-MAPPING",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/settings.php:281-299"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/sso-config.tsx:1151-1165; resources/js/pages/settings/sso-groups.tsx:81-100"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/settings.php:281-299"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "settings.sso; settings.sso_groups.index; settings.sso_groups.store; settings.sso_groups.update; settings.sso_groups.destroy; settings.sso_groups.fetch",
+            "anchors": [
+              "routes/settings.php:281-299"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 324,
+      "feature_id": "CAP-SET-TERMINOLOGY-CONFIG",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/terminology.tsx:241-241"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 325,
+      "feature_id": "CAP-SET-USER-ACCESS-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/settings/access.tsx:1150-1150"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/SettingsControllerTest.php:714-939"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 326,
+      "feature_id": "CAP-SITE-CALENDAR-EVENT-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:97-116"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/calendar/index.tsx:23-23"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:97-149; tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:202-246"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:97-116"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.calendar.index; sites.calendar.events; sites.calendar.store; sites.calendar.update; sites.calendar.destroy; sites.calendar.approve; sites.calendar.reject",
+            "anchors": [
+              "routes/sites.php:97-116"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 327,
+      "feature_id": "CAP-SITE-CHECKLIST-RUN",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:140-153; routes/sites.php:501-530"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/checklists/index.tsx:13-16"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:140-153; routes/sites.php:501-530"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.checklists.index; sites.checklists.runs; sites.checklists.assign; sites.checklists.removeAssignment; sites.checklists.createRun; sites.checklists.showRun; sites.checklists.completeRun; sites.checklists.response; sites.checklists.rescheduleRun; sites.checklists.reassignRun; sites.checklists.skipRun; sites.checklists.restoreRun",
+            "anchors": [
+              "routes/sites.php:140-153",
+              "routes/sites.php:501-530"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 328,
+      "feature_id": "CAP-SITE-CONTACTS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/assets.php:99-108"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/show.tsx:346-346; resources/js/pages/sites/show.tsx:804-816"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/SiteProfileCanonicalAccessTest.php:489-526"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/assets.php:99-108"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.contacts.store; sites.contacts.update; sites.contacts.destroy",
+            "anchors": [
+              "routes/assets.php:99-108"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 329,
+      "feature_id": "CAP-SITE-CREDENTIAL-VAULT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:179-218; routes/sites.php:550-574"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/vendors-credentials/global.tsx:160-160"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:179-218; routes/sites.php:550-574"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.credentials.index; sites.credentials.store; sites.credentials.reveal; sites.credentials.copy; sites.credentials.update; sites.credentials.destroy; sites.credentials.rotate; sites.credentials.reauth; sites.credentials.audit; sites.credentials.totp.code; sites.credentials.totp.remove; sites.vendors.global; sites.vendors.audit; credential-types.index; credential-types.save; sites.vendors-credentials.legacy",
+            "anchors": [
+              "routes/sites.php:179-218",
+              "routes/sites.php:550-574"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 330,
+      "feature_id": "CAP-SITE-EMERGENCY-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/sites.php:286-292"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/sites.php:286-292",
+            "anchors": [
+              "routes/sites.php:286-292"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/emergency-plan/index.tsx:507-507"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/SiteEmergencyPlanTest.php:177-263"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:286-292"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.emergency-plan.show; sites.emergency-plan.update; sites.emergency-plan.download",
+            "anchors": [
+              "routes/sites.php:286-292"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 331,
+      "feature_id": "CAP-SITE-HARDWARE-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:234-255"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/hardware/index.tsx:1337-1337"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:234-255"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.hardware.index; sites.hardware.assignRoom; sites.hardware.pin; sites.hardware.unpin; sites.hardware.manageRooms",
+            "anchors": [
+              "routes/sites.php:234-255"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 332,
+      "feature_id": "CAP-SITE-HAZARD-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:129-138; routes/sites.php:465-499"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/hazards/index.tsx:16-16"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:129-138; routes/sites.php:465-499"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.hazards.index; sites.hazards.create; sites.hazards.store; sites.hazards.show; sites.hazards.update; sites.hazards.assign; sites.hazards.close; sites.hazards.status; sites.hazards.review; sites.hazards.media; sites.hazards.media.show; sites.hazards.actions.store; sites.hazards.actions.complete",
+            "anchors": [
+              "routes/sites.php:129-138",
+              "routes/sites.php:465-499"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 333,
+      "feature_id": "CAP-SITE-HOUSE-LEDGER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:80-95"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/ledger/index.tsx:141-141"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:80-95"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.ledger.index; sites.ledger.entries.store; sites.ledger.store; sites.ledger.entries.download; sites.ledger.entries.attachment; sites.ledger.reconcile",
+            "anchors": [
+              "routes/sites.php:80-95"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 334,
+      "feature_id": "CAP-SITE-INSPECTION-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:220-232"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/inspections/index.tsx:78-78"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/SafetySiteAccessTest.php:149-192"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:220-232"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.inspections.index; sites.inspections.store; sites.inspections.complete; sites.inspections.destroy",
+            "anchors": [
+              "routes/sites.php:220-232"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 335,
+      "feature_id": "CAP-SITE-PROFILE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/assets.php:33-37; routes/assets.php:48-59; routes/assets.php:125-136"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/assets.php:33-37; routes/assets.php:48-59; routes/assets.php:125-136",
+            "anchors": [
+              "routes/assets.php:33-37",
+              "routes/assets.php:48-59",
+              "routes/assets.php:125-136"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/index.tsx:1211-1211; resources/js/pages/sites/create.tsx:86-86; resources/js/pages/sites/edit.tsx:113-113; resources/js/pages/sites/show.tsx:346-346"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/assets.php:33-37; routes/assets.php:48-59; routes/assets.php:125-136"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.index; sites.show; sites.create; sites.store; sites.edit; sites.update; sites.bulk.archive; sites.archive; sites.unarchive",
+            "anchors": [
+              "routes/assets.php:33-37",
+              "routes/assets.php:48-59",
+              "routes/assets.php:125-136"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 337,
+      "feature_id": "CAP-SITE-RESOURCE-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:643-654"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/resources/index.tsx:57-57"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "No direct pinned owner; adjacent sources excluded.",
+          "verification": [
+            "tests/Feature/Sites/** and tests/Browser/Sites/** terms SiteResource|sites.resources|/sites/*/resources | tests/** terms SiteResourceController|sites.resources.store|sites.resources.update|sites.resources.destroy | tests/** adjacent calendar resource mapping, physical room, and asset register terms"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:643-654"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.resources.index; sites.resources.store; sites.resources.update; sites.resources.destroy",
+            "anchors": [
+              "routes/sites.php:643-654"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 338,
+      "feature_id": "CAP-SITE-ROOM-ZONE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "CORRECT",
+          "rationale": "Overbroad route range.",
+          "verification": [
+            "routes/sites.php:608-641; routes/sites.php:656-667"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "routes/sites.php:608-641; routes/sites.php:656-667",
+            "anchors": [
+              "routes/sites.php:608-641",
+              "routes/sites.php:656-667"
+            ],
+            "rationale": "Exact capability routes.",
+            "bounded_search": []
+          }
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/rooms/index.tsx:193-193; resources/js/pages/sites/zones/index.tsx:32-32"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:608-641; routes/sites.php:656-667"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.rooms.index; sites.rooms.store; sites.rooms.seed-defaults; sites.rooms.update; sites.rooms.destroy; sites.rooms.assign; sites.rooms.assets.attach; sites.rooms.assets.detach; sites.rooms.reorder; sites.rooms.restore; sites.rooms.door-card; sites.zones.index; sites.zones.store; sites.zones.update; sites.zones.destroy",
+            "anchors": [
+              "routes/sites.php:608-641",
+              "routes/sites.php:656-667"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 339,
+      "feature_id": "CAP-SITE-TYPE-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:257-285"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/plan/index.tsx:350-350"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/SiteTypePlanTest.php:93-163; tests/Feature/Sites/SiteTypePlanTest.php:247-311"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:257-285"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.plan.show; sites.plan.draft.store; sites.plan.draft.update; sites.plan.publish; sites.plan.duplicate; sites.plan.draft.destroy; sites.plan.pins.store; sites.plan.pins.update; sites.plan.pins.destroy",
+            "anchors": [
+              "routes/sites.php:257-285"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 340,
+      "feature_id": "CAP-SITE-VENDOR-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "routes/sites.php:162-177; routes/sites.php:550-554"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "resources/js/pages/sites/vendors-credentials/global.tsx:160-160"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct pinned semantic fit.",
+          "verification": [
+            "tests/Feature/Sites/VendorsCredentialsGlobalTest.php:82-160"
+          ],
+          "correction": null
+        },
+        "route_names": {
+          "disposition": "CORRECT",
+          "rationale": "Incomplete route-name set.",
+          "verification": [
+            "routes/sites.php:162-177; routes/sites.php:550-554"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "sites.vendors.index; sites.vendors.store; sites.vendors.update; sites.vendors.destroy; sites.vendors.flags; sites.vendors.global",
+            "anchors": [
+              "routes/sites.php:162-177",
+              "routes/sites.php:550-554"
+            ],
+            "rationale": "Exact corrected route names.",
+            "bounded_search": []
+          }
+        }
+      }
+    }
+  ],
+  "credit_boundary": {
+    "independent_static_source_review": true,
+    "matrix_static_linkage": false,
+    "framework_route_reachability": false,
+    "route_page_to_feature_gate": false,
+    "runtime": false,
+    "browser": false,
+    "executed_test": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Read-only independent review of exact pinned source. No application writes, VCS mutation, browser, runtime, tests, build, database, network, benchmark, ease, pass, or completion credit."
+}

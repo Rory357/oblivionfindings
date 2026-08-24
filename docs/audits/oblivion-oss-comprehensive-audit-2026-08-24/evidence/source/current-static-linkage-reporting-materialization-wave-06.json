@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-076-STATIC-LINKAGE-REPORTING-MATERIALIZATION",
+  "status": "CURRENT_STATIC_LINKAGE_REPORTING_REFRESHED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_checkpoint_parent": "0d5a05e30878d4c24cb7b83c27e63e8c09b498a3",
+    "base_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "updated_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "normalized_producer_sha256": "34c9d419a3b7c0383a5447372a90cf4f70b3bd4fd78eb2b56be05f4dc1d3b065",
+    "independent_review_sha256": "6ee2c0beb90ce8e9fec75190c1a2d87e44b7f7d7b0b7776d25df4832b73d20a0",
+    "integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+  "counts": {
+    "canonical_features_represented": 340,
+    "H_features": 300,
+    "D_features": 40,
+    "provisional_source_claims": 12,
+    "final_findings": 0,
+    "static_visual_rows_represented": 2812,
+    "current_source_rendered_visual_rows": 0,
+    "prompt_unique_projects": 95,
+    "prompt_occurrences": 98,
+    "benchmark_mappings": 0,
+    "final_no_matches": 0,
+    "source_reconstructed_journeys": 8,
+    "source_classified_journey_handoffs": 44,
+    "fresh_independent_source_reviewed_journeys": 8,
+    "prompt_grade_completed_journeys": 0,
+    "canonical_entity_families": 13,
+    "technical_concerns": 17,
+    "architecture_provisional_claims": 9,
+    "architecture_not_established_items": 10,
+    "architecture_final_findings": 0,
+    "architecture_runtime_confirmed_findings": 0,
+    "static_linkage_original_missing_cells": 503,
+    "static_linkage_reviewed_gap_targets": 288,
+    "static_linkage_matrix_rows_changed": 282,
+    "static_linkage_matrix_field_changes": 575,
+    "remaining_missing_route_paths": 1,
+    "remaining_missing_page_files": 6,
+    "remaining_missing_both_route_and_page": 1,
+    "remaining_missing_backend_anchors": 0,
+    "remaining_missing_test_anchors": 8,
+    "remaining_targets_with_any_scoped_gap": 12
+  },
+  "history": {
+    "evidence/source/current-required-reporting-materialization-wave-05.json": {
+      "sha256": "5fc76430b6a33f76182a470dfce774415c1d0618df14c6685c66105eef026c51",
+      "rewritten": false
+    },
+    "evidence/source/raw-run-073f-independent-reporting-materialization-review-wave-05.json": {
+      "sha256": "a97d3b9810dd6298b3c46bfd40b6dd23ed1e747be43be097006bc19750fb9f5d",
+      "rewritten": false
+    },
+    "evidence/source/current-run-073-checkpoint-validation-wave-05.json": {
+      "sha256": "827829d1b48ef804b81a42ade614f8f09de6bab11d39e732d5ed20bc4b8fbc1f",
+      "rewritten": false
+    },
+    "evidence/browser/current-audit-dashboard-verification-run-073-wave-05.json": {
+      "sha256": "814a53449a96abb7a821711ab33a7111d83e64b897ea3cb42ded2448178efdf7",
+      "rewritten": false
+    },
+    "generators/materialize-required-reporting-wave-05.py": {
+      "sha256": "2275a5ef8159a43b4106f13259452dbf376ef566c75de8ffb6550f2b397fd170",
+      "rewritten": false
+    }
+  },
+  "historical_inputs": {
+    "source_matrix_snapshot_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "04-workflow-usability-scorecard.csv": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+    "evidence/source/current-usability-task-script-materialization-wave-01.json": "ad0747f9128b2e92da31c1cff5b1acc5de0a6e1687b2879cf9ddc63b74ba68f7",
+    "task_script_bundle_sha256": "4171e361c5abc17a63af20cc04133826977b6a6b9c11af9e8d528a7815a4ea33",
+    "status": "HISTORICAL_RUN_072_UNEXECUTED_LOCATOR_SNAPSHOT_NOT_REFRESHED"
+  },
+  "inputs": {
+    "03-feature-to-benchmark-matrix.csv": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "05-browser-visual-coverage-matrix.csv": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "06-open-source-benchmark-register.csv": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "evidence/source/current-feature-discovery-wave-01.json": "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb",
+    "evidence/source/current-feature-discovery-wave-02.json": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
+    "evidence/source/current-visual-matrix-materialization-wave-01.json": "d453af91921e213e71d0e8408e5310b6f82a4e9f335f7a3a44b6679633db2e38",
+    "evidence/source/current-visual-static-census-wave-01.json": "39f6f60be3312ea99ec375eaf853b180f69b3087d15a7b0b1030549bf2493729",
+    "evidence/browser/current-deployed-selected-feature-observation-wave-03.json": "e9c95d695212875a756e704ec0754b0d6998476f9e34d6dce166f8e520027fc3",
+    "evidence/browser/root-run-072-authentication-blocked-frontline-slice-wave-04.json": "1bbba21a0f700ee490042dba30dc1234b99952d217e3471d199813b5766d0731",
+    "evidence/benchmark/current-prompt-project-denominator-reconciliation.json": "51180ed25968ea7dd28bc6bdc39ccc575e3777c8ce210a8a78dd874316d5f5c9",
+    "evidence/benchmark/current-formal-upstream-triage-wave-03.json": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277",
+    "evidence/source/raw-run-073a-required-artifact-contract-wave-05.json": "db4b514f0726a94c189500b0e179af6d11bc3f1998ea6e39e16957769452ade1",
+    "evidence/source/raw-run-073b-cross-module-journeys-wave-05.json": "e1983242ab669153b286138c5a104acd18ea130712717d942256e57b6b42fe0e",
+    "evidence/source/raw-run-073d-independent-journey-review-wave-05.json": "46950af1a82969e0dc0504fcdd0628d776782476e9735256d39ef5ccd6e858b4",
+    "evidence/source/root-run-073c-architecture-data-integration-security-wave-05.json": "e406bdee1412c4ba49ec18afbd80849e7c6bc30e2098229f80f63888bde39272",
+    "evidence/official-sources/nz-source-baseline-2026-08-24.json": "1928f69573ef609831cbf2750a195c346de2b90a0c83ac5685d78a20fbcb52f8",
+    "evidence/source/current-static-linkage-review-wave-06.json": "34c9d419a3b7c0383a5447372a90cf4f70b3bd4fd78eb2b56be05f4dc1d3b065",
+    "evidence/source/current-static-linkage-independent-review-wave-06.json": "6ee2c0beb90ce8e9fec75190c1a2d87e44b7f7d7b0b7776d25df4832b73d20a0",
+    "evidence/source/current-static-linkage-integration-wave-06.json": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf"
+  },
+  "generators": {
+    "generators/materialize-required-reporting-staged-wave-06.py": "64150206c26d04b9467bc1c667555fa972b7272169b640a013ce6ec6719e5408",
+    "generators/materialize-static-linkage-reporting-wave-06.py": "e0b34b4e809ed91f89f70156d6053772cc8a02d897b4c2e5385476fa34df9b56"
+  },
+  "outputs": {
+    "00-executive-summary.md": "231e339c0a830c08ff8b65a290faab710242b224a321289a709b0e228681247a",
+    "01-repository-module-map.md": "82a16b1b4eadd205716299e301ed15e3f3233489399fa992c864c12924c53c61",
+    "07-module-findings.md": "3ebe59ac1891a5bbec78b3b5a32c67993e750ab1d2a6821ab3aebb3899406826",
+    "08-cross-module-journeys.md": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+    "09-ui-ux-accessibility-visual-consistency.md": "b91ce38abc9b5babb9e590641bd7b9bdd7efe6338f4b697060de1f9714b59983",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+    "11-prioritised-roadmap.md": "e5c2f41bf98d3415de97d18d853f1d7c351b337ba544fbf8c81330ec63dcf02d",
+    "12-native-build-and-do-not-copy-register.md": "44ae85422a6863d4804fec7d495107b9bdc937257f023767fb306ccd755e137a",
+    "13-unresolved-questions-and-evidence-gaps.md": "c39e2ddf9ba75f2d8cc8b573af2316df15f5908351798e320d7a267fc61708e2",
+    "findings.json": "abc4e92c4399a1e818ec82eb17eaa42aeb6c125355177f7cc24ea755b98972a4"
+  },
+  "matrix_validation": {
+    "rows": 340,
+    "unique_feature_ids": 340,
+    "classes": {
+      "H": 300,
+      "D": 40
+    },
+    "changed_columns": [
+      "backend_anchors",
+      "page_files",
+      "route_names",
+      "route_paths",
+      "test_anchors"
+    ],
+    "immutable_projection_equal": true,
+    "benchmark_and_credit_projection_equal": true,
+    "gap_lists_recomputed_from_live_csv": true
+  },
+  "evidence_boundary": {
+    "feature_side_static_linkage_cells_integrated": true,
+    "framework_route_reachability": false,
+    "complete_route_page_universe_mapping": false,
+    "run_072_locator_refresh": false
+  },
+  "credit_boundary": {
+    "artifact_presence": false,
+    "final_finding": false,
+    "application_browser": false,
+    "runtime": false,
+    "executed_tests": false,
+    "ease": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Staged deterministic RUN-076 reporting refresh. RUN-073 receipts were never targeted or rewritten. Reports were validated before per-file atomic publication. Application source, runtime, browser, tests, build, database, network, benchmark mapping, ease, Pass and completion credit remain unchanged at zero."
+}

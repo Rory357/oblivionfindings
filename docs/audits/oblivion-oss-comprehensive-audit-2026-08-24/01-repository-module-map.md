@@ -21,6 +21,10 @@ Three formal read-only assignments returned 62 grouped user-observable candidate
 | Operations | 6 | 1 | 7 | Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners. |
 
 
+## RUN-074–076 current linkage overlay
+
+The historical discovery register below remains source provenance. The live 340-target matrix now carries cyclically reviewed feature-side linkage changes on 282 rows / 575 cells. Retained gaps are 1 route paths, 6 page files, 0 backend anchors, and 8 static test anchors. Headless endpoints and support components remain distinct from route-owned pages. Full framework reachability, the 711-page-root universe mapping, runtime, browser, executed-test, benchmark, ease, Pass, and completion evidence remain open.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |

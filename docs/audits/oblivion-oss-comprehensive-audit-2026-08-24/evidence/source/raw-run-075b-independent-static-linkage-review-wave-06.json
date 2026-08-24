@@ -1,0 +1,1914 @@
+{
+  "run_id": "RUN-075B",
+  "review_id": "RUN-075B",
+  "reviewed_partition_id": "RUN-074C",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "normalized_producer_sha256": "34c9d419a3b7c0383a5447372a90cf4f70b3bd4fd78eb2b56be05f4dc1d3b065"
+  },
+  "records": [
+    {
+      "matrix_ordinal": 1,
+      "feature_id": "CAP-CATER-DIETARY-TAG-LIBRARY",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/LibraryManagerTest.php:96-128"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 2,
+      "feature_id": "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/SiteMealPlanScopeIntegrityTest.php:132-449"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 3,
+      "feature_id": "CAP-CATER-PRODUCT-CATALOG",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/sites/meal-planner/index.tsx:907-914"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/LibraryManagerTest.php:34-93"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 4,
+      "feature_id": "CAP-CATER-RECIPE-LIBRARY",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/RecipeControllerTest.php:35-178"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 5,
+      "feature_id": "CAP-CATER-SITE-INVENTORY-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/sites/meal-planner/index.tsx:736-751"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/InventoryMovementRecorderTest.php:31-77"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 6,
+      "feature_id": "CAP-CATER-SITE-SHOPPING-LIST",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Catering/ShoppingListGeneratorTest.php:37-93"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 7,
+      "feature_id": "CAP-CLI-CLIENT-ASSESSMENT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/operations/clients/show.tsx:4496-4517"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Direct assessment delete-dialog test was missed.",
+          "verification": [
+            "tests/Browser/Operations/OperationsShowDialogsTest.php:85-123"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Browser/Operations/OperationsShowDialogsTest.php:85-123",
+            "anchors": [
+              "tests/Browser/Operations/OperationsShowDialogsTest.php:85-123"
+            ],
+            "rationale": "Direct assessment delete-dialog test was missed. Static only; not executed.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 8,
+      "feature_id": "CAP-CLI-CLIENT-ASSIGNMENT",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Operations/ClientProfileDailyWorkspaceSecurityTest.php:71-146"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 11,
+      "feature_id": "CAP-CLI-CLIENT-NOTES",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Operations/ClientNoteConsolidationTest.php:286-430"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 12,
+      "feature_id": "CAP-CLI-CLIENT-RISK-REGISTER",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "CORRECT",
+          "rationale": "Direct risk-register route/UI test was missed.",
+          "verification": [
+            "tests/Browser/Clients/ClientSubpagesTest.php:72-83"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "tests/Browser/Clients/ClientSubpagesTest.php:72-83",
+            "anchors": [
+              "tests/Browser/Clients/ClientSubpagesTest.php:72-83"
+            ],
+            "rationale": "Direct risk-register route/UI test was missed. Static only; not executed.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 13,
+      "feature_id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: tests/Feature; tests/Browser | terms: /clients/*/support-plan, ClientSupportPlanController, support-plan || tests/Feature/Operations | terms: CareSupportPlanTab, care plan review"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 44,
+      "feature_id": "CAP-DAY-MY-CALENDAR",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:320-321"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/my-calendar.tsx:253-435"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 46,
+      "feature_id": "CAP-DAY-MY-ROSTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:155-157"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/my-roster/index.tsx:36-88"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 47,
+      "feature_id": "CAP-DAY-TASK-CSV-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/tasks.php:16-16"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Tasks/TaskProviderRowScopeTest.php:684-734"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 48,
+      "feature_id": "CAP-DAY-TASK-REPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/tasks.php:19-19"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/tasks/reports.tsx:218-243"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 49,
+      "feature_id": "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/dashboard/today.tsx:56-64"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 181,
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/IncidentControllerTest.php:3499-3587"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 182,
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/incidents/show.tsx:1-28"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/IncidentControllerTest.php:3294-3684"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 183,
+      "feature_id": "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/incidents/show.tsx:1-28"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/IncidentControllerTest.php:3687-3811"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 186,
+      "feature_id": "CAP-INT-API-KEY-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/settings/api.tsx:133-150"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 187,
+      "feature_id": "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/integrations.php:26-30"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: resources/js/pages/settings; resources/js/pages/integrations; resources/js | terms: WebhookReceiverController, /webhooks/{provider}, webhooks.receive, inbound provider webhook || app/Http/Controllers/Api/WebhookReceiverController.php; routes/integrations.php"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 188,
+      "feature_id": "CAP-INT-MAILBOX-CONNECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/settings/it-mailbox.tsx:58-75"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 189,
+      "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/settings/api.tsx:133-150"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 192,
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/settings/calendar-sync.tsx:117-140"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Settings/CalendarSyncSettingsTest.php:28-242"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 193,
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-SYNC",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/settings/calendar-sync.tsx:117-140"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Settings/CalendarSyncSettingsTest.php:245-353"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 194,
+      "feature_id": "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:183-268"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/tickets/show.tsx:207-260"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 195,
+      "feature_id": "CAP-IT-CHANGE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:173-237"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/changes/show.tsx:132-170"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 197,
+      "feature_id": "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:175-241"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/major-incidents/show.tsx:124-160"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 198,
+      "feature_id": "CAP-IT-PROBLEM-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:179-244"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/problems/show.tsx:75-110"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 199,
+      "feature_id": "CAP-IT-PROVISIONING-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:164-252"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/index.tsx:1565-1717"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 200,
+      "feature_id": "CAP-IT-REPORTING-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:204-210"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/index.tsx:1563-1563"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 202,
+      "feature_id": "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/web.php:218-233"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/it/setup/index.tsx:447-519"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/It/ItServiceManagementSetupTest.php:156-219"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 203,
+      "feature_id": "CAP-MED-ADMINISTRATION-CORRECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/emar/MarCharts.tsx:605-680"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/MedicationGovernanceAuditTest.php:34-72"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 204,
+      "feature_id": "CAP-MED-BREAK-GLASS-ACCESS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/emergency/access.tsx:200-260"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/EmergencyAccessTest.php:47-531"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 205,
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/emar/ControlledDrugs.tsx:662-745"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 207,
+      "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/DestructionsTest.php:62-183"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 209,
+      "feature_id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/MedicationErrorsTest.php:79-643"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 210,
+      "feature_id": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/emar/Medications.tsx:302-366"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 211,
+      "feature_id": "CAP-MED-MEDICATION-REVIEW",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact backend handler owner at pin.",
+          "verification": [
+            "app/Http/Controllers/Emar/EmarController.php:2379-2424",
+            "app/Http/Controllers/Emar/EmarController.php:3227-3332"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/ReviewsTest.php:37-114"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 212,
+      "feature_id": "CAP-MED-PHARMACY-ACTIONS",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: tests/Feature/Emar; tests/Browser/Emar | terms: /emar/stock/pharmacy-orders, storePharmacyOrder, updatePharmacyOrder, advancePharmacyOrder || tests/Feature/Emar/StockManagementTest.php; tests/Feature/Emar/AuditTrailTest.php | terms: pharmacyOrders, MedicationPharmacyOrder"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 214,
+      "feature_id": "CAP-MED-ROUND-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/RoundsPagePayloadTest.php:31-85"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 215,
+      "feature_id": "CAP-MED-SELF-ADMINISTRATION",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact backend handler owner at pin.",
+          "verification": [
+            "app/Http/Controllers/Emar/EmarController.php:2657-2703",
+            "app/Http/Controllers/Emar/EmarController.php:3894-4012"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/SelfAdminTest.php:49-190"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 216,
+      "feature_id": "CAP-MED-SHIFT-HANDOVER",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/HandoverMedicationLensTest.php:73-243"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 217,
+      "feature_id": "CAP-MED-STAFF-COMPETENCY",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact backend handler owner at pin.",
+          "verification": [
+            "app/Http/Controllers/Emar/EmarController.php:2294-2323",
+            "app/Http/Controllers/Emar/EmarController.php:3588-3743"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/CompetencyTest.php:42-179"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 218,
+      "feature_id": "CAP-MED-STOCK-MOVEMENT",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Emar/StockManagementTest.php:45-133"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 219,
+      "feature_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/meds/today/index.tsx:1278-1390"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 220,
+      "feature_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/meds/today/index.tsx:1598-1760"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 226,
+      "feature_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/operations/clients/index.tsx:1087-1346"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 256,
+      "feature_id": "CAP-PRIV-BREACH-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/breaches/show.tsx:287-356"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 258,
+      "feature_id": "CAP-PRIV-DASHBOARD-WORKLIST",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:146-148"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/dashboard.tsx:469-500"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 259,
+      "feature_id": "CAP-PRIV-DSR-DATA-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:50-56"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/requests/show.tsx:291-330"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 260,
+      "feature_id": "CAP-PRIV-DSR-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/requests/show.tsx:291-397"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 261,
+      "feature_id": "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:20-29"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/dashboard.tsx:822-830",
+            "resources/js/components/privacy/privacy-attachments-pane.tsx:49-159"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 262,
+      "feature_id": "CAP-PRIV-LEGAL-HOLD",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:88-100"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/legal-holds.tsx:31-97"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 263,
+      "feature_id": "CAP-PRIV-PIA-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:126-142"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/dpia/show.tsx:272-306"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 264,
+      "feature_id": "CAP-PRIV-RETENTION-EXECUTION-EVIDENCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/privacy.php:80-84"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/retention/review.tsx:22-165"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Privacy/EnforceDataRetentionJobTest.php:65-337"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 265,
+      "feature_id": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/privacy/retention.tsx:30-222"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/PrivacyControllerTest.php:1465-1585"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 272,
+      "feature_id": "CAP-RESP-BOOKING-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:175-268"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 273,
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:65-171"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 274,
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: tests | terms: respite_bookings, respite_requests, /reports/modules/, ModuleReportController, ReportCatalog || tests/Feature/ClientControllerTest.php | terms: respite_bookings, respite_requests"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 275,
+      "feature_id": "CAP-RESP-COMMUNICATION-LOG",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Browser/Respite/RespiteTest.php:46-65"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 276,
+      "feature_id": "CAP-RESP-DAILY-CARE-NOTES",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:82-213"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 277,
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: resources/js/pages/respite/evidence-packs | terms: /export, Export, Download, evidence-packs || routes/respite.php:178-194; app/Http/Controllers/Respite/RespiteEvidencePackController.php | terms: export"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:603-708"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 278,
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:448-912"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 279,
+      "feature_id": "CAP-RESP-HANDOVER-NOTES",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Browser/Respite/RespiteTest.php:106-125"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 280,
+      "feature_id": "CAP-RESP-PROCEDURE-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Browser/Respite/RespiteTest.php:126-165"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 281,
+      "feature_id": "CAP-RESP-REFERRAL-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteActionsTest.php:38-54"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 282,
+      "feature_id": "CAP-RESP-RISK-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Browser/Respite/RespiteTest.php:206-225"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 283,
+      "feature_id": "CAP-RESP-STAY-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:309-421"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 284,
+      "feature_id": "CAP-RESP-TASK-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Browser/Respite/RespiteTest.php:196-205"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 285,
+      "feature_id": "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/Roadmap/Decisions/Index.tsx:50-242"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Roadmap/RoadmapDecisionAndBudgetApiTest.php:21-46"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 286,
+      "feature_id": "CAP-ROAD-INITIATIVE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/Roadmap/Initiatives/Index.tsx:74-257"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 287,
+      "feature_id": "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/Roadmap/QuarterlyPlans/Show.tsx:91-116"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Roadmap/RoadmapWorkflowTest.php:246-306"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 288,
+      "feature_id": "CAP-ROAD-SUGGESTION-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/Roadmap/Suggestions/Index.tsx:64-155"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 289,
+      "feature_id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2538-2570"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Safeguarding/SafeguardingNestedAuthorizationTest.php:198-238"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 291,
+      "feature_id": "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Bounded search rechecked; adjacent evidence cannot be inherited.",
+          "verification": [
+            "search: tests | terms: safeguarding_concerns, /reports/modules/, ModuleReportController, ReportCatalog || tests/Feature/Safeguarding; tests/Feature/SafeguardingConcernControllerTest.php | terms: export, CSV, report"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 292,
+      "feature_id": "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2608-2695"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:69-136"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 293,
+      "feature_id": "CAP-SAFE-EVIDENCE-DOWNLOAD",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2608-2695"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:92-121"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 294,
+      "feature_id": "CAP-SAFE-EXTERNAL-REPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/safeguarding.php:76-82"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1080-1110"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 295,
+      "feature_id": "CAP-SAFE-INVESTIGATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:951-996"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:51-84"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 296,
+      "feature_id": "CAP-SAFE-RISK-ASSESSMENT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1227-1240"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:85-103"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 297,
+      "feature_id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:694-835"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 298,
+      "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1644-1719"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 299,
+      "feature_id": "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:238-259"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/category.tsx:261-352",
+            "resources/js/components/security-devices/access-control-workspace.tsx:567-1110"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 300,
+      "feature_id": "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:238-251"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/category.tsx:261-352",
+            "resources/js/components/security-devices/access-control-workspace.tsx:135-556"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 301,
+      "feature_id": "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:56-174"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/devices/show.tsx:647-733"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 302,
+      "feature_id": "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:389-410"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/discovery.tsx:662-800"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 303,
+      "feature_id": "CAP-SEC-GOVERNED-COMMAND",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:90-142"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "show.tsx is route-owned; device-profile-sections.tsx is only a nested shared component.",
+          "verification": [
+            "resources/js/pages/security-devices/devices/show.tsx:926-930"
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/security-devices/devices/show.tsx:926-930",
+            "anchors": [
+              "resources/js/pages/security-devices/devices/show.tsx:926-930"
+            ],
+            "rationale": "show.tsx is route-owned; device-profile-sections.tsx is only a nested shared component. Static only; not executed.",
+            "bounded_search": []
+          }
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 304,
+      "feature_id": "CAP-SEC-GROUP-TOPOLOGY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:277-324"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/device-groups/show.tsx:128-212"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 305,
+      "feature_id": "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:332-350"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/monitoring.tsx:1454-1572"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 306,
+      "feature_id": "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:389-425"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/discovery.tsx:603-650"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Monitoring/CollectorLifecycleTest.php:95-163",
+            "tests/Feature/Monitoring/CollectorLifecycleTest.php:632-704"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 307,
+      "feature_id": "CAP-SEC-MONITORING-COVERAGE-POLICY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:428-456"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:644-676"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/SecurityDevices/MonitoringPolicySettingsAuthoringTest.php:55-109"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 308,
+      "feature_id": "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:428-474"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:732-771"
+          ],
+          "correction": null
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Direct static test fit; not executed.",
+          "verification": [
+            "tests/Feature/Monitoring/MonitoringPolicyAuthoringServiceTest.php:121-154"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 309,
+      "feature_id": "CAP-SEC-MONITORING-RETENTION-POLICY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:428-488"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:779-815"
+          ],
+          "correction": null
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 310,
+      "feature_id": "CAP-SEC-REPORTING-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact route/handler fit at pin.",
+          "verification": [
+            "routes/security-devices.php:625-637"
+          ],
+          "correction": null
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual route-owned page; shared controls remain supporting-only.",
+          "verification": [
+            "resources/js/pages/security-devices/reports.tsx:31-114"
+          ],
+          "correction": null
+        }
+      }
+    }
+  ],
+  "counts": {
+    "records_reviewed": 95,
+    "decision_fields_reviewed": 154,
+    "dispositions": {
+      "ACCEPT": 151,
+      "CORRECT": 3,
+      "REJECT": 0
+    },
+    "by_field": {
+      "route_paths": {
+        "reviewed": 31,
+        "ACCEPT": 31,
+        "CORRECT": 0,
+        "REJECT": 0
+      },
+      "page_files": {
+        "reviewed": 63,
+        "ACCEPT": 62,
+        "CORRECT": 1,
+        "REJECT": 0
+      },
+      "backend_anchors": {
+        "reviewed": 3,
+        "ACCEPT": 3,
+        "CORRECT": 0,
+        "REJECT": 0
+      },
+      "test_anchors": {
+        "reviewed": 57,
+        "ACCEPT": 55,
+        "CORRECT": 2,
+        "REJECT": 0
+      }
+    },
+    "resulting_statuses": {
+      "ESTABLISHED": 148,
+      "RETAIN_NOT_ESTABLISHED": 6
+    },
+    "producer_anchor_validation": {
+      "occurrences": 165,
+      "unique": 150,
+      "paths": 89,
+      "invalid": 0
+    },
+    "correction_anchor_validation": {
+      "occurrences": 3,
+      "unique": 3,
+      "paths": 3,
+      "invalid": 0
+    }
+  },
+  "attestation": {
+    "read_only": true,
+    "writes": false,
+    "vcs_mutation": false,
+    "tests_runtime_browser_build_db_network_executed": false,
+    "benchmark_mapping_ease_pass_completion_downstream_credit": false,
+    "statement": "Independent static cross-review only; zero downstream credit."
+  }
+}

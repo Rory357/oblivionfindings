@@ -5,8 +5,12 @@
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
-    "audit_checkpoint_parent": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
-    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+    "audit_checkpoint_parent": "0d5a05e30878d4c24cb7b83c27e63e8c09b498a3",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "base_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "current_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "static_linkage_independent_review_sha256": "6ee2c0beb90ce8e9fec75190c1a2d87e44b7f7d7b0b7776d25df4832b73d20a0",
+    "static_linkage_integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -24,7 +28,11 @@
     "complete_prompt_finding_schema": 0,
     "benchmark_mapped": 0,
     "final_no_match": 0,
-    "browser_observed": 0
+    "browser_observed": 0,
+    "static_linkage_reviewed_gap_targets": 288,
+    "static_linkage_matrix_rows_changed": 282,
+    "static_linkage_matrix_field_changes": 575,
+    "remaining_static_linkage_gap_targets": 12
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -66,10 +74,10 @@
         "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
+        "raw_page_file_field": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -435,10 +443,10 @@
         "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
+        "raw_page_file_field": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -611,16 +619,16 @@
         "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": null,
-        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "status": "NOT_ESTABLISHED"
+        "route_names": "governance.meetings.index; governance.meetings.calendar; governance.meetings.create; governance.meetings.show; governance.meetings.edit; governance.meetings.store; governance.meetings.update; governance.meetings.destroy; governance.meetings.agenda.add; governance.meetings.agenda.update; governance.meetings.agenda.remove; governance.meetings.minutes.store; governance.meetings.minutes.update; governance.meetings.minutes.approve; governance.meetings.attendance.record; governance.meetings.lock; governance.meetings.minutes.sign",
+        "route_paths": "routes/governance.php:51-80",
+        "raw_route_path_field": "routes/governance.php:51-80",
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/Governance/Meetings/Index.tsx:36-36; resources/js/pages/Governance/Meetings/Calendar.tsx:65-65; resources/js/pages/Governance/Meetings/Create.tsx:23-23; resources/js/pages/Governance/Meetings/Show.tsx:173-173; resources/js/pages/Governance/Meetings/Edit.tsx:44-44",
+        "raw_page_file_field": "resources/js/pages/Governance/Meetings/Index.tsx:36-36; resources/js/pages/Governance/Meetings/Calendar.tsx:65-65; resources/js/pages/Governance/Meetings/Create.tsx:23-23; resources/js/pages/Governance/Meetings/Show.tsx:173-173; resources/js/pages/Governance/Meetings/Edit.tsx:44-44",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -794,16 +802,16 @@
         "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": null,
-        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "status": "NOT_ESTABLISHED"
+        "route_names": "governance.packs.index; governance.packs.show; governance.packs.download; governance.packs.attachments.download; governance.packs.read; governance.packs.generate; governance.packs.distribute; governance.packs.regenerate; governance.packs.attachments.store; governance.packs.attachments.destroy",
+        "route_paths": "routes/governance.php:83-97",
+        "raw_route_path_field": "routes/governance.php:83-97",
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/Governance/Packs/Index.tsx:54-54; resources/js/pages/Governance/Packs/Show.tsx:71-71",
+        "raw_page_file_field": "resources/js/pages/Governance/Packs/Index.tsx:54-54; resources/js/pages/Governance/Packs/Show.tsx:71-71",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -974,16 +982,16 @@
         "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": null,
-        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "status": "NOT_ESTABLISHED"
+        "route_names": "governance.resolutions.index; governance.resolutions.create; governance.resolutions.show; governance.resolutions.attachments.download; governance.resolutions.vote; governance.resolutions.conflict.declare; governance.resolutions.store; governance.resolutions.update; governance.resolutions.open; governance.resolutions.close; governance.resolutions.finalize; governance.resolutions.attachments.store; governance.resolutions.attachments.destroy",
+        "route_paths": "routes/governance.php:100-121",
+        "raw_route_path_field": "routes/governance.php:100-121",
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/Governance/Resolutions/Index.tsx:44-44; resources/js/pages/Governance/Resolutions/Create.tsx:31-31; resources/js/pages/Governance/Resolutions/Show.tsx:113-113",
+        "raw_page_file_field": "resources/js/pages/Governance/Resolutions/Index.tsx:44-44; resources/js/pages/Governance/Resolutions/Create.tsx:31-31; resources/js/pages/Governance/Resolutions/Show.tsx:113-113",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -1158,16 +1166,16 @@
         "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": null,
-        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "status": "NOT_ESTABLISHED"
+        "route_names": "health-safety.first-aid.index; health-safety.first-aid.export; health-safety.first-aid.attachments.download; health-safety.first-aid.show; health-safety.first-aid.store; health-safety.first-aid.update; health-safety.first-aid.link-incident; health-safety.first-aid.followups.add; health-safety.first-aid.followups.complete; health-safety.first-aid.attachments.upload; health-safety.first-aid.attachments.destroy; health-safety.first-aid.destroy",
+        "route_paths": "routes/health-safety.php:129-153",
+        "raw_route_path_field": "routes/health-safety.php:129-153",
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/health-safety/first-aid/index.tsx:179-207",
+        "raw_page_file_field": "resources/js/pages/health-safety/first-aid/index.tsx:179-207",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -1718,16 +1726,16 @@
         "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
       },
       "route_url": {
-        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "route_paths": null,
-        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
-        "status": "NOT_ESTABLISHED"
+        "route_names": "control-room.alerts.index; control-room.alerts.show; control-room.alerts.acknowledge; control-room.alerts.confirm; control-room.alerts.dismiss; control-room.alerts.triage; control-room.alerts.create-incident; control-room.alerts.resolve; control-room.alerts.close; control-room.alerts.reopen-for-incident; control-room.alerts.note; control-room.alerts.meta; control-room.alerts.snooze; control-room.alerts.unsnooze; control-room.alerts.assign; control-room.alerts.unassign; control-room.alerts.escalate; control-room.alerts.store",
+        "route_paths": "routes/control-room.php:49-60; routes/control-room.php:91-140; routes/control-room.php:167-187",
+        "raw_route_path_field": "routes/control-room.php:49-60; routes/control-room.php:91-140; routes/control-room.php:167-187",
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/control-room/alerts/index.tsx:203-230; resources/js/pages/control-room/show.tsx:17-64",
+        "raw_page_file_field": "resources/js/pages/control-room/alerts/index.tsx:203-230; resources/js/pages/control-room/show.tsx:17-64",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -1907,10 +1915,10 @@
         "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/safeguarding/concern.tsx:1-35",
+        "raw_page_file_field": "resources/js/pages/safeguarding/concern.tsx:1-35",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -2093,10 +2101,10 @@
         "status": "SOURCE_LOCATOR_ONLY"
       },
       "frontend_anchor": {
-        "page_files": null,
-        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "page_files": "resources/js/pages/settings/api.tsx:133-150",
+        "raw_page_file_field": "resources/js/pages/settings/api.tsx:133-150",
         "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
-        "status": "NOT_ESTABLISHED"
+        "status": "SOURCE_LOCATOR_ONLY"
       },
       "visual_context": {
         "visual_id": null,
@@ -2247,5 +2255,30 @@
         "completion": false
       }
     }
-  ]
+  ],
+  "current_static_linkage": {
+    "status": "INDEPENDENTLY_REVIEWED_COMMITTED_SOURCE_LINKAGE_ONLY",
+    "remaining_gap_counts": {
+      "route_paths": 1,
+      "page_files": 6,
+      "both_route_and_page": 1,
+      "backend_anchors": 0,
+      "test_anchors": 8
+    },
+    "framework_route_reachability": false,
+    "complete_route_page_universe_mapping": false,
+    "runtime": false,
+    "browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "task_script_boundary": {
+    "status": "HISTORICAL_RUN_072_SOURCE_CONTRACT_SNAPSHOT_UNEXECUTED",
+    "source_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "locator_refresh_completed": false,
+    "measurement_credit": false
+  }
 }

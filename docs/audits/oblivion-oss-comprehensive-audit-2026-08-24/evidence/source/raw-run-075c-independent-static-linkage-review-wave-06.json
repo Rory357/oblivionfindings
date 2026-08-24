@@ -1,0 +1,2031 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-075C",
+  "review_id": "RUN-075C",
+  "status": "COMPLETE_INDEPENDENT_STATIC_SOURCE_REVIEW_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "normalized_producer_sha256": "34c9d419a3b7c0383a5447372a90cf4f70b3bd4fd78eb2b56be05f4dc1d3b065"
+  },
+  "reviewed_partition_id": "RUN-074A",
+  "counts": {
+    "targets": 96,
+    "field_decisions": 200,
+    "dispositions": {
+      "ACCEPT": 195,
+      "CORRECT": 1,
+      "REJECT": 4
+    },
+    "producer_anchor_occurrences_validated": 267,
+    "producer_unique_anchors_validated": 217,
+    "producer_anchor_paths_validated": 147,
+    "invalid_producer_anchors": 0
+  },
+  "records": [
+    {
+      "matrix_ordinal": 14,
+      "feature_id": "CAP-CLIN-ASSESSMENT-RECORD",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 15,
+      "feature_id": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 16,
+      "feature_id": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 17,
+      "feature_id": "CAP-CLIN-CLIENT-SUMMARY-LENS",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 19,
+      "feature_id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 20,
+      "feature_id": "CAP-CLIN-HEALTH-MONITORING-LENS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 21,
+      "feature_id": "CAP-CLIN-MODULE-DASHBOARD",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 23,
+      "feature_id": "CAP-CLIN-PROTOCOL-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 24,
+      "feature_id": "CAP-CLIN-TRENDS-LENS",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 25,
+      "feature_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 28,
+      "feature_id": "CAP-CR-ALERT-TASK-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 29,
+      "feature_id": "CAP-CR-ALERT-WATCH",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 30,
+      "feature_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 31,
+      "feature_id": "CAP-CR-BROADCAST",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 32,
+      "feature_id": "CAP-CR-ESCALATION-QUEUE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 33,
+      "feature_id": "CAP-CR-EVIDENCE-PACK-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 34,
+      "feature_id": "CAP-CR-LIVE-DEVICE-MAP",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 35,
+      "feature_id": "CAP-CR-MESSAGING-DISCUSSION",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 36,
+      "feature_id": "CAP-CR-PLAYBOOK-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 37,
+      "feature_id": "CAP-CR-RECOVERY-CONFIGURATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 38,
+      "feature_id": "CAP-CR-REPORTING-EXPORT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 39,
+      "feature_id": "CAP-CR-SHIFT-HANDOVER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 40,
+      "feature_id": "CAP-CR-SIGNAL-QUEUE-CONFIGURATION",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 41,
+      "feature_id": "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 42,
+      "feature_id": "CAP-CR-TIME-RECORDING",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 51,
+      "feature_id": "CAP-FIN-ACCOUNTING-PERIOD-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 52,
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 53,
+      "feature_id": "CAP-FIN-BANK-FEED-IMPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 54,
+      "feature_id": "CAP-FIN-BANK-STATEMENT-RECONCILIATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 55,
+      "feature_id": "CAP-FIN-BILL-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 56,
+      "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 57,
+      "feature_id": "CAP-FIN-BUDGET-ACTUAL-VARIANCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 58,
+      "feature_id": "CAP-FIN-CASH-FLOW-FORECAST-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 60,
+      "feature_id": "CAP-FIN-CHART-OF-ACCOUNTS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 62,
+      "feature_id": "CAP-FIN-CLIENT-FUND-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 63,
+      "feature_id": "CAP-FIN-CLIENT-STATEMENT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 64,
+      "feature_id": "CAP-FIN-COST-CENTRE-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 65,
+      "feature_id": "CAP-FIN-CREDIT-NOTE-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 66,
+      "feature_id": "CAP-FIN-CURRENCY-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 67,
+      "feature_id": "CAP-FIN-DONOR-FUND-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 68,
+      "feature_id": "CAP-FIN-EFTPOS-BATCH-RECONCILIATION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 69,
+      "feature_id": "CAP-FIN-ENCRYPTED-AUDIT-PACK",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 71,
+      "feature_id": "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "REJECT",
+          "rationale": "The cited routes render financial-statement views but declare no export or download transport, so adjacent view routes cannot establish the export target.",
+          "verification": [
+            "routes/finance.php:619-630 re-opened at pin: only statement-view GET routes and adjacent report routes are declared.",
+            "FinancialReportController and the pinned finance routes were searched for export, download, CSV, and PDF; no financial-statement export transport was found."
+          ]
+        },
+        "page_files": {
+          "disposition": "REJECT",
+          "rationale": "The cited statement pages render and filter reports but expose no export or download control, so they are not actual page owners of this export target.",
+          "verification": [
+            "resources/js/pages/finance/reports/TrialBalance.tsx, ProfitAndLoss.tsx, BalanceSheet.tsx, and CashFlow.tsx were re-opened at pin; they contain render/filter UI and no export/download control."
+          ]
+        },
+        "test_anchors": {
+          "disposition": "REJECT",
+          "rationale": "The cited tests exercise report rendering and figures only; they do not statically locate any financial-statement export or download contract.",
+          "verification": [
+            "tests/Feature/Finance/ReportsRenderTest.php:51-78 was re-opened at pin; it contains GET/render and report-value assertions only, with no export response assertion."
+          ]
+        },
+        "route_names": {
+          "disposition": "REJECT",
+          "rationale": "The listed names are exact names for statement-view routes, but none names an export or download route for this target.",
+          "verification": [
+            "The four listed finance.reports.* names were matched to pinned GET view declarations at routes/finance.php:621-624; none is an export/download name."
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 72,
+      "feature_id": "CAP-FIN-FIXED-ASSET-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 73,
+      "feature_id": "CAP-FIN-FUNDING-STREAM-ADMIN",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 75,
+      "feature_id": "CAP-FIN-GST-RETURN-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 76,
+      "feature_id": "CAP-FIN-IRD-FILING-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 77,
+      "feature_id": "CAP-FIN-MANUAL-JOURNAL-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 80,
+      "feature_id": "CAP-FIN-PAYMENT-RUN-EXPORT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 81,
+      "feature_id": "CAP-FIN-PAYMENT-RUN-EXTERNAL-SETTLEMENT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 82,
+      "feature_id": "CAP-FIN-PAYMENT-RUN-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 83,
+      "feature_id": "CAP-FIN-PETTY-CASH-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 84,
+      "feature_id": "CAP-FIN-PURCHASE-ORDER-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 85,
+      "feature_id": "CAP-FIN-QUOTE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 86,
+      "feature_id": "CAP-FIN-RECEIPT-ALLOCATION-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 87,
+      "feature_id": "CAP-FIN-RECURRING-JOURNAL-EXECUTION",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "CORRECT",
+          "rationale": "The producer retained page absence, but the pinned journals index is the actual page owner of recurring-journal execution history, including failed, posted, recovered, retry, attempt, and journal-link projections.",
+          "verification": [
+            "resources/js/pages/finance/journals/Index.tsx:176-204 was re-opened at pin and receives recurringOccurrenceHistory in the page owner.",
+            "resources/js/pages/finance/journals/Index.tsx:277-415 was re-opened at pin and renders recurring journal run status, retries, attempts, and linked journals.",
+            "app/Domain/Finance/Http/Controllers/JournalController.php:71-120 supplies the same recurringOccurrenceHistory projection to finance/journals/Index."
+          ],
+          "correction": {
+            "status": "ESTABLISHED",
+            "value": "resources/js/pages/finance/journals/Index.tsx:176-204; resources/js/pages/finance/journals/Index.tsx:277-415",
+            "anchors": [
+              "resources/js/pages/finance/journals/Index.tsx:176-204",
+              "resources/js/pages/finance/journals/Index.tsx:277-415"
+            ],
+            "rationale": "The journals index is the pinned Inertia page owner for recurring-journal occurrence execution history and retry evidence.",
+            "bounded_search": []
+          }
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 90,
+      "feature_id": "CAP-FIN-VENDOR-MASTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 91,
+      "feature_id": "CAP-FIN-XERO-ACCOUNTING-SYNC",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 92,
+      "feature_id": "CAP-FLEET-ASSET-REGISTER",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned backend owner; no runtime credit.",
+          "verification": [
+            "backend @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 93,
+      "feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 94,
+      "feature_id": "CAP-FLEET-GEOFENCE-LIFECYCLE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 95,
+      "feature_id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 96,
+      "feature_id": "CAP-FLEET-INCIDENT-RECORD",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 97,
+      "feature_id": "CAP-FLEET-KEY-CUSTODY",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 98,
+      "feature_id": "CAP-FLEET-MAINTENANCE-SCHEDULE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 99,
+      "feature_id": "CAP-FLEET-MILEAGE-RECORD",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 100,
+      "feature_id": "CAP-FLEET-OUTING-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 101,
+      "feature_id": "CAP-FLEET-PANIC-RESPONSE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 103,
+      "feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 104,
+      "feature_id": "CAP-FLEET-RESIDENT-TRANSPORT",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 105,
+      "feature_id": "CAP-FLEET-VEHICLE-BOOKING",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 106,
+      "feature_id": "CAP-FLEET-VEHICLE-INSPECTION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 107,
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned backend owner; no runtime credit.",
+          "verification": [
+            "backend @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 108,
+      "feature_id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+      "field_reviews": {
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 162,
+      "feature_id": "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 163,
+      "feature_id": "CAP-HS-DASHBOARD-ANALYTICS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 164,
+      "feature_id": "CAP-HS-EMERGENCY-DRILLS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 165,
+      "feature_id": "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 166,
+      "feature_id": "CAP-HS-EVENT-REGISTER",
+      "field_reviews": {
+        "backend_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned backend owner; no runtime credit.",
+          "verification": [
+            "backend @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 167,
+      "feature_id": "CAP-HS-FIRST-AID-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 168,
+      "feature_id": "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 169,
+      "feature_id": "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 170,
+      "feature_id": "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 171,
+      "feature_id": "CAP-HS-INVESTIGATION-ASSURANCE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 172,
+      "feature_id": "CAP-HS-LONE-WORKER-SAFETY",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 173,
+      "feature_id": "CAP-HS-PPE-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 174,
+      "feature_id": "CAP-HS-RESTRAINT-REGISTER",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 175,
+      "feature_id": "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 176,
+      "feature_id": "CAP-HS-SAFE-WORK-PROCEDURES",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 177,
+      "feature_id": "CAP-HS-WORKER-PARTICIPATION",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 178,
+      "feature_id": "CAP-HS-WORKPLACE-INJURY-RTW",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 179,
+      "feature_id": "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+      "field_reviews": {
+        "route_paths": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route linkage; no runtime credit.",
+          "verification": [
+            "route @pin"
+          ]
+        },
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "route_names": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned route names; no reachability credit.",
+          "verification": [
+            "names @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 221,
+      "feature_id": "CAP-NOTIF-PERSONAL-INBOX-ACK",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 244,
+      "feature_id": "CAP-PLAT-ADMIN-DASHBOARD",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 270,
+      "feature_id": "CAP-REP-COMBINED-REPORTS",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "No direct pinned test; adjacent tests excluded.",
+          "verification": [
+            "search @pin"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 271,
+      "feature_id": "CAP-REP-REPORT-CATALOG-HUB",
+      "field_reviews": {
+        "page_files": {
+          "disposition": "ACCEPT",
+          "rationale": "Actual pinned page owner; no browser credit.",
+          "verification": [
+            "page @pin"
+          ]
+        },
+        "test_anchors": {
+          "disposition": "ACCEPT",
+          "rationale": "Exact pinned test locator; not executed.",
+          "verification": [
+            "test @pin"
+          ]
+        }
+      }
+    }
+  ],
+  "credit_boundary": {
+    "independent_static_source_review": true,
+    "application_write": false,
+    "vcs_mutation": false,
+    "runtime": false,
+    "browser": false,
+    "executed_test": false,
+    "build": false,
+    "database": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Independent read-only review of RUN-074A producer records at the pinned application commit. No files, VCS state, application state, runtime, browser, tests, build, database, benchmark, ease, Pass, or completion credit were changed or exercised."
+}

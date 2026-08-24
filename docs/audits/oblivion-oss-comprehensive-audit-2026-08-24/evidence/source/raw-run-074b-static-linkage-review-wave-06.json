@@ -1,0 +1,2997 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-074B",
+  "partition_id": "RUN-074B",
+  "status": "COMPLETE_STATIC_LINKAGE_RECONSTRUCTION_ZERO_CREDIT",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "partition_manifest_sha256": "819a31557af4599387e4d226f228e4d94f80883c477ffd3375cc230f538990ab"
+  },
+  "records": [
+    {
+      "matrix_ordinal": 27,
+      "feature_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/feedback/Index.tsx:185-185",
+          "anchors": [
+            "resources/js/pages/sites/feedback/Index.tsx:185-185"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Record and respond to an approved-Site complaint or feedback record",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 109,
+      "feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:249-251; routes/governance.php:359-363",
+          "anchors": [
+            "routes/governance.php:249-251",
+            "routes/governance.php:359-363"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Create, progress, block, complete, and escalate governance actions",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Actions/Index.tsx:36-36",
+          "anchors": [
+            "resources/js/pages/Governance/Actions/Index.tsx:36-36"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create, progress, block, complete, and escalate governance actions",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.actions.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 110,
+      "feature_id": "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:41-49",
+          "anchors": [
+            "routes/governance.php:41-49"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Generate governance audit-evidence packs",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "The exact governance evidence-pack route is a headless POST download handled by ReportController; it has no Inertia render or owning page. The Board Packs pages own a different generate/distribute workflow and cannot be inherited.",
+          "bounded_search": [
+            "resources/js/pages/Governance/** terms evidence-pack|evidencePack|reports.evidence",
+            "resources/js/** terms governance.reports.evidence-pack|/governance/reports/evidence-pack",
+            "app/Domain/Governance/Http/Controllers/ReportController.php and routes/governance.php"
+          ]
+        },
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test at the pin targets governance.reports.evidence-pack or ReportController::evidencePack. Board-pack, Control Room, Respite and Finance evidence-pack tests exercise different endpoints and contracts, so they cannot be inherited.",
+          "bounded_search": [
+            "tests/Feature/Governance/** and tests/Browser/Governance/** terms evidence-pack|evidencePack|evidence_pack",
+            "tests/** terms governance.reports.evidence-pack|ReportController.*evidencePack",
+            "tests/** adjacent terms board pack|control room evidence pack|finance evidence pack"
+          ]
+        }
+      },
+      "route_names": [
+        "governance.reports.evidence-pack"
+      ]
+    },
+    {
+      "matrix_ordinal": 111,
+      "feature_id": "CAP-GOV-AUDIT-LOG-EXPORT",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:366-370",
+          "anchors": [
+            "routes/governance.php:366-370"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Review and export cross-module governance audit evidence",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/AuditLog/Index.tsx:51-51",
+          "anchors": [
+            "resources/js/pages/Governance/AuditLog/Index.tsx:51-51"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review and export cross-module governance audit evidence",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.audit-log.index",
+        "governance.audit-log.export"
+      ]
+    },
+    {
+      "matrix_ordinal": 112,
+      "feature_id": "CAP-GOV-BOARD-EVALUATION",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:300-312",
+          "anchors": [
+            "routes/governance.php:300-312"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Conduct board evaluations",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Evaluations/Index.tsx:31-31",
+          "anchors": [
+            "resources/js/pages/Governance/Evaluations/Index.tsx:31-31"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Conduct board evaluations",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.evaluations.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 113,
+      "feature_id": "CAP-GOV-BOARD-MEMBERSHIP",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:123-129",
+          "anchors": [
+            "routes/governance.php:123-129"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Administer board membership",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Admin/BoardMembers.tsx:46-46",
+          "anchors": [
+            "resources/js/pages/Governance/Admin/BoardMembers.tsx:46-46"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Administer board membership",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Governance/GovernanceBoardMemberAdminTest.php:22-70",
+          "anchors": [
+            "tests/Feature/Governance/GovernanceBoardMemberAdminTest.php:22-70"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Administer board membership. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.admin.board-members.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 114,
+      "feature_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:83-97",
+          "anchors": [
+            "routes/governance.php:83-97"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Generate, distribute, read, and download board packs",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Packs/Index.tsx:54-54",
+          "anchors": [
+            "resources/js/pages/Governance/Packs/Index.tsx:54-54"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Generate, distribute, read, and download board packs",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.packs.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 115,
+      "feature_id": "CAP-GOV-BUDGET-ALLOCATIONS-ADJUSTMENTS",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:210-245",
+          "anchors": [
+            "routes/governance.php:210-245"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Manage governance budgets, allocations, actuals, and approvals",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Budgets/Index.tsx:38-38",
+          "anchors": [
+            "resources/js/pages/Governance/Budgets/Index.tsx:38-38"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage governance budgets, allocations, actuals, and approvals",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.budgets.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 116,
+      "feature_id": "CAP-GOV-CEO-BOARD-REPORT",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:271-286",
+          "anchors": [
+            "routes/governance.php:271-286"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Draft, submit, present, and evidence CEO board reports",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/CeoReports/Index.tsx:77-77",
+          "anchors": [
+            "resources/js/pages/Governance/CeoReports/Index.tsx:77-77"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Draft, submit, present, and evidence CEO board reports",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.ceo-reports.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 117,
+      "feature_id": "CAP-GOV-CLINICAL-INDICATOR-SNAPSHOT",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:327-335",
+          "anchors": [
+            "routes/governance.php:327-335"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Review clinical governance indicators and record snapshots",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Clinical/Dashboard.tsx:78-78",
+          "anchors": [
+            "resources/js/pages/Governance/Clinical/Dashboard.tsx:78-78"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review clinical governance indicators and record snapshots",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.clinical.dashboard"
+      ]
+    },
+    {
+      "matrix_ordinal": 118,
+      "feature_id": "CAP-GOV-COMPLIANCE-OBLIGATION-EVIDENCE",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:155-170",
+          "anchors": [
+            "routes/governance.php:155-170"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Manage compliance obligations, evidence, and notifiable records",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Compliance/Index.tsx:49-49",
+          "anchors": [
+            "resources/js/pages/Governance/Compliance/Index.tsx:49-49"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage compliance obligations, evidence, and notifiable records",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.compliance.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 119,
+      "feature_id": "CAP-GOV-DASHBOARD-READ-LENS",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:24-39",
+          "anchors": [
+            "routes/governance.php:24-39"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Review the authorised governance overview",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Dashboard.tsx:45-45",
+          "anchors": [
+            "resources/js/pages/Governance/Dashboard.tsx:45-45"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review the authorised governance overview",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Governance/GovernanceDashboardTest.php:20-60",
+          "anchors": [
+            "tests/Feature/Governance/GovernanceDashboardTest.php:20-60"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review the authorised governance overview. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.dashboard"
+      ]
+    },
+    {
+      "matrix_ordinal": 120,
+      "feature_id": "CAP-GOV-DOCUMENT-LIBRARY",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:315-324",
+          "anchors": [
+            "routes/governance.php:315-324"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Store, browse, download, and remove governance documents",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Documents/Index.tsx:39-39",
+          "anchors": [
+            "resources/js/pages/Governance/Documents/Index.tsx:39-39"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Store, browse, download, and remove governance documents",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.documents.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 121,
+      "feature_id": "CAP-GOV-INTEREST-REGISTER",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:289-298",
+          "anchors": [
+            "routes/governance.php:289-298"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Record and govern board-member interests",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Interests/Index.tsx:43-43",
+          "anchors": [
+            "resources/js/pages/Governance/Interests/Index.tsx:43-43"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Record and govern board-member interests",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.interests.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 122,
+      "feature_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:51-80",
+          "anchors": [
+            "routes/governance.php:51-80"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Schedule meetings and manage agendas, attendance, minutes, and status",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Meetings/Index.tsx:36-36",
+          "anchors": [
+            "resources/js/pages/Governance/Meetings/Index.tsx:36-36"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Schedule meetings and manage agendas, attendance, minutes, and status",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.meetings.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 123,
+      "feature_id": "CAP-GOV-PERFORMANCE-REVIEW",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:173-189",
+          "anchors": [
+            "routes/governance.php:173-189"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Run board and CEO performance reviews and approvals",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Performance/Index.tsx:35-35",
+          "anchors": [
+            "resources/js/pages/Governance/Performance/Index.tsx:35-35"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Run board and CEO performance reviews and approvals",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.performance.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 124,
+      "feature_id": "CAP-GOV-POLICY-ATTESTATION",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:254-267",
+          "anchors": [
+            "routes/governance.php:254-267"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Acknowledge and evidence governance policy attestations",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Policies/Attestations.tsx:105-105",
+          "anchors": [
+            "resources/js/pages/Governance/Policies/Attestations.tsx:105-105"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Acknowledge and evidence governance policy attestations",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.policies.attestations",
+        "governance.policies.attest"
+      ]
+    },
+    {
+      "matrix_ordinal": 125,
+      "feature_id": "CAP-GOV-POLICY-LIFECYCLE",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:254-267",
+          "anchors": [
+            "routes/governance.php:254-267"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Draft, approve, publish, and version governance policies",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Policies/Index.tsx:33-33",
+          "anchors": [
+            "resources/js/pages/Governance/Policies/Index.tsx:33-33"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Draft, approve, publish, and version governance policies",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.policies.index",
+        "governance.policies.approve",
+        "governance.policies.version"
+      ]
+    },
+    {
+      "matrix_ordinal": 126,
+      "feature_id": "CAP-GOV-REPORTING-EXPORT",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:41-49",
+          "anchors": [
+            "routes/governance.php:41-49"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Generate and export governance reports",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Reports/BoardMonthly.tsx:64-64; resources/js/pages/Governance/Reports/Committee.tsx:80-80; resources/js/pages/Governance/Reports/ComplianceStatus.tsx:52-52; resources/js/pages/Governance/Reports/RiskNarrative.tsx:58-58",
+          "anchors": [
+            "resources/js/pages/Governance/Reports/BoardMonthly.tsx:64-64",
+            "resources/js/pages/Governance/Reports/Committee.tsx:80-80",
+            "resources/js/pages/Governance/Reports/ComplianceStatus.tsx:52-52",
+            "resources/js/pages/Governance/Reports/RiskNarrative.tsx:58-58"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Generate and export governance reports",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.reports.board-monthly",
+        "governance.reports.export"
+      ]
+    },
+    {
+      "matrix_ordinal": 127,
+      "feature_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:100-121",
+          "anchors": [
+            "routes/governance.php:100-121"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Resolutions/Index.tsx:44-44",
+          "anchors": [
+            "resources/js/pages/Governance/Resolutions/Index.tsx:44-44"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.resolutions.index",
+        "governance.resolutions.vote"
+      ]
+    },
+    {
+      "matrix_ordinal": 128,
+      "feature_id": "CAP-GOV-RISK-REGISTER-TREATMENT",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:131-152",
+          "anchors": [
+            "routes/governance.php:131-152"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Score risks, add treatments, accept, and close records",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Risks/Index.tsx:60-60",
+          "anchors": [
+            "resources/js/pages/Governance/Risks/Index.tsx:60-60"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Score risks, add treatments, accept, and close records",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.risks.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 129,
+      "feature_id": "CAP-GOV-SETTINGS-CONTROL",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:394-400",
+          "anchors": [
+            "routes/governance.php:394-400"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Configure governed spend, escalation, and variance settings",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Settings/Index.tsx:26-26",
+          "anchors": [
+            "resources/js/pages/Governance/Settings/Index.tsx:26-26"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure governed spend, escalation, and variance settings",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.settings.index",
+        "governance.settings.update"
+      ]
+    },
+    {
+      "matrix_ordinal": 130,
+      "feature_id": "CAP-GOV-SPEND-APPROVAL",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:372-392",
+          "anchors": [
+            "routes/governance.php:372-392"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Request, decide, and evidence board or committee spend approval",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/SpendApprovals/Index.tsx:67-67",
+          "anchors": [
+            "resources/js/pages/Governance/SpendApprovals/Index.tsx:67-67"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Request, decide, and evidence board or committee spend approval",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.spend-approvals.index",
+        "governance.spend-approvals.approve",
+        "governance.spend-approvals.reject"
+      ]
+    },
+    {
+      "matrix_ordinal": 131,
+      "feature_id": "CAP-GOV-STRATEGY-PLAN-GOALS",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:192-207",
+          "anchors": [
+            "routes/governance.php:192-207"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Create strategic plans, goals, versions, and approvals",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/Strategy/Index.tsx:34-34",
+          "anchors": [
+            "resources/js/pages/Governance/Strategy/Index.tsx:34-34"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create strategic plans, goals, versions, and approvals",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.strategy.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 132,
+      "feature_id": "CAP-GOV-TE-TIRITI-OBLIGATION",
+      "module": "Governance",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/governance.php:338-345",
+          "anchors": [
+            "routes/governance.php:338-345"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Record and maintain Te Tiriti governance obligations",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Governance/TeTiriti/Index.tsx:50-50",
+          "anchors": [
+            "resources/js/pages/Governance/TeTiriti/Index.tsx:50-50"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Record and maintain Te Tiriti governance obligations",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "governance.te-tiriti.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 136,
+      "feature_id": "CAP-HR-COMPETENCY-ASSESSMENT",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:949-964",
+          "anchors": [
+            "routes/hr.php:949-964"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Assess and govern staff competencies",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/performance/competencies/index.tsx:63-63",
+          "anchors": [
+            "resources/js/pages/hr/performance/competencies/index.tsx:63-63"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Assess and govern staff competencies",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:101-127",
+          "anchors": [
+            "tests/Feature/Hr/CompetencyCanonicalAccessTest.php:101-127"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Assess and govern staff competencies. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.competencies.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 137,
+      "feature_id": "CAP-HR-COMPLIANCE-RECORDS",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/compliance/index.tsx:122-122",
+          "anchors": [
+            "resources/js/pages/hr/compliance/index.tsx:122-122"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage staff compliance records",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 138,
+      "feature_id": "CAP-HR-DOCUMENT-LIBRARY",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/documents/index.tsx:336-336",
+          "anchors": [
+            "resources/js/pages/hr/documents/index.tsx:336-336"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage governed HR documents",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 139,
+      "feature_id": "CAP-HR-DOCUMENT-SIGNATURE",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:1239-1251",
+          "anchors": [
+            "routes/hr.php:1239-1251"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Request and record document signatures",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/signatures/pending.tsx:57-57",
+          "anchors": [
+            "resources/js/pages/hr/signatures/pending.tsx:57-57"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Request and record document signatures",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/ESignatureAuthorizationTest.php:215-252",
+          "anchors": [
+            "tests/Feature/Hr/ESignatureAuthorizationTest.php:215-252"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Request and record document signatures. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.signatures.pending"
+      ]
+    },
+    {
+      "matrix_ordinal": 141,
+      "feature_id": "CAP-HR-LEAVE-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/leave/index.tsx:199-199",
+          "anchors": [
+            "resources/js/pages/hr/leave/index.tsx:199-199"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Request, approve, decline, and cancel leave",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 142,
+      "feature_id": "CAP-HR-OFFBOARDING-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/offboarding/index.tsx:102-102",
+          "anchors": [
+            "resources/js/pages/hr/offboarding/index.tsx:102-102"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Offboard staff through governed terminal tasks",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 143,
+      "feature_id": "CAP-HR-ONBOARDING-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/onboarding/index.tsx:168-168",
+          "anchors": [
+            "resources/js/pages/hr/onboarding/index.tsx:168-168"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Onboard staff through governed checklists and tasks",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 144,
+      "feature_id": "CAP-HR-PAYROLL-RUN-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:718-735",
+          "anchors": [
+            "routes/hr.php:718-735"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Prepare and govern payroll runs",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/payroll/index.tsx:146-146",
+          "anchors": [
+            "resources/js/pages/hr/payroll/index.tsx:146-146"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Prepare and govern payroll runs",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/PayrollRunApplicationCreationTest.php:23-51",
+          "anchors": [
+            "tests/Feature/Hr/PayrollRunApplicationCreationTest.php:23-51"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Prepare and govern payroll runs. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.payroll.index",
+        "hr.payroll.runs.store"
+      ]
+    },
+    {
+      "matrix_ordinal": 145,
+      "feature_id": "CAP-HR-PERFORMANCE-REVIEW",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/performance/reviews.tsx:204-204",
+          "anchors": [
+            "resources/js/pages/hr/performance/reviews.tsx:204-204"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage staff performance reviews",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 146,
+      "feature_id": "CAP-HR-POLICY-ATTESTATION",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:575-595",
+          "anchors": [
+            "routes/hr.php:575-595"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Acknowledge and evidence HR policy attestations",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/documents/policies/attestations.tsx:62-62",
+          "anchors": [
+            "resources/js/pages/hr/documents/policies/attestations.tsx:62-62"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Acknowledge and evidence HR policy attestations",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Hr/HrPoliciesTest.php:29-35",
+          "anchors": [
+            "tests/Browser/Hr/HrPoliciesTest.php:29-35"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Acknowledge and evidence HR policy attestations. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.policies.attestations.index",
+        "hr.policies.attestations.store"
+      ]
+    },
+    {
+      "matrix_ordinal": 147,
+      "feature_id": "CAP-HR-POLICY-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/documents/policies/index.tsx:129-129",
+          "anchors": [
+            "resources/js/pages/hr/documents/policies/index.tsx:129-129"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Draft, version, publish, and retire HR policies",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 154,
+      "feature_id": "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/reports/index.tsx:81-81; resources/js/pages/hr/reports/index.tsx:421-558",
+          "anchors": [
+            "resources/js/pages/hr/reports/index.tsx:81-81",
+            "resources/js/pages/hr/reports/index.tsx:421-558"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Execute due HR report subscriptions, persist exports, and notify authorised recipients.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 155,
+      "feature_id": "CAP-HR-TIME-ENTRY-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:1298-1318",
+          "anchors": [
+            "routes/hr.php:1298-1318"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Administer HR time entries and amendments",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/time/index.tsx:95-95",
+          "anchors": [
+            "resources/js/pages/hr/time/index.tsx:95-95"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Administer HR time entries and amendments",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/HrTimeTrackingAuthorizationTest.php:223-393",
+          "anchors": [
+            "tests/Feature/Hr/HrTimeTrackingAuthorizationTest.php:223-393"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Administer HR time entries and amendments. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.time.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 156,
+      "feature_id": "CAP-HR-TRAINING-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/hr.php:1391-1418",
+          "anchors": [
+            "routes/hr.php:1391-1418"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Assign and complete staff training",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/training/catalog.tsx:232-232",
+          "anchors": [
+            "resources/js/pages/hr/training/catalog.tsx:232-232"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Assign and complete staff training",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/TrainingHubTest.php:72-204",
+          "anchors": [
+            "tests/Feature/Hr/TrainingHubTest.php:72-204"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Assign and complete staff training. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "hr.training.catalog"
+      ]
+    },
+    {
+      "matrix_ordinal": 157,
+      "feature_id": "CAP-HR-VETTING-LIFECYCLE",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/vetting/index.tsx:128-128",
+          "anchors": [
+            "resources/js/pages/hr/vetting/index.tsx:128-128"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Manage staff vetting decisions",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 158,
+      "feature_id": "CAP-HR-WEBHOOK-CONFIGURATION",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/settings/webhooks.tsx:75-75; resources/js/pages/hr/settings/webhooks.tsx:170-497",
+          "anchors": [
+            "resources/js/pages/hr/settings/webhooks.tsx:75-75",
+            "resources/js/pages/hr/settings/webhooks.tsx:170-497"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure governed HR webhook endpoints",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 159,
+      "feature_id": "CAP-HR-WEBHOOK-DELIVERY",
+      "module": "HR",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/settings/webhooks.tsx:75-75; resources/js/pages/hr/settings/webhooks.tsx:537-611",
+          "anchors": [
+            "resources/js/pages/hr/settings/webhooks.tsx:75-75",
+            "resources/js/pages/hr/settings/webhooks.tsx:537-611"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Deliver and retry governed HR webhook events",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 224,
+      "feature_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "module": "Operations",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/CarePlanWorkspaceTest.php:59-109; tests/Feature/Operations/CarePlanWorkspaceTest.php:255-336; tests/Feature/Operations/CarePlanWorkspaceTest.php:338-397; tests/Feature/Operations/CarePlanWorkspaceTest.php:433-444",
+          "anchors": [
+            "tests/Feature/Operations/CarePlanWorkspaceTest.php:59-109",
+            "tests/Feature/Operations/CarePlanWorkspaceTest.php:255-336",
+            "tests/Feature/Operations/CarePlanWorkspaceTest.php:338-397",
+            "tests/Feature/Operations/CarePlanWorkspaceTest.php:433-444"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Create, review, attest, export, and close a care plan. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 225,
+      "feature_id": "CAP-OPS-CLIENT-ONBOARDING",
+      "module": "Operations",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/onboarding/Index.tsx:82-82",
+          "anchors": [
+            "resources/js/pages/operations/onboarding/Index.tsx:82-82"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Run governed client onboarding",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 227,
+      "feature_id": "CAP-OPS-DASHBOARD-ACTIVITY",
+      "module": "Operations",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/Index.tsx:94-94; resources/js/pages/operations/activity/Index.tsx:65-65",
+          "anchors": [
+            "resources/js/pages/operations/Index.tsx:94-94",
+            "resources/js/pages/operations/activity/Index.tsx:65-65"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review operations dashboard activity",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 228,
+      "feature_id": "CAP-OPS-FUNDING-CLAIMS",
+      "module": "Operations",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/funding/claims/Index.tsx:62-62",
+          "anchors": [
+            "resources/js/pages/operations/funding/claims/Index.tsx:62-62"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Prepare and manage governed funding claims",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 229,
+      "feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "module": "Operations",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/CalendarSyncTriggerTest.php:9-23",
+          "anchors": [
+            "tests/Feature/Operations/CalendarSyncTriggerTest.php:9-23"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Create, list, remove, and timestamp trigger attempts for user-owned personal calendar connection metadata.. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 234,
+      "feature_id": "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2832-2865",
+          "anchors": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531",
+            "resources/js/pages/operations/rostering/index.tsx:2832-2865"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create, duplicate, update, apply, and remove a roster template.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 235,
+      "feature_id": "CAP-OPS-ROSTER-TIME-OFF",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/operations.php:960-966",
+          "anchors": [
+            "routes/operations.php:960-966"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain non-leave roster unavailability and training blocks",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2780-2793",
+          "anchors": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531",
+            "resources/js/pages/operations/rostering/index.tsx:2780-2793"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain non-leave roster unavailability and training blocks",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/LeaveProjectionSyncTest.php:113-139",
+          "anchors": [
+            "tests/Feature/Hr/LeaveProjectionSyncTest.php:113-139"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain non-leave roster unavailability and training blocks. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "operations.rostering.time_off.store",
+        "operations.rostering.time_off.destroy"
+      ]
+    },
+    {
+      "matrix_ordinal": 236,
+      "feature_id": "CAP-OPS-SHIFT-COVER-LIFECYCLE",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2750-2769",
+          "anchors": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531",
+            "resources/js/pages/operations/rostering/index.tsx:2750-2769"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Request, claim, approve, and resolve shift cover",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 237,
+      "feature_id": "CAP-OPS-SHIFT-HANDOVER",
+      "module": "Operations",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/ShiftHandoverWorkflowTest.php:80-141; tests/Feature/Operations/ShiftHandoverWorkflowTest.php:143-181",
+          "anchors": [
+            "tests/Feature/Operations/ShiftHandoverWorkflowTest.php:80-141",
+            "tests/Feature/Operations/ShiftHandoverWorkflowTest.php:143-181"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Prepare and accept shift handover. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 238,
+      "feature_id": "CAP-OPS-SHIFT-LIFECYCLE",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/shifts/index.tsx:164-164",
+          "anchors": [
+            "resources/js/pages/operations/shifts/index.tsx:164-164"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create, publish, start, and close a shift",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 239,
+      "feature_id": "CAP-OPS-SHIFT-NOTES",
+      "module": "Operations",
+      "original_missing_fields": [
+        "route_paths",
+        "backend_anchors",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/operations.php:855-871",
+          "anchors": [
+            "routes/operations.php:855-871"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Record and review shift notes",
+          "bounded_search": []
+        },
+        "backend_anchors": {
+          "status": "ESTABLISHED",
+          "value": "app/Http/Controllers/Operations/ShiftNoteController.php:26-170",
+          "anchors": [
+            "app/Http/Controllers/Operations/ShiftNoteController.php:26-170"
+          ],
+          "rationale": "The pinned ShiftNoteController index/store/update/flag/review implementation is the narrow backend owner for recording and reviewing shift-linked notes.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/ShiftNoteAuthorizationTest.php:107-184",
+          "anchors": [
+            "tests/Feature/Operations/ShiftNoteAuthorizationTest.php:107-184"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Record and review shift notes. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "operations.shift_notes.index",
+        "operations.shift_notes.store",
+        "operations.shift_notes.review"
+      ]
+    },
+    {
+      "matrix_ordinal": 240,
+      "feature_id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2750-2764",
+          "anchors": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531",
+            "resources/js/pages/operations/rostering/index.tsx:2750-2764"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Assign eligible staff to shifts",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 241,
+      "feature_id": "CAP-OPS-STAFF-AVAILABILITY",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/rostering/index.tsx:531-531; resources/js/pages/operations/rostering/index.tsx:2794-2803",
+          "anchors": [
+            "resources/js/pages/operations/rostering/index.tsx:531-531",
+            "resources/js/pages/operations/rostering/index.tsx:2794-2803"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain recurring staff availability",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 243,
+      "feature_id": "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE",
+      "module": "Workforce",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/operations.php:1009-1029; routes/operations.php:1060-1089",
+          "anchors": [
+            "routes/operations.php:1009-1029",
+            "routes/operations.php:1060-1089"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Approve, reject, return, and amend timesheets",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/timesheets/index.tsx:563-575; resources/js/pages/operations/timesheets/index.tsx:640-656; resources/js/pages/operations/timesheets/index.tsx:741-753",
+          "anchors": [
+            "resources/js/pages/operations/timesheets/index.tsx:563-575",
+            "resources/js/pages/operations/timesheets/index.tsx:640-656",
+            "resources/js/pages/operations/timesheets/index.tsx:741-753"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Approve, reject, return, and amend timesheets",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/TimesheetControllerTest.php:941-1038",
+          "anchors": [
+            "tests/Feature/TimesheetControllerTest.php:941-1038"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Approve, reject, return, and amend timesheets. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "operations.timesheets.index",
+        "operations.timesheets.approve",
+        "operations.timesheets.reject",
+        "operations.timesheets.return"
+      ]
+    },
+    {
+      "matrix_ordinal": 245,
+      "feature_id": "CAP-PORT-CLIENT-WORKSPACE",
+      "module": "Portal",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:273-282",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:273-282"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Use the authorised portal client workspace and section-gated summary. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 246,
+      "feature_id": "CAP-PORT-FAMILY-CALENDAR",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/calendar.tsx:192-192",
+          "anchors": [
+            "resources/js/pages/portal/calendar.tsx:192-192"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review the section-filtered family calendar and events",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:322-328",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:322-328"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review the section-filtered family calendar and events. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 247,
+      "feature_id": "CAP-PORT-FAMILY-DASHBOARD",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/family-dashboard.tsx:340-340",
+          "anchors": [
+            "resources/js/pages/portal/family-dashboard.tsx:340-340"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Use the family dashboard and create or cancel visit requests",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:301-312",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:301-312"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Use the family dashboard and create or cancel visit requests. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 248,
+      "feature_id": "CAP-PORT-FAMILY-DOCUMENTS",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/documents.tsx:78-78",
+          "anchors": [
+            "resources/js/pages/portal/documents.tsx:78-78"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review and upload authorised family-shared documents",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalDirectRouteAuthorizationTest.php:153-207",
+          "anchors": [
+            "tests/Feature/Portal/PortalDirectRouteAuthorizationTest.php:153-207"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review and upload authorised family-shared documents. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 249,
+      "feature_id": "CAP-PORT-FAMILY-HEALTH-LENS",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/health.tsx:76-76",
+          "anchors": [
+            "resources/js/pages/portal/health.tsx:76-76"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review the consent and section-filtered family health lens",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:284-292",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:284-292"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review the consent and section-filtered family health lens. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 250,
+      "feature_id": "CAP-PORT-FAMILY-LOCATION-LENS",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/location.tsx:87-87",
+          "anchors": [
+            "resources/js/pages/portal/location.tsx:87-87"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review consented location, history, and privacy status",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalSurfaceTest.php:104-134",
+          "anchors": [
+            "tests/Feature/Portal/PortalSurfaceTest.php:104-134"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review consented location, history, and privacy status. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 251,
+      "feature_id": "CAP-PORT-FAMILY-MESSAGING",
+      "module": "Portal",
+      "original_missing_fields": [
+        "route_paths",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/portal.php:147-163",
+          "anchors": [
+            "routes/portal.php:147-163"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Exchange messages within an authorised client relationship",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalSurfaceTest.php:74-101",
+          "anchors": [
+            "tests/Feature/Portal/PortalSurfaceTest.php:74-101"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Exchange messages within an authorised client relationship. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "portal.clients.messages",
+        "portal.clients.messages.send"
+      ]
+    },
+    {
+      "matrix_ordinal": 252,
+      "feature_id": "CAP-PORT-FAMILY-NOTES",
+      "module": "Portal",
+      "original_missing_fields": [
+        "route_paths",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/portal.php:93-101",
+          "anchors": [
+            "routes/portal.php:93-101"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Record and review authorised family notes",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:330-332",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:330-332"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Record and review authorised family notes. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "portal.clients.family-notes",
+        "portal.clients.family-notes.store"
+      ]
+    },
+    {
+      "matrix_ordinal": 253,
+      "feature_id": "CAP-PORT-FAMILY-PHOTOS",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/photos.tsx:49-49",
+          "anchors": [
+            "resources/js/pages/portal/photos.tsx:49-49"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review and upload authorised family-shared photos",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:375-406",
+          "anchors": [
+            "tests/Feature/Portal/PortalMessageMediaSecurityTest.php:375-406"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review and upload authorised family-shared photos. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 254,
+      "feature_id": "CAP-PORT-FAMILY-SCHEDULE",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/schedule.tsx:159-159",
+          "anchors": [
+            "resources/js/pages/portal/schedule.tsx:159-159"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review the authorised family shift and respite schedule",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:314-320",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:314-320"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review the authorised family shift and respite schedule. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 255,
+      "feature_id": "CAP-PORT-FAMILY-TIMELINE",
+      "module": "Portal",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/portal/timeline.tsx:110-110",
+          "anchors": [
+            "resources/js/pages/portal/timeline.tsx:110-110"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review and interact with the authorised family timeline",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:294-299",
+          "anchors": [
+            "tests/Feature/Portal/PortalClientSectionDisclosureTest.php:294-299"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review and interact with the authorised family timeline. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 266,
+      "feature_id": "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/careers/index.tsx:40-40; resources/js/pages/careers/apply.tsx:36-36; resources/js/pages/careers/application-status.tsx:40-40; resources/js/pages/careers/offer-response.tsx:34-34; resources/js/pages/careers/reference-questionnaire.tsx:27-27",
+          "anchors": [
+            "resources/js/pages/careers/index.tsx:40-40",
+            "resources/js/pages/careers/apply.tsx:36-36",
+            "resources/js/pages/careers/application-status.tsx:40-40",
+            "resources/js/pages/careers/offer-response.tsx:34-34",
+            "resources/js/pages/careers/reference-questionnaire.tsx:27-27"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Apply for a role and use token-bound application, offer, and reference flows",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Hr/CareersPortalTest.php:15-103",
+          "anchors": [
+            "tests/Feature/Hr/CareersPortalTest.php:15-103"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Apply for a role and use token-bound application, offer, and reference flows. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 267,
+      "feature_id": "CAP-PUB-CONTACT-SUBMISSION",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/contact.tsx:468-468",
+          "anchors": [
+            "resources/js/pages/contact.tsx:468-468"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Submit a public contact request",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 268,
+      "feature_id": "CAP-PUB-MARKETING-PAGES",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "backend_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/home.tsx:580-580; resources/js/pages/features.tsx:647-647; resources/js/pages/pricing.tsx:456-456; resources/js/pages/about.tsx:291-291; resources/js/pages/privacy.tsx:387-387; resources/js/pages/terms.tsx:432-432; resources/js/pages/smart-monitoring.tsx:652-652",
+          "anchors": [
+            "resources/js/pages/home.tsx:580-580",
+            "resources/js/pages/features.tsx:647-647",
+            "resources/js/pages/pricing.tsx:456-456",
+            "resources/js/pages/about.tsx:291-291",
+            "resources/js/pages/privacy.tsx:387-387",
+            "resources/js/pages/terms.tsx:432-432",
+            "resources/js/pages/smart-monitoring.tsx:652-652"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Read public product and policy pages",
+          "bounded_search": []
+        },
+        "backend_anchors": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:68-106",
+          "anchors": [
+            "routes/web.php:68-106"
+          ],
+          "rationale": "The pinned public web route closures are the request handlers that render the marketing and policy pages; no separate controller owns those routes.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 313,
+      "feature_id": "CAP-SET-EMAIL-CONFIG",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/settings.php:182-191",
+          "anchors": [
+            "routes/settings.php:182-191"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Configure application email delivery",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/email-settings.tsx:48-48",
+          "anchors": [
+            "resources/js/pages/settings/email-settings.tsx:48-48"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure application email delivery",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "settings.email",
+        "settings.email.update"
+      ]
+    },
+    {
+      "matrix_ordinal": 314,
+      "feature_id": "CAP-SET-MODULE-CONFIG",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/settings.php:250-256",
+          "anchors": [
+            "routes/settings.php:250-256"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Configure enabled application modules",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/modules.tsx:161-161",
+          "anchors": [
+            "resources/js/pages/settings/modules.tsx:161-161"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure enabled application modules",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "settings.modules",
+        "settings.modules.update"
+      ]
+    },
+    {
+      "matrix_ordinal": 315,
+      "feature_id": "CAP-SET-NOTIFICATION-CONFIG",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/notifications.tsx:103-103; resources/js/pages/settings/notification-defaults.tsx:119-119",
+          "anchors": [
+            "resources/js/pages/settings/notifications.tsx:103-103",
+            "resources/js/pages/settings/notification-defaults.tsx:119-119"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure personal and role notification preferences",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 316,
+      "feature_id": "CAP-SET-PERSONAL-PASSWORD",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/password.tsx:80-80",
+          "anchors": [
+            "resources/js/pages/settings/password.tsx:80-80"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Change the signed-in user's password",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/PasswordUpdateTest.php:6-33",
+          "anchors": [
+            "tests/Feature/Settings/PasswordUpdateTest.php:6-33"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Change the signed-in user's password. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 317,
+      "feature_id": "CAP-SET-PERSONAL-PREFERENCES",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/appearance.tsx:143-143",
+          "anchors": [
+            "resources/js/pages/settings/appearance.tsx:143-143"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain appearance and UI preferences",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/UiPreferenceTest.php:12-30",
+          "anchors": [
+            "tests/Feature/Settings/UiPreferenceTest.php:12-30"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain appearance and UI preferences. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 318,
+      "feature_id": "CAP-SET-PERSONAL-PROFILE",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/profile.tsx:134-134",
+          "anchors": [
+            "resources/js/pages/settings/profile.tsx:134-134"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain the signed-in user's profile",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/ProfileUpdateTest.php:9-40",
+          "anchors": [
+            "tests/Feature/Settings/ProfileUpdateTest.php:9-40"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain the signed-in user's profile. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 319,
+      "feature_id": "CAP-SET-PERSONAL-TWO-FACTOR",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/two-factor.tsx:38-38",
+          "anchors": [
+            "resources/js/pages/settings/two-factor.tsx:38-38"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Review and manage personal two-factor security",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/TwoFactorAuthenticationTest.php:7-64",
+          "anchors": [
+            "tests/Feature/Settings/TwoFactorAuthenticationTest.php:7-64"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Review and manage personal two-factor security. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 320,
+      "feature_id": "CAP-SET-ROLE-PERMISSION-ADMIN",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/roles/index.tsx:79-79; resources/js/pages/settings/roles/edit.tsx:176-176",
+          "anchors": [
+            "resources/js/pages/settings/roles/index.tsx:79-79",
+            "resources/js/pages/settings/roles/edit.tsx:176-176"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create roles and attach permissions",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 321,
+      "feature_id": "CAP-SET-SECURITY-POLICY",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/security.tsx:50-50",
+          "anchors": [
+            "resources/js/pages/settings/security.tsx:50-50"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure application security policy",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 322,
+      "feature_id": "CAP-SET-SESSION-ADMIN",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/settings.php:258-279",
+          "anchors": [
+            "routes/settings.php:258-279"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Terminate a user's active sessions",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/users/show.tsx:219-219; resources/js/pages/settings/users/show.tsx:780-895",
+          "anchors": [
+            "resources/js/pages/settings/users/show.tsx:219-219",
+            "resources/js/pages/settings/users/show.tsx:780-895"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Terminate a user's active sessions",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "settings.users.terminate-session",
+        "settings.users.terminate-all-sessions"
+      ]
+    },
+    {
+      "matrix_ordinal": 323,
+      "feature_id": "CAP-SET-SSO-MAPPING",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/settings.php:281-299",
+          "anchors": [
+            "routes/settings.php:281-299"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Configure SSO and group mappings",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/sso-config.tsx:1151-1165; resources/js/pages/settings/sso-groups.tsx:81-100",
+          "anchors": [
+            "resources/js/pages/settings/sso-config.tsx:1151-1165",
+            "resources/js/pages/settings/sso-groups.tsx:81-100"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure SSO and group mappings",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "settings.sso",
+        "settings.sso_groups.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 324,
+      "feature_id": "CAP-SET-TERMINOLOGY-CONFIG",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/terminology.tsx:241-241",
+          "anchors": [
+            "resources/js/pages/settings/terminology.tsx:241-241"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Configure organisation terminology",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 325,
+      "feature_id": "CAP-SET-USER-ACCESS-ADMIN",
+      "module": "Public & Settings Platform",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/access.tsx:1150-1150",
+          "anchors": [
+            "resources/js/pages/settings/access.tsx:1150-1150"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Approve users and administer role or permission overrides",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/SettingsControllerTest.php:714-939",
+          "anchors": [
+            "tests/Feature/SettingsControllerTest.php:714-939"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Approve users and administer role or permission overrides. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 326,
+      "feature_id": "CAP-SITE-CALENDAR-EVENT-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:97-116",
+          "anchors": [
+            "routes/sites.php:97-116"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Create, approve, update, and cancel Site calendar events",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/calendar/index.tsx:23-23",
+          "anchors": [
+            "resources/js/pages/sites/calendar/index.tsx:23-23"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create, approve, update, and cancel Site calendar events",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:97-149; tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:202-246",
+          "anchors": [
+            "tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:97-149",
+            "tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:202-246"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Create, approve, update, and cancel Site calendar events. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.calendar.index",
+        "sites.calendar.store",
+        "sites.calendar.approve"
+      ]
+    },
+    {
+      "matrix_ordinal": 327,
+      "feature_id": "CAP-SITE-CHECKLIST-RUN",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:140-153; routes/sites.php:501-530",
+          "anchors": [
+            "routes/sites.php:140-153",
+            "routes/sites.php:501-530"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Execute and complete Site checklist runs",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/checklists/index.tsx:13-16",
+          "anchors": [
+            "resources/js/pages/sites/checklists/index.tsx:13-16"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Execute and complete Site checklist runs",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.checklists.index",
+        "sites.checklists.completeRun"
+      ]
+    },
+    {
+      "matrix_ordinal": 328,
+      "feature_id": "CAP-SITE-CONTACTS",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/assets.php:99-108",
+          "anchors": [
+            "routes/assets.php:99-108"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site contacts",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/show.tsx:346-346; resources/js/pages/sites/show.tsx:804-816",
+          "anchors": [
+            "resources/js/pages/sites/show.tsx:346-346",
+            "resources/js/pages/sites/show.tsx:804-816"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site contacts",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/SiteProfileCanonicalAccessTest.php:489-526",
+          "anchors": [
+            "tests/Feature/Sites/SiteProfileCanonicalAccessTest.php:489-526"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain Site contacts. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.contacts.store",
+        "sites.contacts.update"
+      ]
+    },
+    {
+      "matrix_ordinal": 329,
+      "feature_id": "CAP-SITE-CREDENTIAL-VAULT",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:179-218; routes/sites.php:550-574",
+          "anchors": [
+            "routes/sites.php:179-218",
+            "routes/sites.php:550-574"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain protected Site credentials",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/vendors-credentials/global.tsx:160-160",
+          "anchors": [
+            "resources/js/pages/sites/vendors-credentials/global.tsx:160-160"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain protected Site credentials",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.credentials.index",
+        "sites.vendors.global"
+      ]
+    },
+    {
+      "matrix_ordinal": 330,
+      "feature_id": "CAP-SITE-EMERGENCY-PLAN-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:257-292",
+          "anchors": [
+            "routes/sites.php:257-292"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site emergency plans",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/emergency-plan/index.tsx:507-507",
+          "anchors": [
+            "resources/js/pages/sites/emergency-plan/index.tsx:507-507"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site emergency plans",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/SiteEmergencyPlanTest.php:177-263",
+          "anchors": [
+            "tests/Feature/Sites/SiteEmergencyPlanTest.php:177-263"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain Site emergency plans. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.emergency-plan.show",
+        "sites.emergency-plan.update"
+      ]
+    },
+    {
+      "matrix_ordinal": 331,
+      "feature_id": "CAP-SITE-HARDWARE-REGISTER",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:234-255",
+          "anchors": [
+            "routes/sites.php:234-255"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site hardware and physical placement",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/hardware/index.tsx:1337-1337",
+          "anchors": [
+            "resources/js/pages/sites/hardware/index.tsx:1337-1337"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site hardware and physical placement",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.hardware.index",
+        "sites.hardware.assignRoom"
+      ]
+    },
+    {
+      "matrix_ordinal": 332,
+      "feature_id": "CAP-SITE-HAZARD-REGISTER",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:129-138; routes/sites.php:465-499",
+          "anchors": [
+            "routes/sites.php:129-138",
+            "routes/sites.php:465-499"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Record and govern Site hazards",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/hazards/index.tsx:16-16",
+          "anchors": [
+            "resources/js/pages/sites/hazards/index.tsx:16-16"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Record and govern Site hazards",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.hazards.index",
+        "sites.hazards.store",
+        "sites.hazards.close"
+      ]
+    },
+    {
+      "matrix_ordinal": 333,
+      "feature_id": "CAP-SITE-HOUSE-LEDGER",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:80-95",
+          "anchors": [
+            "routes/sites.php:80-95"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain and reconcile the Site house ledger",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/ledger/index.tsx:141-141",
+          "anchors": [
+            "resources/js/pages/sites/ledger/index.tsx:141-141"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain and reconcile the Site house ledger",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.ledger.index",
+        "sites.ledger.reconcile"
+      ]
+    },
+    {
+      "matrix_ordinal": 334,
+      "feature_id": "CAP-SITE-INSPECTION-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:220-232",
+          "anchors": [
+            "routes/sites.php:220-232"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Schedule and evidence Site inspections",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/inspections/index.tsx:78-78",
+          "anchors": [
+            "resources/js/pages/sites/inspections/index.tsx:78-78"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Schedule and evidence Site inspections",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/SafetySiteAccessTest.php:149-192",
+          "anchors": [
+            "tests/Feature/Sites/SafetySiteAccessTest.php:149-192"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Schedule and evidence Site inspections. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.inspections.index",
+        "sites.inspections.complete"
+      ]
+    },
+    {
+      "matrix_ordinal": 335,
+      "feature_id": "CAP-SITE-PROFILE-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/assets.php:33-59; routes/assets.php:125-136",
+          "anchors": [
+            "routes/assets.php:33-59",
+            "routes/assets.php:125-136"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Create, edit, archive, and restore an operational Site",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/index.tsx:1211-1211; resources/js/pages/sites/create.tsx:86-86; resources/js/pages/sites/edit.tsx:113-113; resources/js/pages/sites/show.tsx:346-346",
+          "anchors": [
+            "resources/js/pages/sites/index.tsx:1211-1211",
+            "resources/js/pages/sites/create.tsx:86-86",
+            "resources/js/pages/sites/edit.tsx:113-113",
+            "resources/js/pages/sites/show.tsx:346-346"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Create, edit, archive, and restore an operational Site",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.index",
+        "sites.show",
+        "sites.store",
+        "sites.update",
+        "sites.archive",
+        "sites.unarchive"
+      ]
+    },
+    {
+      "matrix_ordinal": 337,
+      "feature_id": "CAP-SITE-RESOURCE-REGISTER",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:643-654",
+          "anchors": [
+            "routes/sites.php:643-654"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site calendar resources",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/resources/index.tsx:57-57",
+          "anchors": [
+            "resources/js/pages/sites/resources/index.tsx:57-57"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site calendar resources",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test at the pin directly locates SiteResourceController or the sites.resources CRUD routes. Calendar resource-sync tests concern external calendar mappings and room/asset tests concern different canonical records, so adjacent evidence cannot be inherited.",
+          "bounded_search": [
+            "tests/Feature/Sites/** and tests/Browser/Sites/** terms SiteResource|sites.resources|/sites/*/resources",
+            "tests/** terms SiteResourceController|sites.resources.store|sites.resources.update|sites.resources.destroy",
+            "tests/** adjacent calendar resource mapping, physical room, and asset register terms"
+          ]
+        }
+      },
+      "route_names": [
+        "sites.resources.index",
+        "sites.resources.store"
+      ]
+    },
+    {
+      "matrix_ordinal": 338,
+      "feature_id": "CAP-SITE-ROOM-ZONE-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:608-667",
+          "anchors": [
+            "routes/sites.php:608-667"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site rooms and zones",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/rooms/index.tsx:193-193; resources/js/pages/sites/zones/index.tsx:32-32",
+          "anchors": [
+            "resources/js/pages/sites/rooms/index.tsx:193-193",
+            "resources/js/pages/sites/zones/index.tsx:32-32"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site rooms and zones",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.rooms.index",
+        "sites.zones.index"
+      ]
+    },
+    {
+      "matrix_ordinal": 339,
+      "feature_id": "CAP-SITE-TYPE-PLAN-LIFECYCLE",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:257-285",
+          "anchors": [
+            "routes/sites.php:257-285"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site plans and governed plan pins",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/plan/index.tsx:350-350",
+          "anchors": [
+            "resources/js/pages/sites/plan/index.tsx:350-350"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site plans and governed plan pins",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/SiteTypePlanTest.php:93-163; tests/Feature/Sites/SiteTypePlanTest.php:247-311",
+          "anchors": [
+            "tests/Feature/Sites/SiteTypePlanTest.php:93-163",
+            "tests/Feature/Sites/SiteTypePlanTest.php:247-311"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain Site plans and governed plan pins. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.plan.show",
+        "sites.plan.publish",
+        "sites.plan.pins.store"
+      ]
+    },
+    {
+      "matrix_ordinal": 340,
+      "feature_id": "CAP-SITE-VENDOR-REGISTER",
+      "module": "Sites & Locations",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/sites.php:162-177; routes/sites.php:550-554",
+          "anchors": [
+            "routes/sites.php:162-177",
+            "routes/sites.php:550-554"
+          ],
+          "rationale": "Exact pinned route declarations expose the HTTP read/write surface needed to: Maintain Site vendor records",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/vendors-credentials/global.tsx:160-160",
+          "anchors": [
+            "resources/js/pages/sites/vendors-credentials/global.tsx:160-160"
+          ],
+          "rationale": "The pinned exported Inertia page owner(s) render the user-facing surface needed to: Maintain Site vendor records",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Sites/VendorsCredentialsGlobalTest.php:82-160",
+          "anchors": [
+            "tests/Feature/Sites/VendorsCredentialsGlobalTest.php:82-160"
+          ],
+          "rationale": "Static pinned test locator(s) exercise the source contract for: Maintain Site vendor records. They were identified only and were not executed.",
+          "bounded_search": []
+        }
+      },
+      "route_names": [
+        "sites.vendors.global",
+        "sites.vendors.store"
+      ]
+    }
+  ],
+  "credit_boundary": {
+    "application_writes": false,
+    "vcs": false,
+    "browser": false,
+    "runtime": false,
+    "tests_executed": false,
+    "build": false,
+    "database": false,
+    "network": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Read-only static source linkage at the application pin; retained unknowns are preserved and no downstream credit is awarded."
+}

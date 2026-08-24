@@ -1,0 +1,2450 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-074C",
+  "partition_id": "RUN-074C",
+  "status": "COMPLETE_STATIC_LINKAGE_RECONSTRUCTION_ZERO_CREDIT",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "partition_manifest_sha256": "819a31557af4599387e4d226f228e4d94f80883c477ffd3375cc230f538990ab"
+  },
+  "records": [
+    {
+      "matrix_ordinal": 1,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-DIETARY-TAG-LIBRARY",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/LibraryManagerTest.php:96-128",
+          "anchors": [
+            "tests/Feature/Catering/LibraryManagerTest.php:96-128"
+          ],
+          "rationale": "Exact static test locator for dietary tag library; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 2,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/SiteMealPlanScopeIntegrityTest.php:132-449",
+          "anchors": [
+            "tests/Feature/Catering/SiteMealPlanScopeIntegrityTest.php:132-449"
+          ],
+          "rationale": "Exact static test locator for meal plan lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 3,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-PRODUCT-CATALOG",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/meal-planner/index.tsx:907-914",
+          "anchors": [
+            "resources/js/pages/sites/meal-planner/index.tsx:907-914"
+          ],
+          "rationale": "Actual pinned page owner for product catalog.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/LibraryManagerTest.php:34-93",
+          "anchors": [
+            "tests/Feature/Catering/LibraryManagerTest.php:34-93"
+          ],
+          "rationale": "Exact static test locator for product catalog; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 4,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-RECIPE-LIBRARY",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/RecipeControllerTest.php:35-178",
+          "anchors": [
+            "tests/Feature/Catering/RecipeControllerTest.php:35-178"
+          ],
+          "rationale": "Exact static test locator for recipe library; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 5,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-SITE-INVENTORY-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/sites/meal-planner/index.tsx:736-751",
+          "anchors": [
+            "resources/js/pages/sites/meal-planner/index.tsx:736-751"
+          ],
+          "rationale": "Actual pinned page owner for site inventory lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/InventoryMovementRecorderTest.php:31-77",
+          "anchors": [
+            "tests/Feature/Catering/InventoryMovementRecorderTest.php:31-77"
+          ],
+          "rationale": "Exact static test locator for site inventory lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 6,
+      "module": "Catering",
+      "feature_id": "CAP-CATER-SITE-SHOPPING-LIST",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Catering/ShoppingListGeneratorTest.php:37-93",
+          "anchors": [
+            "tests/Feature/Catering/ShoppingListGeneratorTest.php:37-93"
+          ],
+          "rationale": "Exact static test locator for site shopping list; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 7,
+      "module": "Clients",
+      "feature_id": "CAP-CLI-CLIENT-ASSESSMENT",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/clients/show.tsx:4496-4517",
+          "anchors": [
+            "resources/js/pages/operations/clients/show.tsx:4496-4517"
+          ],
+          "rationale": "Actual pinned page owner for client assessment.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test directly invokes the client-assessment routes/controller. Client-profile fixture and projection assertions are adjacent read evidence and cannot establish assessment mutation tests.",
+          "bounded_search": [
+            "tests/Feature; tests/Browser | terms: /operations/clients/*/assessments, ClientAssessmentController, assessments.store, assessments.update, assessments.destroy",
+            "tests/Feature/Operations/ClientProfilePhaseOneTest.php | terms: ClientAssessment, assessments"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 8,
+      "module": "Clients",
+      "feature_id": "CAP-CLI-CLIENT-ASSIGNMENT",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/ClientProfileDailyWorkspaceSecurityTest.php:71-146",
+          "anchors": [
+            "tests/Feature/Operations/ClientProfileDailyWorkspaceSecurityTest.php:71-146"
+          ],
+          "rationale": "Exact static test locator for client assignment; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 11,
+      "module": "Clients",
+      "feature_id": "CAP-CLI-CLIENT-NOTES",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Operations/ClientNoteConsolidationTest.php:286-430",
+          "anchors": [
+            "tests/Feature/Operations/ClientNoteConsolidationTest.php:286-430"
+          ],
+          "rationale": "Exact static test locator for client notes; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 12,
+      "module": "Clients",
+      "feature_id": "CAP-CLI-CLIENT-RISK-REGISTER",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test directly invokes the client-risk register routes/controller. Direct ClientRisk fixtures and payload assertions do not establish register lifecycle behavior.",
+          "bounded_search": [
+            "tests/Feature; tests/Browser | terms: /operations/clients/*/risks, ClientRiskController, clients.risks",
+            "tests/Feature/Operations; tests/Feature/ClientControllerTest.php | terms: ClientRisk, risk register"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 13,
+      "module": "Clients",
+      "feature_id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test directly invokes the legacy client support-plan endpoint/controller. Modern care-plan review tests concern a different lifecycle and cannot be inherited.",
+          "bounded_search": [
+            "tests/Feature; tests/Browser | terms: /clients/*/support-plan, ClientSupportPlanController, support-plan",
+            "tests/Feature/Operations | terms: CareSupportPlanTab, care plan review"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 44,
+      "module": "Frontline Workspaces",
+      "feature_id": "CAP-DAY-MY-CALENDAR",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:320-321",
+          "anchors": [
+            "routes/web.php:320-321"
+          ],
+          "rationale": "Exact pinned route registration for my calendar.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/my-calendar.tsx:253-435",
+          "anchors": [
+            "resources/js/pages/my-calendar.tsx:253-435"
+          ],
+          "rationale": "Actual pinned page owner for my calendar.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 46,
+      "module": "Frontline Workspaces",
+      "feature_id": "CAP-DAY-MY-ROSTER",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:155-157",
+          "anchors": [
+            "routes/web.php:155-157"
+          ],
+          "rationale": "Exact pinned route registration for my roster.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/my-roster/index.tsx:36-88",
+          "anchors": [
+            "resources/js/pages/my-roster/index.tsx:36-88"
+          ],
+          "rationale": "Actual pinned page owner for my roster.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 47,
+      "module": "Frontline Workspaces",
+      "feature_id": "CAP-DAY-TASK-CSV-EXPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/tasks.php:16-16",
+          "anchors": [
+            "routes/tasks.php:16-16"
+          ],
+          "rationale": "Exact pinned route registration for task csv export.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Tasks/TaskProviderRowScopeTest.php:684-734",
+          "anchors": [
+            "tests/Feature/Tasks/TaskProviderRowScopeTest.php:684-734"
+          ],
+          "rationale": "Exact static test locator for task csv export; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 48,
+      "module": "Frontline Workspaces",
+      "feature_id": "CAP-DAY-TASK-REPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/tasks.php:19-19",
+          "anchors": [
+            "routes/tasks.php:19-19"
+          ],
+          "rationale": "Exact pinned route registration for task report.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/tasks/reports.tsx:218-243",
+          "anchors": [
+            "resources/js/pages/tasks/reports.tsx:218-243"
+          ],
+          "rationale": "Actual pinned page owner for task report.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 49,
+      "module": "Frontline Workspaces",
+      "feature_id": "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/dashboard/today.tsx:56-64",
+          "anchors": [
+            "resources/js/pages/dashboard/today.tsx:56-64"
+          ],
+          "rationale": "Actual pinned page owner for today operations overview.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 181,
+      "module": "Incidents",
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/IncidentControllerTest.php:3499-3587",
+          "anchors": [
+            "tests/Feature/IncidentControllerTest.php:3499-3587"
+          ],
+          "rationale": "Exact static test locator for incident evidence download; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 182,
+      "module": "Incidents",
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/incidents/show.tsx:1-28",
+          "anchors": [
+            "resources/js/pages/incidents/show.tsx:1-28"
+          ],
+          "rationale": "Actual pinned page owner for incident evidence lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/IncidentControllerTest.php:3294-3684",
+          "anchors": [
+            "tests/Feature/IncidentControllerTest.php:3294-3684"
+          ],
+          "rationale": "Exact static test locator for incident evidence lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 183,
+      "module": "Incidents",
+      "feature_id": "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/incidents/show.tsx:1-28",
+          "anchors": [
+            "resources/js/pages/incidents/show.tsx:1-28"
+          ],
+          "rationale": "Actual pinned page owner for incident followup lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/IncidentControllerTest.php:3687-3811",
+          "anchors": [
+            "tests/Feature/IncidentControllerTest.php:3687-3811"
+          ],
+          "rationale": "Exact static test locator for incident followup lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 186,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-API-KEY-ADMIN",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/api.tsx:133-150",
+          "anchors": [
+            "resources/js/pages/settings/api.tsx:133-150"
+          ],
+          "rationale": "Actual pinned page owner for api key admin.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 187,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/integrations.php:26-30",
+          "anchors": [
+            "routes/integrations.php:26-30"
+          ],
+          "rationale": "Exact pinned route registration for inbound provider webhook.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "The signed provider webhook is a headless ingress transport and has no Inertia/page owner. API-key and outbound-webhook settings pages configure adjacent concerns and cannot be treated as an inbound receiver UI.",
+          "bounded_search": [
+            "resources/js/pages/settings; resources/js/pages/integrations; resources/js | terms: WebhookReceiverController, /webhooks/{provider}, webhooks.receive, inbound provider webhook",
+            "app/Http/Controllers/Api/WebhookReceiverController.php; routes/integrations.php"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 188,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-MAILBOX-CONNECTION",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/it-mailbox.tsx:58-75",
+          "anchors": [
+            "resources/js/pages/settings/it-mailbox.tsx:58-75"
+          ],
+          "rationale": "Actual pinned page owner for mailbox connection.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 189,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/api.tsx:133-150",
+          "anchors": [
+            "resources/js/pages/settings/api.tsx:133-150"
+          ],
+          "rationale": "Actual pinned page owner for outbound webhook connection.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 192,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/calendar-sync.tsx:117-140",
+          "anchors": [
+            "resources/js/pages/settings/calendar-sync.tsx:117-140"
+          ],
+          "rationale": "Actual pinned page owner for site resource calendar connection.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/CalendarSyncSettingsTest.php:28-242",
+          "anchors": [
+            "tests/Feature/Settings/CalendarSyncSettingsTest.php:28-242"
+          ],
+          "rationale": "Exact static test locator for site resource calendar connection; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 193,
+      "module": "Integrations",
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-SYNC",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/settings/calendar-sync.tsx:117-140",
+          "anchors": [
+            "resources/js/pages/settings/calendar-sync.tsx:117-140"
+          ],
+          "rationale": "Actual pinned page owner for site resource calendar sync.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Settings/CalendarSyncSettingsTest.php:245-353",
+          "anchors": [
+            "tests/Feature/Settings/CalendarSyncSettingsTest.php:245-353"
+          ],
+          "rationale": "Exact static test locator for site resource calendar sync; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 194,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:183-268",
+          "anchors": [
+            "routes/web.php:183-268"
+          ],
+          "rationale": "Exact pinned route registration for agent ticket workflow.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/tickets/show.tsx:207-260",
+          "anchors": [
+            "resources/js/pages/it/tickets/show.tsx:207-260"
+          ],
+          "rationale": "Actual pinned page owner for agent ticket workflow.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 195,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-CHANGE-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:173-237",
+          "anchors": [
+            "routes/web.php:173-237"
+          ],
+          "rationale": "Exact pinned route registration for change lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/changes/show.tsx:132-170",
+          "anchors": [
+            "resources/js/pages/it/changes/show.tsx:132-170"
+          ],
+          "rationale": "Actual pinned page owner for change lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 197,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:175-241",
+          "anchors": [
+            "routes/web.php:175-241"
+          ],
+          "rationale": "Exact pinned route registration for major incident lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/major-incidents/show.tsx:124-160",
+          "anchors": [
+            "resources/js/pages/it/major-incidents/show.tsx:124-160"
+          ],
+          "rationale": "Actual pinned page owner for major incident lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 198,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-PROBLEM-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:179-244",
+          "anchors": [
+            "routes/web.php:179-244"
+          ],
+          "rationale": "Exact pinned route registration for problem lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/problems/show.tsx:75-110",
+          "anchors": [
+            "resources/js/pages/it/problems/show.tsx:75-110"
+          ],
+          "rationale": "Actual pinned page owner for problem lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 199,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-PROVISIONING-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:164-252",
+          "anchors": [
+            "routes/web.php:164-252"
+          ],
+          "rationale": "Exact pinned route registration for provisioning lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/index.tsx:1565-1717",
+          "anchors": [
+            "resources/js/pages/it/index.tsx:1565-1717"
+          ],
+          "rationale": "Actual pinned page owner for provisioning lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 200,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-REPORTING-EXPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:204-210",
+          "anchors": [
+            "routes/web.php:204-210"
+          ],
+          "rationale": "Exact pinned route registration for reporting export.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/index.tsx:1563-1563",
+          "anchors": [
+            "resources/js/pages/it/index.tsx:1563-1563"
+          ],
+          "rationale": "Actual pinned page owner for reporting export.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 202,
+      "module": "IT & Support",
+      "feature_id": "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/web.php:218-233",
+          "anchors": [
+            "routes/web.php:218-233"
+          ],
+          "rationale": "Exact pinned route registration for service management setup.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/it/setup/index.tsx:447-519",
+          "anchors": [
+            "resources/js/pages/it/setup/index.tsx:447-519"
+          ],
+          "rationale": "Actual pinned page owner for service management setup.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/It/ItServiceManagementSetupTest.php:156-219",
+          "anchors": [
+            "tests/Feature/It/ItServiceManagementSetupTest.php:156-219"
+          ],
+          "rationale": "Exact static test locator for service management setup; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 203,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-ADMINISTRATION-CORRECTION",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/emar/MarCharts.tsx:605-680",
+          "anchors": [
+            "resources/js/pages/emar/MarCharts.tsx:605-680"
+          ],
+          "rationale": "Actual pinned page owner for administration correction.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/MedicationGovernanceAuditTest.php:34-72",
+          "anchors": [
+            "tests/Feature/Emar/MedicationGovernanceAuditTest.php:34-72"
+          ],
+          "rationale": "Exact static test locator for administration correction; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 204,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-BREAK-GLASS-ACCESS",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/emergency/access.tsx:200-260",
+          "anchors": [
+            "resources/js/pages/emergency/access.tsx:200-260"
+          ],
+          "rationale": "Actual pinned page owner for break glass access.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/EmergencyAccessTest.php:47-531",
+          "anchors": [
+            "tests/Feature/Emar/EmergencyAccessTest.php:47-531"
+          ],
+          "rationale": "Exact static test locator for break glass access; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 205,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/emar/ControlledDrugs.tsx:662-745",
+          "anchors": [
+            "resources/js/pages/emar/ControlledDrugs.tsx:662-745"
+          ],
+          "rationale": "Actual pinned page owner for cd register balance.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 207,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/DestructionsTest.php:62-183",
+          "anchors": [
+            "tests/Feature/Emar/DestructionsTest.php:62-183"
+          ],
+          "rationale": "Exact static test locator for destruction lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 209,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/MedicationErrorsTest.php:79-643",
+          "anchors": [
+            "tests/Feature/Emar/MedicationErrorsTest.php:79-643"
+          ],
+          "rationale": "Exact static test locator for medication error lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 210,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/emar/Medications.tsx:302-366",
+          "anchors": [
+            "resources/js/pages/emar/Medications.tsx:302-366"
+          ],
+          "rationale": "Actual pinned page owner for medication order verification.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 211,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-MEDICATION-REVIEW",
+      "original_missing_fields": [
+        "backend_anchors",
+        "test_anchors"
+      ],
+      "decisions": {
+        "backend_anchors": {
+          "status": "ESTABLISHED",
+          "value": "app/Http/Controllers/Emar/EmarController.php:2379-2424; app/Http/Controllers/Emar/EmarController.php:3227-3332",
+          "anchors": [
+            "app/Http/Controllers/Emar/EmarController.php:2379-2424",
+            "app/Http/Controllers/Emar/EmarController.php:3227-3332"
+          ],
+          "rationale": "Exact pinned backend lifecycle owner for medication review.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/ReviewsTest.php:37-114",
+          "anchors": [
+            "tests/Feature/Emar/ReviewsTest.php:37-114"
+          ],
+          "rationale": "Exact static test locator for medication review; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 212,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-PHARMACY-ACTIONS",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test invokes the pharmacy-order create/update/advance endpoints. Stock page payload fixtures mentioning pharmacy orders are adjacent presentation evidence, not pharmacy-action lifecycle tests.",
+          "bounded_search": [
+            "tests/Feature/Emar; tests/Browser/Emar | terms: /emar/stock/pharmacy-orders, storePharmacyOrder, updatePharmacyOrder, advancePharmacyOrder",
+            "tests/Feature/Emar/StockManagementTest.php; tests/Feature/Emar/AuditTrailTest.php | terms: pharmacyOrders, MedicationPharmacyOrder"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 214,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-ROUND-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/RoundsPagePayloadTest.php:31-85",
+          "anchors": [
+            "tests/Feature/Emar/RoundsPagePayloadTest.php:31-85"
+          ],
+          "rationale": "Exact static test locator for round lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 215,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-SELF-ADMINISTRATION",
+      "original_missing_fields": [
+        "backend_anchors",
+        "test_anchors"
+      ],
+      "decisions": {
+        "backend_anchors": {
+          "status": "ESTABLISHED",
+          "value": "app/Http/Controllers/Emar/EmarController.php:2657-2703; app/Http/Controllers/Emar/EmarController.php:3894-4012",
+          "anchors": [
+            "app/Http/Controllers/Emar/EmarController.php:2657-2703",
+            "app/Http/Controllers/Emar/EmarController.php:3894-4012"
+          ],
+          "rationale": "Exact pinned backend lifecycle owner for self administration.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/SelfAdminTest.php:49-190",
+          "anchors": [
+            "tests/Feature/Emar/SelfAdminTest.php:49-190"
+          ],
+          "rationale": "Exact static test locator for self administration; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 216,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-SHIFT-HANDOVER",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/HandoverMedicationLensTest.php:73-243",
+          "anchors": [
+            "tests/Feature/Emar/HandoverMedicationLensTest.php:73-243"
+          ],
+          "rationale": "Exact static test locator for shift handover; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 217,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-STAFF-COMPETENCY",
+      "original_missing_fields": [
+        "backend_anchors",
+        "test_anchors"
+      ],
+      "decisions": {
+        "backend_anchors": {
+          "status": "ESTABLISHED",
+          "value": "app/Http/Controllers/Emar/EmarController.php:2294-2323; app/Http/Controllers/Emar/EmarController.php:3588-3743",
+          "anchors": [
+            "app/Http/Controllers/Emar/EmarController.php:2294-2323",
+            "app/Http/Controllers/Emar/EmarController.php:3588-3743"
+          ],
+          "rationale": "Exact pinned backend lifecycle owner for staff competency.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/CompetencyTest.php:42-179",
+          "anchors": [
+            "tests/Feature/Emar/CompetencyTest.php:42-179"
+          ],
+          "rationale": "Exact static test locator for staff competency; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 218,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-STOCK-MOVEMENT",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Emar/StockManagementTest.php:45-133",
+          "anchors": [
+            "tests/Feature/Emar/StockManagementTest.php:45-133"
+          ],
+          "rationale": "Exact static test locator for stock movement; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 219,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/meds/today/index.tsx:1278-1390",
+          "anchors": [
+            "resources/js/pages/meds/today/index.tsx:1278-1390"
+          ],
+          "rationale": "Actual pinned page owner for worker dose prn lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 220,
+      "module": "eMAR",
+      "feature_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/meds/today/index.tsx:1598-1760",
+          "anchors": [
+            "resources/js/pages/meds/today/index.tsx:1598-1760"
+          ],
+          "rationale": "Actual pinned page owner for worker today worklist.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 226,
+      "module": "Clients",
+      "feature_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/operations/clients/index.tsx:1087-1346",
+          "anchors": [
+            "resources/js/pages/operations/clients/index.tsx:1087-1346"
+          ],
+          "rationale": "Actual pinned page owner for client record lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 256,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-BREACH-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/breaches/show.tsx:287-356",
+          "anchors": [
+            "resources/js/pages/privacy/breaches/show.tsx:287-356"
+          ],
+          "rationale": "Actual pinned page owner for breach lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 258,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-DASHBOARD-WORKLIST",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:146-148",
+          "anchors": [
+            "routes/privacy.php:146-148"
+          ],
+          "rationale": "Exact pinned route registration for dashboard worklist.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/dashboard.tsx:469-500",
+          "anchors": [
+            "resources/js/pages/privacy/dashboard.tsx:469-500"
+          ],
+          "rationale": "Actual pinned page owner for dashboard worklist.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 259,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-DSR-DATA-EXPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:50-56",
+          "anchors": [
+            "routes/privacy.php:50-56"
+          ],
+          "rationale": "Exact pinned route registration for dsr data export.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/requests/show.tsx:291-330",
+          "anchors": [
+            "resources/js/pages/privacy/requests/show.tsx:291-330"
+          ],
+          "rationale": "Actual pinned page owner for dsr data export.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 260,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-DSR-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/requests/show.tsx:291-397",
+          "anchors": [
+            "resources/js/pages/privacy/requests/show.tsx:291-397"
+          ],
+          "rationale": "Actual pinned page owner for dsr lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 261,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:20-29",
+          "anchors": [
+            "routes/privacy.php:20-29"
+          ],
+          "rationale": "Exact pinned route registration for evidence attachments.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/dashboard.tsx",
+          "anchors": [
+            "resources/js/pages/privacy/dashboard.tsx:822-830",
+            "resources/js/components/privacy/privacy-attachments-pane.tsx:49-159"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for evidence attachments.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 262,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-LEGAL-HOLD",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:88-100",
+          "anchors": [
+            "routes/privacy.php:88-100"
+          ],
+          "rationale": "Exact pinned route registration for legal hold.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/legal-holds.tsx:31-97",
+          "anchors": [
+            "resources/js/pages/privacy/legal-holds.tsx:31-97"
+          ],
+          "rationale": "Actual pinned page owner for legal hold.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 263,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-PIA-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:126-142",
+          "anchors": [
+            "routes/privacy.php:126-142"
+          ],
+          "rationale": "Exact pinned route registration for pia lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/dpia/show.tsx:272-306",
+          "anchors": [
+            "resources/js/pages/privacy/dpia/show.tsx:272-306"
+          ],
+          "rationale": "Actual pinned page owner for pia lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 264,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-RETENTION-EXECUTION-EVIDENCE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/privacy.php:80-84",
+          "anchors": [
+            "routes/privacy.php:80-84"
+          ],
+          "rationale": "Exact pinned route registration for retention execution evidence.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/retention/review.tsx:22-165",
+          "anchors": [
+            "resources/js/pages/privacy/retention/review.tsx:22-165"
+          ],
+          "rationale": "Actual pinned page owner for retention execution evidence.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Privacy/EnforceDataRetentionJobTest.php:65-337",
+          "anchors": [
+            "tests/Feature/Privacy/EnforceDataRetentionJobTest.php:65-337"
+          ],
+          "rationale": "Exact static test locator for retention execution evidence; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 265,
+      "module": "Privacy",
+      "feature_id": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/privacy/retention.tsx:30-222",
+          "anchors": [
+            "resources/js/pages/privacy/retention.tsx:30-222"
+          ],
+          "rationale": "Actual pinned page owner for retention policy lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/PrivacyControllerTest.php:1465-1585",
+          "anchors": [
+            "tests/Feature/PrivacyControllerTest.php:1465-1585"
+          ],
+          "rationale": "Exact static test locator for retention policy lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 272,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-BOOKING-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:175-268",
+          "anchors": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:175-268"
+          ],
+          "rationale": "Exact static test locator for booking lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 273,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:65-171",
+          "anchors": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:65-171"
+          ],
+          "rationale": "Exact static test locator for booking request lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 274,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test targets either respite report-catalog entry or the module-report CSV endpoint. Generic reporting framework tests and client respite projections cannot establish the exact respite export contract.",
+          "bounded_search": [
+            "tests | terms: respite_bookings, respite_requests, /reports/modules/, ModuleReportController, ReportCatalog",
+            "tests/Feature/ClientControllerTest.php | terms: respite_bookings, respite_requests"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 275,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-COMMUNICATION-LOG",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Respite/RespiteTest.php:46-65",
+          "anchors": [
+            "tests/Browser/Respite/RespiteTest.php:46-65"
+          ],
+          "rationale": "Exact static test locator for communication log; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 276,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-DAILY-CARE-NOTES",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteScopeIntegrityTest.php:82-213",
+          "anchors": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:82-213"
+          ],
+          "rationale": "Exact static test locator for daily care notes; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 277,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "The export is a headless file-response route; the evidence-pack pages expose create, item, and seal controls but no export/download control. The lifecycle UI cannot be inherited as an export page owner.",
+          "bounded_search": [
+            "resources/js/pages/respite/evidence-packs | terms: /export, Export, Download, evidence-packs",
+            "routes/respite.php:178-194; app/Http/Controllers/Respite/RespiteEvidencePackController.php | terms: export"
+          ]
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteScopeIntegrityTest.php:603-708",
+          "anchors": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:603-708"
+          ],
+          "rationale": "Exact static test locator for evidence pack export; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 278,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteScopeIntegrityTest.php:448-912",
+          "anchors": [
+            "tests/Feature/Respite/RespiteScopeIntegrityTest.php:448-912"
+          ],
+          "rationale": "Exact static test locator for evidence pack lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 279,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-HANDOVER-NOTES",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Respite/RespiteTest.php:106-125",
+          "anchors": [
+            "tests/Browser/Respite/RespiteTest.php:106-125"
+          ],
+          "rationale": "Exact static test locator for handover notes; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 280,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-PROCEDURE-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Respite/RespiteTest.php:126-165",
+          "anchors": [
+            "tests/Browser/Respite/RespiteTest.php:126-165"
+          ],
+          "rationale": "Exact static test locator for procedure lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 281,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-REFERRAL-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteActionsTest.php:38-54",
+          "anchors": [
+            "tests/Feature/Respite/RespiteActionsTest.php:38-54"
+          ],
+          "rationale": "Exact static test locator for referral lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 282,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-RISK-PLAN-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Respite/RespiteTest.php:206-225",
+          "anchors": [
+            "tests/Browser/Respite/RespiteTest.php:206-225"
+          ],
+          "rationale": "Exact static test locator for risk plan lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 283,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-STAY-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:309-421",
+          "anchors": [
+            "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php:309-421"
+          ],
+          "rationale": "Exact static test locator for stay lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 284,
+      "module": "Respite",
+      "feature_id": "CAP-RESP-TASK-LIFECYCLE",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Browser/Respite/RespiteTest.php:196-205",
+          "anchors": [
+            "tests/Browser/Respite/RespiteTest.php:196-205"
+          ],
+          "rationale": "Exact static test locator for task lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 285,
+      "module": "Roadmap",
+      "feature_id": "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Roadmap/Decisions/Index.tsx:50-242",
+          "anchors": [
+            "resources/js/pages/Roadmap/Decisions/Index.tsx:50-242"
+          ],
+          "rationale": "Actual pinned page owner for decision approval lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Roadmap/RoadmapDecisionAndBudgetApiTest.php:21-46",
+          "anchors": [
+            "tests/Feature/Roadmap/RoadmapDecisionAndBudgetApiTest.php:21-46"
+          ],
+          "rationale": "Exact static test locator for decision approval lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 286,
+      "module": "Roadmap",
+      "feature_id": "CAP-ROAD-INITIATIVE-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Roadmap/Initiatives/Index.tsx:74-257",
+          "anchors": [
+            "resources/js/pages/Roadmap/Initiatives/Index.tsx:74-257"
+          ],
+          "rationale": "Actual pinned page owner for initiative lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 287,
+      "module": "Roadmap",
+      "feature_id": "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Roadmap/QuarterlyPlans/Show.tsx:91-116",
+          "anchors": [
+            "resources/js/pages/Roadmap/QuarterlyPlans/Show.tsx:91-116"
+          ],
+          "rationale": "Actual pinned page owner for quarterly plan lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Roadmap/RoadmapWorkflowTest.php:246-306",
+          "anchors": [
+            "tests/Feature/Roadmap/RoadmapWorkflowTest.php:246-306"
+          ],
+          "rationale": "Exact static test locator for quarterly plan lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 288,
+      "module": "Roadmap",
+      "feature_id": "CAP-ROAD-SUGGESTION-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/Roadmap/Suggestions/Index.tsx:64-155",
+          "anchors": [
+            "resources/js/pages/Roadmap/Suggestions/Index.tsx:64-155"
+          ],
+          "rationale": "Actual pinned page owner for suggestion lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 289,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2538-2570"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for action plan lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Safeguarding/SafeguardingNestedAuthorizationTest.php:198-238",
+          "anchors": [
+            "tests/Feature/Safeguarding/SafeguardingNestedAuthorizationTest.php:198-238"
+          ],
+          "rationale": "Exact static test locator for action plan lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 291,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "original_missing_fields": [
+        "test_anchors"
+      ],
+      "decisions": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": null,
+          "anchors": [],
+          "rationale": "No test targets the safeguarding-concerns report-catalog entry or module-report CSV endpoint. Safeguarding lifecycle/controller tests do not exercise the separate generic reporting export.",
+          "bounded_search": [
+            "tests | terms: safeguarding_concerns, /reports/modules/, ModuleReportController, ReportCatalog",
+            "tests/Feature/Safeguarding; tests/Feature/SafeguardingConcernControllerTest.php | terms: export, CSV, report"
+          ]
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 292,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2608-2695"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for evidence attachments.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:69-136",
+          "anchors": [
+            "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:69-136"
+          ],
+          "rationale": "Exact static test locator for evidence attachments; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 293,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-EVIDENCE-DOWNLOAD",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:2608-2695"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for evidence download.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:92-121",
+          "anchors": [
+            "tests/Feature/Safeguarding/SafeguardingAttachmentTest.php:92-121"
+          ],
+          "rationale": "Exact static test locator for evidence download; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 294,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-EXTERNAL-REPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/safeguarding.php:76-82",
+          "anchors": [
+            "routes/safeguarding.php:76-82"
+          ],
+          "rationale": "Exact pinned route registration for external report.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1080-1110"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for external report.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 295,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-INVESTIGATION",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:951-996"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for investigation.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:51-84",
+          "anchors": [
+            "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:51-84"
+          ],
+          "rationale": "Exact static test locator for investigation; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 296,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-RISK-ASSESSMENT",
+      "original_missing_fields": [
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1227-1240"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for risk assessment.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:85-103",
+          "anchors": [
+            "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:85-103"
+          ],
+          "rationale": "Exact static test locator for risk assessment; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 297,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:694-835"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for sensitivity declassification.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 298,
+      "module": "Safeguarding",
+      "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
+      "original_missing_fields": [
+        "page_files"
+      ],
+      "decisions": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/safeguarding/concern.tsx",
+          "anchors": [
+            "resources/js/pages/safeguarding/concern.tsx:1-35",
+            "resources/js/components/safeguarding/concern-dialog.tsx:1644-1719"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for terminal projection.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 299,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:238-259",
+          "anchors": [
+            "routes/security-devices.php:238-259"
+          ],
+          "rationale": "Exact pinned route registration for access credential lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/category.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/category.tsx:261-352",
+            "resources/js/components/security-devices/access-control-workspace.tsx:567-1110"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for access credential lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 300,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:238-251",
+          "anchors": [
+            "routes/security-devices.php:238-251"
+          ],
+          "rationale": "Exact pinned route registration for access schedule lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/category.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/category.tsx:261-352",
+            "resources/js/components/security-devices/access-control-workspace.tsx:135-556"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for access schedule lifecycle.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 301,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:56-174",
+          "anchors": [
+            "routes/security-devices.php:56-174"
+          ],
+          "rationale": "Exact pinned route registration for device registry custody.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/devices/show.tsx:647-733",
+          "anchors": [
+            "resources/js/pages/security-devices/devices/show.tsx:647-733"
+          ],
+          "rationale": "Actual pinned page owner for device registry custody.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 302,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:389-410",
+          "anchors": [
+            "routes/security-devices.php:389-410"
+          ],
+          "rationale": "Exact pinned route registration for discovery scope lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/discovery.tsx:662-800",
+          "anchors": [
+            "resources/js/pages/security-devices/discovery.tsx:662-800"
+          ],
+          "rationale": "Actual pinned page owner for discovery scope lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129",
+          "anchors": [
+            "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129"
+          ],
+          "rationale": "Exact static test locator for discovery scope lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 303,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-GOVERNED-COMMAND",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:90-142",
+          "anchors": [
+            "routes/security-devices.php:90-142"
+          ],
+          "rationale": "Exact pinned route registration for governed command.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/devices/show.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/devices/show.tsx:926-930",
+            "resources/js/pages/security-devices/devices/device-profile-sections.tsx:599-869"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for governed command.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 304,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-GROUP-TOPOLOGY",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:277-324",
+          "anchors": [
+            "routes/security-devices.php:277-324"
+          ],
+          "rationale": "Exact pinned route registration for group topology.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/device-groups/show.tsx:128-212",
+          "anchors": [
+            "resources/js/pages/security-devices/device-groups/show.tsx:128-212"
+          ],
+          "rationale": "Actual pinned page owner for group topology.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 305,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:332-350",
+          "anchors": [
+            "routes/security-devices.php:332-350"
+          ],
+          "rationale": "Exact pinned route registration for monitor definition lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/monitoring.tsx:1454-1572",
+          "anchors": [
+            "resources/js/pages/security-devices/monitoring.tsx:1454-1572"
+          ],
+          "rationale": "Actual pinned page owner for monitor definition lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129",
+          "anchors": [
+            "tests/Feature/SecurityDevices/NativeMonitoringOperatorWorkflowTest.php:40-129"
+          ],
+          "rationale": "Exact static test locator for monitor definition lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 306,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:389-425",
+          "anchors": [
+            "routes/security-devices.php:389-425"
+          ],
+          "rationale": "Exact pinned route registration for monitoring collector lifecycle.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/discovery.tsx:603-650",
+          "anchors": [
+            "resources/js/pages/security-devices/discovery.tsx:603-650"
+          ],
+          "rationale": "Actual pinned page owner for monitoring collector lifecycle.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Monitoring/CollectorLifecycleTest.php:95-163; tests/Feature/Monitoring/CollectorLifecycleTest.php:632-704",
+          "anchors": [
+            "tests/Feature/Monitoring/CollectorLifecycleTest.php:95-163",
+            "tests/Feature/Monitoring/CollectorLifecycleTest.php:632-704"
+          ],
+          "rationale": "Exact static test locator for monitoring collector lifecycle; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 307,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-MONITORING-COVERAGE-POLICY",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:428-456",
+          "anchors": [
+            "routes/security-devices.php:428-456"
+          ],
+          "rationale": "Exact pinned route registration for monitoring coverage policy.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/settings.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:644-676"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for monitoring coverage policy.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/SecurityDevices/MonitoringPolicySettingsAuthoringTest.php:55-109",
+          "anchors": [
+            "tests/Feature/SecurityDevices/MonitoringPolicySettingsAuthoringTest.php:55-109"
+          ],
+          "rationale": "Exact static test locator for monitoring coverage policy; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 308,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files",
+        "test_anchors"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:428-474",
+          "anchors": [
+            "routes/security-devices.php:428-474"
+          ],
+          "rationale": "Exact pinned route registration for monitoring maintenance policy.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/settings.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:732-771"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for monitoring maintenance policy.",
+          "bounded_search": []
+        },
+        "test_anchors": {
+          "status": "ESTABLISHED",
+          "value": "tests/Feature/Monitoring/MonitoringPolicyAuthoringServiceTest.php:121-154",
+          "anchors": [
+            "tests/Feature/Monitoring/MonitoringPolicyAuthoringServiceTest.php:121-154"
+          ],
+          "rationale": "Exact static test locator for monitoring maintenance policy; not executed.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 309,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-MONITORING-RETENTION-POLICY",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:428-488",
+          "anchors": [
+            "routes/security-devices.php:428-488"
+          ],
+          "rationale": "Exact pinned route registration for monitoring retention policy.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/settings.tsx",
+          "anchors": [
+            "resources/js/pages/security-devices/settings.tsx:318-320",
+            "resources/js/components/security-devices/monitoring-policy-settings.tsx:779-815"
+          ],
+          "rationale": "Actual pinned page owner and exact shared controls for monitoring retention policy.",
+          "bounded_search": []
+        }
+      }
+    },
+    {
+      "matrix_ordinal": 310,
+      "module": "Security Devices",
+      "feature_id": "CAP-SEC-REPORTING-EXPORT",
+      "original_missing_fields": [
+        "route_paths",
+        "page_files"
+      ],
+      "decisions": {
+        "route_paths": {
+          "status": "ESTABLISHED",
+          "value": "routes/security-devices.php:625-637",
+          "anchors": [
+            "routes/security-devices.php:625-637"
+          ],
+          "rationale": "Exact pinned route registration for reporting export.",
+          "bounded_search": []
+        },
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/security-devices/reports.tsx:31-114",
+          "anchors": [
+            "resources/js/pages/security-devices/reports.tsx:31-114"
+          ],
+          "rationale": "Actual pinned page owner for reporting export.",
+          "bounded_search": []
+        }
+      }
+    }
+  ],
+  "credit_boundary": {
+    "application_writes": false,
+    "vcs": false,
+    "browser": false,
+    "runtime": false,
+    "tests_executed": false,
+    "build": false,
+    "database": false,
+    "network": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Read-only static source linkage at the application pin; retained unknowns are preserved and no downstream credit is awarded."
+}

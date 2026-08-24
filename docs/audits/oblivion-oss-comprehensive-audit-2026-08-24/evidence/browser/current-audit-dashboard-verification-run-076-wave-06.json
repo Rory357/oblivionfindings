@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-076-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_AND_LOCAL_LINK_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "observed_at": "2026-08-25T11:18:08.7124860+12:00",
+  "target": {
+    "url": "http://127.0.0.1:8771/audit-dashboard.html?v=run076-69fb03de1f64",
+    "artifact": "audit-dashboard.html",
+    "sha256": "69fb03de1f64097cfb027b8d50b4ac06824790ab98d54f529c0d7692002d74e8",
+    "generator": "generators/build-current-audit-dashboard.py",
+    "generator_sha256": "b190ae047aee68e68cc7f80393842770430136a4428a4165cea35bda5c9f6310"
+  },
+  "lineage": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "static_linkage_integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf",
+    "static_linkage_reporting_sha256": "04d5fd61048c2c877f6bdba3785fa46365ba85464649eb1b83779cc0daf39906"
+  },
+  "browser": {
+    "surface": "Codex in-app browser",
+    "page_title": "Oblivion Findings current-source audit",
+    "console_warnings": 0,
+    "console_errors": 0,
+    "visual_screenshots_inspected": 2,
+    "screenshots_retained": 0
+  },
+  "semantic_markers": {
+    "run_071_through_076_checkpoint_visible": true,
+    "run_076_282_rows_575_fields_visible": true,
+    "live_matrix_00085d407433307e_visible": true,
+    "remaining_1_route_6_page_1_combined_0_backend_8_test_gaps_visible": true,
+    "zero_of_340_mapping_visible": true,
+    "no_completion_claim_visible": true,
+    "zero_downstream_credit_visible": true
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "page_client_width": 1425,
+      "page_scroll_width": 1425,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1180,
+      "navigation_scroll_width": 1180,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "page_client_width": 1265,
+      "page_scroll_width": 1265,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1180,
+      "navigation_scroll_width": 1180,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "page_client_width": 1009,
+      "page_scroll_width": 1009,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1009,
+      "navigation_scroll_width": 1009,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "page_client_width": 375,
+      "page_scroll_width": 375,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 375,
+      "navigation_scroll_width": 962,
+      "navigation_overflow_x": "auto"
+    }
+  ],
+  "local_link_validation": {
+    "total_links": 206,
+    "unique_links": 156,
+    "unique_local_paths": 146,
+    "in_page_anchor_links": 10,
+    "external_links": 0,
+    "missing_links_after_evidence_creation": 0
+  },
+  "credit_boundary": {
+    "audit_artifact_browser_verification": true,
+    "application_browser": false,
+    "application_responsive": false,
+    "application_visual": false,
+    "workflow": false,
+    "finding": false,
+    "runtime": false,
+    "executed_test": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Read-only verification of the exact generated audit dashboard artifact. No application route, form, record, runtime, test, build, database, network, or external system was exercised or changed."
+}

@@ -33,6 +33,12 @@ RUN-073 source-reconstructs all eight prompt-named journeys and classifies 44 ha
 
 The architecture lane accounts for 13 canonical entity families and 17 technical concerns, retaining nine separate provisional source candidates (7 P1 / 2 P2) and ten explicit `NOT_ESTABLISHED` items. There are 0 final architecture findings and 0 runtime-confirmed findings. Reports 07–12 and `findings.json` are deterministic source-bound reporting artifacts only; they grant no application remediation, compliance, legal, clinical, security, benchmark, runtime, browser, executed-test, Pass, or completion credit.
 
+## RUN-074–076 static-linkage checkpoint
+
+RUN-074 partitions and reconstructs all 503 previously missing route-path, page-file, backend-anchor, and static test-anchor cells across 288 canonical targets. RUN-075 cyclically reviews every producer decision under a different agent, and RUN-076 integrates only the permitted linkage columns. The matrix changes 282 rows / 575 cells from base SHA-256 `df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4` to `00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd`.
+
+Live retained gaps are 1 route paths, 6 page files, 1 with both missing, 0 backend anchors, and 8 static test anchors. These are feature-side locators only. Full framework route reachability, the complete route/page universe, RUN-072 task-locator refresh, runtime, application browser, executed tests, benchmark mapping, ease, Pass, final findings, and completion remain open and receive zero credit.
+
 ## Current raw source census
 
 These are deterministic path counts, not semantic feature or runtime denominators.
@@ -119,7 +125,7 @@ The new `02-eight-pass-coverage-ledger.csv` contains 38 provisional route-file o
 
 RUN-017 through RUN-029 performed partitioned, adversarial, owner, report-catalog, integrator, and denominator-red-team reconciliation. RUN-030 deterministically integrated the pinned evidence and froze **340 current-source static canonical targets: 300 H, 40 D, and zero M**. Of the 186 discovery sources, 185 map through 362 Layer-A edges to 338 targets. The bounded protected-disclosure source is excluded because no current canonical owner was established; that exclusion does not prove that no external or undocumented process exists. The report-catalog layer contributes 14 relations across nine targets, two of them new, producing the 340-target global denominator.
 
-Three independent reconstructions agree, with zero remaining identity conflicts. The normalized Layer-A edge SHA-256 is `131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0`, and the global target class/module row SHA-256 is `f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac`. Static linkage gaps remain explicit: 120 targets lack a route anchor, 226 lack a page anchor, and 116 lack both.
+Three independent reconstructions agree, with zero remaining identity conflicts. The normalized Layer-A edge SHA-256 is `131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0`, and the global target class/module row SHA-256 is `f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac`. The RUN-030/RUN-073 snapshot retained 120 route-anchor, 226 page-anchor, and 116 combined gaps. RUN-076 now retains 1 route-path, 6 page-file, and 1 combined gaps after cyclic independent review; this is static linkage only.
 
 This freezes static identity only. Framework route execution, current-build browser coverage, executed tests, benchmark mappings or final no-matches, task/ease evidence, release evidence, Pass completion, and audit completion all retain zero credit.
 
@@ -159,6 +165,10 @@ RUN-058-BROWSER later preserved a read-only, signed-in observation of six select
 - `evidence/source/current-canonical-feature-identity-wave-01.json`: the RUN-030 186-source, 362-edge, 340-target static canonical identity registry, exact hashes, linkage gaps, and zero-credit boundaries.
 - `evidence/source/current-canonical-identity-agent-register.json`: independent RUN-027 through RUN-029 agreement and deterministic RUN-030 integration, with zero remaining identity conflicts and no downstream credit.
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
+- `evidence/source/current-static-linkage-review-wave-06.json`: RUN-074 normalized three-part producer reconstruction for 288 targets / 503 original missing cells; zero downstream credit.
+- `evidence/source/current-static-linkage-independent-review-wave-06.json`: RUN-075 cyclic independent review of every producer target and field decision, with zero invalid final anchors.
+- `evidence/source/current-static-linkage-integration-wave-06.json`: RUN-076 linkage-only matrix integration (282 rows / 575 fields), unchanged immutable and benchmark/credit projections, and zero runtime/browser/test/mapping/ease/Pass/completion credit.
+- `evidence/source/current-static-linkage-reporting-materialization-wave-06.json`: current report/hash receipt preserving RUN-073 reporting receipts as immutable history.
 - `evidence/source/raw-run-073a-required-artifact-contract-wave-05.json`: historical RUN-073A review-time deliverable contract, including the then-current 11/18 snapshot and all 26 literal completion gates.
 - `evidence/source/raw-run-073b-cross-module-journeys-wave-05.json`: all eight pinned source reconstructions, 44 classified handoffs, exact Site/role/privacy boundaries, provisional candidates, blockers, and zero prompt-grade execution credit.
 - `evidence/source/raw-run-073d-independent-journey-review-wave-05.json`: fresh independent source-semantic review of all eight journeys and 155/155 selected anchors, retaining 0/8 prompt-grade completion.
@@ -237,7 +247,7 @@ The collector was rerun twice with identical output hashes. It did not boot Lara
 ## Immediate work order
 
 1. Preserve the frozen 340-target, 300 H / 40 D / zero M denominator and its exact hashes; use the historical 904 register only as a crosswalk.
-2. Resolve the static linkage gaps—120 targets without route anchors, 226 without page anchors, and 116 without either—then finish safe framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership. The semantic/runtime graph remains partial.
+2. Continue from RUN-076's retained gaps—1 route paths, 6 page files, 0 backend anchors, and 8 static test anchors—then finish the complete route/page-universe mapping, safe framework reachability, canonical backend/data/test ownership, and a separate RUN-072 task-locator refresh. The semantic/runtime graph remains partial.
 3. Complete route/page ownership, canonical module/pass ledgers, and safe execution of the eight independently source-reviewed journeys across representative roles/Sites, material states, task/ease evidence, and all four required viewports; use the completed 2,812-row static visual matrix as the source universe for later attributable current-build rendered coverage.
 4. Build on the completed 16/16 blocker review, effective 88 complete observer-only / seven retained-partial split, RUN-046 six-target NO-GO evidence, and the corrected RUN-053–057 static diagnostic chain. Preserve the seven project-level blockers and D's bounded `AO-A53-024-01` correction. Complete formal full-project triage or exhaustive no-match evidence for the six selected feature IDs, then continue across the other 334 canonical targets. Promote only an independently approved exact edge or documented final no-match, and repeat until all 340 targets are adjudicated; packet materialization, lineage validation, mechanical comparison, and source-anchor validation are not mapping or completion credit.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.
