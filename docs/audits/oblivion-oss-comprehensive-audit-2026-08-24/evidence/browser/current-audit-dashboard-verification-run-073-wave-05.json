@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_AND_LOCAL_LINK_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "observed_at": "2026-08-25T09:26:34.3044663+12:00",
+  "target": {
+    "url": "http://127.0.0.1:8771/audit-dashboard.html?v=run073-final",
+    "artifact": "audit-dashboard.html",
+    "sha256": "a95efdd493c6409343dba8d24301be7930c5bc64449515082934d51f8b3fa9db",
+    "generator": "generators/build-current-audit-dashboard.py",
+    "generator_sha256": "49f61f9a89efd32851a9b64f3ca700f3ec565d4f37c6140d840f48fa90abc56a"
+  },
+  "browser": {
+    "surface": "Codex in-app browser",
+    "page_title": "Oblivion Findings current-source audit",
+    "console_warnings": 0,
+    "console_errors": 0,
+    "visual_screenshots_inspected": 2,
+    "screenshots_retained": 0
+  },
+  "semantic_markers": {
+    "run_073_checkpoint_visible": true,
+    "required_paths_18_of_18_visible": true,
+    "journey_27_8_9_counts_visible": true,
+    "architecture_13_17_counts_visible": true,
+    "no_completion_claim_visible": true
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "page_client_width": 1425,
+      "page_scroll_width": 1425,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1180,
+      "navigation_scroll_width": 1180
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "page_client_width": 1265,
+      "page_scroll_width": 1265,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1180,
+      "navigation_scroll_width": 1180
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "page_client_width": 1009,
+      "page_scroll_width": 1009,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1009,
+      "navigation_scroll_width": 1009
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "page_client_width": 375,
+      "page_scroll_width": 375,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 375,
+      "navigation_scroll_width": 962,
+      "navigation_overflow_x": "auto"
+    }
+  ],
+  "local_link_validation": {
+    "total_links": 181,
+    "unique_links": 143,
+    "in_page_anchor_links": 10,
+    "external_links": 0,
+    "missing_links_after_evidence_creation": 0
+  },
+  "credit_boundary": {
+    "audit_artifact_browser_verification": true,
+    "application_browser": false,
+    "application_responsive": false,
+    "application_visual": false,
+    "workflow": false,
+    "finding": false,
+    "runtime": false,
+    "executed_test": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Read-only verification of the generated audit dashboard artifact. No application route, form, record, runtime, test, build, database or external system was exercised or changed."
+}

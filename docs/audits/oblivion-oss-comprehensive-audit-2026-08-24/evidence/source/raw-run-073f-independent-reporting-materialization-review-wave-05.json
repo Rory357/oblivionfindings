@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073F",
+  "status": "INDEPENDENT_REPORTING_MATERIALIZATION_REVIEW_GO",
+  "reviewed_on": "2026-08-25",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "hashes": {
+    "evidence/source/current-required-reporting-materialization-wave-05.json": "5fc76430b6a33f76182a470dfce774415c1d0618df14c6685c66105eef026c51",
+    "evidence/source/raw-run-073b-cross-module-journeys-wave-05.json": "e1983242ab669153b286138c5a104acd18ea130712717d942256e57b6b42fe0e",
+    "08-cross-module-journeys.md": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+    "evidence/source/root-run-073c-architecture-data-integration-security-wave-05.json": "e406bdee1412c4ba49ec18afbd80849e7c6bc30e2098229f80f63888bde39272",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22"
+  },
+  "checks": {
+    "materialization_inputs_matching": "18/18",
+    "materialization_outputs_matching": "7/7",
+    "missing_files": 0,
+    "hash_mismatches": 0,
+    "journey_raw_report_handoffs_compared": 44,
+    "journey_raw_report_field_mismatches": 0,
+    "referenced_journey_feature_ids": 46,
+    "missing_feature_ids_in_matrix": 0,
+    "missing_feature_ids_in_scorecard": 0
+  },
+  "validated_counts": {
+    "source_reconstructed_journeys": 8,
+    "source_classified_journey_handoffs": 44,
+    "fresh_independent_source_reviewed_journeys": 8,
+    "prompt_grade_completed_journeys": 0,
+    "canonical_entity_families": 13,
+    "technical_concerns": 17,
+    "architecture_provisional_claims": 9,
+    "architecture_not_established_items": 10,
+    "architecture_final_findings": 0,
+    "architecture_runtime_confirmed_findings": 0
+  },
+  "credit_boundary": {
+    "artifact_presence": true,
+    "final_finding": false,
+    "browser": false,
+    "ease": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "pass": false,
+    "completion": false
+  },
+  "defects": [],
+  "attestation": "Independent report/hash/path/feature-ID/zero-credit review after final journey and architecture regeneration. No writes, VCS mutation, browser/network, application runtime, tests/build or database activity were performed by the reviewer."
+}

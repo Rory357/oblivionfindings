@@ -1,0 +1,2251 @@
+{
+  "schema_version": "oblivion_audit_findings_v1_provisional",
+  "audit_status": "PROVISIONAL_SOURCE_CLAIMS_MATERIALIZED_ZERO_FINAL_FINDING_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_checkpoint_parent": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+  "denominators": {
+    "canonical_features": 340,
+    "human_features": 300,
+    "system_data_features": 40,
+    "canonical_submodules": null,
+    "provisional_source_claim_floor": 12
+  },
+  "counts": {
+    "provisional_source_claims": 12,
+    "provisional_P1": 12,
+    "final_P0": 0,
+    "final_P1": 0,
+    "complete_prompt_finding_schema": 0,
+    "benchmark_mapped": 0,
+    "final_no_match": 0,
+    "browser_observed": 0
+  },
+  "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
+  "reconciliation": {
+    "provisional_ids_unique": true,
+    "every_primary_feature_id_in_canonical_matrix": true,
+    "final_ids_cross_file_reconciled": false,
+    "reason": "There are no final finding IDs; provisional links do not satisfy the cross-file final-finding gate."
+  },
+  "records": [
+    {
+      "id": "MED-RBAC-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "related_feature_ids": [
+        "CAP-MED-DESTRUCTION-LIFECYCLE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "passes": [
+        "P1",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "eMAR",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "Controlled-drug register owner",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Maintain the controlled-drug register and balance",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/emar.php:30-395",
+        "raw_route_path_field": "routes/emar.php:30-395",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023-4121; app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1; app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "claim_anchors": [
+          "routes/emar.php:30-395",
+          "app/Http/Controllers/Emar/EmarController.php:4023-4121"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Broad medications.orders.manage routing appears to reach controlled-drug, destruction, and stock operations even though dedicated controlled capabilities exist; cited controller methods do not visibly enforce the exact controlled action capability.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Maintain the controlled-drug register and balance. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-med-cd-register-balance.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "claim_anchors": [
+          "routes/emar.php:30-395",
+          "app/Http/Controllers/Emar/EmarController.php:4023-4121"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The provisional source review found broad order-management routing adjacent to narrower controlled-action capabilities; exact enforcement remains unverified.",
+      "impact": "Possible controlled-medication action-authority bypass, with resident safety and governed-register integrity consequences.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-MED-DESTRUCTION-LIFECYCLE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Do not treat the broad orders permission as evidence that controlled actions are authorised; require manual role review before any production remediation decision.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases."
+      },
+      "validation_plan": {
+        "required": "Independently trace every controlled-drug, destruction and stock command to its exact capability, then execute allowed and denied role/Site/witness cases.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "MED-CD-SCOPE-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+      "related_feature_ids": [
+        "CAP-MED-CD-REGISTER-BALANCE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "passes": [
+        "P1",
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "eMAR",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "Medication destruction owner",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Record and, under authority, void a medication destruction",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/emar.php:139-141; routes/emar.php:217-218",
+        "raw_route_path_field": "routes/emar.php:139-141; routes/emar.php:217-218",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": "resources/js/pages/emar/Destructions.tsx",
+        "raw_page_file_field": "resources/js/pages/emar/Destructions.tsx",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023",
+        "claim_anchors": [
+          "app/Http/Controllers/Emar/EmarController.php:4732-4826",
+          "app/Services/Medication/MedicationScopeDecisionService.php:374-547"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Controlled-drug and destruction paths appear to accept independently supplied client, medication, Site, or witness identifiers without consistently routing every relationship through the canonical medication scope decision service before disclosure or mutation.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Record and, under authority, void a medication destruction. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-med-destruction-lifecycle.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "claim_anchors": [
+          "app/Http/Controllers/Emar/EmarController.php:4732-4826",
+          "app/Services/Medication/MedicationScopeDecisionService.php:374-547"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The provisional source review found independently supplied identifiers whose canonical relationship checks were not established at every boundary.",
+      "impact": "Possible foreign-Site or mismatched Client/medication/witness disclosure or mutation, affecting privacy and medication safety.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-MED-CD-REGISTER-BALANCE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Treat controlled-drug and destruction requests with mixed identifiers as high-risk until the canonical scope path is independently proven.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations."
+      },
+      "validation_plan": {
+        "required": "Prove owner-first canonical scope reconciliation and concealed foreign-Site/direct-ID denial for Client, medication, Site and witness combinations.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "MED-CD-ATOMICITY-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "related_feature_ids": [
+        "CAP-MED-DESTRUCTION-LIFECYCLE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "passes": [
+        "P1",
+        "P2",
+        "P5",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "eMAR",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "Controlled-drug register owner",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Maintain the controlled-drug register and balance",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/emar.php:30-395",
+        "raw_route_path_field": "routes/emar.php:30-395",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/Emar/EmarController.php:4023-4121; app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1; app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "claim_anchors": [
+          "app/Http/Controllers/Emar/EmarController.php:4986-5314"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Controlled-drug entry and stock update appear not to share one encompassing transaction with owner-first locking; destruction relationship checks appear later than the first mutation boundary.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Maintain the controlled-drug register and balance. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-med-cd-register-balance.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-01.json",
+        "claim_anchors": [
+          "app/Http/Controllers/Emar/EmarController.php:4986-5314"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "One encompassing owner-first transaction and lock order were not established by the provisional source slice.",
+      "impact": "Possible divergence between the controlled-drug register and physical/logical stock under failure or concurrency.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-MED-DESTRUCTION-LIFECYCLE",
+        "CAP-MED-STOCK-MOVEMENT"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Use existing reconciliation controls and investigate any register/stock mismatch; this audit does not assert that a mismatch has occurred.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions."
+      },
+      "validation_plan": {
+        "required": "Independently prove transaction boundaries, parent-to-child lock order, rollback, retry and concurrent balance assertions.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "GOV-EXECUTIVE-VISIBILITY-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+      "related_feature_ids": [
+        "CAP-GOV-RESOLUTION-VOTE-QUORUM"
+      ],
+      "passes": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Governance",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "GovernanceMeetingController and governance workflow services",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Schedule meetings and manage agendas, attendance, minutes, and status",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": null,
+        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "status": "NOT_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php:41-152",
+        "claim_anchors": [
+          "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php:41-152",
+          "app/Domain/Governance/Http/Controllers/ResolutionController.php:26-84"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Meeting and resolution index, calendar, and direct reads do not visibly enforce executive-session or committee visibility for broad governance viewers.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Schedule meetings and manage agendas, attendance, minutes, and status. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-gov-meeting-agenda-minutes-attendance.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php:41-152",
+          "app/Domain/Governance/Http/Controllers/ResolutionController.php:26-84"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "Broad governance viewing was visible in the source slice, while executive-session and committee projection filtering was not established.",
+      "impact": "Possible disclosure of executive-session or committee material beyond its intended audience.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-GOV-RESOLUTION-VOTE-QUORUM"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Do not use the provisional claim as proof of disclosure; restrict operational review of sensitive meetings to explicitly authorised audiences pending verification.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests."
+      },
+      "validation_plan": {
+        "required": "Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "GOV-BOARD-PACK-VISIBILITY-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+      "related_feature_ids": [
+        "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE"
+      ],
+      "passes": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Governance",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "BoardPackBuilderService and BoardPackController",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Generate, distribute, read, and download board packs",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": null,
+        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "status": "NOT_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90",
+        "claim_anchors": [
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90",
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:194-247"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Board-pack list, show, manifest, attachment metadata, and read tracking appear broader than the explicit recipient distribution boundary.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Generate, distribute, read, and download board packs. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-gov-board-pack-distribution.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90",
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:194-247"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The provisional slice did not establish that every list, manifest, attachment and read-tracking path applies the recipient boundary.",
+      "impact": "Possible disclosure of confidential board-pack metadata or attachments to non-recipients.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Keep board-pack distribution explicitly recipient-controlled and avoid assuming broad governance visibility is equivalent to receipt.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments."
+      },
+      "validation_plan": {
+        "required": "Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "GOV-RESOLUTION-QUORUM-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+      "related_feature_ids": [],
+      "passes": [
+        "P1",
+        "P2",
+        "P5",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Governance",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "VotingService and ResolutionController",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": null,
+        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "status": "NOT_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Domain/Governance/Services/VotingService.php:29-187",
+        "claim_anchors": [
+          "app/Domain/Governance/Services/VotingService.php:29-187",
+          "app/Domain/Governance/Models/Resolution.php:186-212"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Resolution eligibility, conflicts, quorum, final vote, and close outcome are not visibly bound to one canonical locked decision snapshot.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-gov-resolution-vote-quorum.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Domain/Governance/Services/VotingService.php:29-187",
+          "app/Domain/Governance/Models/Resolution.php:186-212"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The source slice did not establish one immutable, locked eligibility and conflict snapshot shared by vote, quorum and close.",
+      "impact": "Possible incorrect quorum, eligibility or close outcome under changing participation/conflict state or concurrency.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent design review plus sequential and concurrent eligibility, conflict, quorum, vote-close, replay, and immutable-evidence tests.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent design review plus sequential and concurrent eligibility, conflict, quorum, vote-close, replay, and immutable-evidence tests."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Require governance owners to verify quorum and conflicts against the authoritative meeting record until the runtime contract is proven.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent design review plus sequential and concurrent eligibility, conflict, quorum, vote-close, replay, and immutable-evidence tests."
+      },
+      "validation_plan": {
+        "required": "Independent design review plus sequential and concurrent eligibility, conflict, quorum, vote-close, replay, and immutable-evidence tests.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "HS-REGISTER-SITE-SCOPE-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-HS-FIRST-AID-REGISTER",
+      "related_feature_ids": [
+        "CAP-HS-WORKER-PARTICIPATION",
+        "CAP-HS-PPE-REGISTER",
+        "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+        "CAP-HS-EMERGENCY-DRILLS"
+      ],
+      "passes": [
+        "P1",
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Health & Safety",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "FirstAidController",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Record first aid, follow-up, evidence, and linked incidents",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": null,
+        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "status": "NOT_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/HealthSafety/FirstAidController.php:55-115",
+        "claim_anchors": [
+          "app/Http/Controllers/HealthSafety/FirstAidController.php:55-85",
+          "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:63-147",
+          "app/Http/Controllers/HealthSafety/PpeController.php:37-112"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "First aid, worker participation, hazardous substances, emergency drills, and PPE appear to use optional Site filters rather than approved-Site scope on all list, picker, direct-object, and write paths.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Record first aid, follow-up, evidence, and linked incidents. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-hs-first-aid-register.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Http/Controllers/HealthSafety/FirstAidController.php:55-85",
+          "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:63-147",
+          "app/Http/Controllers/HealthSafety/PpeController.php:37-112"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "Optional Site filtering appeared in the sampled controllers; universal approved-Site scoping was not established.",
+      "impact": "Possible cross-Site disclosure or mutation of safety records within the same organisation.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-HS-WORKER-PARTICIPATION",
+        "CAP-HS-PPE-REGISTER",
+        "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+        "CAP-HS-EMERGENCY-DRILLS"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent per-controller review and representative foreign-Site list, picker, direct-ID, export, and write denial tests.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent per-controller review and representative foreign-Site list, picker, direct-ID, export, and write denial tests."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Treat Site selection as a filter, not an authorisation grant; operational reviewers should verify Site access separately from action authority.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent per-controller review and representative foreign-Site list, picker, direct-ID, export, and write denial tests."
+      },
+      "validation_plan": {
+        "required": "Independent per-controller review and representative foreign-Site list, picker, direct-ID, export, and write denial tests.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "PRIV-REPORT-DOMAIN-RBAC-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "related_feature_ids": [
+        "CAP-PRIV-BREACH-LIFECYCLE",
+        "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+        "CAP-PRIV-LEGAL-HOLD",
+        "CAP-PRIV-PIA-LIFECYCLE"
+      ],
+      "passes": [
+        "P1",
+        "P4",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Privacy",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "controller: PrivacyReportController; policy: Explicit privacy-domain permissions",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Review and export a cross-domain privacy compliance report only for domains the actor is independently authorised to view.",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/privacy.php:105-121; routes/privacy.php:126-142; routes/privacy.php:145-154; routes/privacy.php:146-154; routes/privacy.php:50-56; routes/privacy.php:60-76; routes/privacy.php:88-100",
+        "raw_route_path_field": "routes/privacy.php:105-121; routes/privacy.php:126-142; routes/privacy.php:145-154; routes/privacy.php:146-154; routes/privacy.php:50-56; routes/privacy.php:60-76; routes/privacy.php:88-100",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": "resources/js/pages/privacy/dashboard.tsx:617-648; resources/js/pages/privacy/reports/compliance.tsx:69-145",
+        "raw_page_file_field": "resources/js/pages/privacy/dashboard.tsx:617-648; resources/js/pages/privacy/reports/compliance.tsx:69-145",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/PrivacyReportController.php:21-225; app/Http/Controllers/PrivacyReportController.php:21-23; app/Http/Controllers/PrivacyReportController.php:21-94; app/Http/Controllers/PrivacyReportController.php:76-81; app/Models/DataBreachLog.php:11-67; app/Models/DataRetentionPolicy.php:11-99; app/Models/DataSubjectRequest.php:14-212; app/Models/LegalHold.php:11-66; app/Models/PrivacyImpactAssessment.php:10-63",
+        "claim_anchors": [
+          "routes/privacy.php:145-154",
+          "app/Http/Controllers/PrivacyReportController.php:21-174"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Privacy reports appear to expose breach, retention, legal-hold, and PIA aggregates and exports with privacy.viewRequests rather than their distinct domain permissions.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Review and export a cross-domain privacy compliance report only for domains the actor is independently authorised to view.. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": null
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "routes/privacy.php:145-154",
+          "app/Http/Controllers/PrivacyReportController.php:21-174"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The provisional report slice appeared to reuse request-view authority across distinct privacy domains.",
+      "impact": "Possible over-broad access to sensitive privacy aggregates or exports.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-PRIV-BREACH-LIFECYCLE",
+        "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+        "CAP-PRIV-LEGAL-HOLD",
+        "CAP-PRIV-PIA-LIFECYCLE"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent field-flow review and a per-report/per-export capability denial matrix.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent field-flow review and a per-report/per-export capability denial matrix."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Do not infer export authority from dashboard or request visibility; review sensitive exports under the exact domain capability.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent field-flow review and a per-report/per-export capability denial matrix."
+      },
+      "validation_plan": {
+        "required": "Independent field-flow review and a per-report/per-export capability denial matrix.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SAFE-INTAKE-CANONICAL-SCOPE-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "related_feature_ids": [
+        "CAP-SAFE-TERMINAL-PROJECTION"
+      ],
+      "passes": [
+        "P1",
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Safeguarding",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "SafeguardingConcernController and lifecycle owners",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Raise, assign, and triage a safeguarding concern",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/safeguarding.php:19-52",
+        "raw_route_path_field": "routes/safeguarding.php:19-52",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": "resources/js/pages/safeguarding/index.tsx",
+        "raw_page_file_field": "resources/js/pages/safeguarding/index.tsx",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/SafeguardingConcernController.php:213-252",
+        "claim_anchors": [
+          "app/Http/Controllers/SafeguardingConcernController.php:217-252",
+          "app/Http/Controllers/SafeguardingConcernController.php:1090-1127"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Safeguarding intake and update appear to trust submitted Site, person, and incident identifiers without canonical reconciliation before downstream projection.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Raise, assign, and triage a safeguarding concern. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-safe-concern-intake-triage.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Http/Controllers/SafeguardingConcernController.php:217-252",
+          "app/Http/Controllers/SafeguardingConcernController.php:1090-1127"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "Canonical reconciliation of submitted Site, person and incident identifiers was not established before downstream projection.",
+      "impact": "Possible incorrect cross-Site/person/incident linkage, privacy exposure or misdirected safeguarding response.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-SAFE-TERMINAL-PROJECTION"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Confirm reporter product policy and run adversarial foreign-Site, person, incident, update, and projection tests.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Confirm reporter product policy and run adversarial foreign-Site, person, incident, update, and projection tests."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Operationally verify the Site/person/incident chain for sensitive intake records pending independent proof.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Confirm reporter product policy and run adversarial foreign-Site, person, incident, update, and projection tests."
+      },
+      "validation_plan": {
+        "required": "Confirm reporter product policy and run adversarial foreign-Site, person, incident, update, and projection tests.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SAFE-ALERT-DEDUP-IDENTITY-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+      "related_feature_ids": [
+        "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+        "CAP-SAFE-TERMINAL-PROJECTION"
+      ],
+      "passes": [
+        "P2",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Control Room",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "ControlRoomAlertAccessService and lifecycle service",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Inspect, acknowledge, triage, resolve, close, or reopen alerts",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": null,
+        "raw_route_path_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "status": "NOT_ESTABLISHED"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:45-777",
+        "claim_anchors": [
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136",
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Control Room alert deduplication appears able to collapse distinct safeguarding concerns because concern identity is not part of the generic deduplication key.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Inspect, acknowledge, triage, resolve, close, or reopen alerts. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-cr-alert-worklist-lifecycle.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136",
+          "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The provisional source slice did not establish concern identity as part of the generic deduplication identity.",
+      "impact": "Possible collapse of distinct safeguarding concerns into one Control Room alert, delaying response or obscuring custody.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+        "CAP-SAFE-TERMINAL-PROJECTION"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "When reconciling alerts, verify source concern identity rather than relying on generic client/time similarity alone.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains."
+      },
+      "validation_plan": {
+        "required": "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SAFE-PROJECTION-DURABILITY-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
+      "related_feature_ids": [
+        "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+        "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE"
+      ],
+      "passes": [
+        "P2",
+        "P5",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Safeguarding",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "SafeguardingTerminalTransitionService",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Complete a safeguarding terminal transition across linked owners",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/safeguarding.php:75-82",
+        "raw_route_path_field": "routes/safeguarding.php:75-82",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:45-225",
+        "claim_anchors": [
+          "app/Observers/SafeguardingConcernObserver.php:19-35",
+          "app/Observers/SafeguardingConcernObserver.php:166-249",
+          "app/Services/ControlRoom/SafetySignalDeliveryRecoveryService.php:26-75"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "Safeguarding intake projections are after-commit catch-and-log operations, while the inspected recovery owner does not visibly include safeguarding sources.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Complete a safeguarding terminal transition across linked owners. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-safe-terminal-projection.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Observers/SafeguardingConcernObserver.php:19-35",
+          "app/Observers/SafeguardingConcernObserver.php:166-249",
+          "app/Services/ControlRoom/SafetySignalDeliveryRecoveryService.php:26-75"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The inspected observer caught post-commit projection failure, while the sampled recovery owner did not visibly include safeguarding sources.",
+      "impact": "Possible silent loss or indefinite delay of safety projections after a committed safeguarding intake.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+        "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Reconcile committed safeguarding concerns against H&S and Control Room projections until durable recovery is proven.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery."
+      },
+      "validation_plan": {
+        "required": "Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    },
+    {
+      "id": "SET-API-WEBHOOK-DESTINATION-01",
+      "record_status": "PROVISIONAL_SOURCE_CLAIM_NOT_FINAL_FINDING",
+      "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+      "related_feature_ids": [
+        "CAP-INT-API-KEY-ADMIN",
+        "CAP-HR-WEBHOOK-CONFIGURATION"
+      ],
+      "passes": [
+        "P1",
+        "P5",
+        "P6",
+        "P7"
+      ],
+      "module_submodule": {
+        "module": "Integrations",
+        "submodule": "CANONICAL_STATIC_IDENTITY_DENOMINATOR",
+        "submodule_status": "CANONICAL_SUBMODULE_DENOMINATOR_NOT_ESTABLISHED"
+      },
+      "actor_and_job": {
+        "actor": "ApiSettingsController and integration settings owners",
+        "secondary_actors": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "job": "Configure and test outbound webhooks",
+        "status": "SOURCE_BOUND_NOT_REPRESENTATIVE_USER_VALIDATED"
+      },
+      "route_url": {
+        "route_names": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "route_paths": "routes/settings.php:201-219; routes/settings.php:211",
+        "raw_route_path_field": "routes/settings.php:201-219; routes/settings.php:211",
+        "status": "SOURCE_LOCATOR_ONLY"
+      },
+      "frontend_anchor": {
+        "page_files": null,
+        "raw_page_file_field": "NOT_ESTABLISHED_CURRENT_AUDIT",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+        "status": "NOT_ESTABLISHED"
+      },
+      "visual_context": {
+        "visual_id": null,
+        "role": null,
+        "site_scope": null,
+        "viewport": null,
+        "ui_state": null,
+        "pattern_type": null,
+        "screenshot_reference": null,
+        "status": "BLOCKED_NOT_OBSERVED_OR_LINKED_CURRENT_AUDIT"
+      },
+      "pattern_implementation": {
+        "shared_component_or_variant": null,
+        "overlay_trigger": null,
+        "internal_baseline": null,
+        "status": "NOT_ADJUDICATED_FOR_THIS_PROVISIONAL_CLAIM"
+      },
+      "backend_anchor": {
+        "matrix_anchors": "app/Http/Controllers/Settings/ApiSettingsController.php:17",
+        "claim_anchors": [
+          "app/Http/Controllers/Settings/ApiSettingsController.php:132-211",
+          "app/Http/Controllers/Settings/ApiSettingsController.php:321-360",
+          "app/Domain/Hr/Services/HrWebhookDestinationPolicy.php:59-151"
+        ],
+        "controller_request_service_model_policy_job_event_migration": "PARTIAL_SOURCE_SLICE_ONLY",
+        "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35"
+      },
+      "current_behaviour": {
+        "classification": "SOURCE_INFERRED_PROVISIONAL",
+        "summary": "API webhook testing appears to issue server-side POST, HEAD, and GET requests to administrator-supplied URLs without the repository-native public-address and redirect destination policy.",
+        "runtime_observed": false
+      },
+      "current_workflow": {
+        "matrix_summary": "Static canonical identity only: Configure and test outbound webhooks. Representative-role completion was not executed.",
+        "entry_prerequisites_steps_decisions_states_failure_recovery_handoff_completion": "NOT_FULLY_RECONSTRUCTED_OR_EXECUTED_CURRENT_AUDIT"
+      },
+      "ease_evidence": {
+        "status": "NOT_MEASURED",
+        "ten_dimensions": null,
+        "completion_time": null,
+        "step_count": null,
+        "field_count": null,
+        "decision_count": null,
+        "context_switches": null,
+        "uncertainty_points": null,
+        "task_script": "task-scripts/cap-int-outbound-webhook-connection.md"
+      },
+      "evidence": {
+        "source_claim_record": "evidence/source/current-feature-discovery-wave-02.json",
+        "claim_anchors": [
+          "app/Http/Controllers/Settings/ApiSettingsController.php:132-211",
+          "app/Http/Controllers/Settings/ApiSettingsController.php:321-360",
+          "app/Domain/Hr/Services/HrWebhookDestinationPolicy.php:59-151"
+        ],
+        "tests_executed": 0,
+        "browser_cells": 0,
+        "database_checks": 0
+      },
+      "problem_root_cause": "The administrator-supplied test destination was not visibly bound to the repository-native destination and redirect policy in the sampled path.",
+      "impact": "Possible server-side requests to internal, reserved or metadata destinations, affecting security and availability.",
+      "benchmark": {
+        "official_repository": null,
+        "inspected_ref": null,
+        "verified_behaviour": null,
+        "no_credible_match_evidence": null,
+        "status": "NOT_MAPPED_AND_NO_FINAL_NO_MATCH_CURRENT_AUDIT"
+      },
+      "benchmark_outcome": "NOT_ADJUDICATED_CURRENT_AUDIT",
+      "neutral_requirements": [
+        "Preserve the legitimate user job while enforcing the canonical owner and exact action authority.",
+        "Keep Site access, direct-object privacy and consent checks explicit; broader Site scope never replaces action authority.",
+        "Make success, failure, audit provenance and recovery observable without copying third-party wording, assets, source or layout."
+      ],
+      "better_oblivion_design": {
+        "proposal": null,
+        "status": "NOT_DESIGNED_UNTIL_NEUTRAL_REQUIREMENTS_BENCHMARK_AND_CURRENT_FINDING_ARE_FINAL"
+      },
+      "target_ease": {
+        "scores": null,
+        "measurable_reduction": null,
+        "status": "NOT_MEASURED"
+      },
+      "cross_module_effects": [
+        "CAP-INT-API-KEY-ADMIN",
+        "CAP-HR-WEBHOOK-CONFIGURATION"
+      ],
+      "rbac_privacy": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+      "priority": "P1",
+      "priority_status": "PROVISIONAL_NOT_FINAL_PRIORITY_COUNT",
+      "effort": {
+        "size": null,
+        "assumptions": null,
+        "status": "NOT_ESTIMATED"
+      },
+      "dependencies_sequence": [
+        "Independent source review at the audited application pin",
+        "Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests.",
+        "Only then decide whether a native remediation contract is warranted"
+      ],
+      "confidence": {
+        "level": "LOW_PENDING_INDEPENDENT_AND_RUNTIME_REVIEW",
+        "evidence_gap": "Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests."
+      },
+      "source_boundary": "Native Oblivion analysis only; no third-party source, assets, wording or distinctive layout may be copied.",
+      "interim_safeguard": "Administrators should use only approved public webhook destinations pending independent destination-policy verification.",
+      "acceptance_criteria": {
+        "given_when_then": null,
+        "status": "NOT_FINAL; REQUIRED GATE: Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests."
+      },
+      "validation_plan": {
+        "required": "Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests.",
+        "unit": "NOT_PLANNED_TO_EXACT_CASES",
+        "feature": "NOT_EXECUTED",
+        "architecture": "NOT_EXECUTED",
+        "e2e": "BLOCKED",
+        "visual_accessibility": "BLOCKED",
+        "performance_concurrency": "NOT_EXECUTED",
+        "representative_user": "NOT_EXECUTED"
+      },
+      "finalization_blockers": [
+        "Independent current-source review",
+        "Exact final feature/finding ownership confirmation",
+        "Safe attributable runtime and/or browser validation where applicable",
+        "Target-specific benchmark or exhaustive final no-match adjudication",
+        "Complete observable acceptance criteria and validation plan"
+      ],
+      "independent_review": {
+        "status": "NOT_COMPLETED",
+        "reviewer": null,
+        "disagreements": null,
+        "reconciliation": null
+      },
+      "unresolved_fields": [
+        "final exact route/page/action ownership where a sentinel remains",
+        "VISUAL-ID, role, Site, viewport, state, pattern baseline and screenshot",
+        "observed workflow and ten-dimension current/target ease measures",
+        "target-specific benchmark or exhaustive final no-match",
+        "native design, effort, final acceptance criteria and executable validation cases"
+      ],
+      "completion_credit": false,
+      "credit": {
+        "final_finding": false,
+        "p0_p1_schema_gate": false,
+        "benchmark": false,
+        "browser": false,
+        "ease": false,
+        "pass": false,
+        "completion": false
+      }
+    }
+  ]
+}

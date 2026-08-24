@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073D",
+  "status": "INDEPENDENT_SOURCE_REVIEW_GO_GENERATED_REPORT_REQUIRES_REGENERATION",
+  "reviewed_on": "2026-08-25",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "input": {
+    "path": "evidence/source/raw-run-073b-cross-module-journeys-wave-05.json",
+    "sha256": "e1983242ab669153b286138c5a104acd18ea130712717d942256e57b6b42fe0e"
+  },
+  "decision": {
+    "raw_evidence": "GO",
+    "generated_08_at_review_time": "NO_GO_STALE",
+    "required_action": "Regenerate 08-cross-module-journeys.md from the reviewed raw artifact and recheck its input hash."
+  },
+  "anchor_validation": {
+    "anchors": 155,
+    "unique_anchors": 139,
+    "missing_or_invalid": 0
+  },
+  "validated_totals": {
+    "journeys": 8,
+    "fresh_independent_source_reviews": 8,
+    "handoffs": 44,
+    "PROVEN": 27,
+    "PARTIAL": 8,
+    "NOT_ESTABLISHED": 9,
+    "provisional_candidates": 12,
+    "prompt_grade_completed_journeys": 0
+  },
+  "per_journey": {
+    "RUN-073-J1": {"PROVEN": 2, "PARTIAL": 1, "NOT_ESTABLISHED": 2},
+    "RUN-073-J2": {"PROVEN": 4, "PARTIAL": 1, "NOT_ESTABLISHED": 0},
+    "RUN-073-J3": {"PROVEN": 2, "PARTIAL": 0, "NOT_ESTABLISHED": 2},
+    "RUN-073-J4": {"PROVEN": 3, "PARTIAL": 2, "NOT_ESTABLISHED": 1},
+    "RUN-073-J5": {"PROVEN": 4, "PARTIAL": 1, "NOT_ESTABLISHED": 1},
+    "RUN-073-J6": {"PROVEN": 3, "PARTIAL": 1, "NOT_ESTABLISHED": 2},
+    "RUN-073-J7": {"PROVEN": 5, "PARTIAL": 0, "NOT_ESTABLISHED": 1},
+    "RUN-073-J8": {"PROVEN": 4, "PARTIAL": 2, "NOT_ESTABLISHED": 0}
+  },
+  "review_boundary": {
+    "fresh_independent_source_review_per_journey": "8/8",
+    "fresh_independent_prompt_grade_journey_reviews": "0/8",
+    "runtime_browser_journey_execution": "0/8",
+    "four_viewport_journey_sets": "0/8",
+    "validated_ease_sets": "0/8",
+    "final_findings": 0,
+    "benchmark_mapping_credit": 0,
+    "final_no_match_credit": 0,
+    "pass_credit": 0,
+    "completion_credit": false
+  },
+  "attestation": "Fresh independent pinned-source review of all eight reconstructed journeys. Locator and semantic review grants source-review accounting only; no application execution or downstream credit."
+}

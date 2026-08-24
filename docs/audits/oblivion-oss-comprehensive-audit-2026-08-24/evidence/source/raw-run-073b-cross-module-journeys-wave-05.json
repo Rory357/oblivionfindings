@@ -1,0 +1,350 @@
+{
+  "schema_version": "RUN-073_PASS2_CROSS_MODULE_JOURNEYS_V1",
+  "run_id": "RUN-073B",
+  "status": "COMPLETE_SOURCE_RECONSTRUCTION_ZERO_EXECUTION_OR_PASS_CREDIT",
+  "agent_task_path": "/root/run073_cross_module_journeys",
+  "audit_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "checkpoint_main": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
+    "pin_verified": true
+  },
+  "scope": {
+    "primary_lens": "Pass 2 source-level task flow",
+    "secondary_lenses": [
+      "Pass 5 canonical ownership handoff where anchored",
+      "Pass 6 Site, role and privacy boundary where anchored"
+    ],
+    "architecture": "One operating organisation across multiple Sites; Site access, action permissions, canonical record ownership, direct-object concealment and privacy are the boundaries.",
+    "method": "Immutable git-show/git-grep reconstruction only",
+    "runtime_or_browser_execution": false
+  },
+  "counts": {
+    "journeys": 8,
+    "handoffs": 44,
+    "PROVEN": 27,
+    "PARTIAL": 8,
+    "NOT_ESTABLISHED": 9,
+    "provisional_source_candidates": 12
+  },
+  "journeys": [
+    {
+      "journey_id": "RUN-073-J1",
+      "name": "hire-to-first-shift",
+      "actors_jobs": ["candidate", "recruiter or HR manager", "employee intake and onboarding owner", "roster manager", "new worker"],
+      "feature_ids": ["CAP-HR-RECRUITMENT-OFFER-HIRE-LIFECYCLE", "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE", "CAP-HR-ONBOARDING-LIFECYCLE", "CAP-OPS-STAFF-AVAILABILITY", "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "CAP-OPS-ROSTER-PERIOD-PUBLICATION", "CAP-OPS-SHIFT-LIFECYCLE"],
+      "handoff_counts": {"PROVEN": 2, "PARTIAL": 1, "NOT_ESTABLISHED": 2},
+      "ordered_handoffs": [
+        {
+          "id": "J1-H1",
+          "from": "accepted recruitment offer",
+          "to": "employee profile with primary Site and start date",
+          "classification": "PROVEN",
+          "canonical_owner": "RecruitmentService delegates employee creation to EmployeeIntakeService",
+          "evidence": ["routes/hr.php:224-228", "app/Domain/Hr/Services/RecruitmentService.php:283-359", "tests/Feature/Hr/OfferAcceptOnboardingFlowTest.php:85-140"],
+          "site_role_privacy": "Recruitment and employee-management permissions guard the action; primary_site_id is carried into employee intake.",
+          "proof_or_gap": "Offer conversion creates the employee through the canonical intake service and marks the candidate hired."
+        },
+        {
+          "id": "J1-H2",
+          "from": "employee profile creation",
+          "to": "onboarding checklist instantiation",
+          "classification": "PARTIAL",
+          "canonical_owner": "EmployeeIntakeService after-commit onboarding hook",
+          "evidence": ["app/Domain/Hr/Services/EmployeeIntakeService.php:240-270", "app/Domain/Hr/Services/EmployeeIntakeService.php:481-501", "tests/Feature/Hr/OfferAcceptOnboardingFlowTest.php:126-140"],
+          "site_role_privacy": "The employee retains the intake Site, but checklist creation failure is not transaction-fatal.",
+          "proof_or_gap": "Checklist creation is attempted after commit; when no active template matches, no checklist is created, the exception is caught and logged, and the hire remains committed."
+        },
+        {
+          "id": "J1-H3",
+          "from": "completed or missing onboarding",
+          "to": "shift eligibility and availability",
+          "classification": "NOT_ESTABLISHED",
+          "canonical_owner": "ShiftStaffEligibilityService with AvailabilityRule",
+          "evidence": ["app/Services/ShiftStaffEligibilityService.php:175-221", "app/Services/ShiftStaffEligibilityService.php:310-369", "app/Services/Eligibility/Rules/AvailabilityRule.php:101-167"],
+          "site_role_privacy": "Eligibility checks employment, dates, Site, leave and compliance; global Site scope only broadens visibility and does not supply shift-management permission.",
+          "proof_or_gap": "No onboarding-checklist completion condition is consulted by shift eligibility."
+        },
+        {
+          "id": "J1-H4",
+          "from": "eligible employee selected for a shift",
+          "to": "assigned and published first shift",
+          "classification": "PROVEN",
+          "canonical_owner": "ShiftLifecycleService for assignment and RosterPublishingService for publication",
+          "evidence": ["routes/operations.php:807-813", "app/Http/Controllers/ShiftController.php:1975-2053", "app/Http/Controllers/ShiftController.php:2495-2533", "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:456-510", "app/Domain/Rostering/RosterPublishingService.php:73-125", "routes/operations.php:968-980", "tests/Feature/Rostering/RosterPublishingTest.php:11-40"],
+          "site_role_privacy": "Assignment remains Site-bound and requires roster or shift action permission independently of Site scope.",
+          "proof_or_gap": "The canonical shift lifecycle assigns the worker and the roster service publishes the period."
+        },
+        {
+          "id": "J1-H5",
+          "from": "published shift belonging to the new hire",
+          "to": "that worker's first attended shift",
+          "classification": "NOT_ESTABLISHED",
+          "canonical_owner": "AttendanceService once a worker initiates attendance",
+          "evidence": ["routes/shifts.php:96-126", "app/Domain/Hr/Services/AttendanceService.php:37-84", "app/Domain/Hr/Services/AttendanceService.php:693-715", "tests/Feature/Hr/AttendanceClockWorkflowTest.php:40-95"],
+          "site_role_privacy": "Attendance is anchored to the authenticated worker and canonical shift, but no source test binds the recruitment-created user through this first attendance.",
+          "proof_or_gap": "Attendance accepts an assigned worker shift in allowed states but does not itself require publication; the specific hire-to-first-attendance thread is not established and is not inherited from J2."
+        }
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J1-P1", "severity": "P1", "title": "A newly hired employee can reach assignment eligibility without proven onboarding completion", "feature_ids": ["CAP-HR-ONBOARDING-LIFECYCLE", "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "CAP-OPS-ROSTER-PERIOD-PUBLICATION"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted browser or runtime lane executed candidate acceptance, onboarding, roster publication and first clock-in using the same identity.",
+      "completion_test": "Accept one Site-bound candidate, complete required onboarding, prove eligibility consumes completion, assign and publish the first shift, then clock in as the same worker under distinct HR, roster and worker roles."
+    },
+    {
+      "journey_id": "RUN-073-J2",
+      "name": "availability-to-published-roster-to-attendance-to-timesheet-to-payroll",
+      "actors_jobs": ["worker", "roster manager", "attendance worker", "timesheet approver", "payroll administrator"],
+      "feature_ids": ["CAP-OPS-STAFF-AVAILABILITY", "CAP-OPS-ROSTER-PLANNING-WORKSPACE", "CAP-OPS-ROSTER-PERIOD-PUBLICATION", "CAP-OPS-ATTENDANCE-CLOCK-SESSION", "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT", "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE", "CAP-HR-PAYROLL-RUN-LIFECYCLE"],
+      "handoff_counts": {"PROVEN": 4, "PARTIAL": 1, "NOT_ESTABLISHED": 0},
+      "ordered_handoffs": [
+        {
+          "id": "J2-H1",
+          "from": "worker availability declaration",
+          "to": "shift-assignment eligibility decision",
+          "classification": "PARTIAL",
+          "canonical_owner": "StaffAvailabilityController persists declarations; ShiftStaffEligibilityService applies AvailabilityRule",
+          "evidence": ["app/Http/Controllers/StaffAvailabilityController.php:11-90", "app/Services/Eligibility/Rules/AvailabilityRule.php:101-167", "app/Services/ShiftStaffEligibilityService.php:68-110"],
+          "site_role_privacy": "Availability belongs to the worker; these anchors establish availability ownership and evaluation only, not the separate assignment Site or permission boundary.",
+          "proof_or_gap": "Declared conflicts are evaluated, but missing availability and uncovered windows can remain soft warnings or be overridden rather than forming a hard publication invariant."
+        },
+        {
+          "id": "J2-H2",
+          "from": "eligible shift assignment",
+          "to": "published roster period",
+          "classification": "PROVEN",
+          "canonical_owner": "ShiftLifecycleService and RosterPublishingService",
+          "evidence": ["routes/operations.php:807-813", "app/Http/Controllers/ShiftController.php:1975-2053", "app/Http/Controllers/ShiftController.php:2495-2533", "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:456-510", "app/Domain/Rostering/RosterPublishingService.php:73-125", "tests/Feature/Rostering/RosterPublishingTest.php:11-40"],
+          "site_role_privacy": "Canonical shift Site and roster action permission govern assignment and publication.",
+          "proof_or_gap": "The assignment is persisted through the shift lifecycle and included in the published period."
+        },
+        {
+          "id": "J2-H3",
+          "from": "assigned worker shift in an attendance-eligible state; publication is not enforced here",
+          "to": "attendance clock session",
+          "classification": "PROVEN",
+          "canonical_owner": "AttendanceService",
+          "evidence": ["routes/shifts.php:96-126", "app/Domain/Hr/Services/AttendanceService.php:37-84", "app/Domain/Hr/Services/AttendanceService.php:693-715", "tests/Feature/Hr/AttendanceClockWorkflowTest.php:40-95"],
+          "site_role_privacy": "The authenticated worker and canonical assigned shift constrain clock-in; Site scope does not replace attendance capability.",
+          "proof_or_gap": "Clock-in creates the attendance session against the authenticated worker's assigned shift in an allowed state; this edge does not prove a publication precondition."
+        },
+        {
+          "id": "J2-H4",
+          "from": "attendance clock-out",
+          "to": "draft timesheet",
+          "classification": "PROVEN",
+          "canonical_owner": "AttendanceService delegates draft creation and reconciliation to DraftTimesheetService",
+          "evidence": ["app/Domain/Hr/Services/AttendanceService.php:90-218", "app/Domain/Shifts/Timesheets/Drafts/DraftTimesheetService.php:28-76", "tests/Feature/Hr/AttendanceClockWorkflowTest.php:40-95", "tests/Feature/DraftTimesheetServiceReconciliationCallTest.php:28-76"],
+          "site_role_privacy": "Timesheet identity, worker, shift and Site are derived from canonical attendance and shift records.",
+          "proof_or_gap": "Clock-out invokes canonical draft-timesheet materialization."
+        },
+        {
+          "id": "J2-H5",
+          "from": "approved in-period timesheet",
+          "to": "payroll-run source and later bank-accepted net-pay settlement",
+          "classification": "PROVEN",
+          "canonical_owner": "PayrollExportService owns payroll-run sources; ExternalSettlementService owns bank-accepted net-pay settlement",
+          "evidence": ["app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:28-161", "app/Domain/Hr/Services/PayrollExportService.php:501-556", "app/Domain/Hr/Services/PayrollExportService.php:677-820", "app/Domain/Finance/Services/ExternalSettlementService.php:660-720", "tests/Feature/Hr/ShiftPayrollBackboneIntegrationTest.php:38-154"],
+          "site_role_privacy": "Manager approval and payroll execution require their own actions; payroll sources retain canonical shift and timesheet Site context.",
+          "proof_or_gap": "Approved in-period timesheets are selected as payroll-run sources; after bank acceptance, the separate settlement service records net-pay settlement and marks the run timesheets paid."
+        }
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J2-P2", "severity": "P2", "title": "Publication-time roster validation does not demonstrate linkage to the persisted eligibility-override reason and warning record", "feature_ids": ["CAP-OPS-STAFF-AVAILABILITY", "CAP-OPS-ROSTER-PLANNING-WORKSPACE", "CAP-OPS-ROSTER-PERIOD-PUBLICATION"], "evidence": ["app/Http/Controllers/ShiftController.php:1436-1497", "app/Domain/Rostering/RosterPublishValidator.php:25-71"], "status": "PROVISIONAL_SOURCE_ONLY_UNADJUDICATED"}
+      ],
+      "browser_task_script_coverage_blocker": "Static tests were located but not executed; no role-driven worker, manager and payroll-admin browser script was permitted.",
+      "completion_test": "Declare availability, roster and publish, clock in/out, submit and independently approve the generated timesheet, then include and settle it in one payroll run with Site and direct-object denials tested separately."
+    },
+    {
+      "journey_id": "RUN-073-J3",
+      "name": "client-intake-to-plan-to-shift-task-to-note-or-outcome",
+      "actors_jobs": ["client intake worker", "care-plan author", "roster or shift-task coordinator", "frontline worker", "clinical or service reviewer"],
+      "feature_ids": ["CAP-OPS-CLIENT-ONBOARDING", "CAP-OPS-CARE-PLAN-LIFECYCLE", "CAP-DAY-ALL-TASKS-WORKBENCH", "CAP-DAY-MY-DAY-WORKSPACE", "CAP-OPS-SHIFT-NOTES", "CAP-CLI-CLIENT-NOTES"],
+      "handoff_counts": {"PROVEN": 2, "PARTIAL": 0, "NOT_ESTABLISHED": 2},
+      "ordered_handoffs": [
+        {
+          "id": "J3-H1",
+          "from": "client intake workflow",
+          "to": "completed onboarding and active Client",
+          "classification": "PROVEN",
+          "canonical_owner": "ClientOnboardingWorkflowController",
+          "evidence": ["app/Http/Controllers/Operations/ClientOnboardingWorkflowController.php:120-151", "app/Http/Controllers/Operations/ClientOnboardingWorkflowController.php:154-226", "app/Http/Controllers/Operations/ClientOnboardingWorkflowController.php:242-302", "tests/Feature/Operations/ClientProfileDailyWorkspaceSecurityTest.php:147-227"],
+          "site_role_privacy": "Workflow queries are constrained by approved Sites and Client access; action permissions remain required.",
+          "proof_or_gap": "The controller owns workflow steps and explicit completion for the canonical Client."
+        },
+        {
+          "id": "J3-H2",
+          "from": "care-plan creation submitted with from_onboarding during an in-progress Client onboarding workflow",
+          "to": "completion of the matching incomplete Care Plan Created onboarding step",
+          "classification": "PROVEN",
+          "canonical_owner": "CarePlanController",
+          "evidence": ["app/Http/Controllers/Operations/CarePlanController.php:122-177", "app/Http/Controllers/Operations/CarePlanController.php:198-221"],
+          "site_role_privacy": "Care-plan creation is anchored to the accessible Client and its Site.",
+          "proof_or_gap": "Only the from_onboarding path, while the workflow is in progress and the exact-name Care Plan Created step is still incomplete, completes that onboarding step."
+        },
+        {
+          "id": "J3-H3",
+          "from": "care-plan intervention or goal",
+          "to": "worker ShiftTask",
+          "classification": "NOT_ESTABLISHED",
+          "canonical_owner": "No canonical cross-module owner found; ShiftTaskController owns standalone shift tasks",
+          "evidence": ["app/Models/ShiftTask.php:16-42", "app/Http/Controllers/ShiftTaskController.php:11-47"],
+          "site_role_privacy": "Task mutation checks action capability, worker ownership unless manageAny, and task-to-shift identity; these anchors do not establish a canonical Site boundary, and ShiftTask has no care-plan or goal identity.",
+          "proof_or_gap": "ShiftTask contains shift, label, schedule and completion data but no Client, care-plan, goal, intervention or outcome foreign key."
+        },
+        {
+          "id": "J3-H4",
+          "from": "completed ShiftTask",
+          "to": "client note and care-plan outcome",
+          "classification": "NOT_ESTABLISHED",
+          "canonical_owner": "ClientNoteController owns shift-linked notes; CarePlanGoalController independently owns goal notes and progress",
+          "evidence": ["app/Http/Controllers/ClientNoteController.php:13-55", "app/Http/Controllers/Operations/CarePlanGoalController.php:109-179", "app/Http/Controllers/Operations/CarePlanGoalController.php:335-348", "tests/Feature/Operations/CarePlanGoalManagementTest.php:118-142"],
+          "site_role_privacy": "Client notes validate the shift and Client relationship, while goal notes use the care-plan hierarchy; neither can authorize the other by adjacency.",
+          "proof_or_gap": "Independent shift-linked note and goal-progress capabilities exist, but neither binds to the completed ShiftTask; the completed-task-to-note-or-outcome handoff is therefore not established."
+        }
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J3-P1", "severity": "P1", "title": "Care-plan interventions lack canonical lineage through assigned shift tasks to worker evidence and outcomes", "feature_ids": ["CAP-OPS-CARE-PLAN-LIFECYCLE", "CAP-DAY-MY-DAY-WORKSPACE", "CAP-OPS-SHIFT-NOTES", "CAP-CLI-CLIENT-NOTES"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted task script created a goal-driven shift task and traced its completion into a client note and reviewed outcome.",
+      "completion_test": "Create a Site-authorized Client, create a care-plan goal, generate a ShiftTask carrying immutable goal or intervention identity, complete it as the assigned worker, and display an auditable task-to-note-to-outcome chain."
+    },
+    {
+      "journey_id": "RUN-073-J4",
+      "name": "prescription-to-stock-to-round-to-administration-error-review",
+      "actors_jobs": ["medication-order manager", "order verifier", "stock custodian", "round generator", "medication administrator", "medication-error reviewer"],
+      "feature_ids": ["CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE", "CAP-MED-MEDICATION-ORDER-VERIFICATION", "CAP-MED-STOCK-MOVEMENT", "CAP-MED-ROUND-LIFECYCLE", "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE", "CAP-MED-MEDICATION-ERROR-LIFECYCLE", "CAP-MED-MEDICATION-REVIEW"],
+      "handoff_counts": {"PROVEN": 3, "PARTIAL": 2, "NOT_ESTABLISHED": 1},
+      "ordered_handoffs": [
+        {"id": "J4-H1", "from": "client medication order", "to": "optional medication stock relation identity", "classification": "PARTIAL", "canonical_owner": "ClientMedication and ClientMedicationStock", "evidence": ["app/Models/ClientMedication.php:197-205", "app/Models/ClientMedicationStock.php:16-40", "tests/Feature/Emar/MedicationOrderLifecycleTest.php:471-515"], "site_role_privacy": "Medication stock carries Client and medication identity, but these anchors do not prove Site-safe access or order-lifecycle materialization.", "proof_or_gap": "The canonical medication exposes an optional stock relation and stock records retain medication identity; these anchors do not prove that the order lifecycle materializes a stock aggregate."},
+        {"id": "J4-H2", "from": "verified active medication orders", "to": "generated medication round schedule", "classification": "PARTIAL", "canonical_owner": "GenerateMedicationRounds command and GuidedRoundService", "evidence": ["app/Console/Commands/GenerateMedicationRounds.php:18-56", "app/Models/MedicationRound.php:13-38", "app/Services/GuidedRoundService.php:62-94", "tests/Feature/Emar/MedicationRoundsDemoSeederTest.php:42-89"], "site_role_privacy": "Round access is Client and Site sensitive, but the round aggregate does not persist immutable per-order membership.", "proof_or_gap": "A round is generated and medication candidates are queried dynamically; no immutable round-item snapshot binds the verified order version."},
+        {"id": "J4-H3", "from": "guided medication round", "to": "dose administration", "classification": "PROVEN", "canonical_owner": "GuidedRoundController delegates administration to EnhancedMarService", "evidence": ["app/Models/MedicationRound.php:89-92", "app/Http/Controllers/Emar/GuidedRoundController.php:65-133", "app/Http/Controllers/Emar/GuidedRoundController.php:169-262", "app/Services/EnhancedMarService.php:774-850", "tests/Feature/Emar/OneChartAdministrationSafetyTest.php:247-280"], "site_role_privacy": "The administrator must be authorized for Client, medication and Site; administration stores medication_round_id.", "proof_or_gap": "The guided-round action invokes the canonical MAR service and binds administration to the round."},
+        {"id": "J4-H4", "from": "given controlled-drug administration", "to": "controlled-drug register entry and, when stock.on_hand is non-null, a clamped stock-balance update", "classification": "PROVEN", "canonical_owner": "EnhancedMarService", "evidence": ["app/Services/EnhancedMarService.php:795-880", "app/Services/EnhancedMarService.php:1319-1339"], "site_role_privacy": "The conditional stock mutation occurs inside the authorized medication-administration transaction and canonical Client medication context.", "proof_or_gap": "The service always creates the controlled-drug register entry; when stock exists and on_hand is non-null it assigns max(0, before minus quantity), so no positive decrement is claimed for a zero balance."},
+        {"id": "J4-H5", "from": "specific administration event", "to": "specific medication-error record", "classification": "NOT_ESTABLISHED", "canonical_owner": "MedicationErrorController owns errors independently", "evidence": ["app/Models/MedicationError.php:19-65", "app/Http/Controllers/Emar/MedicationErrorController.php:165-241"], "site_role_privacy": "MedicationError carries client_id and optional client_medication_id, but these anchors do not establish that the medication belongs to that Client or that direct-object access is Site-scoped.", "proof_or_gap": "MedicationError links to Client medication and optionally an incident, but has no administration_id."},
+        {"id": "J4-H6", "from": "reported medication error", "to": "error review and resolution", "classification": "PROVEN", "canonical_owner": "MedicationErrorController", "evidence": ["routes/emar.php:371-382", "app/Http/Controllers/Emar/MedicationErrorController.php:262-327", "app/Models/MedicationReview.php:13-53"], "site_role_privacy": "Routes require medications.administer.correct or clients.update, but the cited direct-bound review and resolve actions do not establish canonical Client/Site access; Site-safe direct-object review and resolution are NOT_ESTABLISHED.", "proof_or_gap": "MedicationError has its own lifecycle; separate MedicationReview medications_reviewed JSON is not inherited as error lineage."}
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J4-P1", "severity": "P1", "title": "Medication errors cannot be traced to the exact administered dose", "feature_ids": ["CAP-MED-WORKER-DOSE-PRN-LIFECYCLE", "CAP-MED-MEDICATION-ERROR-LIFECYCLE", "CAP-MED-MEDICATION-REVIEW"], "status": "PROVISIONAL_SOURCE_ONLY"},
+        {"candidate_id": "RUN-073-J4-P2", "severity": "P2", "title": "Medication-round membership lacks an immutable verified-order snapshot", "feature_ids": ["CAP-MED-MEDICATION-ORDER-VERIFICATION", "CAP-MED-ROUND-LIFECYCLE"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted runtime round was generated, administered, stock-reconciled, deliberately errored and reviewed end to end.",
+      "completion_test": "Bind an immutable verified order version to a round item, administer it, prove stock movement references administration, create an error referencing the same administration, and independently review and close it."
+    },
+    {
+      "journey_id": "RUN-073-J5",
+      "name": "incident-or-hazard-to-investigation-to-corrective-action-evidence-verification",
+      "actors_jobs": ["incident reporter", "incident reviewer", "H&S handover acceptor", "investigator", "corrective-action owner", "independent verifier", "hazard-register owner"],
+      "feature_ids": ["CAP-INC-INCIDENT-AUTHOR-TEMPLATE", "CAP-INC-INCIDENT-REVIEW-CLOSURE", "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE", "CAP-HS-INVESTIGATION-ASSURANCE", "CAP-HS-CORRECTIVE-ACTION-EVIDENCE", "CAP-SITE-HAZARD-REGISTER"],
+      "handoff_counts": {"PROVEN": 4, "PARTIAL": 1, "NOT_ESTABLISHED": 1},
+      "ordered_handoffs": [
+        {"id": "J5-H1", "from": "submitted incident", "to": "health and safety event handover", "classification": "PROVEN", "canonical_owner": "IncidentJourneyService creates handover; HsEventController accepts it", "evidence": ["app/Services/Incidents/IncidentJourneyService.php:128-169", "app/Services/Incidents/IncidentJourneyService.php:924-999", "app/Http/Controllers/HealthSafety/HsEventController.php:408-440"], "site_role_privacy": "Incident and H&S event retain canonical Site; incident review and H&S acceptance are separate capabilities.", "proof_or_gap": "IncidentJourneyService materializes the H&S event and exposes handover acceptance."},
+        {"id": "J5-H2", "from": "open H&S event, whether or not handover acceptance occurred", "to": "investigation", "classification": "PARTIAL", "canonical_owner": "HsInvestigationService", "evidence": ["app/Services/HealthSafety/HsInvestigationService.php:44-135", "tests/Feature/HealthSafety/HsInvestigationAssuranceTest.php:28-83"], "site_role_privacy": "Investigation is tied to canonical H&S event Site and investigation permission.", "proof_or_gap": "The service creates and governs investigation from an open H&S event, but it does not inspect handover acceptance; accepted-handover-to-investigation sequencing is not established."},
+        {"id": "J5-H3", "from": "completed and approved investigation recommendation, with accepted handover when incident-backed", "to": "corrective action", "classification": "PROVEN", "canonical_owner": "HsInvestigationService delegates to HsCorrectiveActionService", "evidence": ["app/Services/HealthSafety/HsInvestigationService.php:144-347", "app/Services/HealthSafety/HsCorrectiveActionService.php:53-145", "app/Services/HealthSafety/HsCorrectiveActionService.php:650-683"], "site_role_privacy": "The action inherits investigation and event Site; assignment does not bypass corrective-action permission.", "proof_or_gap": "Only a completed investigation can materialize its approved recommendation as a governed corrective action, and incident-backed events must also have an accepted handover; review alone is not sufficient."},
+        {"id": "J5-H4", "from": "corrective action execution", "to": "completion evidence", "classification": "PROVEN", "canonical_owner": "HsCorrectiveActionService and evidence routes", "evidence": ["app/Services/HealthSafety/HsCorrectiveActionService.php:421-483", "routes/health-safety.php:57-62", "tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php:31-65", "tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php:197-214"], "site_role_privacy": "Evidence mutation is constrained by action ownership, H&S permission and Site.", "proof_or_gap": "Completion and governed evidence operations are explicit."},
+        {"id": "J5-H5", "from": "completed corrective action", "to": "independent verification and closure", "classification": "PROVEN", "canonical_owner": "HsCorrectiveActionService", "evidence": ["app/Services/HealthSafety/HsCorrectiveActionService.php:492-580", "app/Http/Controllers/HealthSafety/HsCorrectiveActionController.php:127-165", "tests/Feature/HealthSafety/HsCorrectiveActionTest.php:574-680"], "site_role_privacy": "Independent verification is distinct and the controller binds the verifier to the authenticated user after accessible-event resolution; exact wrong-Site denial for this corrective-action verification/closure handoff remains NOT_ESTABLISHED by these anchors.", "proof_or_gap": "Verification and closure are separate governed transitions after completion."},
+        {"id": "J5-H6", "from": "SiteHazard register item", "to": "the same H&S investigation and corrective-action assurance chain", "classification": "NOT_ESTABLISHED", "canonical_owner": "SiteHazardController and SiteHazardAction form a parallel owner", "evidence": ["app/Http/Controllers/Sites/SiteHazardController.php:380-708", "app/Models/SiteHazard.php:102-102", "app/Models/SiteHazardAction.php:1-49"], "site_role_privacy": "Hazard register is Site-bound, but adjacent Site ownership cannot establish HsEvent, Investigation or CorrectiveAction lineage.", "proof_or_gap": "No source bridge was found into the canonical H&S investigation and independent-verification chain."}
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J5-P1", "severity": "P1", "title": "Hazard-register actions do not reach the canonical independent investigation and corrective-action assurance chain", "feature_ids": ["CAP-SITE-HAZARD-REGISTER", "CAP-HS-INVESTIGATION-ASSURANCE", "CAP-HS-CORRECTIVE-ACTION-EVIDENCE"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted role-driven script compared incident-originated and hazard-originated assurance through final verification.",
+      "completion_test": "Submit an incident and Site hazard, prove each enters canonical H&S investigation, create actions and evidence, reject self-verification and wrong-Site access, then independently verify closure."
+    },
+    {
+      "journey_id": "RUN-073-J6",
+      "name": "purchase-to-asset-device-vehicle-to-maintenance-depreciation-disposal",
+      "actors_jobs": ["purchasing officer", "goods receiver", "asset custodian", "device custodian", "fleet manager", "maintenance coordinator", "finance fixed-asset officer"],
+      "feature_ids": ["CAP-FIN-PURCHASE-ORDER-LIFECYCLE", "CAP-FLEET-ASSET-REGISTER", "CAP-SEC-DEVICE-REGISTRY-CUSTODY", "CAP-FLEET-VEHICLE-REGISTER", "CAP-FLEET-WORK-ORDER-LIFECYCLE", "CAP-FIN-FIXED-ASSET-LIFECYCLE"],
+      "handoff_counts": {"PROVEN": 3, "PARTIAL": 1, "NOT_ESTABLISHED": 2},
+      "ordered_handoffs": [
+        {"id": "J6-H1", "from": "purchase-order line; a goods-receipt transition is itself not established", "to": "operational Asset, Device or vehicle identity", "classification": "NOT_ESTABLISHED", "canonical_owner": "PurchaseOrderController owns procurement; no canonical procurement-to-register owner found", "evidence": ["app/Domain/Finance/Http/Controllers/PurchaseOrderController.php:131-180", "app/Domain/Finance/Models/FinPurchaseOrder.php:25-85", "app/Domain/Finance/Models/FinPurchaseOrderLine.php:15-49"], "site_role_privacy": "Procurement and registers have separate permissions and Site contexts; shared descriptions or serials do not establish ownership.", "proof_or_gap": "The line exposes received_quantity, but the bounded source search did not establish a goods-receipt mutation path, an Asset/Device/vehicle foreign key, or a canonical register-creation handoff."},
+        {"id": "J6-H2", "from": "operational Asset or vehicle", "to": "maintenance work order", "classification": "PROVEN", "canonical_owner": "AssetController and WorkOrderController", "evidence": ["app/Http/Controllers/FleetAssets/AssetController.php:540-607", "app/Models/Asset.php:271-271", "app/Http/Controllers/FleetAssets/WorkOrderController.php:170-245", "app/Models/FleetWorkOrder.php:19-65"], "site_role_privacy": "Model carries Asset identity; controller list/options/direct-write Site and policy boundaries require separate scrutiny.", "proof_or_gap": "Operational Asset exposes work orders and the controller creates maintenance records against it."},
+        {"id": "J6-H3", "from": "operational Asset identity", "to": "explicit security Device identity link", "classification": "PROVEN", "canonical_owner": "DeviceLinkService", "evidence": ["app/Domain/SecurityDevices/Services/DeviceLinkService.php:11-59", "tests/Feature/SecurityDevices/DeviceAssetLinkTest.php:57-77"], "site_role_privacy": "The cited service proves duplicate-active-pair prevention and link creation only; Asset and Device Site compatibility, authorization, and Site-safe custody semantics are NOT_ESTABLISHED by these anchors.", "proof_or_gap": "An explicit service binds canonical Device identity to Asset identity. This classification does not award Site compatibility, authorization, or custody-boundary proof."},
+        {"id": "J6-H4", "from": "operational Asset valuation", "to": "financial fixed-asset record", "classification": "PARTIAL", "canonical_owner": "AssetValueObserver delegates selective capture to FixedAssetService", "evidence": ["app/Observers/AssetValueObserver.php:10-76", "app/Providers/AppServiceProvider.php:479-480", "tests/Feature/Finance/FixedAssetCaptureTest.php:48-108"], "site_role_privacy": "Site is available from Asset; financial category and threshold rules determine capture.", "proof_or_gap": "Observer registration and capture are proven, but no normal AssetValue creation path was located; capture is selective and observer failure is logged."},
+        {"id": "J6-H5", "from": "financial fixed asset", "to": "depreciation entries", "classification": "PROVEN", "canonical_owner": "FixedAssetService", "evidence": ["app/Domain/Finance/Services/FixedAssetService.php:111-213", "tests/Feature/Finance/FixedAssetDepreciationIntegrityTest.php:93-150"], "site_role_privacy": "Finance action permission controls depreciation; financial asset retains source identity.", "proof_or_gap": "The service calculates and records depreciation with source-anchored integrity tests."},
+        {"id": "J6-H6", "from": "financial fixed-asset disposal", "to": "operational Asset, Device and vehicle retirement", "classification": "NOT_ESTABLISHED", "canonical_owner": "FixedAssetService owns financial disposal; operational retirement and DeviceLinkService unlink remain separate", "evidence": ["app/Domain/Finance/Services/FixedAssetService.php:362-580", "app/Domain/SecurityDevices/Services/DeviceLinkService.php:48-84"], "site_role_privacy": "Finance disposal permission cannot implicitly authorize fleet retirement or device unlinking.", "proof_or_gap": "Financial disposal updates fixed asset and journal but does not retire operational Asset/vehicle, unlink Device or resolve maintenance."
+        }
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J6-P1A", "severity": "P1", "title": "No canonical goods-receipt-to-Asset, Device or vehicle register provenance is established; the receipt mutation itself is also not established", "feature_ids": ["CAP-FIN-PURCHASE-ORDER-LIFECYCLE", "CAP-FLEET-ASSET-REGISTER", "CAP-SEC-DEVICE-REGISTRY-CUSTODY", "CAP-FLEET-VEHICLE-REGISTER"], "status": "PROVISIONAL_SOURCE_ONLY"},
+        {"candidate_id": "RUN-073-J6-P1B", "severity": "P1", "title": "Financial disposal does not terminalize operational Asset, Device, vehicle and maintenance projections", "feature_ids": ["CAP-FIN-FIXED-ASSET-LIFECYCLE", "CAP-FLEET-ASSET-REGISTER", "CAP-SEC-DEVICE-REGISTRY-CUSTODY", "CAP-FLEET-WORK-ORDER-LIFECYCLE"], "status": "PROVISIONAL_SOURCE_ONLY"},
+        {"candidate_id": "RUN-073-J6-P1C", "severity": "P1", "title": "Fleet work-order controller paths lack an established per-record Site and direct-object authorization boundary", "feature_ids": ["CAP-FLEET-WORK-ORDER-LIFECYCLE"], "evidence": ["app/Http/Controllers/FleetAssets/WorkOrderController.php:15-167", "app/Http/Controllers/FleetAssets/WorkOrderController.php:170-281"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted task received a PO, registered the same item operationally and financially, maintained, depreciated and disposed of all projections.",
+      "completion_test": "Receive one serialized PO line into a canonical Asset, bind Device/vehicle projections, close maintenance, create depreciation, then dispose and terminalize all projections with foreign-Site IDs concealed."
+    },
+    {
+      "journey_id": "RUN-073-J7",
+      "name": "telemetry-to-signal-to-alert-to-incident-or-work-order-to-closure",
+      "actors_jobs": ["monitoring collector", "DeviceEventObserver", "outbox job", "signal processor", "control-room operator", "incident reviewer", "maintenance coordinator"],
+      "feature_ids": ["CAP-SEC-DEVICE-REGISTRY-CUSTODY", "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE", "CAP-CR-SIGNAL-QUEUE-CONFIGURATION", "CAP-CR-ALERT-WORKLIST-LIFECYCLE", "CAP-CR-ALERT-TASK-LIFECYCLE", "CAP-INC-INCIDENT-REVIEW-CLOSURE", "CAP-FLEET-WORK-ORDER-LIFECYCLE", "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER"],
+      "handoff_counts": {"PROVEN": 5, "PARTIAL": 0, "NOT_ESTABLISHED": 1},
+      "ordered_handoffs": [
+        {"id": "J7-H1", "from": "non-heartbeat DeviceEvent telemetry", "to": "durable signal outbox", "classification": "PROVEN", "canonical_owner": "DeviceEventObserver", "evidence": ["app/Observers/DeviceEventObserver.php:19-94", "app/Domain/SecurityDevices/Models/DeviceEventSignalOutbox.php:1-28", "app/Jobs/DispatchDeviceEventSignalOutbox.php:19-128", "tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php:67-166"], "site_role_privacy": "Downstream signal projection resolves canonical Device Site; collector authentication and ingress scope are NOT_ESTABLISHED by these anchors.", "proof_or_gap": "The observer suppresses heartbeat events, persists an outbox for the remaining already-created DeviceEvents, and the job owns retryable delivery."},
+        {"id": "J7-H2", "from": "routable signal outbox whose Device resolves to one canonical active Site", "to": "canonical Site-bound control-room signal", "classification": "PROVEN", "canonical_owner": "DeviceEventObserver builds payload; DispatchDeviceEventSignalOutbox delivers it", "evidence": ["app/Observers/DeviceEventObserver.php:96-181", "app/Jobs/DispatchDeviceEventSignalOutbox.php:39-70"], "site_role_privacy": "Observer resolves canonical Device Site and rejects adjacent projection ownership; unroutable or ambiguous Site resolution does not produce this signal edge.", "proof_or_gap": "A routable outbox delivers a signal payload with canonical Site and Device context; the unroutable branch records SafetySignalUnroutable instead."},
+        {"id": "J7-H3", "from": "pending non-online control-room signal outside a maintenance window", "to": "new, correlated or reconciled alert", "classification": "PROVEN", "canonical_owner": "SignalProcessingService", "evidence": ["app/Services/ControlRoom/SignalProcessingService.php:68-216", "app/Services/ControlRoom/SignalProcessingService.php:296-461", "tests/Feature/ControlRoom/SignalAlertAtomicityTest.php:42-165", "tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php:67-166"], "site_role_privacy": "Alert consumes canonical signal Site; online events use recovery handling and maintenance-window signals are suppressed rather than inheriting this edge.", "proof_or_gap": "Eligible pending signals either reconcile or correlate to a canonical existing alert or, after applicable monitor-rule evaluation, create a new alert; online and maintenance branches are deliberately excluded."},
+        {"id": "J7-H4", "from": "authorized operator create-incident action or confirmed detection/sensor alert", "to": "incident and H&S journey", "classification": "PROVEN", "canonical_owner": "SensorIncidentBridgeService delegates to IncidentJourneyService", "evidence": ["app/Services/ControlRoom/SensorIncidentBridgeService.php:13-79", "app/Services/Incidents/IncidentJourneyService.php:79-121", "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php:174-243", "tests/Feature/ControlRoom/SensorIncidentJourneyTest.php:45-103"], "site_role_privacy": "Bridge preserves alert and Device Site; control-room and incident permissions remain distinct.", "proof_or_gap": "The explicit authorized controller action and confirmed detection/sensor branch create or link the incident through the canonical journey; arbitrary alerts do not automatically inherit this edge."},
+        {"id": "J7-H5", "from": "control-room alert", "to": "fleet maintenance work order", "classification": "NOT_ESTABLISHED", "canonical_owner": "No alert-to-FleetWorkOrder bridge found", "evidence": ["app/Services/ControlRoom/SensorIncidentBridgeService.php:13-79", "app/Http/Controllers/FleetAssets/WorkOrderController.php:170-245", "app/Models/FleetWorkOrder.php:19-65"], "site_role_privacy": "Shared Asset/Device Site cannot authorize or establish maintenance without Fleet work-order capability and an explicit bridge.", "proof_or_gap": "Bounded ControlRoom source search found no FleetWorkOrder creation path; incident semantics cannot be inherited as maintenance semantics."},
+        {"id": "J7-H6", "from": "alert, tasks and linked incident", "to": "gated alert closure", "classification": "PROVEN", "canonical_owner": "ControlRoomAlertLifecycleService", "evidence": ["app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:262-355", "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:1214-1350", "tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php:78-194", "tests/Feature/ControlRoom/ControlRoomAlertLifecycleGateTest.php:194-305"], "site_role_privacy": "Closure requires alert action authority and canonical linked-state checks; visibility alone does not confer closure.", "proof_or_gap": "Lifecycle requires terminal alert tasks and linked incident/H&S closure before alert closure."}
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J7-P1", "severity": "P1", "title": "Telemetry maintenance alerts lack a canonical Fleet work-order handoff", "feature_ids": ["CAP-CR-ALERT-WORKLIST-LIFECYCLE", "CAP-FLEET-WORK-ORDER-LIFECYCLE"], "status": "PROVISIONAL_SOURCE_ONLY_IF_WORK_ORDER_BRANCH_IS_REQUIRED_PRODUCT_CONTRACT"}
+      ],
+      "browser_task_script_coverage_blocker": "No real collector event, outbox worker, signal processor, alert operator, incident reviewer and maintenance owner were executed.",
+      "completion_test": "Ingest one authenticated DeviceEvent, persist/retry outbox, create Site-bound signal and alert, exercise incident and explicit work-order branches, and deny closure until all linked work is terminal."
+    },
+    {
+      "journey_id": "RUN-073-J8",
+      "name": "service-agreement-or-funding-to-delivery-to-claim-or-invoice-to-GL",
+      "actors_jobs": ["service-agreement author", "agreement approver", "frontline worker", "timesheet approver", "billing officer", "claim officer", "invoice officer", "journal jobs", "GL reviewer"],
+      "feature_ids": ["CAP-OPS-FUNDING-CLAIMS", "CAP-FIN-BILLING-INVOICE-LIFECYCLE", "CAP-FIN-FUNDING-STREAM-ADMIN", "CAP-FIN-CHART-OF-ACCOUNTS"],
+      "identity_coverage_note": "No dedicated current matrix ID was determinable for the service-agreement lifecycle.",
+      "handoff_counts": {"PROVEN": 4, "PARTIAL": 2, "NOT_ESTABLISHED": 0},
+      "ordered_handoffs": [
+        {"id": "J8-H1", "from": "service-agreement creation and approval", "to": "active funding authority", "classification": "PARTIAL", "canonical_owner": "ServiceAgreementController", "evidence": ["app/Http/Controllers/Operations/ServiceAgreementController.php:23-104", "app/Http/Controllers/Operations/ServiceAgreementController.php:116-208", "app/Http/Controllers/Operations/ServiceAgreementController.php:296-459", "app/Http/Controllers/Operations/ServiceAgreementController.php:639-657", "tests/Feature/Operations/ServiceAgreementClientBindingTest.php:53-105"], "site_role_privacy": "Client and Site binding is explicit, but submit and approve use the same service_agreements.update permission and do not establish independent approval.", "proof_or_gap": "Store/update can accept active status, generic transition accepts lifecycle changes, and approval lacks demonstrated segregation of duties."},
+        {"id": "J8-H2", "from": "approved delivered timesheet with a positive eligible Client allocation", "to": "BillingEntry with optional service-agreement identity", "classification": "PROVEN", "canonical_owner": "TimesheetApprovalService delegates to BillingService", "evidence": ["app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:413-458", "app/Services/Operations/BillingService.php:27-132", "tests/Feature/Billing/GenerateFromTimesheetAllocationsTest.php:20-235"], "site_role_privacy": "BillingEntry derives Client, shift and Site from approved delivery; service_agreement_id may be null and is not inferred as mandatory authority by this edge.", "proof_or_gap": "Approval invokes canonical BillingEntry generation for positive eligible Client allocation; it does not require an agreement record for every entry."},
+        {"id": "J8-H3", "from": "eligible unconsumed BillingEntry under an active canonical ServiceAgreement and line item", "to": "FundingClaim", "classification": "PROVEN", "canonical_owner": "FundingClaimService through FundingClaimController", "evidence": ["app/Services/Operations/FundingClaimService.php:34-200", "app/Services/Operations/FundingClaimService.php:373-622", "app/Http/Controllers/Operations/FundingClaimController.php:70-223", "tests/Feature/Operations/FundingClaimBindingTest.php:42-184", "tests/Feature/Operations/FundingClaimBindingTest.php:469-537"], "site_role_privacy": "Claim selection and direct access are Site-scoped; eligibility also binds Client, Site, delivery date/state, active agreement and line item before retaining BillingEntry provenance.", "proof_or_gap": "The service binds only eligible snapshot-complete delivery entries to claim items and serializes claim-versus-invoice consumption."},
+        {"id": "J8-H4", "from": "eligible unconsumed pending/approved BillingEntry set for one active-Site Client", "to": "FinInvoice", "classification": "PROVEN", "canonical_owner": "BillingService and Finance InvoiceController", "evidence": ["app/Services/Operations/BillingService.php:168-350", "app/Domain/Finance/Http/Controllers/InvoiceController.php:210-292", "app/Domain/Finance/Models/FinInvoiceLine.php:16-59", "tests/Feature/Finance/OperationsBillingServiceFinInvoiceTest.php:11-57"], "site_role_privacy": "Invoice retains Client, Site and service provenance and requires finance billing authority.", "proof_or_gap": "BillingService locks a complete eligible set and materializes FinInvoice/lines; the source test proves legacy App Models Invoice is not owner."},
+        {"id": "J8-H5", "from": "submitted FundingClaim whose queued or retried posting job completes successfully", "to": "general-ledger journal", "classification": "PROVEN", "canonical_owner": "FundingClaimService dispatches PostFundingClaimJournalJob to FundingClaimJournalService", "evidence": ["routes/operations.php:1113-1121", "app/Services/Operations/FundingClaimService.php:203-329", "app/Services/Operations/FundingClaimService.php:740-772", "app/Domain/Finance/Jobs/PostFundingClaimJournalJob.php:18-84", "app/Domain/Finance/Services/FundingClaimJournalService.php:54-214", "tests/Feature/Finance/FundingClaimJournalDispatchTest.php:126-180"], "site_role_privacy": "Claim submission permission and canonical claim Site access precede finance posting; the job posts from canonical claim identity.", "proof_or_gap": "Submission durably records queued and possible failed/retry state; only a successfully completed idempotent posting job creates the source-bound journal."},
+        {"id": "J8-H6", "from": "sent FinInvoice", "to": "general-ledger journal", "classification": "PARTIAL", "canonical_owner": "InvoiceController dispatches PostFinInvoiceJournalJob to FinInvoiceJournalService", "evidence": ["app/Domain/Finance/Http/Controllers/InvoiceController.php:567-600", "app/Domain/Finance/Jobs/PostFinInvoiceJournalJob.php:14-46", "app/Domain/Finance/Services/FinInvoiceJournalService.php:25-108", "tests/Feature/Finance/FinInvoiceJournalPostingTest.php:71-97"], "site_role_privacy": "Invoice-send and GL posting are finance actions on canonical Site-bound FinInvoice.", "proof_or_gap": "Sent status commits before job dispatch; unlike FundingClaim, FinInvoice has no demonstrated durable queued/failed/retry state, so interruption can strand sent invoice without GL."}
+      ],
+      "provisional_finding_candidates": [
+        {"candidate_id": "RUN-073-J8-P1A", "severity": "P1", "title": "Service agreements can become active without a proven independent approval boundary", "feature_ids": ["CAP-OPS-FUNDING-CLAIMS", "CAP-FIN-FUNDING-STREAM-ADMIN"], "status": "PROVISIONAL_SOURCE_ONLY_WITH_SERVICE_AGREEMENT_IDENTITY_GAP"},
+        {"candidate_id": "RUN-073-J8-P1B", "severity": "P1", "title": "FinInvoice can reach sent state without durable assurance that its GL job was dispatched or recoverable", "feature_ids": ["CAP-FIN-BILLING-INVOICE-LIFECYCLE", "CAP-FIN-CHART-OF-ACCOUNTS"], "status": "PROVISIONAL_SOURCE_ONLY"}
+      ],
+      "browser_task_script_coverage_blocker": "No permitted role-separated agreement approval, delivered shift, timesheet approval, claim/invoice creation and GL reconciliation was executed.",
+      "completion_test": "Require independently approved Site-bound agreement, approve delivery into BillingEntry, prove mutually exclusive claim/invoice consumption, post each branch exactly once to GL, recover dispatch failure and reconcile provenance."
+    }
+  ],
+  "cross_review": {
+    "collisions_and_duplicates": [
+      {"id": "CR-01", "journeys": ["RUN-073-J1", "RUN-073-J2"], "collision": "Both traverse shift assignment and roster publication.", "adjudication": "J1 asks whether recruitment/onboarding reaches a first shift; J2 begins with availability and follows an operational shift into payroll. J2 attendance evidence does not repair J1's missing new-hire identity thread."},
+      {"id": "CR-02", "journeys": ["RUN-073-J2", "RUN-073-J8"], "collision": "Both consume an approved timesheet.", "adjudication": "PayrollExportService owns payroll-run source materialization, ExternalSettlementService owns bank-accepted net-pay settlement, and BillingService owns revenue/funding materialization. None supplies another owner's completion semantics."},
+      {"id": "CR-03", "journeys": ["RUN-073-J5", "RUN-073-J7"], "collision": "Both can enter IncidentJourneyService and H&S corrective-action state.", "adjudication": "J5 evaluates investigation assurance; J7 telemetry/control-room orchestration. Incident bridge does not establish alert-to-FleetWorkOrder."},
+      {"id": "CR-04", "journeys": ["RUN-073-J6", "RUN-073-J7"], "collision": "Asset, Device and FleetWorkOrder are adjacent to telemetry alerts.", "adjudication": "J6 proves explicit Asset work-order and Device-link actions. J7 cannot inherit work-order creation from Device/Asset origin."},
+      {"id": "CR-05", "journeys": ["RUN-073-J5"], "collision": "SiteHazardAction and HsCorrectiveAction are parallel owners.", "adjudication": "Site and purpose similarity do not establish hazard-to-HsEvent-to-Investigation-to-CorrectiveAction lineage."},
+      {"id": "CR-06", "journeys": ["RUN-073-J4"], "collision": "MedicationError review and MedicationReview are parallel concepts.", "adjudication": "MedicationErrorController owns error resolution; MedicationReview JSON cannot be inherited as exact error/administration review."},
+      {"id": "CR-07", "journeys": ["RUN-073-J3"], "collision": "ShiftTask, ClientNote and care-plan goal progress share shift or Client context.", "adjudication": "They lack immutable task-to-note-to-goal identity, so adjacency does not prove outcome lineage."},
+      {"id": "CR-08", "journeys": ["RUN-073-J8"], "collision": "App Models Invoice and Domain Finance FinInvoice are duplicate concepts.", "adjudication": "BillingService canonically writes FinInvoice; tests/Feature/Finance/OperationsBillingServiceFinInvoiceTest.php:48-57 proves legacy Invoice is not populated."},
+      {"id": "CR-09", "journeys": ["RUN-073-J7"], "collision": "Canonical SecurityDevices Device and a ControlRoom Device projection coexist.", "adjudication": "app/Observers/DeviceEventObserver.php:117-132 guards canonical Device/Site projection; projection identity cannot replace ownership."},
+      {"id": "CR-10", "journeys": ["RUN-073-J8"], "collision": "ServiceAgreement active state has direct create, update, generic transition, submit and approve paths.", "adjudication": "Competing lifecycle paths do not demonstrate an independently authorized activation gate."}
+    ],
+    "no_inherited_adjacent_semantics": true,
+    "distinct_journeys_returned": 8,
+    "all_handoffs_classified": true,
+    "handoff_classification_totals_reconciled": true,
+    "completion_test_result": "PASS for source reconstruction schema; FAIL or NOT_ESTABLISHED for runtime and browser completion because execution was prohibited."
+  },
+  "zero_credit_attestation": {
+    "benchmark_subset": "none",
+    "upstream_projects_selected": 0,
+    "benchmark_mappings_created": 0,
+    "NCM_credit_awarded": 0,
+    "browser_credit_awarded": 0,
+    "runtime_credit_awarded": 0,
+    "test_execution_credit_awarded": 0,
+    "completion_credit": false,
+    "attestation": "No upstream project was selected or mapped, static tests were source anchors only, and no browser, network, runtime, build, database or test execution was performed."
+  }
+}

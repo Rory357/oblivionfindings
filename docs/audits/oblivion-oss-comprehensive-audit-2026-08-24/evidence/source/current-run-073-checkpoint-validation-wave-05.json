@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073-CHECKPOINT-VALIDATION",
+  "status": "SOURCE_REPORTING_CHECKPOINT_GO_AUDIT_REMAINS_IN_PROGRESS",
+  "observed_at": "2026-08-25T09:30:01.0572021+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_checkpoint_parent": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
+    "branch": "main"
+  },
+  "required_reporting_paths": {
+    "required": 18,
+    "present": 18,
+    "missing": [],
+    "evidence_directory_in_denominator": true,
+    "dashboard_in_denominator": false,
+    "presence_is_completion": false
+  },
+  "deterministic_generation": {
+    "reporting_materializer_two_consecutive_runs_match": true,
+    "reporting_outputs_two_consecutive_runs_match": true,
+    "materialization_sha256": "5fc76430b6a33f76182a470dfce774415c1d0618df14c6685c66105eef026c51",
+    "dashboard_generator_two_consecutive_runs_match": true,
+    "dashboard_sha256": "a95efdd493c6409343dba8d24301be7930c5bc64449515082934d51f8b3fa9db",
+    "dashboard_matches_browser_evidence_target": true
+  },
+  "root_anchor_validation": {
+    "journey_serialized_anchor_occurrences": 159,
+    "journey_distinct_anchor_ranges": 143,
+    "journey_distinct_paths": 97,
+    "journey_invalid": 0,
+    "architecture_serialized_anchor_occurrences": 75,
+    "architecture_distinct_anchor_ranges": 70,
+    "architecture_distinct_paths": 47,
+    "architecture_invalid": 0
+  },
+  "syntax_and_contract_validation": {
+    "new_json_files_checked": 10,
+    "invalid_json_files": 0,
+    "python_generators_parse": true,
+    "provisional_findings_records": 12,
+    "final_findings": 0,
+    "dashboard_total_links": 181,
+    "dashboard_unique_links": 143,
+    "dashboard_missing_links": 0,
+    "git_diff_check": "PASS"
+  },
+  "browser_verification": {
+    "path": "evidence/browser/current-audit-dashboard-verification-run-073-wave-05.json",
+    "sha256": "814a53449a96abb7a821711ab33a7111d83e64b897ea3cb42ded2448178efdf7",
+    "viewports": ["1440x900", "1280x800", "1024x768", "390x844"],
+    "console_warnings": 0,
+    "console_errors": 0,
+    "application_browser_credit": false
+  },
+  "independent_reviews": {
+    "architecture": {
+      "path": "evidence/source/raw-run-073e-independent-architecture-review-wave-05.json",
+      "sha256": "6d8331e12cd43af8ffe47e496273f0ee7ca5cf7075e3b2a7c9cad0367eba906b",
+      "verdict": "GO"
+    },
+    "reporting_materialization": {
+      "path": "evidence/source/raw-run-073f-independent-reporting-materialization-review-wave-05.json",
+      "sha256": "a97d3b9810dd6298b3c46bfd40b6dd23ed1e747be43be097006bc19750fb9f5d",
+      "verdict": "GO"
+    }
+  },
+  "repository_boundary": {
+    "non_audit_paths_between_application_pin_and_checkpoint_parent": 0,
+    "working_tree_changes_outside_audit_root": 0,
+    "application_remediation": false
+  },
+  "credit_boundary": {
+    "source_reporting_checkpoint": true,
+    "application_runtime": false,
+    "application_browser": false,
+    "executed_test": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "ease": false,
+    "final_finding": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "RUN-073 source-reporting checkpoint is mechanically and independently reviewable. The comprehensive audit remains open and no application remediation was performed."
+}

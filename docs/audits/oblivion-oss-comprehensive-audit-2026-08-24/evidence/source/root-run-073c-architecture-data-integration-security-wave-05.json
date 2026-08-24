@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073C",
+  "status": "GO_FOR_ARTIFACT_10_SOURCE_SYNTHESIS_NO_GO_FOR_FINAL_FINDING_PROMOTION",
+  "generated_on": "2026-08-25",
+  "scope": "Pinned-source architecture, canonical data ownership, integration, security, safety and operability synthesis for required artifact 10. This is static source evidence only.",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_checkpoint_parent": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries. Legacy tenant-labelled fields are not evidence of tenant isolation.",
+  "counts": {
+    "entity_families": 13,
+    "technical_concerns": 17,
+    "provisional_claims": 9,
+    "provisional_P1": 7,
+    "provisional_P2": 2,
+    "final_findings": 0,
+    "runtime_confirmed_findings": 0,
+    "not_established_items": 10,
+    "unbounded_duplicate_owner_collisions_proven": 0,
+    "serialized_anchor_occurrences": 75,
+    "distinct_reviewed_anchor_ranges": 70,
+    "reviewed_paths": 47,
+    "invalid_reviewed_anchors": 0
+  },
+  "static_census": {
+    "controllers": 561,
+    "service_entries": 735,
+    "models": 782,
+    "policies": 75,
+    "jobs": 126,
+    "events": 14,
+    "listeners": 12,
+    "observers": 29,
+    "migrations": 978,
+    "php_test_files": 1381,
+    "lexical_test_count": "OMITTED_NOT_REPRODUCIBLE_WITHOUT_COUNTING_RULE"
+  },
+  "entity_families": [
+    {
+      "id": "CE-01",
+      "family": "Person / Client",
+      "disposition": "REPRESENTATIVE_SOURCE_OWNER_IDENTIFIED",
+      "evidence": ["app/Models/Client.php:15-35", "app/Models/Client.php:125-160"]
+    },
+    {
+      "id": "CE-02",
+      "family": "Staff",
+      "disposition": "CANONICAL_HR_PROFILE_AND_INTAKE_PATH_IDENTIFIED",
+      "evidence": ["app/Domain/Hr/Models/HrEmployeeProfile.php:17-75", "app/Domain/Hr/Services/EmployeeIntakeService.php:21-29", "app/Domain/Hr/Services/EmployeeIntakeService.php:58-65"]
+    },
+    {
+      "id": "CE-03",
+      "family": "Site / Room / Zone",
+      "disposition": "CANONICAL_PHYSICAL_PLACEMENT_OWNERS_IDENTIFIED",
+      "evidence": ["app/Models/Site.php:15-25", "app/Models/Site.php:96-100", "app/Models/SiteRoom.php:16-46", "app/Models/SiteFacilityZone.php:10-32"]
+    },
+    {
+      "id": "CE-04",
+      "family": "Asset / Equipment",
+      "disposition": "CANONICAL_OPERATIONAL_ASSET_OWNER_IDENTIFIED",
+      "evidence": ["app/Models/Asset.php:16-105", "app/Models/Asset.php:145-175"]
+    },
+    {
+      "id": "CE-05",
+      "family": "Vehicle",
+      "disposition": "VEHICLE_REPRESENTED_THROUGH_ASSET_AND_FLEET_CONTROLLER",
+      "evidence": ["app/Models/Asset.php:223-295", "app/Models/Asset.php:327-335", "app/Http/Controllers/FleetAssets/VehicleController.php:60-72", "app/Http/Controllers/FleetAssets/VehicleController.php:247-265"]
+    },
+    {
+      "id": "CE-06",
+      "family": "Device",
+      "disposition": "CANONICAL_SECURITY_DEVICE_OWNER_IDENTIFIED",
+      "evidence": ["app/Domain/SecurityDevices/Models/Device.php:41-66", "app/Domain/SecurityDevices/Models/Device.php:146-165"]
+    },
+    {
+      "id": "CE-07",
+      "family": "Assignment / Custody / Placement",
+      "disposition": "DOMAIN_ASSIGNMENT_OWNERS_IDENTIFIED_WITHOUT_CLAIMING_ONE_GLOBAL_OWNER",
+      "evidence": ["app/Domain/SecurityDevices/Models/DeviceAssignment.php:18-33", "app/Domain/SecurityDevices/Models/DeviceAssignment.php:58-75", "app/Domain/SecurityDevices/Models/DeviceAssignment.php:81-125", "app/Models/AssetAssignment.php:9-31"]
+    },
+    {
+      "id": "CE-08",
+      "family": "Funding / Agreement",
+      "disposition": "SERVICE_AGREEMENT_OWNER_IDENTIFIED",
+      "evidence": ["app/Models/ServiceAgreement.php:11-25", "app/Models/ServiceAgreement.php:97-145"]
+    },
+    {
+      "id": "CE-09",
+      "family": "Work Item",
+      "disposition": "PROVIDER_AGGREGATION_IDENTIFIED_NOT_ONE_PERSISTED_GLOBAL_TASK_OWNER",
+      "evidence": ["app/Services/Tasks/TaskAggregator.php:22-80", "app/Services/Tasks/TaskAggregator.php:443-467"]
+    },
+    {
+      "id": "CE-10",
+      "family": "Incident",
+      "disposition": "CANONICAL_CLIENT_INCIDENT_OWNER_IDENTIFIED",
+      "evidence": ["app/Models/ClientIncident.php:16-45", "app/Models/ClientIncident.php:132-145"]
+    },
+    {
+      "id": "CE-11",
+      "family": "Signal / Alert",
+      "disposition": "DEVICE_EVENT_OUTBOX_AND_CONTROL_ROOM_ALERT_OWNERS_IDENTIFIED",
+      "evidence": ["app/Domain/SecurityDevices/Models/DeviceEvent.php:9-43", "app/Domain/SecurityDevices/Models/DeviceEventSignalOutbox.php:8-27", "app/Models/ControlRoom/Alert.php:32-93"]
+    },
+    {
+      "id": "CE-12",
+      "family": "Consent",
+      "disposition": "REQUEST_AND_CLIENT_CONSENT_OWNERS_IDENTIFIED",
+      "evidence": ["app/Models/ConsentRequest.php:17-80", "app/Models/ConsentRequest.php:170-245", "app/Models/ClientConsent.php:13-50", "app/Models/ClientConsent.php:131-135"]
+    },
+    {
+      "id": "CE-13",
+      "family": "Audit Event",
+      "disposition": "AUDIT_LOG_AND_LOGGER_IDENTIFIED_RUNTIME_COMPLETENESS_UNEXECUTED",
+      "evidence": ["app/Models/AuditLog.php:10-42", "app/Services/AuditLogger.php:12-73"]
+    }
+  ],
+  "technical_concerns": [
+    {"id": "TC-P5-IDENTITY-OWNERSHIP", "disposition": "PARTIAL_LEGACY_STORE_READ_ONLY_IN_INSPECTED_CONTROLLER_COMPETING_LIVE_WRITER_NOT_ESTABLISHED", "claim_id": "ARCH-STAFF-LIFECYCLE-01"},
+    {"id": "TC-P5-PHYSICAL-PLACEMENT", "disposition": "SOURCE_MAPPED", "claim_id": null},
+    {"id": "TC-P5-ASSET-VEHICLE-FEDERATION", "disposition": "SOURCE_MAPPED_ASSET_IS_FLEET_VEHICLE_OWNER_AND_HR_ASSET_IS_EXPLICITLY_FEDERATED", "claim_id": null},
+    {"id": "TC-P5-DEVICE-ASSIGNMENT", "disposition": "SOURCE_MAPPED_WITH_CUSTODY_SITE_CAPTURE", "claim_id": null},
+    {"id": "TC-P5-FUNDING-AGREEMENT", "disposition": "SOURCE_CONDITION_PRESENT", "claim_id": "ARCH-SERVICE-AGREEMENT-LIFECYCLE-01"},
+    {"id": "TC-P5-WORK-ITEM", "disposition": "SOURCE_MAPPED_AS_PROVIDER_AGGREGATION_NOT_ONE_PERSISTED_TASK_OWNER", "claim_id": null},
+    {"id": "TC-P5-INCIDENT-LIFECYCLE", "disposition": "SOURCE_SECURITY_CONDITION_PRESENT", "claim_id": "SEC-INCIDENT-REVIEW-SITE-01"},
+    {"id": "TC-P5-SIGNAL-OUTBOX", "disposition": "SOURCE_MAPPED_RECOVERABLE_WORKER_OPERATION_UNEXECUTED", "claim_id": null, "evidence": ["app/Observers/DeviceEventObserver.php:61-93", "app/Jobs/DispatchDeviceEventSignalOutbox.php:39-69", "app/Jobs/DispatchDeviceEventSignalOutbox.php:89-126"]},
+    {"id": "TC-P5-CONSENT", "disposition": "SOURCE_INTEGRATION_CONDITION_PRESENT", "claim_id": "INTEG-CONSENT-NOTIFICATION-ATOMICITY-01"},
+    {"id": "TC-P5-AUDIT", "disposition": "SOURCE_MAPPED_COMPLETENESS_AT_RUNTIME_UNEXECUTED", "claim_id": null},
+    {"id": "TC-P5-INTEGRATION-WEBHOOK", "disposition": "SOURCE_MAPPED_EXTERNAL_DELIVERY_AND_CONFIGURED_ENDPOINTS_UNKNOWN", "claim_id": null, "evidence": ["app/Domain/Hr/Services/HrWebhookService.php:62-110", "app/Domain/Hr/Services/HrWebhookService.php:116-181", "app/Http/Controllers/Api/WebhookReceiverController.php:41-154"]},
+    {"id": "TC-P5-DUPLICATE-CROSS-DOMAIN", "disposition": "NO_UNBOUNDED_COLLISION_PROVEN", "claim_id": null},
+    {"id": "TC-P6-CONTROLLED-DRUG-SAFETY", "disposition": "SOURCE_SAFETY_CONDITION_PRESENT", "claim_id": "SAFE-CONTROLLED-DRUG-REGISTER-01"},
+    {"id": "TC-P7-CALENDAR-INTEGRATION", "disposition": "SOURCE_TRUTH_CONDITION_PRESENT", "claim_id": "INTEG-CALENDAR-SYNC-TRUTH-01"},
+    {"id": "TC-P7-AUTH-EVENT-REACHABILITY", "disposition": "SOURCE_REGISTRATION_GAP_PRESENT", "claim_id": "SEC-AUTH-EVENT-REACHABILITY-01"},
+    {"id": "TC-P7-FINANCE-JOB-FAILURE", "disposition": "SOURCE_PARTIAL_FAILURE_CONDITION_PRESENT", "claim_id": "FIN-POSTING-PARTIAL-FAILURE-01"},
+    {"id": "TC-P7-TEST-PERFORMANCE-OPERABILITY-SCHEMA", "disposition": "SCALE_DEPENDENT", "claim_id": "PERF-TASK-ESCALATION-01"}
+  ],
+  "provisional_claims": [
+    {
+      "id": "ARCH-STAFF-LIFECYCLE-01",
+      "severity": "P1",
+      "title": "Legacy staff-store lifecycle divergence is conditional on an external or live writer that is not established",
+      "disposition": "CONTRACT_DEPENDENT_NOT_ESTABLISHED",
+      "claim": "HrEmployeeProfile is the canonical inspected source path and StaffController labels staff as a read-only compatibility fallback. Retain the divergence question only if a live or external writer still mutates staff; otherwise retire it.",
+      "evidence": ["app/Http/Controllers/StaffController.php:410-447", "app/Models/Staff.php:9-27", "app/Domain/Hr/Models/HrEmployeeProfile.php:17-75", "app/Domain/Hr/Services/EmployeeIntakeService.php:21-29", "app/Domain/Hr/Services/EmployeeIntakeService.php:58-65"],
+      "required_gate": "Identify every deployed writer to the legacy staff store and reconcile representative records before any finding promotion."
+    },
+    {
+      "id": "ARCH-SERVICE-AGREEMENT-LIFECYCLE-01",
+      "severity": "P1",
+      "title": "Service-agreement status history and current status are written without one transaction or lock",
+      "disposition": "SOURCE_CONDITION_PROVEN_IMPACT_UNEXECUTED",
+      "claim": "History creation and agreement status mutation are separate unlocked statements; failure or concurrency could leave them inconsistent. No induced-failure or concurrency witness exists.",
+      "evidence": ["app/Http/Controllers/Operations/ServiceAgreementController.php:360-463"],
+      "required_gate": "Execute bounded failure and concurrent-transition cases on a disposable database and reconcile current status with history."
+    },
+    {
+      "id": "SEC-INCIDENT-REVIEW-SITE-01",
+      "severity": "P1",
+      "title": "Incident review direct-object path lacks an established canonical Site-access check",
+      "disposition": "SOURCE_CONDITION_PROVEN_RUNTIME_EXPLOIT_UNEXECUTED",
+      "claim": "The review route binds ClientIncident; the policy requires incidents.approve and submitted status, and review locks and reauthorizes through that policy without an explicit canonical Site-access assertion.",
+      "evidence": ["routes/incidents.php:90-96", "app/Policies/ClientIncidentPolicy.php:62-65", "app/Http/Controllers/IncidentController.php:1560-1591"],
+      "required_gate": "Execute an allowed same-Site review and a concealed foreign-Site direct-ID denial with a Site-restricted approver."
+    },
+    {
+      "id": "SAFE-CONTROLLED-DRUG-REGISTER-01",
+      "severity": "P1",
+      "title": "A given controlled-drug administration can record a register entry without a truthful stock balance",
+      "disposition": "SOURCE_SAFETY_CONDITION_PROVEN_MYSQL_RESULT_UNEXECUTED",
+      "claim": "Only for controlled_drug with given status: stock is optional and on_hand nullable integer; the service can write null balances when stock is absent, floor insufficient stock to zero, and accept fractional quantity against integer balance columns.",
+      "evidence": ["app/Services/EnhancedMarService.php:795-800", "app/Services/EnhancedMarService.php:863-875", "app/Services/EnhancedMarService.php:1311-1345", "database/migrations/2026_01_24_000001_medication_mar_and_stock.php:26-35", "database/migrations/2026_01_24_000020_controlled_drug_register.php:17-35"],
+      "required_gate": "On disposable MySQL, execute absent-stock, null-stock, insufficient-stock and fractional-dose cases and reconcile register and stock balances."
+    },
+    {
+      "id": "INTEG-CONSENT-NOTIFICATION-ATOMICITY-01",
+      "severity": "P2",
+      "title": "Consent notifications can perform external side effects before the enclosing database transaction commits",
+      "disposition": "SOURCE_CONDITION_PROVEN_FAILURE_WITNESS_UNEXECUTED",
+      "claim": "Consent flows synchronously send mail plus database notifications inside database transactions; the inspected notifications do not implement ShouldQueue. External delivery cannot be rolled back if a later database or channel operation fails.",
+      "evidence": ["app/Services/ConsentRequestService.php:43-79", "app/Services/ConsentRequestService.php:112-172", "app/Services/ConsentRequestService.php:381-418", "app/Notifications/Operations/ConsentRequestCreatedNotification.php:14-23", "app/Notifications/Operations/ConsentRequestRespondedNotification.php:14-25", "app/Notifications/Operations/ConsentRequestReminderNotification.php:14-23"],
+      "required_gate": "Use fake and failure-injected channels to prove commit, rollback and exactly-once delivery behavior without sending real notifications."
+    },
+    {
+      "id": "INTEG-CALENDAR-SYNC-TRUTH-01",
+      "severity": "P1",
+      "title": "Legacy calendar-sync trigger reports success and advances last_synced_at while dispatch is commented out",
+      "disposition": "ROUTE_BEHAVIOR_PROVEN_LIVE_PROVIDER_PROOF_ABSENT",
+      "claim": "This claim is limited to the inspected Operations CalendarSyncController surface and does not claim that Sites Calendar CalendarSyncService is universally nonfunctional.",
+      "evidence": ["routes/operations.php:1322-1322", "app/Http/Controllers/Operations/CalendarSyncController.php:73-91"],
+      "required_gate": "Bind the live route to its deployed owner and verify provider-side effects plus truthful status under success and failure."
+    },
+    {
+      "id": "SEC-AUTH-EVENT-REACHABILITY-01",
+      "severity": "P1",
+      "title": "Authentication event subscriber is not registered while event discovery is disabled",
+      "disposition": "STATIC_REGISTRATION_GAP_PROVEN_EVENT_EXECUTION_UNTESTED",
+      "claim": "AuthEventSubscriber defines handlers, but the registered EventServiceProvider neither lists it nor enables discovery; exact-class source search found only the subscriber definition.",
+      "evidence": ["app/Listeners/AuthEventSubscriber.php:13-74", "app/Providers/EventServiceProvider.php:41-75", "app/Providers/EventServiceProvider.php:90-93", "bootstrap/providers.php:3-8"],
+      "required_gate": "Boot the pinned application in an authorised disposable environment and prove login, logout, failed-login and reset event persistence."
+    },
+    {
+      "id": "FIN-POSTING-PARTIAL-FAILURE-01",
+      "severity": "P1",
+      "title": "Site rent posting can finish normally after per-Site failures and present a partial batch as successful",
+      "disposition": "SOURCE_BEHAVIOR_PROVEN_SCHEDULED_RUN_IMPACT_UNEXECUTED",
+      "claim": "PostSiteRentJob catches per-Site exceptions, logs them and returns normally. Payroll persists an error and rethrows; depreciation aggregates failures and throws. tenant_id is legacy organisational context, not a tenant-isolation boundary.",
+      "evidence": ["app/Domain/Finance/Jobs/PostSiteRentJob.php:40-103", "app/Domain/Finance/Jobs/PostPayrollJournalJob.php:56-77", "app/Domain/Finance/Jobs/RunDepreciationJob.php:39-57"],
+      "required_gate": "Induce one per-Site failure in a disposable batch and prove job status, retry, alert and ledger reconciliation behavior."
+    },
+    {
+      "id": "PERF-TASK-ESCALATION-01",
+      "severity": "P2",
+      "title": "Hourly task escalation has an O(users x providers) source shape with unmeasured production impact",
+      "disposition": "SCALE_DEPENDENT_IMPACT_NOT_ESTABLISHED",
+      "claim": "The command iterates every approved user and invokes per-user provider aggregation. Source establishes the shape, not an SLA breach.",
+      "evidence": ["app/Console/Commands/EscalateOverdueTasks.php:27-33", "app/Console/Commands/EscalateOverdueTasks.php:58-67", "app/Services/Tasks/TaskAggregator.php:22-80", "app/Services/Tasks/TaskAggregator.php:443-467"],
+      "required_gate": "Measure representative and upper-bound user/provider/task cardinalities, query counts, memory and wall time in an authorised disposable environment."
+    }
+  ],
+  "not_established": [
+    "Any live or external writer still mutating legacy staff, and actual staff/profile drift.",
+    "Deployed MySQL migration and constraint state matching the pinned migration source.",
+    "Production entity, user, provider, work-item and queue cardinalities.",
+    "Service-agreement failure or concurrency reproduction.",
+    "Foreign-Site direct-ID incident review behavior with a Site-restricted approver.",
+    "Controlled-drug absent-stock, null-stock, insufficient-stock and fractional-dose behavior on MySQL.",
+    "Consent mail or channel failure after external delivery but before transaction commit.",
+    "Live calendar provider connectivity and actual synchronization after the inspected trigger.",
+    "Authentication-event handler invocation and persisted login-log behavior.",
+    "Scheduler, worker, webhook and finance operational health, retries, dead-letter handling and partial-batch alerting."
+  ],
+  "official_source_boundary": {
+    "input": "evidence/official-sources/nz-source-baseline-2026-08-24.json",
+    "sha256": "1928f69573ef609831cbf2750a195c346de2b90a0c83ac5685d78a20fbcb52f8",
+    "sources": 6,
+    "use": "Source facts, audit inference and specialist decisions remain separated. The baseline may frame later review but proves no application mapping or compliance outcome.",
+    "compliance_assurance": false,
+    "legal_assurance": false,
+    "clinical_assurance": false,
+    "security_assurance": false
+  },
+  "credit_boundary": {
+    "artifact_10_source_synthesis": true,
+    "final_finding": false,
+    "runtime": false,
+    "browser": false,
+    "executed_test": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Independent source reconstruction followed by root normalization. No application files, runtime, browser, tests, build, database, external provider, legal, clinical or VCS state were changed."
+}

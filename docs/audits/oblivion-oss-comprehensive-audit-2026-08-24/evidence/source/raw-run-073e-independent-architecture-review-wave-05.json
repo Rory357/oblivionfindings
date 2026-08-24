@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073E",
+  "status": "INDEPENDENT_ARCHITECTURE_SOURCE_AND_REPORT_REVIEW_GO",
+  "reviewed_on": "2026-08-25",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "inputs": {
+    "evidence/source/root-run-073c-architecture-data-integration-security-wave-05.json": "e406bdee1412c4ba49ec18afbd80849e7c6bc30e2098229f80f63888bde39272",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+    "evidence/official-sources/nz-source-baseline-2026-08-24.json": "1928f69573ef609831cbf2750a195c346de2b90a0c83ac5685d78a20fbcb52f8"
+  },
+  "anchor_validation": {
+    "serialized_anchor_occurrences": 75,
+    "distinct_anchor_ranges": 70,
+    "distinct_application_paths": 47,
+    "missing_or_invalid": 0
+  },
+  "validated_counts": {
+    "entity_families": 13,
+    "technical_concerns": 17,
+    "provisional_claims": 9,
+    "provisional_P1": 7,
+    "provisional_P2": 2,
+    "not_established_items": 10,
+    "final_findings": 0,
+    "runtime_confirmed_findings": 0
+  },
+  "semantic_checks": {
+    "entity_ids_unique": true,
+    "concern_ids_unique": true,
+    "claim_ids_unique": true,
+    "all_concern_claim_references_resolve": true,
+    "every_claim_referenced": true,
+    "claims_no_stronger_than_source": true,
+    "single_organisation_multi_site_wording": true,
+    "tenant_label_treated_only_as_legacy_organisational_context": true,
+    "official_source_facts_inferences_and_specialist_decisions_separated": true
+  },
+  "credit_boundary": {
+    "final_finding": false,
+    "runtime": false,
+    "browser": false,
+    "executed_test": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "defects": [],
+  "attestation": "Fresh independent pinned-source and generated-report review. No writes, VCS mutation, browser/network, application runtime, tests/build or database activity were performed by the reviewer."
+}

@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-073A",
+  "status": "COMPLETE_READ_ONLY_ARTIFACT_AND_GATE_CONTRACT",
+  "agent_task_path": "/root/run073_artifact_contract",
+  "observed_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_checkpoint": "0d9a6c4c44c236e1c0695f25191bc962b73efe4e",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+  "artifact_presence_at_review": {
+    "present": 11,
+    "required": 18,
+    "missing": [
+      "07-module-findings.md",
+      "08-cross-module-journeys.md",
+      "09-ui-ux-accessibility-visual-consistency.md",
+      "10-architecture-data-integration-security.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "findings.json"
+    ],
+    "boundary": "Materializing all seven changes file presence to 18/18 but does not satisfy execution, benchmark, semantic classification, Pass 8 or final-finding gates."
+  },
+  "artifact_contracts": [
+    {
+      "artifact": "07-module-findings.md",
+      "permissible_current_status": "IN_PROGRESS_SOURCE_SYNTHESIS_12_PROVISIONAL_P1_ZERO_FINAL_FINDING_CREDIT",
+      "denominators": {
+        "canonical_targets": 340,
+        "H": 300,
+        "D": 40,
+        "static_owner_module_labels": 29,
+        "canonical_submodules": null,
+        "provisional_P1_claims": 12,
+        "final_findings": 0
+      },
+      "completion_test": "Every canonical feature appears exactly once under a frozen module/submodule denominator; every feature has reconciled P1-P8 evidence or an explicit gap; every final finding has all required fields and no orphan references."
+    },
+    {
+      "artifact": "08-cross-module-journeys.md",
+      "permissible_current_status": "CURRENT_SOURCE_RECONSTRUCTION_PENDING_ZERO_JOURNEY_CREDIT",
+      "denominators": {
+        "required_journeys": 8,
+        "reconstructed_at_review": 0,
+        "independently_reviewed_at_review": 0,
+        "executed_at_review": 0
+      },
+      "completion_test": "All eight exact journeys have current-source edges, required state paths, independent review and current-build execution at all four required viewports."
+    },
+    {
+      "artifact": "09-ui-ux-accessibility-visual-consistency.md",
+      "permissible_current_status": "STATIC_CENSUS_COMPLETE_BROWSER_BLOCKED_ZERO_VISUAL_FINDING_CREDIT",
+      "denominators": {
+        "visual_rows": 2812,
+        "hero_instances": 659,
+        "overlay_instances": 1211,
+        "declarative_triggers": 115,
+        "inline_triggers": 689,
+        "named_handler_triggers": 138,
+        "hero_definitions": 57,
+        "overlay_definitions": 473,
+        "current_source_rendered_rows": 0,
+        "unknown_build_visual_candidates": 2
+      },
+      "completion_test": "Every safe page is observed at desktop; every selected family and all eight journeys cover four viewports; every required state is classified; every material finding family is independently resampled with complete context."
+    },
+    {
+      "artifact": "10-architecture-data-integration-security.md",
+      "permissible_current_status": "STATIC_LOCATOR_CENSUS_COMPLETE_SEMANTIC_CLASSIFICATION_INCOMPLETE",
+      "denominators": {
+        "models": 782,
+        "policies": 75,
+        "service_domain_entries": 735,
+        "jobs": 126,
+        "events": 14,
+        "listeners": 12,
+        "observers": 29,
+        "critical_async_outbox": null,
+        "migrations": 978,
+        "php_test_files": 1381,
+        "lexical_test_cases": 9895,
+        "executed_tests": 0
+      },
+      "completion_test": "All locator denominators are semantically classified, the critical async subset is frozen, all 13 owner families are source-proved, and Passes 5-7 have safe executed evidence where required."
+    },
+    {
+      "artifact": "11-prioritised-roadmap.md",
+      "permissible_current_status": "PROVISIONAL_AUDIT_COMPLETION_ROADMAP_NOT_A_REMEDIATION_PLAN",
+      "denominators": {
+        "final_finding_corpus": 0,
+        "provisional_P1_claims": 12
+      },
+      "completion_test": "Every roadmap item references a complete final finding and native/no-copy record; every P0/P1 has owner, interim safeguard, sequence, acceptance criteria and test plan."
+    },
+    {
+      "artifact": "12-native-build-and-do-not-copy-register.md",
+      "permissible_current_status": "BENCHMARK_DENOMINATOR_READY_ZERO_TARGET_EDGE_ZERO_FINAL_NCM",
+      "denominators": {
+        "unique_prompt_repositories": 95,
+        "prompt_occurrences": 98,
+        "formal_accepted_unique": 9,
+        "formal_accepted_weighted": 10,
+        "canonical_targets": 340,
+        "target_edges": 0,
+        "final_NCM": 0
+      },
+      "completion_test": "Every target has one independently approved exact mapping or exhaustive final NCM; every redesign has clean A-B-C lineage and explicit native/no-copy attestation."
+    },
+    {
+      "artifact": "findings.json",
+      "permissible_current_status": "TWELVE_PROVISIONAL_P1_RECORDS_ZERO_FINAL_FINDINGS",
+      "denominators": {
+        "provisional_P1_floor": 12,
+        "final_findings": 0
+      },
+      "completion_test": "JSON parses; every final record has all applicable prompt fields or evidenced not-applicable reasons; every ID reconciles across all matrices/reports; every P0/P1 passes full-field and independent-evidence gates."
+    }
+  ],
+  "completion_gates": [
+    {"gate": 1, "name": "routes_classified", "numerator": 0, "denominator": null, "context": "38 files and 3217 callsites are locators only"},
+    {"gate": 2, "name": "inertia_pages_classified", "numerator": 0, "denominator": 711, "context": "963 resolver paths are partitioned; final prompt-grade classification remains open"},
+    {"gate": 3, "name": "features_in_canonical_register", "numerator": 340, "denominator": 340, "context": "bounded static identities only"},
+    {"gate": 4, "name": "routes_and_pages_mapped_to_feature_id", "numerator": null, "denominator": null, "context": "120 targets lack route anchors, 226 lack page anchors, 116 lack both"},
+    {"gate": 5, "name": "verified_benchmark_or_final_ncm", "numerator": 0, "denominator": 340},
+    {"gate": 6, "name": "task_script_and_ten_dimension_ease", "numerator": 0, "denominator": 300, "context": "300/300 source-bound task contracts; 0/300 validated; 0/3000 current and 0/3000 target dimension scores"},
+    {"gate": 7, "name": "common_and_safety_journeys_cross_reviewed", "numerator": 0, "denominator": 8},
+    {"gate": 8, "name": "hero_banner_instances_classified", "numerator": 659, "denominator": 659, "context": "static only; rendered 0/659"},
+    {"gate": 9, "name": "overlay_implementations_and_triggers_classified", "numerator": 1415, "denominator": 1415, "context": "473 definitions plus 942 trigger sites; rendered verification 0"},
+    {"gate": 10, "name": "safe_routes_observed_at_desktop", "numerator": 0, "denominator": null},
+    {"gate": 11, "name": "selected_families_and_journeys_all_viewports", "numerator": 0, "denominator": null},
+    {"gate": 12, "name": "required_visual_states_classified", "numerator": null, "denominator": null},
+    {"gate": 13, "name": "material_visual_finding_families_resampled", "numerator": 0, "denominator": 2, "context": "provisional unknown-build floor; final denominator unknown"},
+    {"gate": 14, "name": "models_classified", "numerator": 0, "denominator": 782},
+    {"gate": 15, "name": "policies_classified", "numerator": 0, "denominator": 75},
+    {"gate": 16, "name": "service_domain_entries_classified", "numerator": 0, "denominator": 735},
+    {"gate": 17, "name": "critical_async_owners_classified", "numerator": 0, "denominator": null, "context": "181 job/event/listener/observer locators plus unbounded outboxes"},
+    {"gate": 18, "name": "modules_with_all_eight_passes", "numerator": 0, "denominator": null, "context": "38 provisional route-file rows are not a canonical module/submodule denominator"},
+    {"gate": 19, "name": "prompt_benchmark_projects_formally_triaged", "numerator": 9, "denominator": 95, "weighted_numerator": 10, "weighted_denominator": 98},
+    {"gate": 20, "name": "p0_p1_complete_finding_fields", "numerator": 0, "denominator": 12, "context": "provisional P1 floor"},
+    {"gate": 21, "name": "redesigns_neutral_native_no_copy", "numerator": 0, "denominator": null},
+    {"gate": 22, "name": "ease_4_5_claims_independently_reviewed", "numerator": 0, "denominator": 0, "context": "no current trigger and no coverage credit"},
+    {"gate": 23, "name": "browser_claims_labeled", "numerator": 2812, "denominator": 2812, "context": "bounded static visual matrix only"},
+    {"gate": 24, "name": "visual_inconsistencies_complete_context", "numerator": 0, "denominator": 2, "context": "provisional floor; final denominator unknown"},
+    {"gate": 25, "name": "official_source_inference_specialist_split", "numerator": 6, "denominator": 6, "context": "bounded official-source baseline only"},
+    {"gate": 26, "name": "all_agents_returned_reconciled_represented_none_live", "numerator": 0, "denominator": 1, "context": "necessarily open while later RUN-073 agents are active"}
+  ],
+  "cross_file_invariants": [
+    "Non-empty sentinel values count as null, not linkage or measurement.",
+    "All 300 task files map one-to-one to H features; NOT_MEASURED is not numeric zero.",
+    "All valid visual references resolve to the 2812-row VISUAL-ID set; unknown-build candidates remain separate non-findings.",
+    "Benchmark accounting preserves 95 unique repositories, 98 prompt occurrences and three zero-weight historical extras.",
+    "Formal project record acceptance is not target mapping, final no-match or NCM.",
+    "The 12 P1-labelled records remain provisional until independently adjudicated.",
+    "Official-source fact, audit inference and specialist decision remain separate.",
+    "File presence, generator success, hashes, source anchors or agent return cannot award browser, runtime, test, mapping, ease, Pass 8 or completion credit."
+  ],
+  "ambiguities": [
+    "Canonical submodule denominator",
+    "Final Gate 9 definition/implementation/instance/trigger union",
+    "Selected visual-family denominator",
+    "Material visual-state denominator",
+    "Whether Gate 3 bounded static 340/340 is locally satisfied while global completion credit remains withheld"
+  ],
+  "credit_boundary": {
+    "artifact_presence": false,
+    "browser": false,
+    "runtime": false,
+    "tests": false,
+    "benchmark_mapping": false,
+    "final_ncm": false,
+    "ease": false,
+    "pass": false,
+    "completion": false
+  },
+  "attestation": "Read-only agent review; no files, VCS state, browser, network, runtime, tests, build or database were changed or used. Root is the only writer."
+}
