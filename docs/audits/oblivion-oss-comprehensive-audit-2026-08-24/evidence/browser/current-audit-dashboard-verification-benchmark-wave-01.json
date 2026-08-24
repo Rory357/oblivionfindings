@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T16:51:29+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=benchmark-wave-01",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_counts_observed": {
+    "formal_assignments": 9,
+    "planned_formal_assignments_target": 11,
+    "historical_physical_project_rows": 98,
+    "prompt_project_denominator": 97,
+    "supplemental_project_rows": 1,
+    "current_upstream_project_refreshes": 0,
+    "observer_records": 30,
+    "observer_unique_candidates": 29,
+    "neutralizer_adjudications": 15,
+    "native_comparator_packets": 8,
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_horizontal_overflow": false,
+      "benchmark_heading_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 539,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "benchmark_heading_observed": true,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 11,
+    "http_200": 11,
+    "failures": []
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current-build application browser, route, workflow, benchmark, runtime, test, release, or audit-completion credit."
+}

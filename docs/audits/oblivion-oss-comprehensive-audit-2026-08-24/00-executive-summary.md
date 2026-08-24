@@ -1,4 +1,4 @@
-# Oblivion Findings comprehensive audit — current-source restart
+# Oblivion Findings current-source restart toward the comprehensive audit
 
 Status: **IN PROGRESS — not comprehensive or complete**
 
@@ -61,6 +61,16 @@ The two discovery waves now contain 172 unique grouped rows: 145 H, 26 D, and on
 
 Nine additional P1 source claims were retained provisionally, bringing the current provisional register to 12. The new claims cover governance meeting/resolution visibility, board-pack distribution, quorum/decision snapshots, H&S register Site scope, privacy report permission separation, safeguarding intake provenance, safeguarding alert identity and projection durability, and outbound webhook destination safety. None is a final finding, verified exploit, remediated issue, or closed gate.
 
+## First current benchmark wave
+
+Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles. That brings the fresh run to nine reconciled formal assignments. It exceeds the prompt's numerical minimum of eight, but the planned current-run universe of 11, fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
+
+The historical project register remains 98 physical rows: 97 projects in the prompt denominator plus supplemental `frappe/frappe`. All 98 rows passed committed-local structural checks, but zero of the 97 prompt projects was refreshed against current upstream activity, ref reachability, licence, edition boundary, or behaviour on 24 August 2026. The historical rows are provenance, not current project-triage credit.
+
+RUN-007 returned 30 provisional observer relations across 29 of the 172 grouped candidates. RUN-008 challenged 15 samples—five semantic/UI collisions failed, five retained only a partial neutral requirement, and five survived a narrow static requirement—and identified nine collision/composite groups. RUN-009 completed eight high-risk comparison packets: zero copied-baseline classifications, two stronger-native-control observations, four Oblivion-specific gaps, and two domains with no credible comparison at the packet level.
+
+None of those slices selects a final current benchmark or establishes a feature-level `No credible match`. The candidate denominator is not frozen, current upstream evidence is absent, and zero current mappings are promoted. No runtime, application-browser, test, compliance, remediation, or completion credit follows.
+
 ## Current official New Zealand source baseline
 
 The six official-source families required by the governing prompt were refreshed from current official pages: the Health Information Privacy Code 2020 including its 1 May 2026 indirect-collection amendment, HISO 10029:2022, the NZ FHIR Base Implementation Guide, Ngā Paerewa NZS 8134:2021, the Code of Health and Disability Services Consumers' Rights, and WorkSafe's HSWA guidance. The structured evidence separates each official source fact from the audit inference and the qualified specialist decision still required.
@@ -78,12 +88,17 @@ The official HISO PDF asset was identified, but direct retrieval returned 403, s
 - `evidence/source/current-feature-discovery-wave-02.json`: 110 additional grouped source-discovery candidates and nine provisional finding rows.
 - `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the cumulative 6/11 formal-assignment state.
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
+- `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and zero-credit evidence.
+- `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
+- `03-feature-to-benchmark-matrix.csv`: interim 172-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
+- `06-open-source-benchmark-register.csv`: the 98 historical rows carried forward with an explicit 97-plus-one denominator and zero current upstream refresh or mapping credit.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
 - `generators/build-current-source-census.py`: the deterministic static collector. It reads committed Git objects and writes only inside this audit directory.
 - `generators/integrate-source-wave-01.py`: deterministic normalization for the first formal semantic/source wave and dashboard.
 - `generators/integrate-source-wave-02.py`: deterministic normalization for the second formal source wave.
+- `generators/integrate-benchmark-wave-01.py`: deterministic normalization for the first current benchmark wave and interim required CSVs.
 - `generators/build-current-audit-dashboard.py`: aggregate dashboard builder over the normalized current evidence.
 
 The collector was rerun twice with identical output hashes. It did not boot Laravel, access a database, run tests or a build, use a browser, or mutate an external system.
@@ -93,7 +108,7 @@ The collector was rerun twice with identical output hashes. It did not boot Lara
 1. Finish manual page/support adjudication, framework-route evidence, and canonical backend/data/test ownership; the current semantic wave is partial.
 2. Continue module discovery and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, visual states, and all eight pass ledgers.
-4. Revalidate the 97-project benchmark register through separate observer, neutralizer, and native-comparator assignments.
+4. Refresh all 97 prompt projects from official upstream evidence and finish one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen; the first A/B/C evidence wave grants zero mapping credit.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.
 6. Freeze artifacts, dispatch fresh independent Pass 8 review, integrate only through the orchestrator, validate all literal completion gates, and update the dashboard from current structured evidence.
 

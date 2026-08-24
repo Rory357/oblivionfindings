@@ -1,0 +1,871 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_BENCHMARK_WAVE_01_RECONCILED_NO_COMPLETION_CREDIT",
+  "generated_at": "2026-08-24T16:38:42+12:00",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "ec11042ea09d7bc56dff5b992b4d6ebfb03ad9df",
+    "non_audit_product_diff_from_application_commit": 0
+  },
+  "pins": {
+    "historical_project_register": {
+      "sha256": "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe",
+      "physical_rows": 98,
+      "prompt_denominator": 97,
+      "supplemental_rows": 1
+    },
+    "current_candidate_wave_01_sha256": "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb",
+    "current_candidate_wave_02_sha256": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
+    "historical_final_904_sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
+    "historical_final_902_sha256": "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
+  },
+  "project_register_current_audit": {
+    "prompt_projects": 97,
+    "historical_rows_structurally_validated_local_only": 97,
+    "supplemental_rows_structurally_validated_local_only": 1,
+    "current_upstream_project_refreshes": 0,
+    "current_project_triage_completion_credit": 0,
+    "licence_noassertion_rows": 11,
+    "prompt_denominator_outcomes": {
+      "native_benchmark": 72,
+      "reject": 15,
+      "separate_future_decision": 10,
+      "pending": 0
+    },
+    "supplemental_outcomes": {
+      "native_benchmark": 1
+    },
+    "physical_row_outcomes": {
+      "native_benchmark": 73,
+      "reject": 15,
+      "separate_future_decision": 10,
+      "pending": 0
+    },
+    "evidence_limit": "The committed historical rows are structurally complete enough to carry forward as provenance. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24."
+  },
+  "observer": {
+    "assignment_id": "RUN-007",
+    "mapping_records": 30,
+    "unique_current_candidates": 29,
+    "strength_counts": {
+      "partial": 22,
+      "strong": 8
+    },
+    "mappings": [
+      {
+        "candidate_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+        "project": "Bahmni/bahmni-core",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/Bahmni/bahmni-core",
+        "historical_project_commit": "5dc6f25d7691dbeeb9924384704fc8e1616d77be",
+        "historical_exact_behaviour_locus": "Transactional discharge resolves the patient, unassigns the current bed and persists the discharge encounter. Exact official loci: https://github.com/Bahmni/bahmni-core/blob/5dc6f25d7691dbeeb9924384704fc8e1616d77be/bahmnicore-omod/src/main/java/org/bahmni/module/bahmnicore/web/v1_0/controller/BahmniDischargeController.java#L18-L32",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+        "project": "paperless-ngx/paperless-ngx",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/paperless-ngx/paperless-ngx",
+        "historical_project_commit": "6a02b87dded9d8f586de3e52b496864858a07518",
+        "historical_exact_behaviour_locus": "Documents retain owner/type/tags/storage/custom fields/checksums/versions; updates use an audit actor; ordered workflows refresh state, stop after deletion and emit effective visibility. Exact official loci: https://github.com/paperless-ngx/paperless-ngx/blob/6a02b87dded9d8f586de3e52b496864858a07518/src/documents/serialisers.py#L1042-L1105 | https://github.com/paperless-ngx/paperless-ngx/blob/6a02b87dded9d8f586de3e52b496864858a07518/src/documents/serialisers.py#L1245-L1275 | https://github.com/paperless-ngx/paperless-ngx/blob/6a02b87dded9d8f586de3e52b496864858a07518/src/documents/models.py#L157-L232 | https://github.com/paperless-ngx/paperless-ngx/blob/6a02b87dded9d8f586de3e52b496864858a07518/src/documents/signals/handlers.py#L803-L940",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "OPS-CLIENT-CONSENT",
+        "project": "ohcnetwork/care",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/ohcnetwork/care",
+        "historical_project_commit": "c64a1ef0e726b06788b63bf4537dea5d16af2269",
+        "historical_exact_behaviour_locus": "Consent reads are patient/encounter authorized; completed encounters deny writes; mutations are request-audited. Primary source: https://github.com/ohcnetwork/care/blob/c64a1ef0e726b06788b63bf4537dea5d16af2269/care/emr/api/viewsets/consent.py#L39-L96",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "OPS-CLIENT-CONSENT",
+        "project": "ohcnetwork/care_fe",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/ohcnetwork/care_fe",
+        "historical_project_commit": "912477accb940e370db85dcb4bb98ebafbb5a45e",
+        "historical_exact_behaviour_locus": "Consent capture includes decision/category/status/effective period, patient/encounter binding, evidence and visible errors/permission denial. Primary source: https://github.com/ohcnetwork/care_fe/blob/912477accb940e370db85dcb4bb98ebafbb5a45e/src/components/Consent/ConsentFormSheet.tsx#L68-L290",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "project": "openemr/openemr",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/openemr/openemr",
+        "historical_project_commit": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "historical_exact_behaviour_locus": "Portal enablement/authentication is audited; sessions are distinct; documents are session/patient scoped and CSRF-protected. Primary source: https://github.com/openemr/openemr/blob/312b5d042f7fa49cc78ebed041155fba339a991c/src/Controllers/Portal/PatientPortalLoginController.php#L124-L249 Wave-4: [CAP-CLIN-OBSERVATION-REGISTER-RECORD] OpenEMR checks observation-form permission, lists and loads patient/encounter observations, validates submitted observations, binds patient/encounter/user context, and saves transactionally. Primary sources: https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L75-L139; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L180-L220; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L242-L354.",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+        "project": "Bahmni/openmrs-module-ipd-frontend",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/Bahmni/openmrs-module-ipd-frontend",
+        "historical_project_commit": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+        "historical_exact_behaviour_locus": "Timed nursing/medication tasks are grouped as scheduled, completed, missed, stopped or not done with time-aware tiles. Primary source: https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/src/features/DisplayControls/NursingTasks/utils/NursingTasksUtils.js#L49-L228",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+        "project": "Bahmni/openmrs-module-medicationadministration",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+        "historical_project_commit": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+        "historical_exact_behaviour_locus": "Administration records retain status/reason, performer, effective time, request, medication, dosage and notes. Primary source: https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java#L27-L59",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+        "project": "Bahmni/openmrs-module-medicationadministration",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+        "historical_project_commit": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+        "historical_exact_behaviour_locus": "Administration records retain status/reason, performer, effective time, request, medication, dosage and notes. Primary source: https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java#L27-L59",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+        "project": "moodle/moodle",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/moodle/moodle",
+        "historical_project_commit": "3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a",
+        "historical_exact_behaviour_locus": "Prior-learning evidence binds immutable learner identity, attachments and competency; requests review; records assessor/action/context/grade/proficiency/note and emits an event; course progress derives from completed activities. Exact official loci: https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L3810-L3863 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L3927-L3962 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L4023-L4039 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L4262-L4510 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/completion/classes/progress.php#L41-L82",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+        "project": "inventree/InvenTree",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/inventree/InvenTree",
+        "historical_project_commit": "55a193e5d794d747bcce64eb43554fdf8e339f38",
+        "historical_exact_behaviour_locus": "Stock count/add/remove/transfer/return validates state, quantities and destinations, sorts locks, records notes, and applies multi-item work atomically with merge/split support. Exact official loci: https://github.com/inventree/InvenTree/blob/55a193e5d794d747bcce64eb43554fdf8e339f38/src/backend/InvenTree/stock/api.py#L214-L273 | https://github.com/inventree/InvenTree/blob/55a193e5d794d747bcce64eb43554fdf8e339f38/src/backend/InvenTree/stock/serializers.py#L1846-L2058 | https://github.com/inventree/InvenTree/blob/55a193e5d794d747bcce64eb43554fdf8e339f38/src/backend/InvenTree/stock/serializers.py#L2064-L2204",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+        "project": "braedonsaunders/beaconhs",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/braedonsaunders/beaconhs",
+        "historical_project_commit": "7de18df3532a96883e1098dea0a4b4dba70909fd",
+        "historical_exact_behaviour_locus": "Incidents retain chronology/root-cause and corrective actions move to separately verified completion. Primary source: https://github.com/braedonsaunders/beaconhs/blob/7de18df3532a96883e1098dea0a4b4dba70909fd/packages/db/src/schema/corrective-actions.ts#L32-L123",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "project": "MeyerThorsten/QAtrial",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/MeyerThorsten/QAtrial",
+        "historical_project_commit": "b10fab722caf9561bcf4fdb03cc9733156992635",
+        "historical_exact_behaviour_locus": "CAPA validates transitions, retains cause/corrective/preventive/effectiveness, logs change and emits resolution cascade; deviations progress detected through closed with actor/time. Exact official loci: server/routes/capa.ts:L137-L185 | server/routes/deviations.ts:L154-L197,L224-L344 | README.md:L223-L239,L576-L580",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+        "project": "MeyerThorsten/QAtrial",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/MeyerThorsten/QAtrial",
+        "historical_project_commit": "b10fab722caf9561bcf4fdb03cc9733156992635",
+        "historical_exact_behaviour_locus": "CAPA validates transitions, retains cause/corrective/preventive/effectiveness, logs change and emits resolution cascade; deviations progress detected through closed with actor/time. Exact official loci: server/routes/capa.ts:L137-L185 | server/routes/deviations.ts:L154-L197,L224-L344 | README.md:L223-L239,L576-L580",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-ONBOARDING-OFFBOARDING",
+        "project": "frappe/hrms",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/frappe/hrms",
+        "historical_project_commit": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "historical_exact_behaviour_locus": "Shift assignment validates active staff and overlaps; requests use approval states; mandatory onboarding tasks gate creation. Primary source: https://github.com/frappe/hrms/blob/450f6ca52c5386020a1023b2f24e4af0ab20521e/hrms/hr/doctype/shift_assignment/shift_assignment.py#L49-L171 Wave-4: [CAP-HR-EXPENSE-AUTHOR-SUBMIT] The employee form defaults to the current employee, supports attachments and submission; backend code validates employee/amounts, totals and taxes, prevents disallowed self-approval, and applies submit/cancel effects. Primary sources: https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/expense_claim/Form.vue#L4-L16; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/expense_claim/Form.vue#L86-L99; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/hr/doctype/expense_claim/expense_claim.py#L105-L174; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/hr/doctype/expense_claim/expense_claim.py#L196-L223. [CAP-HR-PAYSLIP-SELF] The dashboard filters submitted Salary Slips to the active employee, links detail views, exposes earnings/deductions/net pay and PDF download, with Employee read/print rights. Primary sources: https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Dashboard.vue#L35-L50; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Dashboard.vue#L97-L113; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Detail.vue#L4-L40; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Detail.vue#L136-L157; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/payroll/doctype/salary_slip/salary_slip.json#L771-L800.",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-COMPLIANCE-VETTING-TRAINING",
+        "project": "moodle/moodle",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/moodle/moodle",
+        "historical_project_commit": "3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a",
+        "historical_exact_behaviour_locus": "Prior-learning evidence binds immutable learner identity, attachments and competency; requests review; records assessor/action/context/grade/proficiency/note and emits an event; course progress derives from completed activities. Exact official loci: https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L3810-L3863 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L3927-L3962 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L4023-L4039 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/competency/classes/api.php#L4262-L4510 | https://github.com/moodle/moodle/blob/3deaeb9e4d026b75ba8f2f4a9108f6340a85df7a/public/completion/classes/progress.php#L41-L82",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-LEAVE-TIME-PAYROLL",
+        "project": "horilla/horilla-hr",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/horilla/horilla-hr",
+        "historical_project_commit": "53e65898c65cd3c4ff0418f81e9f0fb55e1045dc",
+        "historical_exact_behaviour_locus": "Manager-authorized leave approval prevents self-approval, checks available plus carry-forward balance, persists approved allocations, and rejection restores consumed balances. Exact official loci: leave/views.py:L997-L1080 | leave/views.py:L1245-L1280 | README.md:L10-L42,L175-L184",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-DOCUMENT-POLICY-SIGNATURE",
+        "project": "documenso/documenso",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/documenso/documenso",
+        "historical_project_commit": "962cffc9f546be68860be3489247f67255c83a66",
+        "historical_exact_behaviour_locus": "Token-bound completion rejects expired, terminal, duplicate and out-of-order recipients, validates fields/2FA, transitions once transactionally and audits completion/authentication; rejection stores reason and audit evidence. Exact official loci: https://github.com/documenso/documenso/blob/962cffc9f546be68860be3489247f67255c83a66/packages/lib/server-only/document/complete-document-with-token.ts#L81-L179 | https://github.com/documenso/documenso/blob/962cffc9f546be68860be3489247f67255c83a66/packages/lib/server-only/document/complete-document-with-token.ts#L281-L369 | https://github.com/documenso/documenso/blob/962cffc9f546be68860be3489247f67255c83a66/packages/lib/server-only/document/reject-document-with-token.ts#L28-L112",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-WEBHOOK-DELIVERY",
+        "project": "frappe/frappe",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/frappe/frappe",
+        "historical_project_commit": "e97865c3212334a6b3112177ee0aa81620173f81",
+        "historical_exact_behaviour_locus": "Wave-4: [CAP-SET-OUTBOUND-WEBHOOK-CONFIG] Frappe defines, validates, signs and dispatches configurable webhooks, records delivery status, and schedules retries on failure. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L8-L34; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L42-L72; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L84-L101; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L154-L165; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L67-L106; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L155-L213; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L339-L359. [CAP-SET-ROLE-ASSIGNMENTS] Frappe renders the role editor only with qualifying write permission, persists role tables, and provides direct add-role and remove-role methods. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L74-L100; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L316-L319; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L478-L488; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.py#L718-L734; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.json#L250-L257.",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-SHIFT-STAFFING-COVER",
+        "project": "lennystepn-hue/schichtplaner",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/lennystepn-hue/schichtplaner",
+        "historical_project_commit": "91a91bbfb33ff6ad2aee0832cca3a38643f1c1f2",
+        "historical_exact_behaviour_locus": "Employee submits or cancels a shift wish; manager accepts or declines an OPEN request; acceptance refreshes schedule and books the employee. Exact official loci: src/components/schedule/wish-plan.tsx:L37-L122,L302-L352 | README.md:L23-L54,L337-L339",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-ROSTER-PLAN-PUBLISH",
+        "project": "TimefoldAI/timefold-solver",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/TimefoldAI/timefold-solver",
+        "historical_project_commit": "4f17e1389c70fdd86d9c8b92ae0c62c41dd43ea8",
+        "historical_exact_behaviour_locus": "Pinned assignments are immutable to solving; hard constraints establish feasibility ahead of soft preferences. Primary source: https://github.com/TimefoldAI/timefold-solver/blob/4f17e1389c70fdd86d9c8b92ae0c62c41dd43ea8/core/src/main/java/ai/timefold/solver/core/api/domain/entity/PlanningPin.java#L14-L31",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+        "project": "orangehrm/orangehrm",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/orangehrm/orangehrm",
+        "historical_project_commit": "56e23b3b09e7af29317a0943523b825843fff527",
+        "historical_exact_behaviour_locus": "Attendance editing checks actor workflow permission, retains local and UTC punch times plus timezone provenance, and rejects overlap. Exact official loci: src/plugins/orangehrmAttendancePlugin/Api/AttendanceRecordAPI.php:L188-L224,L263-L347 | README.md:L5-L25,L58-L61",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-TIMESHEET-MANAGER-PAYROLL",
+        "project": "kimai/kimai",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/kimai/kimai",
+        "historical_project_commit": "fd8989e9011aeff0a9ed573c294707140b4401b0",
+        "historical_exact_behaviour_locus": "Timesheet lockdown is timezone-aware and ordinary editing of exported entries is prevented. Primary source: https://github.com/kimai/kimai/blob/fd8989e9011aeff0a9ed573c294707140b4401b0/src/Timesheet/LockdownService.php#L141-L235",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-STAFF-AVAILABILITY-TIME-OFF",
+        "project": "lennystepn-hue/schichtplaner",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/lennystepn-hue/schichtplaner",
+        "historical_project_commit": "91a91bbfb33ff6ad2aee0832cca3a38643f1c1f2",
+        "historical_exact_behaviour_locus": "Employee submits or cancels a shift wish; manager accepts or declines an OPEN request; acceptance refreshes schedule and books the employee. Exact official loci: src/components/schedule/wish-plan.tsx:L37-L122,L302-L352 | README.md:L23-L54,L337-L339",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL",
+        "project": "frappe/hrms",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/frappe/hrms",
+        "historical_project_commit": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "historical_exact_behaviour_locus": "Shift assignment validates active staff and overlaps; requests use approval states; mandatory onboarding tasks gate creation. Primary source: https://github.com/frappe/hrms/blob/450f6ca52c5386020a1023b2f24e4af0ab20521e/hrms/hr/doctype/shift_assignment/shift_assignment.py#L49-L171 Wave-4: [CAP-HR-EXPENSE-AUTHOR-SUBMIT] The employee form defaults to the current employee, supports attachments and submission; backend code validates employee/amounts, totals and taxes, prevents disallowed self-approval, and applies submit/cancel effects. Primary sources: https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/expense_claim/Form.vue#L4-L16; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/expense_claim/Form.vue#L86-L99; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/hr/doctype/expense_claim/expense_claim.py#L105-L174; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/hr/doctype/expense_claim/expense_claim.py#L196-L223. [CAP-HR-PAYSLIP-SELF] The dashboard filters submitted Salary Slips to the active employee, links detail views, exposes earnings/deductions/net pay and PDF download, with Employee read/print rights. Primary sources: https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Dashboard.vue#L35-L50; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Dashboard.vue#L97-L113; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Detail.vue#L4-L40; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/frontend/src/views/salary_slip/Detail.vue#L136-L157; https://github.com/frappe/hrms/blob/4f6ee8504003cf2ea36488cd4876b8b90a8bf68c/hrms/payroll/doctype/salary_slip/salary_slip.json#L771-L800.",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-DAY-MY-DAY-WORKSPACE",
+        "project": "medic/cht-core",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/medic/cht-core",
+        "historical_project_commit": "1d7a4827b0f681b42fa67f1eebaa77e7b89349bc",
+        "historical_exact_behaviour_locus": "Task engine derives Draft/Ready/Completed/Failed/Cancelled with timestamped history and terminal states; mobile action hydrates person context, renders/saves form, reports failure and returns to task list. Exact official loci: shared-libs/rules-engine/src/task-states.js:L28-L155 | webapp/src/ts/modules/tasks/tasks-content.component.ts:L152-L206,L259-L369 | README.md:L9-L35,L55-L57",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+        "project": "medic/cht-core",
+        "observer_strength": "strong",
+        "project_url": "https://github.com/medic/cht-core",
+        "historical_project_commit": "1d7a4827b0f681b42fa67f1eebaa77e7b89349bc",
+        "historical_exact_behaviour_locus": "Task engine derives Draft/Ready/Completed/Failed/Cancelled with timestamped history and terminal states; mobile action hydrates person context, renders/saves form, reports failure and returns to task list. Exact official loci: shared-libs/rules-engine/src/task-states.js:L28-L155 | webapp/src/ts/modules/tasks/tasks-content.component.ts:L152-L206,L259-L369 | README.md:L9-L35,L55-L57",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-OPS-REPORTING-EXPORT",
+        "project": "apache/superset",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/apache/superset",
+        "historical_project_commit": "5248367587051278d815c5d8ef8dc23f18264b0e",
+        "historical_exact_behaviour_locus": "The protected scheduled-report API exposes persisted report-definition, schedule, owner, recipient and action-configuration CRUD. It does not prove report execution or delivery. Exact official locus: https://github.com/apache/superset/blob/5248367587051278d815c5d8ef8dc23f18264b0e/superset/reports/api.py#L78-L210",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-HR-REPORTING-EXPORT",
+        "project": "apache/superset",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/apache/superset",
+        "historical_project_commit": "5248367587051278d815c5d8ef8dc23f18264b0e",
+        "historical_exact_behaviour_locus": "The protected scheduled-report API exposes persisted report-definition, schedule, owner, recipient and action-configuration CRUD. It does not prove report execution or delivery. Exact official locus: https://github.com/apache/superset/blob/5248367587051278d815c5d8ef8dc23f18264b0e/superset/reports/api.py#L78-L210",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+        "project": "openmrs/openmrs-esm-form-engine-lib",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/openmrs/openmrs-esm-form-engine-lib",
+        "historical_project_commit": "b7a344d184b2002dc0babbcb5bba1d37d29ea51b",
+        "historical_exact_behaviour_locus": "Clinical form processing validates fields and exposes separate multi-operation success/error processing. Primary source: https://github.com/openmrs/openmrs-esm-form-engine-lib/blob/b7a344d184b2002dc0babbcb5bba1d37d29ea51b/src/processors/encounter/encounter-form-processor.ts#L127-L247",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      },
+      {
+        "candidate_id": "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+        "project": "openmrs/openmrs-esm-form-engine-lib",
+        "observer_strength": "partial",
+        "project_url": "https://github.com/openmrs/openmrs-esm-form-engine-lib",
+        "historical_project_commit": "b7a344d184b2002dc0babbcb5bba1d37d29ea51b",
+        "historical_exact_behaviour_locus": "Clinical form processing validates fields and exposes separate multi-operation success/error processing. Primary source: https://github.com/openmrs/openmrs-esm-form-engine-lib/blob/b7a344d184b2002dc0babbcb5bba1d37d29ea51b/src/processors/encounter/encounter-form-processor.ts#L127-L247",
+        "status": "PROVISIONAL_OBSERVER_RELATION_NOT_SELECTED_OR_PROMOTED",
+        "evidence_limit": "RUN-007 relation plus committed-local historical project row; no 2026-08-24 upstream refresh, neutralized parity, runtime proof, or completion credit."
+      }
+    ],
+    "completion_credit": false
+  },
+  "neutralizer": {
+    "assignment_id": "RUN-008",
+    "neutralization_rules": [
+      "Shared nouns, CRUD labels, dashboard/list/register/report wording, and visual similarity do not establish feature identity.",
+      "A narrow comparison needs the exact neutral action/invariant, immutable project ref and locus, and a concrete Oblivion owner.",
+      "No sibling/module inheritance; read lenses, mutation owners, external synchronization, exports, and terminal transitions remain separate.",
+      "Composite candidates must be split before one comparator can establish identity.",
+      "Historical benchmark credit is non-transferable to the current partial candidate universe."
+    ],
+    "adjudications": [
+      {
+        "candidate_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+        "project": "ohcnetwork/care",
+        "neutralized_result": "FAIL_SEMANTIC_COLLISION",
+        "reason": "An encounter workflow is not authoritative client-record identity and lifecycle governance.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "OPS-CLIENT-CONSENT",
+        "project": "ohcnetwork/care_fe",
+        "neutralized_result": "PARTIAL_REQUIREMENT_ONLY",
+        "reason": "Structured consent capture does not prove representative authority, decision evidence, withdrawal, expiry, and downstream effects.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-CLIN-MODULE-DASHBOARD",
+        "project": "openmrs/openmrs-esm-patient-chart",
+        "neutralized_result": "FAIL_GENERIC_UI_COLLISION",
+        "reason": "A dashboard component proves presentation, not approved-Site clinical scope or downstream action ownership.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "project": "openemr/openemr",
+        "neutralized_result": "SURVIVES_NARROW_STATIC_REQUIREMENT",
+        "reason": "Patient/encounter-bound validated observation persistence survives narrowly; Oblivion Site and privacy proof does not transfer.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "project": "openmrs/openmrs-core",
+        "neutralized_result": "SURVIVES_NARROW_STATIC_REQUIREMENT",
+        "reason": "Person-context clinical-event persistence survives narrowly; Site/privacy parity does not transfer.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+        "project": "OneUptime/oneuptime",
+        "neutralized_result": "PARTIAL_REQUIREMENT_ONLY",
+        "reason": "Generic alert escalation does not prove accountable clinical review, follow-up, safety closure, or clinical authority.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+        "project": "openmrs/openmrs-esm-patient-management",
+        "neutralized_result": "PARTIAL_REQUIREMENT_ONLY",
+        "reason": "Subject search/context supports selection only; governed payload, approved-Site scope, and wizard authority remain unproved.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+        "project": "opf/openproject",
+        "neutralized_result": "FAIL_GENERIC_WORK_ITEM_COLLISION",
+        "reason": "Generic work-package mechanics do not prove cross-module authority or canonical mutation delegation.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-DAY-MY-CALENDAR",
+        "project": "frappe/hrms",
+        "neutralized_result": "PARTIAL_REQUIREMENT_ONLY",
+        "reason": "A worker event feed supports a narrow personal read need, not the full current calendar owner and scope.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "project": "frappe/erpnext",
+        "neutralized_result": "SURVIVES_NARROW_STATIC_REQUIREMENT",
+        "reason": "Identity/status lifecycle mechanics survive narrowly; Site, privacy, invitation, rehire, and canonical-user convergence do not transfer.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "project": "braedonsaunders/beaconhs",
+        "neutralized_result": "SURVIVES_NARROW_STATIC_REQUIREMENT",
+        "reason": "Incident/action completion and closure evidence survive narrowly; Site, alert journey, reportability, and reopening remain native.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+        "project": "kimai/kimai",
+        "neutralized_result": "FAIL_SEMANTIC_COLLISION",
+        "reason": "Timesheet locking and voter checks do not prove a live attendance clock/break/correction lifecycle.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-OPS-SHIFT-STAFFING-COVER",
+        "project": "TimefoldAI/timefold-solver",
+        "neutralized_result": "FAIL_SEMANTIC_COLLISION",
+        "reason": "Planning scores do not prove assignment, cover acceptance, reservation, expiry, competency, or Site consequences.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-GOV-AUDIT-LOG-EXPORT",
+        "project": "frappe/frappe",
+        "neutralized_result": "PARTIAL_REQUIREMENT_ONLY",
+        "reason": "Generic export/logging does not prove immutable cross-module governance evidence, redaction, approval, retention, or integrity.",
+        "completion_credit": false
+      },
+      {
+        "candidate_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+        "project": "intuitem/ciso-assistant-community",
+        "neutralized_result": "SURVIVES_NARROW_STATIC_REQUIREMENT",
+        "reason": "Accessible-object privacy export mechanics survive narrowly; Oblivion action authority and Site/object scope do not transfer.",
+        "completion_credit": false
+      }
+    ],
+    "result_counts": {
+      "FAIL_SEMANTIC_COLLISION": 3,
+      "PARTIAL_REQUIREMENT_ONLY": 5,
+      "FAIL_GENERIC_UI_COLLISION": 1,
+      "SURVIVES_NARROW_STATIC_REQUIREMENT": 5,
+      "FAIL_GENERIC_WORK_ITEM_COLLISION": 1
+    },
+    "collision_groups": [
+      {
+        "group_id": "CARE_PLAN_IDENTITY_OVERLAP",
+        "candidate_ids": [
+          "CAP-OPS-CARE-PLAN-LIFECYCLE",
+          "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF"
+        ]
+      },
+      {
+        "group_id": "EVENT_INCIDENT_ALERT_TERMINAL_COLLISION",
+        "candidate_ids": [
+          "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+          "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+          "CAP-SAFE-TERMINAL-PROJECTION",
+          "CAP-CR-ALERT-WORKLIST-LIFECYCLE"
+        ]
+      },
+      {
+        "group_id": "REPORT_EXPORT_COLLISION",
+        "candidate_ids": [
+          "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+          "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+          "CAP-INC-REPORT-AUDIT-EXPORTS",
+          "CAP-HR-REPORTING-EXPORT",
+          "CAP-OPS-REPORTING-EXPORT",
+          "CAP-FIN-REPORT-AUDIT-EXPORT",
+          "CAP-GOV-AUDIT-LOG-EXPORT",
+          "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+          "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+          "CAP-SEC-REPORTING-EXPORT"
+        ]
+      },
+      {
+        "group_id": "CALENDAR_SCHEDULE_SYNC_COLLISION",
+        "candidate_ids": [
+          "CAP-DAY-MY-CALENDAR",
+          "CAP-SITE-CALENDAR-RESOURCE-SCHEDULING",
+          "CAP-OPS-CALENDAR-SYNC",
+          "CAP-OPS-ROSTER-PLAN-PUBLISH",
+          "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE"
+        ]
+      },
+      {
+        "group_id": "DOCUMENT_EVIDENCE_COLLISION",
+        "candidate_ids": [
+          "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+          "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+          "CAP-HR-DOCUMENT-POLICY-SIGNATURE",
+          "CAP-GOV-DOCUMENT-LIBRARY",
+          "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+          "CAP-INC-EVIDENCE-DOWNLOADS"
+        ]
+      },
+      {
+        "group_id": "WORKFORCE_TIME_COLLISION",
+        "candidate_ids": [
+          "CAP-OPS-SHIFT-LIFECYCLE",
+          "CAP-OPS-SHIFT-STAFFING-COVER",
+          "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+          "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+          "CAP-OPS-TIMESHEET-MANAGER-PAYROLL",
+          "CAP-OPS-STAFF-AVAILABILITY-TIME-OFF"
+        ]
+      },
+      {
+        "group_id": "DASHBOARD_READ_LENS_COLLISION",
+        "candidate_ids": [
+          "CAP-CLIN-MODULE-DASHBOARD",
+          "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+          "CAP-OPS-DASHBOARD-ACTIVITY",
+          "CAP-FIN-DASHBOARD-INSIGHTS",
+          "CAP-GOV-DASHBOARD-REPORT-EVIDENCE",
+          "CAP-HS-DASHBOARD-ANALYTICS",
+          "CAP-PRIV-DASHBOARD-WORKLIST",
+          "CAP-DAY-MY-DAY-WORKSPACE"
+        ]
+      },
+      {
+        "group_id": "ASSET_SITE_DEVICE_COLLISION",
+        "candidate_ids": [
+          "CAP-SITE-PLAN-ROOM-HARDWARE",
+          "CAP-FLEET-ASSET-VEHICLE-REGISTER",
+          "CAP-FIN-FIXED-ASSET-LIFECYCLE",
+          "CAP-SEC-DEVICE-REGISTRY-CUSTODY"
+        ]
+      },
+      {
+        "group_id": "COMPOSITE_CANDIDATE_COLLISION",
+        "candidate_ids": [
+          "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+          "CAP-HR-LEAVE-TIME-PAYROLL",
+          "CAP-FIN-ACCOUNTING-SYNC-FX-CONSOLIDATION",
+          "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+          "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS"
+        ]
+      }
+    ],
+    "coverage_gaps": {
+      "current_candidate_rows": 172,
+      "fresh_target_specific_benchmark_or_bounded_no_match_credit": 0,
+      "historical_904_exact_id_intersection": 25,
+      "historical_exact_credit_rows_not_inherited": 15,
+      "historical_exact_uncredited_rows": 10,
+      "historical_absent_ids": 147,
+      "effective_current_rows_without_historical_credit": 157,
+      "candidates_without_class_like_named_owner_heuristic": 54,
+      "named_owner_candidates_missing_at_least_one_named_owner_from_production_anchors_heuristic": 48
+    },
+    "completion_credit": false
+  },
+  "native_comparator": {
+    "assignment_id": "RUN-009",
+    "comparison_packets": [
+      {
+        "domain": "controlled_medications",
+        "candidate_ids": [
+          "CAP-MED-CD-REGISTER-BALANCE",
+          "CAP-MED-DESTRUCTION-STOCK-PHARMACY"
+        ],
+        "classification": "OBLIVION_SPECIFIC_GAP",
+        "project": "openemr/openemr",
+        "stronger_side": null,
+        "result": "OpenEMR proves permission/CSRF-backed destruction fields and reporting but not NZ controlled-drug custody. Oblivion destruction is stock-locked transactionally, while register-entry plus stock and balance mutation locking remain incomplete current-source questions.",
+        "anchors": [
+          "routes/emar.php:211-231",
+          "app/Http/Controllers/Emar/EmarController.php:4023-4119",
+          "app/Http/Controllers/Emar/EmarController.php:4986-5237",
+          "evidence/source/current-feature-discovery-wave-01.json"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Bind the authoritative controlled-medication order and stock identity; authorize exact action and approved Site; preserve a signed running balance, independent witness, discrepancy handling, and atomic stock/register consequences.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave21.json@9474a59f10a3aad16ec1dfaeb7e976b9e5f7386a5655c564834e197e092cd2fb"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/openemr/openemr",
+          "inspected_ref": "commit-pinned wave-4",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "historical_inspected_date": "2026-08-13",
+          "historical_exact_behaviour_locus": "Portal enablement/authentication is audited; sessions are distinct; documents are session/patient scoped and CSRF-protected. Primary source: https://github.com/openemr/openemr/blob/312b5d042f7fa49cc78ebed041155fba339a991c/src/Controllers/Portal/PatientPortalLoginController.php#L124-L249 Wave-4: [CAP-CLIN-OBSERVATION-REGISTER-RECORD] OpenEMR checks observation-form permission, lists and loads patient/encounter observations, validates submitted observations, binds patient/encounter/user context, and saves transactionally. Primary sources: https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L75-L139; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L180-L220; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L242-L354.",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "governance_resolution_vote_quorum",
+        "candidate_ids": [
+          "CAP-GOV-RESOLUTION-VOTE-QUORUM"
+        ],
+        "classification": "OBLIVION_SPECIFIC_GAP",
+        "project": "OpenSlides/OpenSlides",
+        "stronger_side": null,
+        "result": "OpenSlides proves internal vote creation but not a frozen eligible electorate. Oblivion source shows no canonical aggregate lock or close-time quorum gate and appears to calculate from live membership/attendance state.",
+        "anchors": [
+          "app/Domain/Governance/Services/VotingService.php:29-68",
+          "app/Domain/Governance/Services/VotingService.php:106-164",
+          "app/Domain/Governance/Models/Resolution.php:122-147",
+          "app/Domain/Governance/Models/Resolution.php:186-212"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Lock the decision aggregate, freeze eligible electorate and quorum evidence, bind conflicts and votes to that snapshot, and close exactly once with reproducible evidence.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave24.json@c96e62aae6964ee6f1fe8633b6ec07c553dccd42cf1ed352544ca7b234f47c38"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/OpenSlides/OpenSlides",
+          "inspected_ref": "prompt-listed root c514bcd8c742053f08ef17741b5c9868cd2186f8; cited behavior source openslides-backend 3917202ccf26efe7efaee81fd56c822ec182a810",
+          "commit_sha": "c514bcd8c742053f08ef17741b5c9868cd2186f8",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Motion transitions are constrained; agenda hierarchy rejects cycles; meeting archive blocks ongoing polls/speakers. Primary source: https://github.com/OpenSlides/openslides-backend/blob/3917202ccf26efe7efaee81fd56c822ec182a810/docs/actions/motion.set_state.md#L9-L46",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "governance_board_packs",
+        "candidate_ids": [
+          "CAP-GOV-BOARD-PACK-DISTRIBUTION"
+        ],
+        "classification": "NO_CREDIBLE_COMPARISON",
+        "project": "OpenSlides/OpenSlides",
+        "stronger_side": null,
+        "result": "OpenSlides does not establish immutable assembled-pack manifests, approval provenance, recipient distribution, or read acknowledgement. Oblivion has a manifest/distribution model, but current visibility and regeneration semantics remain provisional concerns.",
+        "anchors": [
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90",
+          "app/Domain/Governance/Http/Controllers/BoardPackController.php:194-247",
+          "app/Domain/Governance/Services/BoardPackBuilderService.php:27-47",
+          "app/Domain/Governance/Services/BoardPackBuilderService.php:256-287"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Create an immutable pack manifest with approval provenance, explicit recipient distribution, read acknowledgement, version history, and safe reproducible regeneration.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave24.json@c96e62aae6964ee6f1fe8633b6ec07c553dccd42cf1ed352544ca7b234f47c38"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/OpenSlides/OpenSlides",
+          "inspected_ref": "prompt-listed root c514bcd8c742053f08ef17741b5c9868cd2186f8; cited behavior source openslides-backend 3917202ccf26efe7efaee81fd56c822ec182a810",
+          "commit_sha": "c514bcd8c742053f08ef17741b5c9868cd2186f8",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Motion transitions are constrained; agenda hierarchy rejects cycles; meeting archive blocks ongoing polls/speakers. Primary source: https://github.com/OpenSlides/openslides-backend/blob/3917202ccf26efe7efaee81fd56c822ec182a810/docs/actions/motion.set_state.md#L9-L46",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "health_safety_registers",
+        "candidate_ids": [
+          "CAP-HS-FIRST-AID-REGISTER",
+          "CAP-HS-WORKER-PARTICIPATION",
+          "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+          "CAP-HS-EMERGENCY-DRILLS",
+          "CAP-HS-PPE-REGISTER"
+        ],
+        "classification": "OBLIVION_SPECIFIC_GAP",
+        "project": "braedonsaunders/beaconhs",
+        "stronger_side": null,
+        "result": "Comparators provide concrete CAPA, effectiveness, and risk/action mechanics but no approved-Site scoping parity. Representative Oblivion list/count paths use optional Site filters, leaving foreign-Site list/direct-object/picker/export/write risk for independent proof.",
+        "anchors": [
+          "app/Http/Controllers/HealthSafety/FirstAidController.php:55-85",
+          "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:63-147",
+          "app/Http/Controllers/HealthSafety/PpeController.php:37-112"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Require the exact register action plus approved-Site scope and canonical ownership on lists, counts, direct objects, pickers, exports, evidence, and writes.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave30.json@5fd6e15f7796915c1d4ca2b97cecdc77d0732d030ea4b3c0fc4b1fd78cbc23a7"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+          "inspected_ref": "main",
+          "commit_sha": "7de18df3532a96883e1098dea0a4b4dba70909fd",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Incidents retain chronology/root-cause and corrective actions move to separately verified completion. Primary source: https://github.com/braedonsaunders/beaconhs/blob/7de18df3532a96883e1098dea0a4b4dba70909fd/packages/db/src/schema/corrective-actions.ts#L32-L123",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "privacy_compliance_reports",
+        "candidate_ids": [
+          "CAP-PRIV-COMPLIANCE-REPORT-EXPORT"
+        ],
+        "classification": "STRONGER_NATIVE_CONTROL",
+        "project": "intuitem/ciso-assistant-community",
+        "stronger_side": "CISO Assistant benchmark",
+        "result": "CISO Assistant retains role-scoped accessible-object aggregation and export. Oblivion appears to use one broad privacy permission with unscoped aggregate queries, while its repository-native CSV formula sanitisation remains a strength.",
+        "anchors": [
+          "routes/privacy.php:145-155",
+          "app/Http/Controllers/PrivacyReportController.php:21-94",
+          "app/Http/Controllers/PrivacyReportController.php:109-198",
+          "app/Http/Controllers/Concerns/SanitizesCsvOutput.php:32-64"
+        ],
+        "allowed_benchmark_outcome": "Native benchmark",
+        "neutral_requirement": "Gate each privacy report domain with its exact action authority and accessible-object scope, preserve minimum-necessary fields, sanitize exports, and retain export evidence.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave17.json@07860807a51ce1e52c59c3dc520671a89672c0bdca2b95948a6fc13f8fdf5c7a"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/intuitem/ciso-assistant-community",
+          "inspected_ref": "main",
+          "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Risk, controls, evidence, findings and acceptance have distinct owners, states, expiry and revocation. Primary source: https://github.com/intuitem/ciso-assistant-community/blob/1ba187b0117f4dba9e00605bd7d5319ded61cee3/backend/core/models.py#L6930-L7013",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "safeguarding_intake_projections",
+        "candidate_ids": [
+          "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+          "CAP-SAFE-TERMINAL-PROJECTION"
+        ],
+        "classification": "NO_CREDIBLE_COMPARISON",
+        "project": "primeroIMS/primero",
+        "stronger_side": null,
+        "result": "Primero supports case assignment, closure/reopen, and action plans but not Oblivion intake reconciliation, sensitivity/Site authority, projection identity, deduplication, or durable recovery. After-commit projection failures are logged while terminal transitions require existing projections.",
+        "anchors": [
+          "app/Http/Controllers/SafeguardingConcernController.php:213-258",
+          "app/Observers/SafeguardingConcernObserver.php:19-36",
+          "app/Observers/SafeguardingConcernObserver.php:166-188",
+          "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:103-348"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Resolve canonical subject, Site, incident, sensitivity and action authority before intake; project idempotently across owners with durable retry, deduplication, recovery, and terminal reconciliation evidence.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-901-wave2.json@06766d991b6c30afbbdd07729269f3cfcda69b9481a887e21a894aab943b853e",
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-901-wave3.json@126c81376838c4c814f01ed139ae0c6b6747a290fa3af7046efd26dfd2a828fb"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/primeroIMS/primero",
+          "inspected_ref": "main",
+          "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Referrals move through accepted/rejected/done/revoked states, check consent and link service completion. Primary source: https://github.com/primeroIMS/primero/blob/9cea249d502269c258028844884d51e9a89bd00a/app/models/referral.rb#L31-L99",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "outbound_webhook_destinations",
+        "candidate_ids": [
+          "CAP-INT-ADMIN-CONNECTIONS",
+          "CAP-HR-WEBHOOK-DELIVERY"
+        ],
+        "classification": "OBLIVION_SPECIFIC_GAP",
+        "project": "frappe/frappe",
+        "stronger_side": null,
+        "result": "Frappe proves validation, signing, dispatch, logging, and retry but not internal-URL safety. Oblivion has a strong HR destination policy, while API settings appear to store/test administrator URLs without invoking it.",
+        "anchors": [
+          "app/Http/Controllers/Settings/ApiSettingsController.php:132-211",
+          "app/Http/Controllers/Settings/ApiSettingsController.php:321-360",
+          "app/Domain/Hr/Services/HrWebhookDestinationPolicy.php:59-170",
+          "app/Domain/Hr/Jobs/DeliverHrWebhookJob.php:159-230"
+        ],
+        "allowed_benchmark_outcome": "No credible match",
+        "neutral_requirement": "Route every stored, tested, redirected, and delivered outbound destination through one canonical policy that enforces HTTPS, public resolved addresses, DNS/redirect safety, TLS verification, signing, retries, and receipts.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-target-specific-adjudication-902-wave4.json@5b76e440a73edad635bd01d9395dceaeadea2e1642c9b5c165c7be6579afbd84"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/frappe/frappe",
+          "inspected_ref": "commit-pinned wave-4",
+          "commit_sha": "e97865c3212334a6b3112177ee0aa81620173f81",
+          "historical_inspected_date": "2026-08-13",
+          "historical_exact_behaviour_locus": "Wave-4: [CAP-SET-OUTBOUND-WEBHOOK-CONFIG] Frappe defines, validates, signs and dispatches configurable webhooks, records delivery status, and schedules retries on failure. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L8-L34; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L42-L72; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L84-L101; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L154-L165; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L67-L106; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L155-L213; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L339-L359. [CAP-SET-ROLE-ASSIGNMENTS] Frappe renders the role editor only with qualifying write permission, persists role tables, and provides direct add-role and remove-role methods. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L74-L100; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L316-L319; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L478-L488; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.py#L718-L734; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.json#L250-L257.",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      },
+      {
+        "domain": "finance_manual_allocation",
+        "candidate_ids": [
+          "CAP-FIN-AR-QUOTE-INVOICE-BILLING",
+          "CAP-FIN-ALLOCATION-MATCH-HISTORY"
+        ],
+        "classification": "STRONGER_NATIVE_CONTROL",
+        "project": "bigcapitalhq/bigcapital",
+        "stronger_side": "Oblivion Findings",
+        "result": "BigCapital provides adjacent bank-matching locks and atomic state changes. Oblivion's exact manual receipt path adds keyed replay binding, invoice/replay locking, journal posting, append-only allocation evidence, and conflict rejection; historical direct credit is not inherited.",
+        "anchors": [
+          "app/Domain/Finance/Services/AccountsReceivableService.php:292-472",
+          "app/Domain/Finance/Services/PaymentSettlementRecorder.php:26-114",
+          "app/Domain/Finance/Models/FinPaymentAllocation.php:47-54"
+        ],
+        "allowed_benchmark_outcome": "Already better",
+        "neutral_requirement": "Bind a stable idempotency key before side effects; lock canonical invoice and replay evidence; reject changed-payload replay; post the journal once; and retain append-only allocation history.",
+        "historical_packet_evidence_refs": [
+          "docs/audits/oblivion-oss-comprehensive-audit-2026-08-12/evidence/source/benchmark-final-902-mapping.json@21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
+        ],
+        "benchmark_project_evidence": {
+          "canonical_url": "https://github.com/bigcapitalhq/bigcapital",
+          "inspected_ref": "develop",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "historical_inspected_date": "2026-08-12",
+          "historical_exact_behaviour_locus": "Bank matching locks source transactions, validates matchable membership/amount and commits match/unmatch transactionally. Primary source: https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L39-L172",
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+        },
+        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "completion_credit": false
+      }
+    ],
+    "classification_counts": {
+      "OBLIVION_SPECIFIC_GAP": 4,
+      "NO_CREDIBLE_COMPARISON": 2,
+      "STRONGER_NATIVE_CONTROL": 2
+    },
+    "copied_baseline_count": 0,
+    "benchmark_credit_awarded": false
+  },
+  "current_feature_gate": {
+    "partial_grouped_candidates": 172,
+    "frozen_canonical_denominator": null,
+    "verified_benchmark_or_documented_no_credible_match": 0,
+    "completion_percentage": null,
+    "reason": "The denominator is not frozen; observer relations, neutralizer challenges, and comparator packets are evidence slices, not final per-feature mappings."
+  },
+  "evidence_count": 1348,
+  "evidence_count_basis": "Agent-reported evidence counts summed across RUN-007 (127), RUN-008 (1189), and RUN-009 (32); overlap was not deduplicated.",
+  "runtime_gates": null,
+  "completion_credit": false
+}
