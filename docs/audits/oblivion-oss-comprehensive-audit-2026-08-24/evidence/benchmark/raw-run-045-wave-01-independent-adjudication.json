@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-045",
+  "generated_at": "2026-08-24T23:27:50+12:00",
+  "role": "INDEPENDENT_POST_RECONCILIATION_WAVE_ADJUDICATOR_AGENT_D",
+  "responsible_agent_identity": "/root/run046_redteam",
+  "status": "STAGE_LINEAGE_PASS_SIX_NO_GO_EIGHTEEN_FACET_CLOSURE_PASS_ZERO_CREDIT",
+  "inputs": {
+    "raw_runs": [
+      {"run_id": "RUN-039", "sha256": "1675bc983ab446b94ed0b175791f81c2c3548a90a3d004e8fb5d1ecde8bfd3db"},
+      {"run_id": "RUN-040", "sha256": "4d9ea76a79e023e69c996ae8685f19651a0e309a1ffb217a889d7058f6505602"},
+      {"run_id": "RUN-041", "sha256": "aef801877a0392df9a84ee77b8a4c573170de68f6841162aea61b655c057ed7c"},
+      {"run_id": "RUN-042", "sha256": "e17b9aed0268ca22e2a13c843791d3ca65ce818607a9a10a40429b232beab995"},
+      {"run_id": "RUN-043", "sha256": "fd4cb0fca2ca444f36235dab554cf60c9d33e2be6b4cd79e4f4262ad316c2e7c"},
+      {"run_id": "RUN-044", "sha256": "b63de4b47c8703de72550c6c94db9bbe86e5c4aca5bdd891bf42e9f3f1114457"}
+    ],
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "canonical_identity_sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999",
+    "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+  },
+  "lineage_validation": {
+    "status": "PASS",
+    "monotonic_sequence": [
+      "RUN-039 2026-08-24T22:45:00+12:00",
+      "RUN-040 2026-08-24T22:55:00+12:00",
+      "RUN-041 2026-08-24T22:56:00+12:00",
+      "RUN-042 2026-08-24T23:05:00+12:00",
+      "RUN-043 2026-08-24T23:06:00+12:00",
+      "RUN-044 2026-08-24T23:07:00+12:00"
+    ],
+    "bindings": [
+      "RUN-042 hash-binds RUN-039 and RUN-041.",
+      "RUN-043 hash-binds corrected RUN-040, RUN-041, and RUN-042.",
+      "RUN-044 hash-binds corrected RUN-040 and RUN-041.",
+      "This independent RUN-045 adjudication hash-binds RUN-039 through RUN-044.",
+      "RUN-041 GO targets exactly equal RUN-042 neutralized and RUN-043 compared targets.",
+      "RUN-041 deferred targets exactly equal RUN-044 reconciled targets.",
+      "All 18 RUN-041 required facets have a unique RUN-044 crosswalk entry.",
+      "Every RUN-044 crosswalk destination resolves to an explicit overlay facet.",
+      "All declared target, facet, and credit counts reconcile."
+    ],
+    "clean_boundaries": {
+      "agent_a_current_source_withheld": true,
+      "agent_b_upstream_identity_withheld": true,
+      "agent_b_current_source_withheld": true,
+      "agent_c_upstream_identity_and_repository_evidence_withheld": true,
+      "run_044_current_source_only": true,
+      "fresh_agent_d_independent_of_prior_authorship": true
+    },
+    "remaining_stage_conflicts": 0
+  },
+  "source_anchor_validation": {
+    "status": "PASS",
+    "validation_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "validation_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "anchor_occurrences_checked": 210,
+    "by_run": {"RUN-040": 61, "RUN-041": 21, "RUN-043": 22, "RUN-044": 106},
+    "missing_paths": 0,
+    "invalid_or_out_of_range_line_specs": 0,
+    "unique_resolved_paths": 88,
+    "upstream_remote_urls_live_revalidated": false,
+    "upstream_remote_url_boundary": "Not browsed under the explicit no-browse instruction."
+  },
+  "facet_closure": {
+    "status": "PASS_SOURCE_FACET_CLOSURE_ONLY_NO_FORMAL_EDGE",
+    "required_facet_count": 18,
+    "crosswalk_count": 18,
+    "unmapped_required_facets": 0,
+    "targets": [
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "verdict": "PASS_FIVE_OF_FIVE_SOURCE_FACETS_CLOSED",
+        "required_facets": ["allocation_history_read", "match_suggest", "match_confirm", "match_reject", "settlement_replay_and_provenance"],
+        "overlay_facets": ["allocation_history_review", "suggested_match_review", "confirm", "reject", "settlement_replay_and_provenance"],
+        "reason": "All five required owner, authority, Site, state, locking, replay, and provenance facets are explicit. This is source reconciliation only; BigCapital remains merely a candidate matching-command locus and does not establish allocation-history equivalence.",
+        "next_action": "Neutralize and compare each facet independently. Retain BigCapital only for a bounded match-confirm comparison and search separately for allocation-history review, rejection, and settlement-provenance comparators.",
+        "formal_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "completion_credit": false
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "verdict": "PASS_SEVEN_OF_SEVEN_SOURCE_FACETS_CLOSED",
+        "required_facets": ["create_or_link", "view", "update", "set_active_or_inactive", "rehire", "invite_or_resend", "longitudinal_history"],
+        "overlay_facets": ["create", "view", "update", "set_active", "rehire", "invite", "longitudinal_history"],
+        "reason": "All seven required facets are explicit, including a correctly retained missing-capability facet for longitudinal history. ERPNext reactivation and linked-user behavior do not establish Oblivion rehire, invitation, privacy, or complete lifecycle equivalence.",
+        "next_action": "Run clean neutral requirements and current comparisons per facet. Obtain exact upstream evidence for rehire, invitation/resend, and longitudinal history rather than treating generic employee status changes as equivalent.",
+        "formal_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "completion_credit": false
+      },
+      {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "verdict": "PASS_SIX_OF_SIX_SOURCE_FACETS_CLOSED",
+        "required_facets": ["register_read", "stock_movement", "balance_check", "discrepancy_open_and_resolve", "destruction", "witness_authority"],
+        "overlay_facets": ["view", "register_movement", "balance_check", "discrepancy_resolution", "destruction_projection", "witness_authority"],
+        "reason": "All six required facets are explicit, with discrepancy opening and resolution correctly split across native owners. RUN-039 supplies no supportable controlled-drug-register target packet, and current-source Site, authority, locking, atomicity, replay, destruction, and witness contradictions prevent any edge.",
+        "next_action": "Perform a fresh official-source search and clean adjudication separately for register read, movement, balance/discrepancy, destruction projection, and witness authority. The bounded RUN-039 negative remains insufficient for final no-match.",
+        "formal_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "completion_credit": false
+      }
+    ]
+  },
+  "results": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "Only partial overlap is established. Amendment and required care-context, template, and hierarchy filters remain gaps; stronger native Site and provenance controls cannot prove superiority over upstream behavior recorded merely as not established.",
+      "next_action": "Separate create/register from amendment and filter facets, then rerun the clean target-specific comparison.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "OpenMRS Encounter is a compound clinical container whose equivalence to the bounded clinical-event record is unproved. Amendment, type-specific authority, invalidate/restore, full-package atomicity, replay, and concealment remain gaps.",
+      "next_action": "Obtain an exact event-record comparator or reject this candidate, then rerun the bounded initial-record facet.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "Seven current-source facets are now reconciled, but no clean neutral requirement or current comparison exists for those seven facets. ERPNext does not establish exact rehire, invitation/resend, longitudinal-history, authority, privacy, or replay equivalence.",
+      "next_action": "Neutralize and compare all seven reconciled facets independently before selecting a benchmark or documenting final no-match.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "QAtrial deviation/CAPA equivalence to incident closure is unproved. Current source contradicts concealed-object access, while investigation, cause, improvement actions, H&S governance, and Control Room ownership remain external prerequisite owners.",
+      "next_action": "Retain QAtrial only as a generic lifecycle reference; find an exact incident comparator or document no credible match through the required bounded process.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "Six current-source facets are now reconciled, but RUN-039 establishes no supportable controlled-drug-register comparator. Material authority, Site, locking, atomicity, replay, destruction, and witness contradictions also remain.",
+      "next_action": "Search, neutralize, and adjudicate the six reconciled facets separately. Do not promote the bounded locator failure to final no-match.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "verdict": "NO_GO",
+      "formal_edge_count": 0,
+      "determinative_reason": "Five current-source facets are now reconciled, but BigCapital establishes only a candidate matching-command locus. It does not prove allocation-history review, rejection, producer-specific settlement provenance, or one target-wide replay contract.",
+      "next_action": "Run clean neutral comparisons per facet, using BigCapital only for an exact match-confirm candidate and sourcing separate evidence for the remaining facets.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "targets": 6,
+    "bounded_clean_comparisons": 3,
+    "source_reconciled_composites": 3,
+    "required_facets": 18,
+    "crosswalked_facets": 18,
+    "unmapped_required_facets": 0,
+    "no_go": 6,
+    "formal_edges": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "final_no_match_credit": 0,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "test_execution_credit": 0,
+    "ease_credit": 0,
+    "release_credit": 0,
+    "completion_credit": 0
+  },
+  "canonical_matrix_disposition": {
+    "status": "UNCHANGED_GUARDED_OVERLAY_ONLY",
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "external_mutations_attestation": "NONE_READ_ONLY_ADJUDICATION_NO_APP_TEST_OR_BROWSER_EXECUTION",
+  "audit_complete": false
+}

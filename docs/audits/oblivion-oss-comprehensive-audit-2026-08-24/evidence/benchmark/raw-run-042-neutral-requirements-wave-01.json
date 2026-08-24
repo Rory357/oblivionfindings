@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-042",
+  "generated_at": "2026-08-24T23:05:00+12:00",
+  "role": "NEUTRAL_REQUIREMENTS_WRITER_AGENT_B",
+  "status": "THREE_BLIND_NEUTRAL_SPECIFICATIONS_COMPLETE_NO_COMPARISON_OR_CREDIT",
+  "input_boundary": {
+    "upstream_behaviour_run": "RUN-039",
+    "upstream_behaviour_raw_sha256": "1675bc983ab446b94ed0b175791f81c2c3548a90a3d004e8fb5d1ecde8bfd3db",
+    "received_fields": ["packet_id", "feature_id", "user_job", "sanitized_behaviour"],
+    "identity_envelope_withheld": true,
+    "upstream_repository_identity_received": false,
+    "upstream_source_paths_received": false,
+    "current_oblivion_source_received": false,
+    "filesystem_or_web_inspection": false
+  },
+  "orchestration_gate": {
+    "scope_red_team_run": "RUN-041",
+    "scope_red_team_raw_sha256": "aef801877a0392df9a84ee77b8a4c573170de68f6841162aea61b655c057ed7c",
+    "scope_red_team_generated_at": "2026-08-24T22:56:00+12:00",
+    "go_targets_forwarded": [
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+    ],
+    "deferred_targets": [
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "CAP-MED-CD-REGISTER-BALANCE",
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY"
+    ],
+    "upstream_identity_fields_forwarded_to_agent_b": false,
+    "current_source_fields_forwarded_to_agent_b": false
+  },
+  "methodology": {
+    "clean_specification_stage": "Agent B rewrites sanitized observations into source-independent user needs, states, safeguards, and acceptance criteria.",
+    "deferred_targets": [
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "CAP-MED-CD-REGISTER-BALANCE",
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY"
+    ],
+    "deferred_reason": "Independent current-source red team found unresolved target-facet or canonical-anchor collisions before neutral comparison.",
+    "prohibited_actions": ["inspect repositories", "identify upstream project", "compare current product", "propose copied design", "select benchmark", "map target", "award credit"]
+  },
+  "results": [
+    {
+      "packet_id": "B01",
+      "source_packet_id": "A01",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "neutral_actor_user_need": "An authenticated, authorized care-record user needs to create or amend an observation and retrieve it within the relevant person and care-context register.",
+      "preconditions": [
+        "The person and care context are active.",
+        "The actor has record authority.",
+        "Request-integrity validation succeeds.",
+        "Any amended record belongs to the active person."
+      ],
+      "trigger_input": "The actor submits a preliminary record containing validated top-level fields and optional subordinate measurements.",
+      "states_transitions": [
+        "Preliminary to validation attempted to persisted.",
+        "An existing persisted record may become an updated persisted version after ownership and validation checks.",
+        "No approval state is established."
+      ],
+      "success_evidence": [
+        "The top-level record and subordinate measurements persist together.",
+        "Register and review results can be restricted by person, care context, record template, and top-level record."
+      ],
+      "failure_recovery": [
+        "Authorization denial, request-integrity failure, invalid input, cross-person amendment, and persistence failure produce explicit failure outcomes.",
+        "A persistence failure rolls back the parent and subordinate writes."
+      ],
+      "authorization_privacy_direct_object": [
+        "Creation and amendment require record authority.",
+        "An amendment is rejected when the referenced record does not belong to the active person."
+      ],
+      "audit_provenance": "No durable success audit or additional provenance requirement is directly supported.",
+      "concurrency_idempotency": "No locking, duplicate-request protection, or automated retry behavior is directly supported.",
+      "negative_edge_acceptance": [
+        "Unauthorized submission persists nothing.",
+        "Failed request integrity persists nothing.",
+        "Invalid top-level or subordinate data cannot partially persist.",
+        "Cross-person amendment is rejected.",
+        "A subordinate-write failure rolls back the top-level and all subordinate writes.",
+        "Register filters limit results to the requested person, care context, template, and top-level record.",
+        "A preliminary record is not represented as completed before validation and persistence."
+      ],
+      "agent_c_evaluation_questions_not_upstream_requirements": [
+        "Approved-Site access and related-care-context scope.",
+        "Concealment or explicit denial for inaccessible direct identifiers.",
+        "Privacy-minimizing responses and sensitive-health-information controls.",
+        "Stronger provenance, retention, and audit obligations."
+      ],
+      "not_established": ["Site scope", "Durable success audit", "Automated retry", "Locking", "Concurrent-update behavior", "Idempotency", "Duplicate-submission handling", "Stateful review or approval"],
+      "collision_exclusions": ["Questionnaire completion is not separate workflow ownership merely because it may be nested content.", "Approval, sign-off, and escalation are excluded."],
+      "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "B02",
+      "source_packet_id": "A02",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "neutral_actor_user_need": "An authenticated, authorized care-record user needs to create or amend a clinical event associated with a person and optionally a related care visit.",
+      "preconditions": [
+        "The actor has general create or update authority.",
+        "The actor has any additional authority required by the selected event category."
+      ],
+      "trigger_input": "The actor submits a new or existing event container with person context, optional visit association, and zero or more related clinical items.",
+      "states_transitions": [
+        "New to persisted.",
+        "Existing to updated.",
+        "Related clinical items may be created, updated, or revalidated.",
+        "Invalidation and restoration are distinct actions, not ordinary editing."
+      ],
+      "success_evidence": [
+        "The event container is persisted or updated with permitted associations.",
+        "Related items are processed according to their validation rules.",
+        "Read results exclude information the viewer is not permitted to see."
+      ],
+      "failure_recovery": [
+        "Missing general authority or category-specific authority causes failure.",
+        "A transaction boundary exists, but rollback behavior for every checked failure path is not established."
+      ],
+      "authorization_privacy_direct_object": [
+        "Create/update authority is checked separately from category-specific authority.",
+        "Read results are permission-filtered."
+      ],
+      "audit_provenance": "No durable audit requirement is directly supported.",
+      "concurrency_idempotency": "No locking, conflict handling, duplicate-request protection, or user-facing retry is directly supported.",
+      "negative_edge_acceptance": [
+        "Unauthenticated creation or amendment is denied.",
+        "General create authority without category-specific authority is insufficient.",
+        "Update authority without authority for the existing event category is insufficient.",
+        "Related clinical items are processed or revalidated rather than silently assumed valid.",
+        "Unauthorized associated information is excluded on read.",
+        "Invalidation or restoration is not inferred from ordinary editing.",
+        "Rollback after a checked partial-processing failure remains unspecified."
+      ],
+      "agent_c_evaluation_questions_not_upstream_requirements": [
+        "Approved-Site and person-record privacy boundaries.",
+        "Direct-object concealment versus explicit denial.",
+        "Authority over the visit and every associated clinical item.",
+        "Minimum-necessary disclosure and NZ health-information safeguards."
+      ],
+      "not_established": ["Site scope", "Direct-object concealment", "Complete checked-failure rollback", "Retry", "Idempotency", "Locking", "Concurrent-update behavior", "Durable audit", "Atomic success across every related item", "Review, follow-up, escalation, or incident resolution"],
+      "collision_exclusions": ["A compound clinical record container is not proof of one indivisible clinical occurrence.", "Review, follow-up, escalation, incident management, and closure are excluded."],
+      "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "B04",
+      "source_packet_id": "A04",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "neutral_actor_user_need": "An authenticated, authorized reviewer needs to progress an accessible incident record through review and close it only after required investigation outputs and improvement actions exist.",
+      "preconditions": [
+        "The record exists and is accessible to the actor.",
+        "The actor has edit authority within the applicable scope."
+      ],
+      "trigger_input": "The actor submits a lifecycle action against the existing record with evidence required for that transition.",
+      "states_transitions": [
+        "Recorded to under investigation to cause documented to improvement actions established to closed.",
+        "Each transition follows the stated order.",
+        "Reopening is not established."
+      ],
+      "success_evidence": [
+        "Closure succeeds only after investigation, cause documentation, and required improvement actions exist.",
+        "Closure records the responsible actor and time.",
+        "Updates and lifecycle transitions produce audit actions."
+      ],
+      "failure_recovery": [
+        "Invalid transitions, missing records, inaccessible records, and processing failures produce explicit failures.",
+        "An inaccessible direct reference does not disclose object existence."
+      ],
+      "authorization_privacy_direct_object": [
+        "The actor is authenticated, has edit authority, and has access to the referenced scope.",
+        "Direct reference to an inaccessible object is concealed."
+      ],
+      "audit_provenance": "Updates and lifecycle steps create audit evidence; closure records actor and time.",
+      "concurrency_idempotency": "No locking, concurrent-transition resolution, duplicate-request protection, or replay behavior is directly supported.",
+      "negative_edge_acceptance": [
+        "Unauthenticated or unauthorized lifecycle action is denied.",
+        "An inaccessible direct reference does not reveal existence.",
+        "Missing records fail explicitly.",
+        "Skipping a required lifecycle phase is rejected.",
+        "Missing investigation evidence, cause, or required improvement actions prevents closure.",
+        "Valid closure records state, actor, time, and audit action.",
+        "Processing failure is explicit while rollback and partial-write behavior remain unspecified.",
+        "Concurrent closure outcome remains unspecified and must not be assumed."
+      ],
+      "agent_c_evaluation_questions_not_upstream_requirements": [
+        "Approved-Site access and privacy classification.",
+        "Visibility of sensitive incident details and witness/subject boundaries.",
+        "Legal/regulatory reporting and H&S governance.",
+        "Control Room coordination and atomic improvement-action linkage.",
+        "NZ recordkeeping obligations."
+      ],
+      "not_established": ["Transactional recovery", "Retry", "Idempotency", "Reopening", "Concurrency control", "Atomicity between improvement action and closure", "Regulatory/reportability decisions", "Site scope", "Broader H&S governance", "Submission workflow", "Operational-control transitions"],
+      "collision_exclusions": ["Equivalence from a quality-remediation lifecycle to an incident workflow is not established.", "Initial submission, reopening, H&S governance, regulatory reporting, and Control Room transitions are excluded."],
+      "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "neutralized_packets": 3,
+    "deferred_target_facet_reconciliation": 3,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  },
+  "overall_credit_statement": "Zero benchmark credit; these neutral specifications provide no benchmark selection, current-product comparison, native-design mapping, or capability credit."
+}

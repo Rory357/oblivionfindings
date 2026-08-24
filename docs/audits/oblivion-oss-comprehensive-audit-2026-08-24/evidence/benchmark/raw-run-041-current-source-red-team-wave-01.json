@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-041",
+  "generated_at": "2026-08-24T22:56:00+12:00",
+  "role": "CURRENT_SOURCE_SCOPE_RED_TEAM",
+  "status": "THREE_GO_THREE_NO_GO_SCOPE_CORRECTIONS_COMPLETE_NO_CREDIT",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "canonical_identity_sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
+  },
+  "methodology": {
+    "purpose": "Adversarially test whether each frozen target can enter blind neutralization without combining distinct native owners or claiming an unsupported seam.",
+    "upstream_project_evidence_inspected": false,
+    "runtime_lanes": false,
+    "filesystem_mutations": false,
+    "credit_boundary": "GO authorizes only a bounded clean-room requirements packet. NO_GO requires target-facet reconciliation before neutralization. Neither verdict awards a mapping or completion credit."
+  },
+  "results": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "verdict": "GO_BOUNDED",
+      "bounded_owner": "Clinical observation register and record command",
+      "anchor_corrections": [
+        "routes/health-clinical.php:30-35",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100,336-349,620-635",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120,224-273,280-512,527-547,601-693",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:304-387"
+      ],
+      "scope_guards": [
+        "Questionnaire or wizard ownership is excluded.",
+        "Approval and escalation lifecycles are excluded.",
+        "Foreign-Site direct-object behavior is explicit 403 in current source and must not be restated as concealed 404.",
+        "No ordinary request replay contract is established."
+      ],
+      "reason": "One canonical service owns the typed record transaction and register surface, so a clean bounded behavior packet can be compared without absorbing another workflow."
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "verdict": "GO_BOUNDED",
+      "bounded_owner": "Clinical event register and initial record command",
+      "anchor_corrections": [
+        "routes/health-clinical.php:36-41",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:106-161,357-370",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:31-140,206-235",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:780-850"
+      ],
+      "scope_guards": [
+        "Review, follow-up, escalation, and linked incident closure are excluded.",
+        "Foreign-Site direct-object behavior is explicit 403 in current source and must not be restated as concealed 404.",
+        "Attachments are persisted after the core service transaction, so full package atomicity is not established.",
+        "No create replay contract is established."
+      ],
+      "reason": "The initial event record and register form a bounded owner even though later event actions and attachments have separate orchestration boundaries."
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "verdict": "NO_GO_RECONCILE_FACETS",
+      "bounded_owner": "Not singular at the frozen target level",
+      "anchor_corrections": [
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:807-847,854-1025,1032-1077,1084-1168,1275-1300,1744-1857",
+        "app/Domain/Hr/Services/EmployeeIntakeService.php:55-285,309-465,527-629",
+        "app/Domain/Hr/Services/HrLifecycleAccessService.php:16-316"
+      ],
+      "required_facets": [
+        "create_or_link",
+        "view",
+        "update",
+        "set_active_or_inactive",
+        "rehire",
+        "invite_or_resend",
+        "longitudinal_history"
+      ],
+      "reason": "The frozen row combines seven actions across controller, intake, access, identity, audit, and after-commit boundaries; neutralizing it as one operation would hide materially different authority and replay semantics."
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "verdict": "GO_BOUNDED",
+      "bounded_owner": "Incident review and closure transition",
+      "anchor_corrections": [
+        "routes/incidents.php:88-104",
+        "app/Http/Controllers/IncidentController.php:1358-1364,1560-1618,1621-1725",
+        "app/Services/Incidents/IncidentJourneyService.php:637-718"
+      ],
+      "scope_guards": [
+        "Initial submission and reopen are excluded.",
+        "Investigation, root cause, improvement actions, H&S governance, and Control Room ownership remain canonical external prerequisites, not duplicated incident states.",
+        "Review lacks an approved-Site assertion; close and reopen deny foreign Site as 403 rather than concealed 404.",
+        "Repeat review and close reject state rather than return an original result."
+      ],
+      "reason": "Review and close are bounded state transitions with explicit locks and prerequisites, provided external governance owners remain excluded and their evidence is treated only as a gate."
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "verdict": "NO_GO_RECONCILE_FACETS",
+      "bounded_owner": "Distributed controlled-drug controller facets",
+      "anchor_corrections": [
+        "app/Http/Controllers/Emar/EmarController.php:1483-1715,4986-5129,5132-5288,5291-5314",
+        "app/Models/ClientControlledDrugEntry.php:1-67",
+        "app/Models/ClientControlledDrugDiscrepancy.php:1-79"
+      ],
+      "required_facets": [
+        "register_read",
+        "stock_movement",
+        "balance_check",
+        "discrepancy_open_and_resolve",
+        "destruction",
+        "witness_authority"
+      ],
+      "reason": "Read, movement, balance, discrepancy, destruction, witness, Site, action-capability, locking, and replay semantics are materially inconsistent; one neutral contract would conceal contradictions."
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "verdict": "NO_GO_RECONCILE_FACETS",
+      "bounded_owner": "Payment match workflow plus allocation history projection",
+      "anchor_corrections": [
+        "routes/finance.php:464-477",
+        "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:21-156",
+        "app/Domain/Finance/Services/PaymentMatchingService.php:300-421,475-616,619-661",
+        "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150"
+      ],
+      "required_facets": [
+        "allocation_history_read",
+        "match_suggest",
+        "match_confirm",
+        "match_reject",
+        "settlement_replay_and_provenance"
+      ],
+      "reason": "The frozen row combines an append-only history projection with a separate suggested-match lifecycle and settlement side effects; exact authority, state, and replay claims must be reconciled per facet."
+    }
+  ],
+  "counts": {
+    "targets_reviewed": 6,
+    "go_bounded": 3,
+    "no_go_reconcile_facets": 3,
+    "runtime_credit": 0,
+    "test_execution_credit": 0,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  }
+}

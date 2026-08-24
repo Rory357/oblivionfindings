@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-039",
+  "generated_at": "2026-08-24T22:45:00+12:00",
+  "role": "UPSTREAM_BEHAVIOUR_OBSERVER_AGENT_A",
+  "status": "SIX_TARGET_BEHAVIOUR_LOCATOR_PACKETS_COMPLETE_NO_DOWNSTREAM_CREDIT",
+  "input_pins": {
+    "canonical_identity_sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999",
+    "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "effective_observer_resolution_sha256": "6c7c5eb6532a4ec4bcc45ebcb4f2cfd9ff7af6156c68064db58ce5dfeeb2e305",
+    "application_commit_not_inspected_by_agent_a": "a0493442b9e392d324055c35bf25b69421dc2d35"
+  },
+  "methodology": {
+    "clean_specification_stage": "Agent A records observed upstream behavior only.",
+    "sources": "Official GitHub repository files at immutable commit SHAs.",
+    "legacy_evidence_boundary": "RUN-007 through RUN-009 were locator hypotheses only.",
+    "eligibility_guard": "Only projects with effective COMPLETE_OBSERVER_TRIAGE in RUN-038 were eligible; all seven retained-partial projects were excluded.",
+    "prohibited_actions": ["inspect current Oblivion implementation", "clone", "install", "execute upstream code", "neutralize", "compare", "select", "map", "award credit"]
+  },
+  "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+  "results": [
+    {
+      "packet_id": "A01",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "user_job": "Record and review a clinical observation",
+      "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+      "identity_envelope": {
+        "project": "openemr/openemr",
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "root_licence_spdx": "GPL-3.0",
+        "root_licence_locus": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE",
+        "edition_boundary": "Public repository/ref only; hosted services and uncited modules excluded; no further edition split asserted.",
+        "behaviour_loci": [
+          "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L68-L213",
+          "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L222-L327"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "Authenticated session user possessing the observation-form permission.",
+        "preconditions": ["Active patient and encounter session context.", "Valid CSRF token.", "An existing observation update must resolve within the active patient."],
+        "trigger_input": "Save request containing observation fields and optional sub-observations.",
+        "states_transitions": "Default preliminary template to validated persisted observation; list and review are filtered by patient, encounter, form, and top-level observation.",
+        "success_postcondition": "Main and child observations persist in one declared transaction followed by a saved redirect.",
+        "failure_recovery_retry": "Permission or CSRF denial returns 401; invalid data or foreign-patient observation throws; save failure rolls back and returns 500; automatic retry is NOT_ESTABLISHED.",
+        "evidenced_controls": ["Form authorization.", "CSRF validation.", "Patient, encounter, and user binding.", "Explicit transaction commit and rollback."],
+        "audit_provenance": "Durable success audit event is NOT_ESTABLISHED.",
+        "concurrency_idempotency": "Concurrency locking and idempotency/replay semantics are NOT_ESTABLISHED.",
+        "scope_privacy": "Site scope is NOT_ESTABLISHED.",
+        "collision_risk": "Observation may encompass questionnaires and nested clinical measurements; exact register semantics are not established."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "A02",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "user_job": "Record a clinical event",
+      "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+      "identity_envelope": {
+        "project": "openmrs/openmrs-core",
+        "canonical_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "root_licence_spdx": "MPL-2.0_WITH_HEALTHCARE_DISCLAIMER_COMBINED_EXPRESSION_NOT_ESTABLISHED",
+        "root_licence_locus": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE",
+        "edition_boundary": "Core repository modules only; external OpenMRS modules are excluded.",
+        "edition_locus": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/README.md#L195-L223",
+        "behaviour_loci": [
+          "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L91-L255",
+          "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/EncounterService.java#L45-L90"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "Authenticated service caller with add/edit encounter privileges and any encounter-type edit privilege.",
+        "preconditions": ["Encounter carries patient context.", "A new encounter may be assigned a visit through a registered handler."],
+        "trigger_input": "Save an encounter object.",
+        "states_transitions": "New encounter to persisted; existing encounter to updated; related observations, orders, conditions, allergies, and diagnoses are saved or revalidated; separate void and unvoid paths exist.",
+        "success_postcondition": "Returns the persisted encounter after cascading the evidenced related records.",
+        "failure_recovery_retry": "Missing privilege or a disallowed encounter type throws; explicit user-facing retry and checked-exception rollback policy are NOT_ESTABLISHED.",
+        "evidenced_controls": ["Privilege annotations and checks.", "Encounter-type edit denial.", "View-permission filtering.", "Service-level transaction annotation."],
+        "audit_provenance": "Durable audit trail is NOT_ESTABLISHED.",
+        "concurrency_idempotency": "Idempotency and row locking are NOT_ESTABLISHED.",
+        "scope_privacy": "Site/privacy boundary is NOT_ESTABLISHED.",
+        "collision_risk": "An encounter is a compound clinical container; equivalence to an atomic clinical event is not established."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "A03",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "user_job": "Create, view, update, activate, deactivate, rehire, and invite an employee profile through the canonical identity seam.",
+      "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+      "identity_envelope": {
+        "project": "frappe/erpnext",
+        "canonical_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+        "root_licence_spdx": "GPL-3.0",
+        "root_licence_locus": "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/license.txt",
+        "edition_boundary": "ERPNext repository only; hosted Frappe Cloud and external Frappe Framework behavior excluded.",
+        "edition_locus": "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/README.md#L24-L66",
+        "behaviour_loci": [
+          "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L104-L199",
+          "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L257-L309",
+          "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L405-L449",
+          "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "HR User or HR Manager for create/write; linked-user creation additionally checks write permission on the employee record.",
+        "preconditions": ["Valid lifecycle state.", "Automatic user creation requires a preferred, company, or personal email.", "Moving to Left requires a relieving date and no active reports."],
+        "trigger_input": "Employee insert/update, status change, or linked-user creation request.",
+        "states_transitions": "Active, Inactive, Suspended, and Left; non-active employee status disables the linked user and returning to Active re-enables it.",
+        "success_postcondition": "Profile persists; an optional linked user is created enabled with Employee role and optional Employee/Company user permissions.",
+        "failure_recovery_retry": "Missing email, nonexistent user, duplicate linked active employee, self-reporting, or invalid leaving conditions throw validation errors; retry/recovery workflow is NOT_ESTABLISHED.",
+        "evidenced_controls": ["Role-level create/write metadata.", "Record write check.", "Duplicate active-user check.", "User-permission creation and removal."],
+        "audit_provenance": "A source comment mentions a linked-user audit log; durable audit-event mechanics are NOT_ESTABLISHED within the inspected repository slice.",
+        "concurrency_idempotency": "Concurrency and idempotency are NOT_ESTABLISHED.",
+        "scope_privacy": "Privacy-field controls are NOT_ESTABLISHED.",
+        "collision_risk": "Reactivation mechanics must not be treated as evidenced rehire or invitation semantics."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "A04",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "user_job": "Review and close an incident under incident journey rules",
+      "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+      "identity_envelope": {
+        "project": "meyerthorsten/qatrial",
+        "canonical_url": "https://github.com/MeyerThorsten/QAtrial",
+        "commit_sha": "b10fab722caf9561bcf4fdb03cc9733156992635",
+        "root_licence_spdx": "AGPL-3.0",
+        "root_licence_locus": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/LICENSE",
+        "edition_boundary": "Server/PostgreSQL routes only; standalone/localStorage behavior excluded.",
+        "edition_locus": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/README.md#L31-L92",
+        "behaviour_loci": [
+          "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L10-L15",
+          "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L139-L185",
+          "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L203-L313"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "Authenticated caller with edit authority and access to the referenced project.",
+        "preconditions": ["Existing accessible deviation.", "Closure is reachable only after investigation, root-cause identification, and CAPA creation."],
+        "trigger_input": "Update, investigate, root-cause, or create-CAPA request with record ID and relevant payload.",
+        "states_transitions": "Detected to investigating to root_cause_identified to capa_created to closed.",
+        "success_postcondition": "Closure records actor and time; update, investigation, root cause, and CAPA creation produce separate audit actions.",
+        "failure_recovery_retry": "Invalid transition returns 400; missing or inaccessible record returns 404; handler failure returns 500; transactional recovery, retry, and idempotency are NOT_ESTABLISHED.",
+        "evidenced_controls": ["Authentication.", "Edit permission.", "Organization/project accessibility.", "Concealed inaccessible-object response.", "Audit calls."],
+        "audit_provenance": "Status and lifecycle actions are recorded through audit calls.",
+        "concurrency_idempotency": "Concurrency, atomicity across CAPA creation and deviation update, and idempotency are NOT_ESTABLISHED.",
+        "scope_privacy": "Project accessibility is evidenced; approved-Site scope is NOT_ESTABLISHED.",
+        "collision_risk": "The source object is a deviation/CAPA workflow, not an incident record; incident equivalence is not established."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "A05-NC",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "user_job": "Maintain the controlled-drug register and balance",
+      "packet_status": "NO_SUPPORTABLE_TARGET_PACKET_IN_BOUNDED_LEGACY_LOCATOR",
+      "identity_envelope": {
+        "project": "openemr/openemr",
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "root_licence_spdx": "GPL-3.0",
+        "root_licence_locus": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE",
+        "edition_boundary": "Bounded legacy locator inspection only; this is not a repository-wide absence search.",
+        "behaviour_loci": [
+          "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L281-L390"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "Prescription-saving caller; exact role authority is NOT_ESTABLISHED in the bounded locus.",
+        "preconditions": ["Drug exists.", "Quantity is positive.", "Encounter exists.", "Inventory is available when dispensing is requested."],
+        "trigger_input": "Prescription save with controlled-substance flag and optional generic in-house dispensing request.",
+        "states_transitions": "Add or remove a controlled-substance reporting flag; optionally request a generic inventory sale.",
+        "success_postcondition": "Bounded prescription flag and optional inventory operation complete.",
+        "failure_recovery_retry": "Missing drug, non-positive quantity, missing encounter, unavailable inventory, or service error fails the operation; recovery and retry are NOT_ESTABLISHED.",
+        "evidenced_controls": ["Basic prescription/inventory validation only."],
+        "audit_provenance": "Controlled-drug register audit is NOT_ESTABLISHED.",
+        "concurrency_idempotency": "Register locking, balance reconciliation, and idempotency are NOT_ESTABLISHED.",
+        "scope_privacy": "Site scope and witness authority are NOT_ESTABLISHED.",
+        "collision_risk": "The locus does not establish a controlled-drug register, running balance, witness, discrepancy, receipt, administration, destruction, reconciliation, or append-only audit."
+      },
+      "bounded_no_candidate_not_final_no_match": true,
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "A06",
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "user_job": "Review allocation history and confirm or reject payment matches",
+      "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+      "identity_envelope": {
+        "project": "bigcapitalhq/bigcapital",
+        "canonical_url": "https://github.com/bigcapitalhq/bigcapital",
+        "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+        "root_licence_spdx": "AGPL-3.0",
+        "root_licence_locus": "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/LICENSE",
+        "edition_boundary": "Public repository source only; cloud operation excluded.",
+        "edition_locus": "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/README.md#L29-L51",
+        "behaviour_loci": [
+          "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L36-L113",
+          "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L119-L161"
+        ]
+      },
+      "sanitized_behaviour": {
+        "actor": "Service caller; user-facing role and authorization are NOT_ESTABLISHED in the inspected command.",
+        "preconditions": ["Referenced uncategorized transactions exist.", "Sources are neither excluded nor already matched.", "Reference type and ID resolve.", "Matched total equals source total within 0.01."],
+        "trigger_input": "One or more uncategorized transaction IDs plus one or more reference type/ID match entries.",
+        "states_transitions": "Uncategorized/unmatched source to created match-reference records.",
+        "success_postcondition": "Within a unit of work, source rows are locked in deterministic ID order, matchability and totals are validated, match records are created, and matching/matched events are emitted.",
+        "failure_recovery_retry": "Invalid or missing references, excluded/already-matched source, or amount mismatch throws; explicit rollback behavior and user retry flow are NOT_ESTABLISHED.",
+        "evidenced_controls": ["FOR UPDATE locking.", "Ordered source selection.", "Bounded concurrent reference validation and creation.", "Transaction callback."],
+        "audit_provenance": "Durable allocation-history audit is NOT_ESTABLISHED.",
+        "concurrency_idempotency": "Repeat against an already-matched source is rejected; stable request-key replay is NOT_ESTABLISHED.",
+        "scope_privacy": "Authorization and privacy are NOT_ESTABLISHED.",
+        "collision_risk": "Bank-transaction matching must not be treated as evidenced payment-allocation review/history."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "targets": 6,
+    "candidate_locator_packets": 5,
+    "bounded_no_candidate_packets": 1,
+    "final_no_match_credit": 0,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  }
+}

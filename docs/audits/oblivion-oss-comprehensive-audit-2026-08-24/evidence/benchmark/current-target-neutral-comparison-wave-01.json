@@ -1,0 +1,1868 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-046",
+  "generated_at": "2026-08-24T23:30:00+12:00",
+  "status": "FIRST_SIX_TARGET_CLEAN_COMPARISON_WAVE_INTEGRATED_ZERO_FORMAL_EDGES",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "canonical_identity_sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999",
+    "canonical_matrix_guard_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+  },
+  "inputs": {
+    "raw_runs": [
+      {
+        "run_id": "RUN-039",
+        "file": "evidence/benchmark/raw-run-039-target-upstream-behaviour-wave-01.json",
+        "sha256": "1675bc983ab446b94ed0b175791f81c2c3548a90a3d004e8fb5d1ecde8bfd3db",
+        "role": "UPSTREAM_BEHAVIOUR_OBSERVER_AGENT_A"
+      },
+      {
+        "run_id": "RUN-040",
+        "file": "evidence/benchmark/raw-run-040-current-product-source-packets-wave-01.json",
+        "sha256": "4d9ea76a79e023e69c996ae8685f19651a0e309a1ffb217a889d7058f6505602",
+        "role": "CURRENT_PRODUCT_SOURCE_ANALYST_AGENT_C_PRE_NEUTRAL_COMPARISON"
+      },
+      {
+        "run_id": "RUN-041",
+        "file": "evidence/benchmark/raw-run-041-current-source-red-team-wave-01.json",
+        "sha256": "aef801877a0392df9a84ee77b8a4c573170de68f6841162aea61b655c057ed7c",
+        "role": "CURRENT_SOURCE_SCOPE_RED_TEAM"
+      },
+      {
+        "run_id": "RUN-042",
+        "file": "evidence/benchmark/raw-run-042-neutral-requirements-wave-01.json",
+        "sha256": "e17b9aed0268ca22e2a13c843791d3ca65ce818607a9a10a40429b232beab995",
+        "role": "NEUTRAL_REQUIREMENTS_WRITER_AGENT_B"
+      },
+      {
+        "run_id": "RUN-043",
+        "file": "evidence/benchmark/raw-run-043-current-neutral-comparison-wave-01.json",
+        "sha256": "fd4cb0fca2ca444f36235dab554cf60c9d33e2be6b4cd79e4f4262ad316c2e7c",
+        "role": "CLEAN_CURRENT_PRODUCT_NEUTRAL_COMPARATOR_AGENT_C"
+      },
+      {
+        "run_id": "RUN-044",
+        "file": "evidence/benchmark/raw-run-044-current-source-facet-reconciliation-wave-01.json",
+        "sha256": "b63de4b47c8703de72550c6c94db9bbe86e5c4aca5bdd891bf42e9f3f1114457",
+        "role": "CURRENT_SOURCE_COMPOSITE_FACET_RECONCILIATION_AGENT"
+      },
+      {
+        "run_id": "RUN-045",
+        "file": "evidence/benchmark/raw-run-045-wave-01-independent-adjudication.json",
+        "sha256": "734a0fd3f6c8468a237e0d29af902ef6d622dc4dd2c17981ec4a19f2e9723664",
+        "role": "INDEPENDENT_POST_RECONCILIATION_WAVE_ADJUDICATOR_AGENT_D"
+      }
+    ]
+  },
+  "stage_lineage": {
+    "status": "PASS",
+    "upstream_identity_withheld_from_agent_b": true,
+    "current_source_withheld_from_agent_b": true,
+    "upstream_identity_withheld_from_agent_c": true,
+    "scope_gate_hash_bound": true,
+    "post_reconciliation_independent_adjudication": true,
+    "source_anchor_validation_pass": true,
+    "required_facet_crosswalk_pass": true
+  },
+  "counts": {
+    "wave_targets": 6,
+    "candidate_locator_packets": 5,
+    "bounded_no_candidate_packets": 1,
+    "current_source_packets": 6,
+    "scope_go_bounded": 3,
+    "scope_deferred_composites": 3,
+    "blind_neutral_requirement_packets": 3,
+    "clean_current_comparisons": 3,
+    "facet_reconciliation_targets": 3,
+    "facet_reconciliation_facets": 18,
+    "required_facet_crosswalk_rows": 18,
+    "unmapped_required_facets": 0,
+    "source_anchor_occurrences_validated": 210,
+    "independent_no_go_verdicts": 6,
+    "formal_edges": 0,
+    "canonical_targets": 340,
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "records": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "user_job": "Record and review a clinical observation",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A01",
+        "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+        "identity_envelope": {
+          "project": "openemr/openemr",
+          "canonical_url": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "root_licence_spdx": "GPL-3.0",
+          "root_licence_locus": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE",
+          "edition_boundary": "Public repository/ref only; hosted services and uncited modules excluded; no further edition split asserted.",
+          "behaviour_loci": [
+            "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L68-L213",
+            "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L222-L327"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "Authenticated session user possessing the observation-form permission.",
+          "preconditions": [
+            "Active patient and encounter session context.",
+            "Valid CSRF token.",
+            "An existing observation update must resolve within the active patient."
+          ],
+          "trigger_input": "Save request containing observation fields and optional sub-observations.",
+          "states_transitions": "Default preliminary template to validated persisted observation; list and review are filtered by patient, encounter, form, and top-level observation.",
+          "success_postcondition": "Main and child observations persist in one declared transaction followed by a saved redirect.",
+          "failure_recovery_retry": "Permission or CSRF denial returns 401; invalid data or foreign-patient observation throws; save failure rolls back and returns 500; automatic retry is NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "Form authorization.",
+            "CSRF validation.",
+            "Patient, encounter, and user binding.",
+            "Explicit transaction commit and rollback."
+          ],
+          "audit_provenance": "Durable success audit event is NOT_ESTABLISHED.",
+          "concurrency_idempotency": "Concurrency locking and idempotency/replay semantics are NOT_ESTABLISHED.",
+          "scope_privacy": "Site scope is NOT_ESTABLISHED.",
+          "collision_risk": "Observation may encompass questionnaires and nested clinical measurements; exact register semantics are not established."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "ClinicalObservationService",
+        "anchors": [
+          "routes/health-clinical.php:30-35",
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100,336-349",
+          "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:34-69",
+          "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120,601-693",
+          "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-105,121-157,180-194",
+          "app/Domain/Clinical/Models/ClinicalObservation.php:1-105",
+          "database/migrations/2026_04_13_100000_create_clinical_observations_table.php:11-45",
+          "tests/Feature/Domain/Clinical/ObservationRegisterTest.php",
+          "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php"
+        ],
+        "strengths": [
+          "Canonical typed transactional write.",
+          "Approved-Site and provenance integrity.",
+          "Schedule lock ordering for the bounded protocol path."
+        ],
+        "gaps": [
+          "Direct-object concealment is absent; current denial is 403.",
+          "General replay/idempotency and exactly-once dispatch are not established.",
+          "Amendment or stateful review lifecycle is not established.",
+          "Tests are source locators and were not executed."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "GO_BOUNDED",
+        "reason": "One canonical service owns the typed record transaction and register surface, so a clean bounded behavior packet can be compared without absorbing another workflow."
+      },
+      "neutral_requirements": {
+        "packet_id": "B01",
+        "source_packet_id": "A01",
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "neutral_actor_user_need": "An authenticated, authorized care-record user needs to create or amend an observation and retrieve it within the relevant person and care-context register.",
+        "preconditions": [
+          "The person and care context are active.",
+          "The actor has record authority.",
+          "Request-integrity validation succeeds.",
+          "Any amended record belongs to the active person."
+        ],
+        "trigger_input": "The actor submits a preliminary record containing validated top-level fields and optional subordinate measurements.",
+        "states_transitions": [
+          "Preliminary to validation attempted to persisted.",
+          "An existing persisted record may become an updated persisted version after ownership and validation checks.",
+          "No approval state is established."
+        ],
+        "success_evidence": [
+          "The top-level record and subordinate measurements persist together.",
+          "Register and review results can be restricted by person, care context, record template, and top-level record."
+        ],
+        "failure_recovery": [
+          "Authorization denial, request-integrity failure, invalid input, cross-person amendment, and persistence failure produce explicit failure outcomes.",
+          "A persistence failure rolls back the parent and subordinate writes."
+        ],
+        "authorization_privacy_direct_object": [
+          "Creation and amendment require record authority.",
+          "An amendment is rejected when the referenced record does not belong to the active person."
+        ],
+        "audit_provenance": "No durable success audit or additional provenance requirement is directly supported.",
+        "concurrency_idempotency": "No locking, duplicate-request protection, or automated retry behavior is directly supported.",
+        "negative_edge_acceptance": [
+          "Unauthorized submission persists nothing.",
+          "Failed request integrity persists nothing.",
+          "Invalid top-level or subordinate data cannot partially persist.",
+          "Cross-person amendment is rejected.",
+          "A subordinate-write failure rolls back the top-level and all subordinate writes.",
+          "Register filters limit results to the requested person, care context, template, and top-level record.",
+          "A preliminary record is not represented as completed before validation and persistence."
+        ],
+        "agent_c_evaluation_questions_not_upstream_requirements": [
+          "Approved-Site access and related-care-context scope.",
+          "Concealment or explicit denial for inaccessible direct identifiers.",
+          "Privacy-minimizing responses and sensitive-health-information controls.",
+          "Stronger provenance, retention, and audit obligations."
+        ],
+        "not_established": [
+          "Site scope",
+          "Durable success audit",
+          "Automated retry",
+          "Locking",
+          "Concurrent-update behavior",
+          "Idempotency",
+          "Duplicate-submission handling",
+          "Stateful review or approval"
+        ],
+        "collision_exclusions": [
+          "Questionnaire completion is not separate workflow ownership merely because it may be nested content.",
+          "Approval, sign-off, and escalation are excluded."
+        ],
+        "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+        "neutral_requirement_credit": false,
+        "current_product_comparison_credit": false,
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "current_neutral_comparison": {
+        "packet_id": "C01",
+        "neutral_packet_id": "B01",
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "anchors": [
+          "routes/health-clinical.php:30-35",
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100,336-349,620-635",
+          "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:34-69",
+          "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120,224-273,280-512,527-547,601-693",
+          "app/Domain/Clinical/Services/ClinicalDashboardService.php:304-387",
+          "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-105,121-157,180-194",
+          "app/Domain/Clinical/Models/ClinicalObservation.php:18-141",
+          "database/migrations/2026_04_13_100000_create_clinical_observations_table.php:11-45"
+        ],
+        "facets": [
+          {
+            "name": "authorized_create",
+            "rating": "MET",
+            "evidence": "clinical.observations.record plus Client view; typed vitals and pain additionally require clinical.observations.recordClinical."
+          },
+          {
+            "name": "amend",
+            "rating": "GAP",
+            "evidence": "Correction columns and relationships exist, but no observation correction or amendment command was found."
+          },
+          {
+            "name": "person_and_context_ownership",
+            "rating": "STRONGER",
+            "evidence": "Approved-Site Client scope, Shift-to-Client Site integrity, and protocol schedule owner, type, applicability, pending-state, and lock checks."
+          },
+          {
+            "name": "measurements_and_atomicity",
+            "rating": "MET_NATIVE_REPRESENTATION",
+            "evidence": "Type-specific measurement data is range, enum, and time validated and atomically stored as embedded JSON; no separately owned child rows exist."
+          },
+          {
+            "name": "request_to_persisted",
+            "rating": "MET_QUALIFIED",
+            "evidence": "Validated request persists observation, timeline, and optional schedule effect in a three-attempt transaction; there is no preliminary state."
+          },
+          {
+            "name": "register_filters",
+            "rating": "GAP",
+            "evidence": "Client, type, recorder, Site, and date are present; Shift, protocol or template, and top-level or child filters are absent."
+          },
+          {
+            "name": "failure_and_provenance",
+            "rating": "STRONGER",
+            "evidence": "Invalid typed data, mismatched Shift, inaccessible or stale schedule deny before write; synchronous effects are transaction-bound; recorder, time, Site, timeline, and protocol provenance exist."
+          },
+          {
+            "name": "request_replay",
+            "rating": "GAP_NOT_ESTABLISHED",
+            "evidence": "Only pending protocol schedule completion is lock serialized; no ordinary request-key same-result replay exists."
+          },
+          {
+            "name": "direct_object_concealment",
+            "rating": "GAP",
+            "evidence": "Foreign-Site attempts are explicit 403 rather than concealed 404."
+          }
+        ],
+        "native_preserve": "Preserve ClinicalObservationService, embedded typed data, Client and Site ownership, protocol ownership, NEWS2, and timeline.",
+        "bounded_refinement": "Add an append-only correction command with clinical.observations.correct, original-to-correction linkage, and the same Site, type, and context checks. Add only filters backed by native Shift, protocol, and hierarchy fields. Do not absorb questionnaires or approval and escalation.",
+        "negative_acceptance": [
+          "Missing exact action denies with no row.",
+          "Vitals and pain deny without recordClinical.",
+          "Foreign-Site Client or filter writes nothing and leaks no row.",
+          "Mismatched Client and Shift or wrong, stale, or cross-Client schedule rolls back all effects.",
+          "Correction cannot mutate the original or cross Client, Site, or type.",
+          "Context and template filters cannot leak inaccessible rows."
+        ],
+        "provisional_outcome": "PARTIAL_CURRENT_OVERLAP_REFINEMENT_CANDIDATE_ONLY",
+        "reason": "Amendment and required context, template, and hierarchy register facets are missing.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "facet_reconciliation": null,
+      "independent_adjudication": {
+        "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "Only partial overlap is established. Amendment and required care-context, template, and hierarchy filters remain gaps; stronger native Site and provenance controls cannot prove superiority over upstream behavior recorded merely as not established.",
+        "next_action": "Separate create/register from amendment and filter facets, then rerun the clean target-specific comparison.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "fcaf1bdf3d56beb9571601147721d80fdd70ec00a6ee1bf21b64779462a53429"
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "user_job": "Record a clinical event",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A02",
+        "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+        "identity_envelope": {
+          "project": "openmrs/openmrs-core",
+          "canonical_url": "https://github.com/openmrs/openmrs-core",
+          "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+          "root_licence_spdx": "MPL-2.0_WITH_HEALTHCARE_DISCLAIMER_COMBINED_EXPRESSION_NOT_ESTABLISHED",
+          "root_licence_locus": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE",
+          "edition_boundary": "Core repository modules only; external OpenMRS modules are excluded.",
+          "edition_locus": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/README.md#L195-L223",
+          "behaviour_loci": [
+            "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L91-L255",
+            "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/EncounterService.java#L45-L90"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "Authenticated service caller with add/edit encounter privileges and any encounter-type edit privilege.",
+          "preconditions": [
+            "Encounter carries patient context.",
+            "A new encounter may be assigned a visit through a registered handler."
+          ],
+          "trigger_input": "Save an encounter object.",
+          "states_transitions": "New encounter to persisted; existing encounter to updated; related observations, orders, conditions, allergies, and diagnoses are saved or revalidated; separate void and unvoid paths exist.",
+          "success_postcondition": "Returns the persisted encounter after cascading the evidenced related records.",
+          "failure_recovery_retry": "Missing privilege or a disallowed encounter type throws; explicit user-facing retry and checked-exception rollback policy are NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "Privilege annotations and checks.",
+            "Encounter-type edit denial.",
+            "View-permission filtering.",
+            "Service-level transaction annotation."
+          ],
+          "audit_provenance": "Durable audit trail is NOT_ESTABLISHED.",
+          "concurrency_idempotency": "Idempotency and row locking are NOT_ESTABLISHED.",
+          "scope_privacy": "Site/privacy boundary is NOT_ESTABLISHED.",
+          "collision_risk": "An encounter is a compound clinical container; equivalence to an atomic clinical event is not established."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "ClinicalEventService",
+        "anchors": [
+          "routes/health-clinical.php:36-50",
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:106-161,357-370,586-616",
+          "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:81-106",
+          "app/Domain/Clinical/Services/ClinicalEventService.php:46-203",
+          "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-168",
+          "app/Domain/Clinical/Models/ClinicalEvent.php:1-109",
+          "database/migrations/2026_04_13_100001_create_clinical_events_table.php:11-50",
+          "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php",
+          "tests/Feature/Domain/Clinical/ObservationRegisterTest.php"
+        ],
+        "strengths": [
+          "Canonical owner and typed validation.",
+          "Site snapshot integrity and immediate-action guard.",
+          "Core record transaction."
+        ],
+        "gaps": [
+          "Attachment/core atomicity and post-commit exactly-once dispatch are not established.",
+          "Review does not advance state and lacks lock/state guard.",
+          "Direct-object concealment is absent.",
+          "Tests were not executed."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "GO_BOUNDED",
+        "reason": "The initial event record and register form a bounded owner even though later event actions and attachments have separate orchestration boundaries."
+      },
+      "neutral_requirements": {
+        "packet_id": "B02",
+        "source_packet_id": "A02",
+        "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "neutral_actor_user_need": "An authenticated, authorized care-record user needs to create or amend a clinical event associated with a person and optionally a related care visit.",
+        "preconditions": [
+          "The actor has general create or update authority.",
+          "The actor has any additional authority required by the selected event category."
+        ],
+        "trigger_input": "The actor submits a new or existing event container with person context, optional visit association, and zero or more related clinical items.",
+        "states_transitions": [
+          "New to persisted.",
+          "Existing to updated.",
+          "Related clinical items may be created, updated, or revalidated.",
+          "Invalidation and restoration are distinct actions, not ordinary editing."
+        ],
+        "success_evidence": [
+          "The event container is persisted or updated with permitted associations.",
+          "Related items are processed according to their validation rules.",
+          "Read results exclude information the viewer is not permitted to see."
+        ],
+        "failure_recovery": [
+          "Missing general authority or category-specific authority causes failure.",
+          "A transaction boundary exists, but rollback behavior for every checked failure path is not established."
+        ],
+        "authorization_privacy_direct_object": [
+          "Create/update authority is checked separately from category-specific authority.",
+          "Read results are permission-filtered."
+        ],
+        "audit_provenance": "No durable audit requirement is directly supported.",
+        "concurrency_idempotency": "No locking, conflict handling, duplicate-request protection, or user-facing retry is directly supported.",
+        "negative_edge_acceptance": [
+          "Unauthenticated creation or amendment is denied.",
+          "General create authority without category-specific authority is insufficient.",
+          "Update authority without authority for the existing event category is insufficient.",
+          "Related clinical items are processed or revalidated rather than silently assumed valid.",
+          "Unauthorized associated information is excluded on read.",
+          "Invalidation or restoration is not inferred from ordinary editing.",
+          "Rollback after a checked partial-processing failure remains unspecified."
+        ],
+        "agent_c_evaluation_questions_not_upstream_requirements": [
+          "Approved-Site and person-record privacy boundaries.",
+          "Direct-object concealment versus explicit denial.",
+          "Authority over the visit and every associated clinical item.",
+          "Minimum-necessary disclosure and NZ health-information safeguards."
+        ],
+        "not_established": [
+          "Site scope",
+          "Direct-object concealment",
+          "Complete checked-failure rollback",
+          "Retry",
+          "Idempotency",
+          "Locking",
+          "Concurrent-update behavior",
+          "Durable audit",
+          "Atomic success across every related item",
+          "Review, follow-up, escalation, or incident resolution"
+        ],
+        "collision_exclusions": [
+          "A compound clinical record container is not proof of one indivisible clinical occurrence.",
+          "Review, follow-up, escalation, incident management, and closure are excluded."
+        ],
+        "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+        "neutral_requirement_credit": false,
+        "current_product_comparison_credit": false,
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "current_neutral_comparison": {
+        "packet_id": "C02",
+        "neutral_packet_id": "B02",
+        "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "anchors": [
+          "routes/health-clinical.php:36-41",
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:106-161,357-370",
+          "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:81-123",
+          "app/Domain/Clinical/Services/ClinicalEventService.php:31-140,206-235",
+          "app/Domain/Clinical/Services/ClinicalDashboardService.php:780-850",
+          "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-168",
+          "app/Domain/Clinical/Models/ClinicalEvent.php:20-150",
+          "database/migrations/2026_04_13_100001_create_clinical_events_table.php:11-50"
+        ],
+        "facets": [
+          {
+            "name": "authorized_create",
+            "rating": "MET",
+            "evidence": "clinical.events.record plus Client view."
+          },
+          {
+            "name": "general_and_type_authority",
+            "rating": "GAP",
+            "evidence": "One general record capability exists; event type changes validation but not action authority."
+          },
+          {
+            "name": "person_and_visit_context",
+            "rating": "MET",
+            "evidence": "Client is canonical owner; optional Shift must belong to that Client and match Site."
+          },
+          {
+            "name": "amend",
+            "rating": "GAP",
+            "evidence": "No bounded event amendment or update command was found."
+          },
+          {
+            "name": "related_inputs",
+            "rating": "PARTIAL",
+            "evidence": "Witnesses and attachments are validated and Shift ownership is checked, but there is no general related-clinical owner and attachments persist after the core transaction."
+          },
+          {
+            "name": "create_state",
+            "rating": "MET_QUALIFIED",
+            "evidence": "Create writes an open event, timeline, and optional synchronous link in a three-attempt transaction; no preliminary state exists."
+          },
+          {
+            "name": "invalidate_restore",
+            "rating": "GAP",
+            "evidence": "SoftDeletes exists on the model, but no separate invalidate or restore action was found."
+          },
+          {
+            "name": "read_scope",
+            "rating": "STRONGER",
+            "evidence": "clinical.events.viewAny plus approved-Site record scope and Client, type, severity, Site, follow-up, review, and date filters."
+          },
+          {
+            "name": "rollback",
+            "rating": "MET_CORE_GAP_PACKAGE",
+            "evidence": "Core validation and transaction rollback exist; attachment failure can occur after core commit and post-commit dispatch is not exactly once."
+          },
+          {
+            "name": "provenance",
+            "rating": "STRONGER",
+            "evidence": "Site snapshot, AuditableChanges, reporter and time, and timeline provenance exist."
+          },
+          {
+            "name": "replay_and_concealment",
+            "rating": "GAP_NOT_ESTABLISHED",
+            "evidence": "No create replay or command row lock; foreign-Site direct action returns explicit 403 rather than concealed 404."
+          }
+        ],
+        "native_preserve": "Preserve ClinicalEventService, Client and Shift Site integrity, typed validation, immediate-action requirement, timeline, and register.",
+        "bounded_refinement": "Add separate append-only amend or supersede, reasoned invalidate, and restore actions with distinct capabilities. Make staged attachments part of an atomic or durable orchestration boundary. Do not fold review, follow-up, escalation, or incident closure into this target.",
+        "negative_acceptance": [
+          "Missing clinical.events.record denies.",
+          "An event type requiring immediate action cannot write without truthful action.",
+          "Client, Shift, or Site mismatch writes nothing.",
+          "Invalid attachment cannot silently claim an all-or-nothing event package.",
+          "Amend cannot overwrite reporter or original provenance or cross Client or Site.",
+          "Invalidation and restore require distinct actions and a reason."
+        ],
+        "provisional_outcome": "PARTIAL_CURRENT_OVERLAP_REFINEMENT_CANDIDATE_ONLY",
+        "reason": "Amendment, type authority, invalidate and restore, and full related-item atomicity are missing.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "facet_reconciliation": null,
+      "independent_adjudication": {
+        "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "OpenMRS Encounter is a compound clinical container whose equivalence to the bounded clinical-event record is unproved. Amendment, type-specific authority, invalidate/restore, full-package atomicity, replay, and concealment remain gaps.",
+        "next_action": "Obtain an exact event-record comparator or reject this candidate, then rerun the bounded initial-record facet.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "b79d5502aeab89980d3f566c661af078fa0345fa58ed3a632ddcdcc8b543b6d2"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "user_job": "Create, view, update, activate, deactivate, rehire, and invite an employee profile through the canonical identity seam.",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A03",
+        "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+        "identity_envelope": {
+          "project": "frappe/erpnext",
+          "canonical_url": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "root_licence_spdx": "GPL-3.0",
+          "root_licence_locus": "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/license.txt",
+          "edition_boundary": "ERPNext repository only; hosted Frappe Cloud and external Frappe Framework behavior excluded.",
+          "edition_locus": "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/README.md#L24-L66",
+          "behaviour_loci": [
+            "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L104-L199",
+            "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L257-L309",
+            "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L405-L449",
+            "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "HR User or HR Manager for create/write; linked-user creation additionally checks write permission on the employee record.",
+          "preconditions": [
+            "Valid lifecycle state.",
+            "Automatic user creation requires a preferred, company, or personal email.",
+            "Moving to Left requires a relieving date and no active reports."
+          ],
+          "trigger_input": "Employee insert/update, status change, or linked-user creation request.",
+          "states_transitions": "Active, Inactive, Suspended, and Left; non-active employee status disables the linked user and returning to Active re-enables it.",
+          "success_postcondition": "Profile persists; an optional linked user is created enabled with Employee role and optional Employee/Company user permissions.",
+          "failure_recovery_retry": "Missing email, nonexistent user, duplicate linked active employee, self-reporting, or invalid leaving conditions throw validation errors; retry/recovery workflow is NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "Role-level create/write metadata.",
+            "Record write check.",
+            "Duplicate active-user check.",
+            "User-permission creation and removal."
+          ],
+          "audit_provenance": "A source comment mentions a linked-user audit log; durable audit-event mechanics are NOT_ESTABLISHED within the inspected repository slice.",
+          "concurrency_idempotency": "Concurrency and idempotency are NOT_ESTABLISHED.",
+          "scope_privacy": "Privacy-field controls are NOT_ESTABLISHED.",
+          "collision_risk": "Reactivation mechanics must not be treated as evidenced rehire or invitation semantics."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "EmployeeProfileController, EmployeeIntakeService, and HrLifecycleAccessService",
+        "anchors": [
+          "routes/hr.php:259-287",
+          "app/Http/Controllers/Hr/EmployeeProfileController.php:589-644,807-847,854-1168,1275-1300,1744-1857",
+          "app/Domain/Hr/Services/EmployeeIntakeService.php:55-285,309-465,527-629",
+          "app/Domain/Hr/Services/HrLifecycleAccessService.php:16-316",
+          "app/Domain/Hr/Policies/HrEmployeeProfilePolicy.php:10-35",
+          "app/Domain/Hr/Models/HrEmployeeProfile.php:1-130",
+          "database/migrations/2026_02_12_100002_create_hr_employee_profiles_tables.php:11-74",
+          "database/migrations/2026_08_14_000062*:13-41",
+          "resources/js/pages/hr/employees/show.tsx",
+          "tests/Feature/Hr/EmployeeProfileSitePrivacyTest.php",
+          "tests/Feature/Hr/StaffCreationWorkflowTest.php",
+          "tests/Feature/Hr/EmployeeIntakeAfterCommitTest.php"
+        ],
+        "strengths": [
+          "Canonical identity and Site seam.",
+          "Concealed foreign IDs.",
+          "Fixed intake lock order and audit provenance."
+        ],
+        "gaps": [
+          "Seven distinct actions span multiple owners and side-effect boundaries.",
+          "No request-key same-result replay.",
+          "Longitudinal profile version history is not established.",
+          "Runtime was not proved."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "NO_GO_RECONCILE_FACETS",
+        "reason": "The frozen row combines seven actions across controller, intake, access, identity, audit, and after-commit boundaries; neutralizing it as one operation would hide materially different authority and replay semantics."
+      },
+      "neutral_requirements": null,
+      "current_neutral_comparison": null,
+      "facet_reconciliation": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "source_packet_corrections": [
+          "Remove HrLifecycleAccessService as a primary owner of these profile facets.",
+          "The invite guard is User.approved_at null; the profile need not be inactive, correcting RUN-040.",
+          "HrEmployeeProfileVersion and HrEmployeeStatusChange have no production writer found at this pin; do not infer a version or status ledger."
+        ],
+        "required_facet_crosswalk": [
+          {
+            "run_041_required_facet": "create_or_link",
+            "overlay_facet": "create",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "view",
+            "overlay_facet": "view",
+            "disposition": "EXACT_OWNER"
+          },
+          {
+            "run_041_required_facet": "update",
+            "overlay_facet": "update",
+            "disposition": "EXACT_OWNER"
+          },
+          {
+            "run_041_required_facet": "set_active_or_inactive",
+            "overlay_facet": "set_active",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "rehire",
+            "overlay_facet": "rehire",
+            "disposition": "EXACT_OWNER"
+          },
+          {
+            "run_041_required_facet": "invite_or_resend",
+            "overlay_facet": "invite",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "longitudinal_history",
+            "overlay_facet": "longitudinal_history",
+            "disposition": "MISSING_CAPABILITY_FACET_RETAINED"
+          }
+        ],
+        "facets": [
+          {
+            "facet_ordinal": 1,
+            "facet_key": "create",
+            "ownership_class": "CREATE_OR_LINK_COMMAND",
+            "anchors": [
+              "app/Domain/Hr/Services/EmployeeIntakeService.php:41-294,504-630",
+              "app/Domain/Hr/Services/EmployeeRoleAssignmentService.php:18-90",
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:854-1026",
+              "app/Http/Requests/Hr/StoreEmployeeRequest.php:14-123",
+              "resources/js/components/hr/add-employee-dialog.tsx:90-169",
+              "resources/js/pages/hr/employees/index.tsx:94-144,350-412,485-493",
+              "routes/hr.php:264-275",
+              "tests/Feature/Hr/EmployeeIntakeAfterCommitTest.php:100-142",
+              "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:260-915",
+              "tests/Feature/Hr/StaffCreationWorkflowTest.php:68-149,204-235,269-480"
+            ],
+            "authority": "hr.employees.viewAny plus hr.employees.manage; Clinical Lead and administrator-grade assignments have additional gates.",
+            "site_direct_object": "Every requested primary and secondary Site must be active, unarchived, and accessible, then revalidated and locked.",
+            "state_effects": "User, profile, roles, Sites, and fail-closed intake audit are atomic; link_existing can update or link an existing identity. Onboarding, compliance seed, invite, automation, and webhook are best effort after commit.",
+            "transaction_locking_replay": "Normalized-email and employee-number mutexes exist. No request key; duplicate replay validates as duplicate, while an explicit repeated link can re-audit and re-emit.",
+            "contradictions": [],
+            "collision_exclusions": [
+              "This is create-or-link, not pure create."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 2,
+            "facet_key": "view",
+            "ownership_class": "READ_PROJECTION",
+            "anchors": [
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:61-495,571-615,1275-1707",
+              "app/Services/UserSiteAccessService.php:42,1330-1349,1421-1439",
+              "resources/js/pages/hr/employees/index.tsx:94-144,350-474",
+              "resources/js/pages/hr/employees/show.tsx:654-760,870-954",
+              "routes/hr.php:264-266",
+              "tests/Feature/Hr/EmployeeProfileSitePrivacyTest.php:100-251",
+              "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:130-187,1006-1029"
+            ],
+            "authority": "hr.employees.viewAny; the policy self-view allowance is not reachable through these routes.",
+            "site_direct_object": "At least one historical or current assigned Site must overlap; wholly foreign or provenance-free profiles are concealed 404. viewAllSites broadens Site scope only.",
+            "state_effects": "Restricted, financial, document, leave, compliance, and related projections retain separate disclosure gates.",
+            "transaction_locking_replay": "Not applicable to the read action.",
+            "contradictions": [
+              "Policy self allowances are bypassed by route and controller gates."
+            ],
+            "collision_exclusions": [
+              "Workers use the separate self-profile route."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 3,
+            "facet_key": "update",
+            "ownership_class": "UPDATE_COMMAND",
+            "anchors": [
+              "app/Domain/Hr/Services/PeopleMutationLockService.php:9-58",
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:1744-1948",
+              "app/Http/Requests/Hr/UpdateEmployeeProfileRequest.php:12-145",
+              "resources/js/pages/hr/employees/edit.tsx:58-124,505-545,751-762",
+              "routes/hr.php:276-277"
+            ],
+            "authority": "viewAny plus manage; financial fields additionally require hr.employees.viewFinancial.",
+            "site_direct_object": "Edit permits any assigned-Site overlap, while mutation requires every assigned Site. A mixed visible and foreign profile can render edit but conceal PUT as 404.",
+            "state_effects": "Profile, destination Sites, and manager are locked; role, Site, and employment changes may create an IT mover workflow.",
+            "transaction_locking_replay": "No request key, entity version, or stale-write precondition; locks serialize but opposing writes remain last-writer-wins.",
+            "contradictions": [
+              "The FormRequest lacks the HR global Site-bypass list used by the locked controller check, so global-HR foreign-Site update is not positively established.",
+              "PUT accepts is_active but does not apply the dedicated set-active login restoration, creating a second status-transition path."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 4,
+            "facet_key": "set_active",
+            "ownership_class": "STATE_TRANSITION_COMMAND",
+            "anchors": [
+              "app/Observers/HrEmployeeProfileObserver.php:28-57",
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:1032-1077",
+              "resources/js/components/hr/people-pane.tsx:294-300,370-410",
+              "routes/hr.php:280",
+              "tests/Unit/Hr/EmployeePeopleMutationLockingContractTest.php:31-65",
+              "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:189-258",
+              "tests/Feature/Hr/PeoplePaneActionsTest.php:58-88"
+            ],
+            "authority": "viewAny plus manage, with access to every assigned Site; inaccessible targets are concealed before payload validation.",
+            "site_direct_object": "All assigned Sites are checked through the mutation seam.",
+            "state_effects": "Activation restores missing User approval. Deactivation does not revoke login, set end date, or write a status journal. The observer flags held assets and sends deduplicated alerts synchronously inside the transaction.",
+            "transaction_locking_replay": "Target and actor graph are locked. Same-value repeats converge, but there is no request key or version; opposing commands are last-writer-wins.",
+            "contradictions": [
+              "The generic update path can also change is_active without these effects."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 5,
+            "facet_key": "rehire",
+            "ownership_class": "STATE_TRANSITION_COMMAND",
+            "anchors": [
+              "app/Domain/Hr/Services/EmployeeIntakeService.php:296-501",
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:1084-1169",
+              "resources/js/components/hr/rehire-wizard.tsx:135-218,390-470",
+              "resources/js/pages/hr/employees/index.tsx:408-425,521-528",
+              "resources/js/pages/hr/employees/show.tsx:910-954,3316-3322",
+              "routes/hr.php:281",
+              "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:887-915,1129-1149",
+              "tests/Feature/Hr/RehireFlowTest.php:67-166"
+            ],
+            "authority": "viewAny plus manage and exact role-assignment gates.",
+            "site_direct_object": "Every old assigned Site must be accessible before rehire; the new primary Site must also be accessible.",
+            "state_effects": "The locked transaction cancels open offboarding, appends prior-stint history, restores soft delete, activates, clears termination fields, restores login, and synchronizes roles. Login audit, onboarding, invite, and webhook are best effort after commit.",
+            "transaction_locking_replay": "A repeat fails once active; it is not same-result replay and has no request key.",
+            "contradictions": [],
+            "collision_exclusions": [
+              "No executed outer-commit or concurrent-rehire proof is awarded."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 6,
+            "facet_key": "invite",
+            "ownership_class": "AFTER_COMMIT_DELIVERY_COMMAND",
+            "anchors": [
+              "app/Http/Controllers/Hr/EmployeeProfileController.php:807-848",
+              "app/Domain/Hr/Notifications/EmployeeInviteNotification.php:11",
+              "resources/js/components/hr/needs-triage-dialog.tsx:143-160",
+              "routes/hr.php:282",
+              "tests/Feature/Hr/EmployeeInviteLifecycleTest.php:28-103",
+              "tests/Feature/Hr/NeedsTriageTest.php:88-108",
+              "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:189-223"
+            ],
+            "authority": "viewAny plus manage, non-archived profile, and access to every assigned Site.",
+            "site_direct_object": "All assigned Sites are rechecked under the profile lock.",
+            "state_effects": "Guard is User.approved_at null; profile inactivity is not required. After commit, a token is created and the branded invite is queued.",
+            "transaction_locking_replay": "The transaction records no replay marker. Because send does not change approved_at, repeated requests can replace tokens and send multiple notifications.",
+            "contradictions": [
+              "RUN-040's statement that resend requires an inactive profile is false at this pin."
+            ],
+            "collision_exclusions": [
+              "Create and rehire use a different reset-link delivery implementation."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 7,
+            "facet_key": "longitudinal_history",
+            "ownership_class": "MISSING_CAPABILITY_EVIDENCE",
+            "anchors": [
+              "app/Domain/Hr/Models/HrEmployeeProfile.php:127-129,172-174",
+              "app/Domain/Hr/Models/HrEmployeeProfileVersion.php:10-46",
+              "app/Domain/Hr/Models/HrEmployeeStatusChange.php:10-43",
+              "database/migrations/2026_02_12_100002_create_hr_employee_profiles_tables.php:62-73",
+              "database/migrations/2026_03_22_500001_create_hr_employee_status_changes_table.php:10-27"
+            ],
+            "authority": "No production write command or exact action capability was found for either history model at this pin.",
+            "site_direct_object": "Not established because no production writer or direct-object workflow was found.",
+            "state_effects": "Profile-version and status-change schemas and relationships exist, but no production writer was found. Rehire employment_history JSON and generic audit logs are distinct evidence and cannot substitute for these ledgers.",
+            "transaction_locking_replay": "Not established; model and table presence is not a transaction or replay contract.",
+            "contradictions": [
+              "RUN-040's longitudinal-history implication is not supported by a production writer."
+            ],
+            "collision_exclusions": [
+              "Do not credit rehire JSON employment history or generic audit logs as the missing version and status ledgers."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          }
+        ],
+        "residual_status": "SOURCE_FACETS_RECONCILED_CREDIT_ZERO",
+        "credits": {
+          "formal_mapping_credit": false,
+          "benchmark_credit": false,
+          "final_no_match_credit": false,
+          "runtime_credit": false,
+          "browser_credit": false,
+          "ease_credit": false,
+          "release_credit": false,
+          "completion_credit": false
+        }
+      },
+      "independent_adjudication": {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "Seven current-source facets are now reconciled, but no clean neutral requirement or current comparison exists for those seven facets. ERPNext does not establish exact rehire, invitation/resend, longitudinal-history, authority, privacy, or replay equivalence.",
+        "next_action": "Neutralize and compare all seven reconciled facets independently before selecting a benchmark or documenting final no-match.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "bd81cb9dc00596a757c46f7384357372f6a235bfe1645d24b646c25959798932"
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "user_job": "Review and close an incident under incident journey rules",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A04",
+        "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+        "identity_envelope": {
+          "project": "meyerthorsten/qatrial",
+          "canonical_url": "https://github.com/MeyerThorsten/QAtrial",
+          "commit_sha": "b10fab722caf9561bcf4fdb03cc9733156992635",
+          "root_licence_spdx": "AGPL-3.0",
+          "root_licence_locus": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/LICENSE",
+          "edition_boundary": "Server/PostgreSQL routes only; standalone/localStorage behavior excluded.",
+          "edition_locus": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/README.md#L31-L92",
+          "behaviour_loci": [
+            "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L10-L15",
+            "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L139-L185",
+            "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L203-L313"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "Authenticated caller with edit authority and access to the referenced project.",
+          "preconditions": [
+            "Existing accessible deviation.",
+            "Closure is reachable only after investigation, root-cause identification, and CAPA creation."
+          ],
+          "trigger_input": "Update, investigate, root-cause, or create-CAPA request with record ID and relevant payload.",
+          "states_transitions": "Detected to investigating to root_cause_identified to capa_created to closed.",
+          "success_postcondition": "Closure records actor and time; update, investigation, root cause, and CAPA creation produce separate audit actions.",
+          "failure_recovery_retry": "Invalid transition returns 400; missing or inaccessible record returns 404; handler failure returns 500; transactional recovery, retry, and idempotency are NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "Authentication.",
+            "Edit permission.",
+            "Organization/project accessibility.",
+            "Concealed inaccessible-object response.",
+            "Audit calls."
+          ],
+          "audit_provenance": "Status and lifecycle actions are recorded through audit calls.",
+          "concurrency_idempotency": "Concurrency, atomicity across CAPA creation and deviation update, and idempotency are NOT_ESTABLISHED.",
+          "scope_privacy": "Project accessibility is evidenced; approved-Site scope is NOT_ESTABLISHED.",
+          "collision_risk": "The source object is a deviation/CAPA workflow, not an incident record; incident equivalence is not established."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "IncidentController and IncidentJourneyService",
+        "anchors": [
+          "routes/incidents.php:53-104",
+          "app/Http/Controllers/IncidentController.php:1358-1364,1475-1810",
+          "app/Policies/ClientIncidentPolicy.php:11-76",
+          "app/Services/Incidents/IncidentJourneyService.php:637-718",
+          "app/Models/ClientIncident.php",
+          "resources/js/pages/incidents/show.tsx",
+          "tests/Feature/IncidentControllerTest.php",
+          "tests/Feature/Incidents/IncidentJourneyServiceTest.php"
+        ],
+        "strengths": [
+          "Row lock and state gate.",
+          "Synchronous closure prerequisites.",
+          "Durable lifecycle signal outbox."
+        ],
+        "gaps": [
+          "Review/show Site boundary and concealment are not established.",
+          "Close/reopen denial is 403 rather than concealed.",
+          "Same-result retry and exactly-once notification are not established.",
+          "Tests were not executed."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "GO_BOUNDED",
+        "reason": "Review and close are bounded state transitions with explicit locks and prerequisites, provided external governance owners remain excluded and their evidence is treated only as a gate."
+      },
+      "neutral_requirements": {
+        "packet_id": "B04",
+        "source_packet_id": "A04",
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "neutral_actor_user_need": "An authenticated, authorized reviewer needs to progress an accessible incident record through review and close it only after required investigation outputs and improvement actions exist.",
+        "preconditions": [
+          "The record exists and is accessible to the actor.",
+          "The actor has edit authority within the applicable scope."
+        ],
+        "trigger_input": "The actor submits a lifecycle action against the existing record with evidence required for that transition.",
+        "states_transitions": [
+          "Recorded to under investigation to cause documented to improvement actions established to closed.",
+          "Each transition follows the stated order.",
+          "Reopening is not established."
+        ],
+        "success_evidence": [
+          "Closure succeeds only after investigation, cause documentation, and required improvement actions exist.",
+          "Closure records the responsible actor and time.",
+          "Updates and lifecycle transitions produce audit actions."
+        ],
+        "failure_recovery": [
+          "Invalid transitions, missing records, inaccessible records, and processing failures produce explicit failures.",
+          "An inaccessible direct reference does not disclose object existence."
+        ],
+        "authorization_privacy_direct_object": [
+          "The actor is authenticated, has edit authority, and has access to the referenced scope.",
+          "Direct reference to an inaccessible object is concealed."
+        ],
+        "audit_provenance": "Updates and lifecycle steps create audit evidence; closure records actor and time.",
+        "concurrency_idempotency": "No locking, concurrent-transition resolution, duplicate-request protection, or replay behavior is directly supported.",
+        "negative_edge_acceptance": [
+          "Unauthenticated or unauthorized lifecycle action is denied.",
+          "An inaccessible direct reference does not reveal existence.",
+          "Missing records fail explicitly.",
+          "Skipping a required lifecycle phase is rejected.",
+          "Missing investigation evidence, cause, or required improvement actions prevents closure.",
+          "Valid closure records state, actor, time, and audit action.",
+          "Processing failure is explicit while rollback and partial-write behavior remain unspecified.",
+          "Concurrent closure outcome remains unspecified and must not be assumed."
+        ],
+        "agent_c_evaluation_questions_not_upstream_requirements": [
+          "Approved-Site access and privacy classification.",
+          "Visibility of sensitive incident details and witness/subject boundaries.",
+          "Legal/regulatory reporting and H&S governance.",
+          "Control Room coordination and atomic improvement-action linkage.",
+          "NZ recordkeeping obligations."
+        ],
+        "not_established": [
+          "Transactional recovery",
+          "Retry",
+          "Idempotency",
+          "Reopening",
+          "Concurrency control",
+          "Atomicity between improvement action and closure",
+          "Regulatory/reportability decisions",
+          "Site scope",
+          "Broader H&S governance",
+          "Submission workflow",
+          "Operational-control transitions"
+        ],
+        "collision_exclusions": [
+          "Equivalence from a quality-remediation lifecycle to an incident workflow is not established.",
+          "Initial submission, reopening, H&S governance, regulatory reporting, and Control Room transitions are excluded."
+        ],
+        "no_copy_attestation": "Derived only from the sanitized behavior packet; no repository identity, source path, source artifact, or distinctive design was received.",
+        "neutral_requirement_credit": false,
+        "current_product_comparison_credit": false,
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "current_neutral_comparison": {
+        "packet_id": "C04",
+        "neutral_packet_id": "B04",
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "anchors": [
+          "routes/incidents.php:53-57,88-104",
+          "app/Policies/ClientIncidentPolicy.php:11-75",
+          "app/Http/Controllers/IncidentController.php:1358-1364,1560-1618,1621-1725",
+          "app/Models/ClientIncident.php:16-122",
+          "app/Services/Incidents/IncidentJourneyService.php:637-718",
+          "app/Services/UserSiteAccessService.php:220-244"
+        ],
+        "facets": [
+          {
+            "name": "action_authority",
+            "rating": "MET",
+            "evidence": "Review and close require incidents.approve and state predicates; review reauthorizes the locked row."
+          },
+          {
+            "name": "accessible_concealed_object",
+            "rating": "CONTRADICTED",
+            "evidence": "viewAny is unconditional on Site; review checks action plus state but not approved Site. Close asserts Site but returns 403, not concealed 404."
+          },
+          {
+            "name": "neutral_state_chain",
+            "rating": "GAP",
+            "evidence": "Native states are draft, submitted, reviewed, and closed. Investigation, root cause, and improvement actions remain canonical H&S owners outside this target."
+          },
+          {
+            "name": "closure_prerequisites",
+            "rating": "MET_PARTIAL",
+            "evidence": "Review evidence and no open follow-ups are direct gates; high-severity investigation and linked governance closure are external owner gates."
+          },
+          {
+            "name": "actor_time_audit_concurrency",
+            "rating": "STRONGER",
+            "evidence": "Actor and time fields, AuditableChanges, parent row locks, shared lock ordering, and durable lifecycle outbox exist."
+          },
+          {
+            "name": "invalid_state_and_process_conflict",
+            "rating": "MET",
+            "evidence": "Policy, validation, and blocker errors are explicit; inconsistent journey ownership is concealed 404."
+          },
+          {
+            "name": "replay_and_delivery",
+            "rating": "GAP_NOT_ESTABLISHED",
+            "evidence": "Repeat review or close rejects state rather than returning original result; notification dispatch after commit is not exactly once."
+          }
+        ],
+        "native_preserve": "Preserve IncidentJourney closure gates, parent locking, actor and time audit, durable lifecycle outbox, and canonical H&S ownership.",
+        "bounded_refinement": "Resolve show, review, and close through approved-Site scope with an explicit all-Sites bypass and indistinguishable 404, repeated under lock. If a lifecycle projection is needed, expose read-only prerequisite evidence from canonical owners rather than transplanting H&S workflow.",
+        "negative_acceptance": [
+          "Actor with incidents.approve but no target-Site access receives indistinguishable 404 with no mutation, audit, or notification.",
+          "Only submitted incidents review and only reviewed incidents close.",
+          "Missing review, follow-up, investigation, or action prerequisite blocks close.",
+          "Concurrent follow-up creation and close cannot leave a closed incident with open work.",
+          "Audit or outbox failure rolls back state.",
+          "Repeated close cannot duplicate signals or effects."
+        ],
+        "provisional_outcome": "OWNERSHIP_BOUNDARY_REFINEMENT_ONLY_NO_DIRECT_FULL_EDGE",
+        "reason": "The access and concealment contradiction is material, and required investigation, cause, and action ownership is deliberately outside the target.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "completion_credit": false
+      },
+      "facet_reconciliation": null,
+      "independent_adjudication": {
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "QAtrial deviation/CAPA equivalence to incident closure is unproved. Current source contradicts concealed-object access, while investigation, cause, improvement actions, H&S governance, and Control Room ownership remain external prerequisite owners.",
+        "next_action": "Retain QAtrial only as a generic lifecycle reference; find an exact incident comparator or document no credible match through the required bounded process.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "72d87eaa165fc403189e722db8963d2383fdea2f9e905342bb7a2efdf86cb000"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "user_job": "Maintain the controlled-drug register and balance",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A05-NC",
+        "packet_status": "NO_SUPPORTABLE_TARGET_PACKET_IN_BOUNDED_LEGACY_LOCATOR",
+        "identity_envelope": {
+          "project": "openemr/openemr",
+          "canonical_url": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "root_licence_spdx": "GPL-3.0",
+          "root_licence_locus": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE",
+          "edition_boundary": "Bounded legacy locator inspection only; this is not a repository-wide absence search.",
+          "behaviour_loci": [
+            "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L281-L390"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "Prescription-saving caller; exact role authority is NOT_ESTABLISHED in the bounded locus.",
+          "preconditions": [
+            "Drug exists.",
+            "Quantity is positive.",
+            "Encounter exists.",
+            "Inventory is available when dispensing is requested."
+          ],
+          "trigger_input": "Prescription save with controlled-substance flag and optional generic in-house dispensing request.",
+          "states_transitions": "Add or remove a controlled-substance reporting flag; optionally request a generic inventory sale.",
+          "success_postcondition": "Bounded prescription flag and optional inventory operation complete.",
+          "failure_recovery_retry": "Missing drug, non-positive quantity, missing encounter, unavailable inventory, or service error fails the operation; recovery and retry are NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "Basic prescription/inventory validation only."
+          ],
+          "audit_provenance": "Controlled-drug register audit is NOT_ESTABLISHED.",
+          "concurrency_idempotency": "Register locking, balance reconciliation, and idempotency are NOT_ESTABLISHED.",
+          "scope_privacy": "Site scope and witness authority are NOT_ESTABLISHED.",
+          "collision_risk": "The locus does not establish a controlled-drug register, running balance, witness, discrepancy, receipt, administration, destruction, reconciliation, or append-only audit."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "Controlled-drug register facets currently distributed through EmarController",
+        "anchors": [
+          "routes/emar.php:57-81,154-214",
+          "app/Http/Controllers/Emar/EmarController.php:579-618,764-786,1483-1620,4023-4121,4986-5314",
+          "app/Http/Controllers/Concerns/HandlesMedicationSync.php:1-96",
+          "app/Models/ClientControlledDrugEntry.php:1-67",
+          "app/Models/ClientControlledDrugDiscrepancy.php:1-79",
+          "app/Policies/ClientControlledDrugEntryPolicy.php:8-34",
+          "database/migrations/2026_01_24_000020*",
+          "database/migrations/2026_01_24_000050*",
+          "resources/js/pages/emar/ControlledDrugs.tsx",
+          "tests/Feature/Emar/ControlledDrugsTest.php"
+        ],
+        "strengths": [
+          "Witnessed arithmetic.",
+          "Balance discrepancy provenance and incident linkage.",
+          "Destruction path stock lock."
+        ],
+        "gaps": [
+          "Canonical action authority and Site/direct-object boundary are unresolved.",
+          "Durable replay, row locking, and atomic movement/stock are not established.",
+          "Exact medication identity and witness Site/competency are not established.",
+          "No CD-specific Site/concurrency tests were found or run."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "NO_GO_RECONCILE_FACETS",
+        "reason": "Read, movement, balance, discrepancy, destruction, witness, Site, action-capability, locking, and replay semantics are materially inconsistent; one neutral contract would conceal contradictions."
+      },
+      "neutral_requirements": null,
+      "current_neutral_comparison": null,
+      "facet_reconciliation": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "source_packet_corrections": [
+          "Separate view, register movement, balance check, discrepancy resolution, destruction projection, and witness authority.",
+          "The controlled-drug policy defines controlled capabilities, but the controller routes use medications.orders.manage and do not invoke that policy.",
+          "Destruction write ownership remains CAP-MED-DESTRUCTION and is only an external projection dependency here."
+        ],
+        "required_facet_crosswalk": [
+          {
+            "run_041_required_facet": "register_read",
+            "overlay_facet": "view",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "stock_movement",
+            "overlay_facet": "register_movement",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "balance_check",
+            "overlay_facet": "balance_check",
+            "disposition": "EXACT_OWNER"
+          },
+          {
+            "run_041_required_facet": "discrepancy_open_and_resolve",
+            "overlay_facet": "balance_check + discrepancy_resolution",
+            "disposition": "SPLIT_ACROSS_TWO_EXACT_OWNERS"
+          },
+          {
+            "run_041_required_facet": "destruction",
+            "overlay_facet": "destruction_projection",
+            "disposition": "EXTERNAL_OWNER_PROJECTION_ONLY"
+          },
+          {
+            "run_041_required_facet": "witness_authority",
+            "overlay_facet": "witness_authority",
+            "disposition": "EXACT_CROSS_CUTTING_AUTHORITY_FACET"
+          }
+        ],
+        "facets": [
+          {
+            "facet_ordinal": 1,
+            "facet_key": "view",
+            "ownership_class": "READ_PROJECTION",
+            "anchors": [
+              "app/Http/Controllers/Emar/EmarController.php:593-618,1483-1715",
+              "resources/js/pages/emar/ControlledDrugs.tsx:592-620,1436-1475",
+              "routes/emar.php:57-81",
+              "tests/Feature/Emar/ControlledDrugsTest.php:88-156"
+            ],
+            "authority": "medications.view.",
+            "site_direct_object": "Uses medication-viewable Client IDs, assignments, and broad medication or Client permissions rather than UserSiteAccessService. Supplied site_id is a Client query filter without explicit Site-authority validation.",
+            "state_effects": "Projects controlled medications, balances, entries, open or under-review discrepancies, destructions, and loss reports.",
+            "transaction_locking_replay": "Not applicable to the read action.",
+            "contradictions": [
+              "No bounded foreign-Site negative is established."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 2,
+            "facet_key": "register_movement",
+            "ownership_class": "STOCK_AND_REGISTER_COMMAND",
+            "anchors": [
+              "app/Http/Controllers/Concerns/HandlesMedicationSync.php:7-99",
+              "app/Http/Controllers/Emar/EmarController.php:764-787,4986-5129",
+              "app/Models/ClientControlledDrugEntry.php:9-67",
+              "app/Models/ClientMedicationStock.php:11-118",
+              "resources/js/pages/emar/_cd-dialogs.tsx:89-169",
+              "routes/emar.php:154-218"
+            ],
+            "authority": "medications.orders.manage at the route; witness permission is checked separately.",
+            "site_direct_object": "Client and medication are found, but actor Site and direct-object access are not checked.",
+            "state_effects": "Validates caller-supplied before and after arithmetic, creates an entry, changes stock, then updates schedule.",
+            "transaction_locking_replay": "Writes are not transaction-bound and take no stock or register lock. The optional seven-day cache key is not actor or payload bound, is checked before access, and is written after effects without an atomic mutex.",
+            "contradictions": [
+              "ClientControlledDrugEntryPolicy defines medications.controlled.view and record, but this path does not invoke it."
+            ],
+            "collision_exclusions": [
+              "The cache is not durable idempotency."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 3,
+            "facet_key": "balance_check",
+            "ownership_class": "BALANCE_AND_DISCREPANCY_COMMAND",
+            "anchors": [
+              "app/Services/MedicationIncidentIntegrationService.php:211-286",
+              "app/Http/Controllers/Emar/EmarController.php:5132-5288",
+              "app/Models/ClientControlledDrugDiscrepancy.php:10-78",
+              "resources/js/pages/emar/_cd-dialogs.tsx:495-572",
+              "routes/emar.php:213",
+              "tests/Feature/Emar/ControlledDrugsTest.php:190-294"
+            ],
+            "authority": "medications.orders.manage plus witness permission; actor Site checks are absent.",
+            "site_direct_object": "Same missing actor-Site seam as register movement.",
+            "state_effects": "Records check and stock; mismatch requires immediate-action evidence and creates a discrepancy plus linked incident and alerts.",
+            "transaction_locking_replay": "Core writes are transactional but stock is not locked. Alert clearing occurs after commit. The optional cache has the same non-durable limitations as movement.",
+            "contradictions": [
+              "A concurrent stock writer can race the unlocked balance transaction."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 4,
+            "facet_key": "discrepancy_resolution",
+            "ownership_class": "STATE_TRANSITION_COMMAND",
+            "anchors": [
+              "app/Services/MedicationIncidentIntegrationService.php:762-783",
+              "app/Http/Controllers/Emar/EmarController.php:5291-5314",
+              "resources/js/pages/emar/_cd-dialogs.tsx:749-766",
+              "routes/emar.php:214"
+            ],
+            "authority": "medications.orders.manage.",
+            "site_direct_object": "Direct route binding has no actor Site or current-Client access check.",
+            "state_effects": "Overwrites status and resolution evidence without an open-state precondition; alert and signal resolution is a separate call.",
+            "transaction_locking_replay": "No row lock, transaction, request key, or same-result replay.",
+            "contradictions": [
+              "A failure after discrepancy save can leave closed discrepancy evidence with live alerts."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 5,
+            "facet_key": "destruction_projection",
+            "ownership_class": "EXTERNAL_PROJECTION_DEPENDENCY",
+            "anchors": [
+              "app/Http/Controllers/Emar/EmarController.php:1563-1572,1673-1688,4023-4121,5405-5421",
+              "app/Models/MedicationDestruction.php:10-129",
+              "resources/js/pages/emar/ControlledDrugs.tsx:1436-1475",
+              "resources/js/pages/emar/_cd-dialogs.tsx:1342-1414",
+              "routes/emar.php:217-218",
+              "tests/Feature/Emar/MedicationIntegrityAuditTest.php:97"
+            ],
+            "authority": "Projection requires medications.view; external destruction write requires medications.orders.manage.",
+            "site_direct_object": "Independent Client, medication, and Site identifiers are existence-validated but not ownership-consistency or Site-authority checked.",
+            "state_effects": "Creation is transactional and locks stock only when linked stock exists. The controlled page projects destruction evidence but omits void metadata.",
+            "transaction_locking_replay": "No request key. Void does not reverse stock or register movement.",
+            "contradictions": [
+              "Controlled destruction can be saved without a controlled-register disposal entry when linkage or stock is absent.",
+              "Voided evidence can appear in the controlled page without its void state."
+            ],
+            "collision_exclusions": [
+              "The destruction command belongs to CAP-MED-DESTRUCTION, not this target."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 6,
+            "facet_key": "witness_authority",
+            "ownership_class": "CROSS_CUTTING_ACTION_AUTHORITY",
+            "anchors": [
+              "app/Http/Controllers/Emar/EmarController.php:4986-5129,5132-5288",
+              "app/Policies/ClientControlledDrugEntryPolicy.php:8-34",
+              "routes/emar.php:154-218",
+              "tests/Feature/Emar/ControlledDrugsTest.php:88-294"
+            ],
+            "authority": "Movement and balance routes require medications.orders.manage; the selected witness is separately checked for medications.controlled.witness. The controlled-entry policy's record action is not invoked by these routes.",
+            "site_direct_object": "No witness Site overlap, Client assignment, current competency, or canonical relationship to the controlled record is established.",
+            "state_effects": "Witness identity is stored with movement and balance evidence, but the cross-cutting eligibility decision is not a separately governed command or snapshot.",
+            "transaction_locking_replay": "Witness authority inherits each caller's transaction and replay weakness; it has no durable eligibility snapshot or request key of its own.",
+            "contradictions": [
+              "A named controlled-drug policy exists but the route/controller authority seam bypasses its record capability."
+            ],
+            "collision_exclusions": [
+              "Witness identity presence is not proof of Site, assignment, competency, independence, or continuing eligibility."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          }
+        ],
+        "residual_status": "SOURCE_FACETS_RECONCILED_CREDIT_ZERO",
+        "credits": {
+          "formal_mapping_credit": false,
+          "benchmark_credit": false,
+          "final_no_match_credit": false,
+          "runtime_credit": false,
+          "browser_credit": false,
+          "ease_credit": false,
+          "release_credit": false,
+          "completion_credit": false
+        }
+      },
+      "independent_adjudication": {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "Six current-source facets are now reconciled, but RUN-039 establishes no supportable controlled-drug-register comparator. Material authority, Site, locking, atomicity, replay, destruction, and witness contradictions also remain.",
+        "next_action": "Search, neutralize, and adjudicate the six reconciled facets separately. Do not promote the bounded locator failure to final no-match.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "a32ab486c0ec3f9cc9acabf6149317283bc88768a5e6ff0180dc3a90f0fc6c1d"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "user_job": "Review allocation history and confirm or reject payment matches",
+      "feature_class": "H",
+      "upstream_packet": {
+        "packet_id": "A06",
+        "packet_status": "TARGET_SPECIFIC_CANDIDATE_LOCATOR_ONLY",
+        "identity_envelope": {
+          "project": "bigcapitalhq/bigcapital",
+          "canonical_url": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "root_licence_spdx": "AGPL-3.0",
+          "root_licence_locus": "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/LICENSE",
+          "edition_boundary": "Public repository source only; cloud operation excluded.",
+          "edition_locus": "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/README.md#L29-L51",
+          "behaviour_loci": [
+            "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L36-L113",
+            "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L119-L161"
+          ]
+        },
+        "sanitized_behaviour": {
+          "actor": "Service caller; user-facing role and authorization are NOT_ESTABLISHED in the inspected command.",
+          "preconditions": [
+            "Referenced uncategorized transactions exist.",
+            "Sources are neither excluded nor already matched.",
+            "Reference type and ID resolve.",
+            "Matched total equals source total within 0.01."
+          ],
+          "trigger_input": "One or more uncategorized transaction IDs plus one or more reference type/ID match entries.",
+          "states_transitions": "Uncategorized/unmatched source to created match-reference records.",
+          "success_postcondition": "Within a unit of work, source rows are locked in deterministic ID order, matchability and totals are validated, match records are created, and matching/matched events are emitted.",
+          "failure_recovery_retry": "Invalid or missing references, excluded/already-matched source, or amount mismatch throws; explicit rollback behavior and user retry flow are NOT_ESTABLISHED.",
+          "evidenced_controls": [
+            "FOR UPDATE locking.",
+            "Ordered source selection.",
+            "Bounded concurrent reference validation and creation.",
+            "Transaction callback."
+          ],
+          "audit_provenance": "Durable allocation-history audit is NOT_ESTABLISHED.",
+          "concurrency_idempotency": "Repeat against an already-matched source is rejected; stable request-key replay is NOT_ESTABLISHED.",
+          "scope_privacy": "Authorization and privacy are NOT_ESTABLISHED.",
+          "collision_risk": "Bank-transaction matching must not be treated as evidenced payment-allocation review/history."
+        }
+      },
+      "current_source_packet": {
+        "canonical_owner": "PaymentMatchingService plus settlement and allocation-history owners",
+        "anchors": [
+          "routes/finance.php:464-477",
+          "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:21-156",
+          "resources/js/pages/finance/payment-matching/Index.tsx:138-182",
+          "app/Domain/Finance/Services/PaymentMatchingService.php:300-421,475-616,619-661",
+          "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:15-205",
+          "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150",
+          "app/Domain/Finance/Models/FinPaymentMatch.php",
+          "app/Domain/Finance/Models/FinPaymentAllocation.php",
+          "database/migrations/2026_03_28_002100*",
+          "database/migrations/2026_03_28_004400*",
+          "database/migrations/2026_08_14_000064*",
+          "tests/Feature/Finance/PaymentMatchingJournalPostingTest.php",
+          "tests/Feature/Finance/PaymentAllocationIntegrityTest.php"
+        ],
+        "strengths": [
+          "Action/Site split and concealed foreign targets.",
+          "Transactional settlement and immutable provenance.",
+          "Replay validation, lock ordering, and uniqueness."
+        ],
+        "gaps": [
+          "The frozen target combines allocation-history and match-review facets.",
+          "Index payload does not expose stored rejection reason/actor/time.",
+          "Source does not prove every related-object serialization case.",
+          "Tests were not executed."
+        ]
+      },
+      "scope_red_team": {
+        "verdict": "NO_GO_RECONCILE_FACETS",
+        "reason": "The frozen row combines an append-only history projection with a separate suggested-match lifecycle and settlement side effects; exact authority, state, and replay claims must be reconciled per facet."
+      },
+      "neutral_requirements": null,
+      "current_neutral_comparison": null,
+      "facet_reconciliation": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "source_packet_corrections": [
+          "Separate the allocation-history read projection from suggested-match review, confirm, reject, and settlement replay/provenance dependencies.",
+          "Replace missing route and page claims with the exact allocation-history and payment-matching loci below.",
+          "PaymentSettlementRecorder and AccountsReceivableService are producer dependencies, not owners of the history-review action."
+        ],
+        "required_facet_crosswalk": [
+          {
+            "run_041_required_facet": "allocation_history_read",
+            "overlay_facet": "allocation_history_review",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "match_suggest",
+            "overlay_facet": "suggested_match_review",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "match_confirm",
+            "overlay_facet": "confirm",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "match_reject",
+            "overlay_facet": "reject",
+            "disposition": "EXACT_OWNER_RENAMED"
+          },
+          {
+            "run_041_required_facet": "settlement_replay_and_provenance",
+            "overlay_facet": "settlement_replay_and_provenance",
+            "disposition": "EXACT_OWNER"
+          }
+        ],
+        "facets": [
+          {
+            "facet_ordinal": 1,
+            "facet_key": "allocation_history_review",
+            "ownership_class": "READ_PROJECTION",
+            "anchors": [
+              "app/Domain/Finance/Http/Controllers/PaymentAllocationController.php:11-70",
+              "app/Domain/Finance/Models/FinPaymentAllocation.php:13-111",
+              "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:21-100",
+              "resources/js/pages/finance/payment-allocations/Index.tsx:64-226",
+              "routes/finance.php:339-341",
+              "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:256-358,596-671"
+            ],
+            "authority": "finance.ar.view or finance.ap.view; the controller partitions receivable and payable rows by the exact permission held.",
+            "site_direct_object": "Stored settlement Site scope filters rows. finance.payments.viewAllSites broadens read scope and admits legacy review-required rows. No direct allocation mutation route exists.",
+            "state_effects": "Read-only traceable-allocation versus legacy-review projection; the model blocks update and delete.",
+            "transaction_locking_replay": "Not applicable to the read action.",
+            "contradictions": [],
+            "collision_exclusions": [
+              "Settlement and manual-AR producer commands are not review ownership."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 2,
+            "facet_key": "suggested_match_review",
+            "ownership_class": "READ_PROJECTION_AND_PROPOSAL_COMMAND",
+            "anchors": [
+              "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:21-122",
+              "app/Domain/Finance/Models/FinPaymentMatch.php:14-115",
+              "app/Domain/Finance/Services/PaymentMatchingService.php:32-106,206-295,619-662",
+              "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:124-135",
+              "resources/js/pages/finance/payment-matching/Index.tsx:138-236,520-552",
+              "routes/finance.php:464-472"
+            ],
+            "authority": "List requires finance.bank.view; suggestion and match-all require finance.bank.manage.",
+            "site_direct_object": "List is organisation and stored-Site scoped; review does not re-prove that a stored proposal Site still equals its current target Site, while confirm and reject do.",
+            "state_effects": "Suggested, confirmed, auto-confirmed, or rejected; rejection evidence is immutable. Deterministic proposal keys suppress another non-rejected proposal and append a version after rejection.",
+            "transaction_locking_replay": "Suggestion locks the bank transaction. Proposal versioning is not request idempotency.",
+            "contradictions": [
+              "The view-only page renders auto-match and confirm or reject actions without a capability gate, although routes deny those commands to a finance.bank.view-only actor."
+            ],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 3,
+            "facet_key": "confirm",
+            "ownership_class": "STATE_TRANSITION_COMMAND",
+            "anchors": [
+              "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:127-137",
+              "app/Domain/Finance/Services/PaymentMatchingService.php:300-303,352-606",
+              "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150",
+              "routes/finance.php:473-475",
+              "tests/Feature/Finance/PaymentMatchingJournalPostingTest.php:51-197,391-437"
+            ],
+            "authority": "finance.bank.manage at the route envelope; the service does not independently re-check the action.",
+            "site_direct_object": "Organisation, stored proposal Site, current target Site, and actor target access are checked; inaccessible or mismatched targets are concealed as 404 unless manage-all-Sites applies.",
+            "state_effects": "Suggested to confirmed. AP and AR paths enforce sign, due, journal, allocation, and target-state rules; fully allocated invoices project paid state.",
+            "transaction_locking_replay": "One transaction locks journal sequence, match, bank transaction, then bill or invoice. An already-confirmed result replays only when canonical journal and allocation evidence remains present; no request key exists.",
+            "contradictions": [],
+            "collision_exclusions": [
+              "Evidence-conditioned state replay is not general payload-bound idempotency."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 4,
+            "facet_key": "reject",
+            "ownership_class": "STATE_TRANSITION_COMMAND",
+            "anchors": [
+              "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:142-156",
+              "app/Domain/Finance/Models/FinPaymentMatch.php:45-64",
+              "app/Domain/Finance/Services/PaymentMatchingService.php:308-350",
+              "routes/finance.php:476-478",
+              "tests/Feature/Finance/PaymentMatchingJournalPostingTest.php:253-389"
+            ],
+            "authority": "finance.bank.manage at the route envelope.",
+            "site_direct_object": "The same organisation, current-target, Site, and concealed-404 boundary as confirm.",
+            "state_effects": "Unsettled suggested to immutable rejected with actor, time, and reason; confirmed or rejected rows cannot be rejected again.",
+            "transaction_locking_replay": "Proposal lock, validation, rejection evidence, and fail-closed audit share one transaction. Repeat reject fails; a later suggestion is a new version.",
+            "contradictions": [],
+            "collision_exclusions": [],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          },
+          {
+            "facet_ordinal": 5,
+            "facet_key": "settlement_replay_and_provenance",
+            "ownership_class": "PRODUCER_INTEGRITY_DEPENDENCY",
+            "anchors": [
+              "app/Domain/Finance/Models/FinPaymentAllocation.php:13-111",
+              "app/Domain/Finance/Services/AccountsReceivableService.php:296-439",
+              "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150",
+              "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:21-205",
+              "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:360-671"
+            ],
+            "authority": "Producer commands retain their own exact AR, AP, or bank-management action; all-Sites permissions broaden scope but do not replace that action.",
+            "site_direct_object": "Canonical target and settlement Site are rechecked before append-only allocation evidence is accepted; inaccessible targets are concealed by the owning producer seam.",
+            "state_effects": "Settlement provenance binds allocation, target, source, journal, Site, actor, and bank-transaction evidence. These producer effects feed the history projection but are not owned by its read route.",
+            "transaction_locking_replay": "Recorder uniqueness and producer locks prevent duplicate canonical settlement sources; replay strength varies by producer and is not one target-wide idempotency contract.",
+            "contradictions": [],
+            "collision_exclusions": [
+              "Producer integrity is a dependency of allocation history and must not be credited as the history-review action itself."
+            ],
+            "evidence_class": "STATIC_SOURCE_ONLY",
+            "credits": {
+              "formal_mapping_credit": false,
+              "benchmark_credit": false,
+              "final_no_match_credit": false,
+              "runtime_credit": false,
+              "browser_credit": false,
+              "ease_credit": false,
+              "release_credit": false,
+              "completion_credit": false
+            }
+          }
+        ],
+        "residual_status": "SOURCE_FACETS_RECONCILED_CREDIT_ZERO",
+        "credits": {
+          "formal_mapping_credit": false,
+          "benchmark_credit": false,
+          "final_no_match_credit": false,
+          "runtime_credit": false,
+          "browser_credit": false,
+          "ease_credit": false,
+          "release_credit": false,
+          "completion_credit": false
+        }
+      },
+      "independent_adjudication": {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "verdict": "NO_GO",
+        "formal_edge_count": 0,
+        "determinative_reason": "Five current-source facets are now reconciled, but BigCapital establishes only a candidate matching-command locus. It does not prove allocation-history review, rejection, producer-specific settlement provenance, or one target-wide replay contract.",
+        "next_action": "Run clean neutral comparisons per facet, using BigCapital only for an exact match-confirm candidate and sourcing separate evidence for the remaining facets.",
+        "target_specific_mapping_credit": false,
+        "benchmark_credit": false,
+        "final_no_match_credit": false,
+        "runtime_credit": false,
+        "test_execution_credit": false,
+        "completion_credit": false
+      },
+      "formal_edge_count": 0,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "runtime_credit": false,
+      "test_execution_credit": false,
+      "completion_credit": false,
+      "integrated_record_sha256": "186ad14a50be8c48b0dffd435715191f7e8915e9aaf9a70d2203a4fa7b375db9"
+    }
+  ],
+  "canonical_matrix_disposition": {
+    "status": "UNCHANGED_GUARDED_OVERLAY_ONLY",
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "reason": "The independent adjudicator approved zero formal edges; evidence remains in this overlay until a clean target-specific edge or documented final no-match passes."
+  },
+  "credit_boundary": {
+    "neutral_requirement_packets_materialized": 3,
+    "current_source_comparison_packets_materialized": 3,
+    "facet_reconciliation_packets_materialized": 18,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "final_no_match_credit": 0,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "test_execution_credit": 0,
+    "ease_credit": 0,
+    "release_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-043",
+  "generated_at": "2026-08-24T23:06:00+12:00",
+  "role": "CLEAN_CURRENT_PRODUCT_NEUTRAL_COMPARATOR_AGENT_C",
+  "status": "THREE_BOUNDED_COMPARISONS_COMPLETE_THREE_COMPOSITES_DEFERRED_NO_CREDIT",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "inputs": {
+    "neutral_requirements_run": "RUN-042",
+    "neutral_requirements_sha256": "e17b9aed0268ca22e2a13c843791d3ca65ce818607a9a10a40429b232beab995",
+    "current_source_packets_run": "RUN-040",
+    "current_source_packets_sha256": "4d9ea76a79e023e69c996ae8685f19651a0e309a1ffb217a889d7058f6505602",
+    "scope_red_team_run": "RUN-041",
+    "scope_red_team_sha256": "aef801877a0392df9a84ee77b8a4c573170de68f6841162aea61b655c057ed7c"
+  },
+  "methodology": {
+    "project_identities_seen": false,
+    "upstream_repository_evidence_seen": false,
+    "prior_benchmark_conclusions_seen": false,
+    "comparison_rule": "Compare each clean neutral facet against current pinned source; preserve native ownership; record MET, STRONGER, GAP, or CONTRADICTED; do not award a mapping from source presence.",
+    "runtime_lanes": false,
+    "filesystem_mutations": false
+  },
+  "results": [
+    {
+      "packet_id": "C01",
+      "neutral_packet_id": "B01",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "anchors": [
+        "routes/health-clinical.php:30-35",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100,336-349,620-635",
+        "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:34-69",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120,224-273,280-512,527-547,601-693",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:304-387",
+        "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-105,121-157,180-194",
+        "app/Domain/Clinical/Models/ClinicalObservation.php:18-141",
+        "database/migrations/2026_04_13_100000_create_clinical_observations_table.php:11-45"
+      ],
+      "facets": [
+        {"name": "authorized_create", "rating": "MET", "evidence": "clinical.observations.record plus Client view; typed vitals and pain additionally require clinical.observations.recordClinical."},
+        {"name": "amend", "rating": "GAP", "evidence": "Correction columns and relationships exist, but no observation correction or amendment command was found."},
+        {"name": "person_and_context_ownership", "rating": "STRONGER", "evidence": "Approved-Site Client scope, Shift-to-Client Site integrity, and protocol schedule owner, type, applicability, pending-state, and lock checks."},
+        {"name": "measurements_and_atomicity", "rating": "MET_NATIVE_REPRESENTATION", "evidence": "Type-specific measurement data is range, enum, and time validated and atomically stored as embedded JSON; no separately owned child rows exist."},
+        {"name": "request_to_persisted", "rating": "MET_QUALIFIED", "evidence": "Validated request persists observation, timeline, and optional schedule effect in a three-attempt transaction; there is no preliminary state."},
+        {"name": "register_filters", "rating": "GAP", "evidence": "Client, type, recorder, Site, and date are present; Shift, protocol or template, and top-level or child filters are absent."},
+        {"name": "failure_and_provenance", "rating": "STRONGER", "evidence": "Invalid typed data, mismatched Shift, inaccessible or stale schedule deny before write; synchronous effects are transaction-bound; recorder, time, Site, timeline, and protocol provenance exist."},
+        {"name": "request_replay", "rating": "GAP_NOT_ESTABLISHED", "evidence": "Only pending protocol schedule completion is lock serialized; no ordinary request-key same-result replay exists."},
+        {"name": "direct_object_concealment", "rating": "GAP", "evidence": "Foreign-Site attempts are explicit 403 rather than concealed 404."}
+      ],
+      "native_preserve": "Preserve ClinicalObservationService, embedded typed data, Client and Site ownership, protocol ownership, NEWS2, and timeline.",
+      "bounded_refinement": "Add an append-only correction command with clinical.observations.correct, original-to-correction linkage, and the same Site, type, and context checks. Add only filters backed by native Shift, protocol, and hierarchy fields. Do not absorb questionnaires or approval and escalation.",
+      "negative_acceptance": [
+        "Missing exact action denies with no row.",
+        "Vitals and pain deny without recordClinical.",
+        "Foreign-Site Client or filter writes nothing and leaks no row.",
+        "Mismatched Client and Shift or wrong, stale, or cross-Client schedule rolls back all effects.",
+        "Correction cannot mutate the original or cross Client, Site, or type.",
+        "Context and template filters cannot leak inaccessible rows."
+      ],
+      "provisional_outcome": "PARTIAL_CURRENT_OVERLAP_REFINEMENT_CANDIDATE_ONLY",
+      "reason": "Amendment and required context, template, and hierarchy register facets are missing.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "C02",
+      "neutral_packet_id": "B02",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "anchors": [
+        "routes/health-clinical.php:36-41",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:106-161,357-370",
+        "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:81-123",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:31-140,206-235",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:780-850",
+        "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-168",
+        "app/Domain/Clinical/Models/ClinicalEvent.php:20-150",
+        "database/migrations/2026_04_13_100001_create_clinical_events_table.php:11-50"
+      ],
+      "facets": [
+        {"name": "authorized_create", "rating": "MET", "evidence": "clinical.events.record plus Client view."},
+        {"name": "general_and_type_authority", "rating": "GAP", "evidence": "One general record capability exists; event type changes validation but not action authority."},
+        {"name": "person_and_visit_context", "rating": "MET", "evidence": "Client is canonical owner; optional Shift must belong to that Client and match Site."},
+        {"name": "amend", "rating": "GAP", "evidence": "No bounded event amendment or update command was found."},
+        {"name": "related_inputs", "rating": "PARTIAL", "evidence": "Witnesses and attachments are validated and Shift ownership is checked, but there is no general related-clinical owner and attachments persist after the core transaction."},
+        {"name": "create_state", "rating": "MET_QUALIFIED", "evidence": "Create writes an open event, timeline, and optional synchronous link in a three-attempt transaction; no preliminary state exists."},
+        {"name": "invalidate_restore", "rating": "GAP", "evidence": "SoftDeletes exists on the model, but no separate invalidate or restore action was found."},
+        {"name": "read_scope", "rating": "STRONGER", "evidence": "clinical.events.viewAny plus approved-Site record scope and Client, type, severity, Site, follow-up, review, and date filters."},
+        {"name": "rollback", "rating": "MET_CORE_GAP_PACKAGE", "evidence": "Core validation and transaction rollback exist; attachment failure can occur after core commit and post-commit dispatch is not exactly once."},
+        {"name": "provenance", "rating": "STRONGER", "evidence": "Site snapshot, AuditableChanges, reporter and time, and timeline provenance exist."},
+        {"name": "replay_and_concealment", "rating": "GAP_NOT_ESTABLISHED", "evidence": "No create replay or command row lock; foreign-Site direct action returns explicit 403 rather than concealed 404."}
+      ],
+      "native_preserve": "Preserve ClinicalEventService, Client and Shift Site integrity, typed validation, immediate-action requirement, timeline, and register.",
+      "bounded_refinement": "Add separate append-only amend or supersede, reasoned invalidate, and restore actions with distinct capabilities. Make staged attachments part of an atomic or durable orchestration boundary. Do not fold review, follow-up, escalation, or incident closure into this target.",
+      "negative_acceptance": [
+        "Missing clinical.events.record denies.",
+        "An event type requiring immediate action cannot write without truthful action.",
+        "Client, Shift, or Site mismatch writes nothing.",
+        "Invalid attachment cannot silently claim an all-or-nothing event package.",
+        "Amend cannot overwrite reporter or original provenance or cross Client or Site.",
+        "Invalidation and restore require distinct actions and a reason."
+      ],
+      "provisional_outcome": "PARTIAL_CURRENT_OVERLAP_REFINEMENT_CANDIDATE_ONLY",
+      "reason": "Amendment, type authority, invalidate and restore, and full related-item atomicity are missing.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "packet_id": "C04",
+      "neutral_packet_id": "B04",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "anchors": [
+        "routes/incidents.php:53-57,88-104",
+        "app/Policies/ClientIncidentPolicy.php:11-75",
+        "app/Http/Controllers/IncidentController.php:1358-1364,1560-1618,1621-1725",
+        "app/Models/ClientIncident.php:16-122",
+        "app/Services/Incidents/IncidentJourneyService.php:637-718",
+        "app/Services/UserSiteAccessService.php:220-244"
+      ],
+      "facets": [
+        {"name": "action_authority", "rating": "MET", "evidence": "Review and close require incidents.approve and state predicates; review reauthorizes the locked row."},
+        {"name": "accessible_concealed_object", "rating": "CONTRADICTED", "evidence": "viewAny is unconditional on Site; review checks action plus state but not approved Site. Close asserts Site but returns 403, not concealed 404."},
+        {"name": "neutral_state_chain", "rating": "GAP", "evidence": "Native states are draft, submitted, reviewed, and closed. Investigation, root cause, and improvement actions remain canonical H&S owners outside this target."},
+        {"name": "closure_prerequisites", "rating": "MET_PARTIAL", "evidence": "Review evidence and no open follow-ups are direct gates; high-severity investigation and linked governance closure are external owner gates."},
+        {"name": "actor_time_audit_concurrency", "rating": "STRONGER", "evidence": "Actor and time fields, AuditableChanges, parent row locks, shared lock ordering, and durable lifecycle outbox exist."},
+        {"name": "invalid_state_and_process_conflict", "rating": "MET", "evidence": "Policy, validation, and blocker errors are explicit; inconsistent journey ownership is concealed 404."},
+        {"name": "replay_and_delivery", "rating": "GAP_NOT_ESTABLISHED", "evidence": "Repeat review or close rejects state rather than returning original result; notification dispatch after commit is not exactly once."}
+      ],
+      "native_preserve": "Preserve IncidentJourney closure gates, parent locking, actor and time audit, durable lifecycle outbox, and canonical H&S ownership.",
+      "bounded_refinement": "Resolve show, review, and close through approved-Site scope with an explicit all-Sites bypass and indistinguishable 404, repeated under lock. If a lifecycle projection is needed, expose read-only prerequisite evidence from canonical owners rather than transplanting H&S workflow.",
+      "negative_acceptance": [
+        "Actor with incidents.approve but no target-Site access receives indistinguishable 404 with no mutation, audit, or notification.",
+        "Only submitted incidents review and only reviewed incidents close.",
+        "Missing review, follow-up, investigation, or action prerequisite blocks close.",
+        "Concurrent follow-up creation and close cannot leave a closed incident with open work.",
+        "Audit or outbox failure rolls back state.",
+        "Repeated close cannot duplicate signals or effects."
+      ],
+      "provisional_outcome": "OWNERSHIP_BOUNDARY_REFINEMENT_ONLY_NO_DIRECT_FULL_EDGE",
+      "reason": "The access and concealment contradiction is material, and required investigation, cause, and action ownership is deliberately outside the target.",
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "deferred": [
+    {"feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE", "reason": "RUN-041 requires facet reconciliation before clean neutralization."},
+    {"feature_id": "CAP-MED-CD-REGISTER-BALANCE", "reason": "RUN-041 requires facet reconciliation before clean neutralization."},
+    {"feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY", "reason": "RUN-041 requires facet reconciliation before clean neutralization."}
+  ],
+  "counts": {
+    "bounded_comparisons": 3,
+    "deferred_composites": 3,
+    "partial_overlap_refinement_only": 2,
+    "ownership_boundary_refinement_only": 1,
+    "direct_full_edges": 0,
+    "runtime_credit": 0,
+    "test_execution_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  }
+}

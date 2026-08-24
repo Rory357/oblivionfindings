@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "verification_id": "DASHBOARD-RUN-046-RESPONSIVE-01",
+  "verified_at": "2026-08-24T23:36:48+12:00",
+  "dashboard": {
+    "path": "audit-dashboard.html",
+    "sha256": "1981cbc5fde83e648443f59321cad09aa4a055d28bb13e8ccac2d6f7fbec605b",
+    "served_url": "http://127.0.0.1:8771/audit-dashboard.html?v=run046-648fd95c9291#benchmarks",
+    "generator": "generators/build-current-audit-dashboard.py"
+  },
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_integration_base_commit": "64219d80f"
+  },
+  "static_checks": {
+    "href_count": 50,
+    "local_file_links": 42,
+    "missing_local_links": 0,
+    "run_039_046_evidence_links": 9,
+    "run_039_046_http_200": 9,
+    "deterministic_regeneration": true,
+    "diff_check_clean": true,
+    "placeholder_scan_clean": true,
+    "credential_assignment_pattern_matches": 0,
+    "python_cache_residue": 0
+  },
+  "desktop_browser_check": {
+    "requested_viewport_css_pixels": {"width": 1440, "height": 900},
+    "viewport_inner_css_pixels": {"width": 1440, "height": 900},
+    "document_client_width_css_pixels": 1425,
+    "document_scroll_width_css_pixels": 1425,
+    "page_horizontal_overflow": false,
+    "summary_cards": 8,
+    "summary_card_columns": 4,
+    "badge": "IN PROGRESS · NOT COMPREHENSIVE",
+    "benchmark_table_rows": 15,
+    "first_target_comparison_wave": "6 / 340; 5 candidate locators; 1 bounded no-candidate",
+    "scope_gated_comparison": "3 compared / 3 composite",
+    "facet_reconciliation": "3 targets / 18 facets; 7 HR; 6 medication; 5 finance; 18 / 18 required facets",
+    "independent_adjudication": "6 NO-GO / 0 formal edges",
+    "promoted_mapping_or_final_no_match": "0 / 340",
+    "console_error_count": 0
+  },
+  "mobile_browser_check": {
+    "requested_viewport_css_pixels": {"width": 390, "height": 844},
+    "viewport_inner_css_pixels": {"width": 390, "height": 844},
+    "document_client_width_css_pixels": 375,
+    "document_scroll_width_css_pixels": 375,
+    "page_horizontal_overflow": false,
+    "split_layout_columns": 1,
+    "summary_card_columns": 2,
+    "table_wrappers": 6,
+    "table_wrappers_with_internal_horizontal_scroll": 6,
+    "navigation_internal_horizontal_scroll": true,
+    "run_039_046_evidence_links": 9,
+    "badge": "IN PROGRESS · NOT COMPREHENSIVE",
+    "console_error_count": 0,
+    "viewport_override_reset_after_check": true,
+    "reset_viewport_css_pixels": {"width": 1137, "height": 912}
+  },
+  "credit_boundary": {
+    "audit_dashboard_browser_verification_only": true,
+    "current_application_browser_credit": 0,
+    "runtime_credit": 0,
+    "benchmark_mapping_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}
