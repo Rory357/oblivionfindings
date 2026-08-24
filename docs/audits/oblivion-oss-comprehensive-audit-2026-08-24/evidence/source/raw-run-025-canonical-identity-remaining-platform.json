@@ -1,0 +1,284 @@
+{
+  "schema_version": "run-025.final-owner-mapping.v1",
+  "run_id": "RUN-025",
+  "status": "COMPLETE_READ_ONLY_STATIC_IDENTITY",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "non_audit_product_diff_count": 0,
+    "raw_inputs": [
+      {
+        "run_id": "RUN-018",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-018-canonical-identity-platform.json",
+        "sha256": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629"
+      },
+      {
+        "run_id": "RUN-019",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-019-canonical-identity-adversary.json",
+        "sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"
+      },
+      {
+        "run_id": "RUN-021",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-021-canonical-identity-platform-reconciliation.json",
+        "sha256": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20"
+      }
+    ]
+  },
+  "architecture_boundary": {
+    "architecture": "single-tenant multi-Site",
+    "rule": "Use approved Sites, canonical ownership, direct-object concealment, roles, permissions, and privacy-domain authority; no tenant selector or tenant isolation.",
+    "legacy_note": "IntegrationProviderConnection uses legacy table integration_tenant_secrets; the name is not an authorization boundary."
+  },
+  "scope": {
+    "source_candidate_ids": [
+      "CAP-IT-SELF-SERVICE-TICKET-KB",
+      "CAP-INT-SITE-PROVIDER-SYNC-SECRETS",
+      "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "CAP-SET-DATA-PRIVACY-AUDIT"
+    ],
+    "source_count": 4,
+    "initial_target_proposal_count": 7,
+    "source_scope_sha256": "17e616759ae7e03e85345a2ee12bf93aea8f8beece8085d5df48c059261a48e3"
+  },
+  "decisions": [
+    {
+      "source_id": "CAP-IT-SELF-SERVICE-TICKET-KB",
+      "decision": "SPLIT",
+      "targets": [
+        {
+          "id": "CAP-IT-SELF-SERVICE-TICKET",
+          "class": "H",
+          "module": "IT & Support",
+          "job": "Raise a support ticket and track, comment on, reopen, or rate the actor's own ticket.",
+          "canonical_owner": {
+            "record": "ItTicket",
+            "controller": "ItProvisioningController and ItTicketController",
+            "service": "ItTicketIntakeService and ItWorkAccessService",
+            "policy": "ItTicketPolicy"
+          },
+          "anchors": {
+            "navigation": ["resources/js/components/app-sidebar.tsx:582-591", "app/Domain/It/ItModuleNavigation.php:26-31"],
+            "route": ["routes/web.php:159-194"],
+            "page": ["resources/js/pages/it/index.tsx:2606-2681", "resources/js/pages/it/tickets/show.tsx:207-310"],
+            "controller": ["app/Http/Controllers/It/ItProvisioningController.php:637-666", "app/Http/Controllers/It/ItProvisioningController.php:984-1018", "app/Http/Controllers/It/ItTicketController.php:76-87", "app/Http/Controllers/It/ItTicketController.php:445-715"],
+            "service": ["app/Domain/It/Services/ItTicketIntakeService.php:42-298", "app/Domain/It/Services/ItWorkAccessService.php:78-356"],
+            "model": ["app/Models/ItTicket.php:25-390"],
+            "policy": ["app/Policies/ItTicketPolicy.php:23-120"],
+            "test": ["tests/Feature/It/ItTicketAuthzTest.php:37-170", "tests/Feature/It/ItWorkAccessControllerTest.php:80-225"]
+          },
+          "boundary": "Requester ownership and requested-for identity govern self-service visibility. Site scope is derived from approved Sites. Agent queue work remains CAP-IT-AGENT-TICKET-WORKFLOW and is not absorbed here.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "SOURCE_ALIGNED"
+        },
+        {
+          "id": "CAP-IT-KNOWLEDGE-BASE",
+          "class": "H",
+          "module": "IT & Support",
+          "job": "Browse Site-eligible published guidance and provide feedback; authorised IT managers govern article lifecycle.",
+          "canonical_owner": {
+            "record": "ItKbArticle",
+            "controller": "ItKbController",
+            "service": "ItKbLifecycleService",
+            "policy": "ItKbLifecycleService authority and audience guards"
+          },
+          "anchors": {
+            "navigation": ["app/Domain/It/ItModuleNavigation.php:29-43", "resources/js/components/app-sidebar.tsx:582-591"],
+            "route": ["routes/web.php:212-215", "routes/web.php:271-278"],
+            "page": ["resources/js/pages/it/index.tsx:2692-2918"],
+            "controller": ["app/Http/Controllers/It/ItProvisioningController.php:1310-1404", "app/Http/Controllers/It/ItKbController.php:28-141"],
+            "service": ["app/Domain/It/Services/ItKbLifecycleService.php:26-316"],
+            "model": ["app/Models/ItKbArticle.php:17-99"],
+            "policy": ["routes/web.php:163-164", "routes/web.php:217-278", "app/Domain/It/Services/ItKbLifecycleService.php:263-316"],
+            "test": ["tests/Feature/It/ItKbTest.php:25-205", "tests/Feature/It/ItTicketWorkspaceTest.php:682-708"]
+          },
+          "boundary": "Published visibility is all_staff, it_agents, or specific_sites intersected with approved Sites. Draft and inaccessible article existence is concealed. Ticket suggestions do not merge the KB record with ticket ownership.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "SOURCE_ALIGNED"
+        }
+      ]
+    },
+    {
+      "source_id": "CAP-INT-SITE-PROVIDER-SYNC-SECRETS",
+      "decision": "SPLIT",
+      "targets": [
+        {
+          "id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+          "class": "H",
+          "module": "Integrations",
+          "job": "Configure, test, rotate, disable, and map a governed provider connection and its approved-Site credentials or overrides.",
+          "canonical_owner": {
+            "records": ["IntegrationProviderConnection", "IntegrationSiteConfig", "IntegrationSiteSecret"],
+            "controllers": ["UnifiController", "MilesightController", "SiteIntegrationController"],
+            "service": "IntegrationSecretManager",
+            "policy": "Action permission plus SitePolicy"
+          },
+          "anchors": {
+            "navigation": ["resources/js/components/app-sidebar.tsx:1970-1975", "resources/js/pages/security-devices/integrations.tsx:468-555"],
+            "route": ["routes/security-devices.php:385-387", "routes/security-devices.php:504-520", "routes/security-devices.php:598-614", "routes/sites.php:423-447"],
+            "page": ["resources/js/pages/security-devices/integrations/unifi.tsx:263-683", "resources/js/pages/security-devices/integrations/milesight.tsx:146-790"],
+            "controller": ["app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:53-513", "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:39-381", "app/Http/Controllers/Sites/SiteIntegrationController.php:29-162", "app/Http/Controllers/Sites/SiteIntegrationController.php:253-290", "app/Http/Controllers/Sites/SiteIntegrationController.php:504-582"],
+            "service": ["app/Services/Integration/IntegrationSecretManager.php:21-130"],
+            "model": ["app/Models/Integration/IntegrationProviderConnection.php:20-99", "app/Models/Integration/IntegrationSiteConfig.php:15-88", "app/Models/Integration/IntegrationSiteSecret.php:14-75"],
+            "policy": ["routes/security-devices.php:385-387", "routes/security-devices.php:508-509", "routes/security-devices.php:598-599", "routes/sites.php:77-78", "routes/sites.php:423-447", "app/Policies/SitePolicy.php:20-34", "app/Http/Controllers/Sites/SiteIntegrationController.php:94-101"],
+            "test": ["tests/Feature/SecurityDevices/IntegrationProviderSecretCutoverTest.php:267-445", "tests/Feature/Sites/SiteIntegrationReadBoundaryTest.php:20-94", "tests/Feature/SecurityDevices/UnifiSettingsRefactorTest.php:67-317", "tests/Feature/SecurityDevices/MilesightCommonContractTest.php:38-91"]
+          },
+          "boundary": "Provider credentials are application-level governed secrets; mappings and Site secrets remain bound to approved canonical Sites. Global integration authority does not bypass SitePolicy or disclose raw secret material.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "SOURCE_ALIGNED"
+        },
+        {
+          "id": "CAP-INT-SITE-PROVIDER-SYNC",
+          "class": "D",
+          "module": "Integrations",
+          "job": "Discover provider locations and synchronise mapped-Site devices or events while recording bounded sync outcomes.",
+          "canonical_owner": {
+            "records": ["IntegrationSiteConfig", "IntegrationProviderConnection", "IntegrationSyncLog"],
+            "controllers": ["SiteIntegrationController", "UnifiController", "MilesightController"],
+            "service": "IntegrationAdapterRegistry and typed provider capabilities",
+            "policy": "Action permission plus SitePolicy"
+          },
+          "anchors": {
+            "navigation": ["resources/js/pages/security-devices/integrations.tsx:468-555"],
+            "route": ["routes/sites.php:433-441", "routes/security-devices.php:521-528", "routes/security-devices.php:616-622"],
+            "page": ["resources/js/pages/security-devices/integrations/unifi.tsx:655-683", "resources/js/pages/security-devices/integrations/milesight.tsx:662-859"],
+            "controller": ["app/Http/Controllers/Sites/SiteIntegrationController.php:171-249", "app/Http/Controllers/Sites/SiteIntegrationController.php:293-500", "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:526-797", "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:382-582"],
+            "service": ["app/Services/Integration/IntegrationAdapterRegistry.php:9-90", "app/Providers/AppServiceProvider.php:309-375", "app/Services/Integration/Contracts/InventoryDiscoveryCapability.php:7-11", "app/Services/Integration/Contracts/DeviceSyncCapability.php:9-15"],
+            "model": ["app/Models/Integration/IntegrationSiteConfig.php:15-88", "app/Models/Integration/IntegrationProviderConnection.php:20-99", "app/Models/Integration/IntegrationSyncLog.php:13-82"],
+            "policy": ["routes/sites.php:77-78", "routes/sites.php:433-441", "app/Policies/SitePolicy.php:20-34", "app/Http/Controllers/Sites/SiteIntegrationController.php:171-185", "app/Http/Controllers/Sites/SiteIntegrationController.php:293-318"],
+            "test": ["tests/Feature/Sites/SiteIntegrationMutationSafetyTest.php:74-189", "tests/Feature/SecurityDevices/UnifiSettingsRefactorTest.php:378-646", "tests/Feature/SecurityDevices/MilesightCommonContractTest.php:92-344"]
+          },
+          "boundary": "Sync requires an enabled connected provider, a typed capability, and an active mapping to an approved canonical Site. It does not own credentials, inbound webhook projection, outbound delivery, monitoring collectors, or native device commands.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "SOURCE_ALIGNED"
+        }
+      ]
+    },
+    {
+      "source_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "decision": "SURVIVES",
+      "targets": [
+        {
+          "id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+          "class": "D",
+          "module": "Privacy",
+          "job": "Review and export a cross-domain privacy compliance report only for domains the actor is independently authorised to view.",
+          "canonical_owner": {
+            "records": ["DataSubjectRequest", "DataBreachLog", "PrivacyImpactAssessment", "DataRetentionPolicy", "LegalHold"],
+            "controller": "PrivacyReportController",
+            "service": null,
+            "policy": "Explicit privacy-domain permissions"
+          },
+          "anchors": {
+            "navigation": ["resources/js/components/app-sidebar.tsx:1344-1349", "resources/js/pages/privacy/dashboard.tsx:617-648"],
+            "route": ["routes/privacy.php:145-154"],
+            "page": ["resources/js/pages/privacy/reports/compliance.tsx:69-145", "resources/js/pages/privacy/dashboard.tsx:617-648"],
+            "controller": ["app/Http/Controllers/PrivacyReportController.php:21-225"],
+            "service": [],
+            "model": ["app/Models/DataSubjectRequest.php:14-212", "app/Models/DataBreachLog.php:11-67", "app/Models/PrivacyImpactAssessment.php:10-63", "app/Models/DataRetentionPolicy.php:11-101", "app/Models/LegalHold.php:11-66"],
+            "policy": ["routes/privacy.php:50-56", "routes/privacy.php:60-76", "routes/privacy.php:88-100", "routes/privacy.php:105-121", "routes/privacy.php:126-142", "routes/privacy.php:146-154", "app/Http/Controllers/PrivacyReportController.php:21-23", "app/Http/Controllers/PrivacyReportController.php:76-81"],
+            "test": ["tests/Feature/PrivacyControllerTest.php:528-532", "tests/Feature/PrivacyControllerTest.php:1754-1769", "tests/Feature/PrivacyControllerTest.php:1858-1924"]
+          },
+          "boundary": "The report remains application-wide and cross-domain; no Site or tenant selector is invented. Each included privacy domain must retain its independent action authority.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "STATIC_DEFECT_PRIV_REPORT_DOMAIN_RBAC_01"
+        }
+      ]
+    },
+    {
+      "source_id": "CAP-SET-DATA-PRIVACY-AUDIT",
+      "decision": "SPLIT",
+      "targets": [
+        {
+          "id": "CAP-SET-DATA-GOVERNANCE",
+          "class": "H",
+          "module": "Public & Settings Platform",
+          "job": "Configure application privacy and compliance settings and maintain the processor register.",
+          "canonical_owner": {"record": "AppSetting", "controller": "DataSettingsController", "service": null, "policy": "settings.access.manage"},
+          "anchors": {
+            "navigation": ["resources/js/layouts/settings/layout.tsx:172-186"],
+            "route": ["routes/settings.php:222-233", "routes/settings.php:240-248"],
+            "page": ["resources/js/pages/settings/data.tsx:701-785", "resources/js/pages/settings/data.tsx:1006-1061", "resources/js/pages/settings/data.tsx:1169-1216", "resources/js/pages/settings/data.tsx:1450-1453"],
+            "controller": ["app/Http/Controllers/Settings/DataSettingsController.php:97-132", "app/Http/Controllers/Settings/DataSettingsController.php:168-213", "app/Http/Controllers/Settings/DataSettingsController.php:315-373"],
+            "service": [],
+            "model": ["app/Models/AppSetting.php:7-13"],
+            "policy": ["routes/settings.php:222-248", "app/Http/Controllers/Settings/DataSettingsController.php:366-373"],
+            "test": ["tests/Browser/Settings/DataSettingsInteractionTest.php:61-118", "tests/Browser/Settings/DataSettingsInteractionTest.php:177-239", "tests/Feature/Privacy/DataSubjectRequestLifecycleTest.php:566-799"]
+          },
+          "boundary": "This target owns only application setting keys and the processor register. Retention policies, DSRs, and breach records remain canonical Privacy records even when Settings provides an alternate entry point.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "STATIC_GAPS_IN_EXTERNAL_PRIVACY_SHORTCUTS"
+        },
+        {
+          "id": "CAP-SET-AUDIT-HISTORY-EXPORT",
+          "class": "D",
+          "module": "Public & Settings Platform",
+          "job": "Review, filter, and export the redacted application audit history.",
+          "canonical_owner": {"record": "AuditLog", "controllers": ["AuditLogSettingsController", "AuditLogController"], "service": "AuditLogViewService", "policy": "audit.viewAny"},
+          "anchors": {
+            "navigation": ["resources/js/layouts/settings/layout.tsx:172-186"],
+            "route": ["routes/settings.php:301-307", "routes/reports.php:41-43"],
+            "page": ["resources/js/pages/settings/audit-logs.tsx:231-315", "resources/js/pages/audit/index.tsx:1"],
+            "controller": ["app/Http/Controllers/Settings/AuditLogSettingsController.php:14-127", "app/Http/Controllers/AuditLogController.php:8-58"],
+            "service": ["app/Services/Audit/AuditLogViewService.php:13-334"],
+            "model": ["app/Models/AuditLog.php:10-42"],
+            "policy": ["routes/settings.php:301-307", "app/Http/Controllers/Settings/AuditLogSettingsController.php:64-67", "routes/reports.php:41-43", "app/Http/Controllers/AuditLogController.php:12-16"],
+            "test": ["tests/Feature/Audit/AuditLogSurfaceTest.php:27-143", "tests/Browser/Settings/AuditLogsInteractionTest.php:42-110"]
+          },
+          "boundary": "audit.viewAny is intentionally application-wide; settings.access.manage does not imply it. Presentation is bounded and redacted. This owner reads audit_logs and is distinct from Governance-specific audit history.",
+          "identity_status": "RESOLVED_STATIC",
+          "authority_status": "SOURCE_ALIGNED"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {"relation": "MERGE_COMPONENTS", "source": "CAP-SEC-PROVIDER-INTEGRATIONS", "targets": ["CAP-INT-SITE-PROVIDER-CONNECTION", "CAP-INT-SITE-PROVIDER-SYNC"]},
+    {"relation": "NAVIGATION_ONLY", "source": "CAP-REP-CROSS-MODULE-REPORT-HUB", "target": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT"},
+    {"relation": "MERGE_EXTERNAL_COMPONENT", "source_anchor": "routes/settings.php:225-227", "target": "CAP-PRIV-RETENTION-POLICY-EXECUTION"},
+    {"relation": "MERGE_EXTERNAL_COMPONENT", "source_anchor": "routes/settings.php:234-236", "target": "CAP-PRIV-DSR-LIFECYCLE"},
+    {"relation": "MERGE_EXTERNAL_COMPONENT", "source_anchor": "routes/settings.php:237-239", "target": "CAP-PRIV-BREACH-LIFECYCLE"},
+    {"relation": "RELATED_DISTINCT", "source": "CAP-SET-AUDIT-HISTORY-EXPORT", "other": "CAP-GOV-AUDIT-LOG-EXPORT", "proof": ["app/Services/Audit/AuditLogViewService.php:79-163", "app/Domain/Governance/Services/GovernanceAuditService.php:13-81", "app/Domain/Governance/Http/Controllers/GovernanceAuditLogController.php:19-99"]},
+    {"relation": "EXCLUDE", "subject": "Queclink cloud provider connection and sync", "reason": "No verified cloud contract; capability manifest is empty. Native TCP intake and governed Device Management are separate owners.", "proof": ["app/Services/Integration/Adapters/QueclinkAdapter.php:10-56", "app/Providers/AppServiceProvider.php:333-349", "routes/security-devices.php:538-594"]}
+  ],
+  "findings": [
+    {"id": "PRIV-REPORT-DOMAIN-RBAC-01", "severity": "STATIC_AUTHORITY_GAP", "target": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT", "evidence": "PrivacyReportController gates only privacy.viewRequests while reading and exporting breach, PIA, retention, and legal-hold domains whose canonical routes require distinct permissions.", "anchors": ["app/Http/Controllers/PrivacyReportController.php:21-94", "routes/privacy.php:60-142"]},
+    {"id": "SET-DATA-BREACH-DOMAIN-RBAC-01", "severity": "STATIC_AUTHORITY_GAP", "target_relation": "CAP-SET-DATA-GOVERNANCE -> CAP-PRIV-BREACH-LIFECYCLE", "evidence": "Settings index projects breach rows and storeBreach creates DataBreachLog under settings.access.manage without privacy.reportBreaches.", "anchors": ["app/Http/Controllers/Settings/DataSettingsController.php:97-132", "app/Http/Controllers/Settings/DataSettingsController.php:269-313", "routes/privacy.php:105-121"]},
+    {"id": "SET-DATA-RETENTION-DOMAIN-RBAC-01", "severity": "STATIC_AUTHORITY_GAP", "target_relation": "CAP-SET-DATA-GOVERNANCE -> CAP-PRIV-RETENTION-POLICY-EXECUTION", "evidence": "Settings retention mutation writes DataRetentionPolicy under settings.access.manage while the canonical Privacy retention surface requires privacy.manageRetention.", "anchors": ["app/Http/Controllers/Settings/DataSettingsController.php:134-166", "routes/settings.php:225-227", "routes/privacy.php:60-76"]}
+  ],
+  "counts": {
+    "sources_expected": 4,
+    "sources_resolved": 4,
+    "primary_decisions": 4,
+    "split": 3,
+    "survives": 1,
+    "targets_expected": 7,
+    "targets_resolved": 7,
+    "targets_unique": 7,
+    "class_H": 4,
+    "class_D": 3,
+    "class_M": 0,
+    "identity_owner_gaps": 0,
+    "static_authority_gaps": 3,
+    "relations": 7
+  },
+  "hashes": {
+    "ordered_targets_sha256": "779b0dab3dafc7abc8f6c6769db2c297b12f0d916b72b5c047bd4cb9d0ab4dfb",
+    "ordered_mapping_sha256": "463cecde44f1352225df6e4396d8680cd48c345a92c2297aa3149230cdcd1a5a",
+    "target_normalization": "target_id|class|module; request source order then target order; LF joins; no terminal LF",
+    "mapping_normalization": "source_id|decision|comma-joined target_id:class:module; request source order; LF joins; no terminal LF"
+  },
+  "unresolved": {
+    "identity": [],
+    "owner": [],
+    "route_page_navigation": [],
+    "authority_remediation_required": ["PRIV-REPORT-DOMAIN-RBAC-01", "SET-DATA-BREACH-DOMAIN-RBAC-01", "SET-DATA-RETENTION-DOMAIN-RBAC-01"]
+  },
+  "credits": {"execution": 0, "browser": 0, "test": 0, "build": 0, "database": 0, "benchmark": 0, "completion": 0},
+  "limits": [
+    "Static source and test-presence evidence only.",
+    "No application boot, test execution, browser, build, database, network, release, benchmark-behaviour, or production-readiness credit.",
+    "Identity resolution does not resolve the listed authority defects."
+  ],
+  "completion_assertion": {"all_four_sources_resolved": true, "all_seven_initial_proposals_resolved": true, "identity_unresolved_count": 0, "wrote_files": false},
+  "wrote_files": false
+}

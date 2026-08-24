@@ -1,0 +1,144 @@
+{
+  "schema_version": "run-024.canonical-final-owner-mapping.v1",
+  "run_id": "RUN-024",
+  "status": "SOURCE_IDENTITY_MAPPING_COMPLETE_ZERO_EXECUTION_CREDIT",
+  "source_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "current_application_diff_count": 0
+  },
+  "inputs": [
+    {"path": "evidence/source/raw-run-018-canonical-identity-platform.json", "sha256": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629"},
+    {"path": "evidence/source/raw-run-019-canonical-identity-adversary.json", "sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"},
+    {"path": "evidence/source/raw-run-021-canonical-identity-platform-reconciliation.json", "sha256": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20"}
+  ],
+  "architecture_boundary": "Single application and operating organisation across multiple Sites. Authority uses action permission, approved Site scope, canonical ownership, concealed direct objects, and privacy. Legacy organization_id/tenant_id fields are not new tenant boundaries; FinAccountingIntegration.tenant_id is provider context.",
+  "source_decisions": [
+    {
+      "source_id": "CAP-FIN-DASHBOARD-INSIGHTS",
+      "decision": "SPLIT_REQUIRED",
+      "targets": [
+        {"id": "CAP-FIN-MODULE-OVERVIEW", "class": "H", "module": "Finance", "job": "Review the finance module overview, selected period, cash, receivables, payables, funding, and attention items.", "owner": "FinanceDashboardController and DashboardAggregatorService", "anchors": ["routes/finance.php:64-72", "resources/js/pages/finance/Dashboard.tsx:1-1425", "app/Domain/Finance/Http/Controllers/FinanceDashboardController.php:19-76", "app/Domain/Finance/Services/DashboardAggregatorService.php:19-517", "tests/Feature/Finance/OverviewHubTest.php:9-58"]},
+        {"id": "CAP-FIN-EXECUTIVE-INSIGHTS", "class": "H", "module": "Finance", "job": "Review scoped executive KPIs, insights, and Site summaries.", "owner": "ExecutiveFinancialDashboardController and FinancialInsightsScopeResolver", "anchors": ["routes/finance.php:74-77", "resources/js/pages/finance/executive-dashboard/Index.tsx:1-343", "app/Domain/Finance/Http/Controllers/ExecutiveFinancialDashboardController.php:14-44", "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:25-128", "tests/Architecture/FinancialInsightsObjectScopeBoundaryTest.php:1-145"]},
+        {"id": "CAP-FIN-CASH-POSITION", "class": "H", "module": "Finance", "job": "Review live bank balances and near-term financial obligations.", "owner": "CashPositionController", "anchors": ["routes/finance.php:79-82", "resources/js/pages/finance/cash-position/Index.tsx:1-330", "app/Domain/Finance/Http/Controllers/CashPositionController.php:18-79", "app/Domain/Finance/Models/FinBankAccount.php:1", "tests/Feature/Finance/OverviewHubTest.php:40-58"]},
+        {"id": "CAP-FIN-OBLIGATION-CALENDAR", "class": "H", "module": "Finance", "job": "Review finance obligations over a selected calendar range.", "owner": "FinanceCalendarController and FinanceCalendarAggregator", "anchors": ["routes/finance.php:84-91", "resources/js/pages/finance/Calendar.tsx:1-393", "app/Domain/Finance/Http/Controllers/FinanceCalendarController.php:18-63", "app/Domain/Finance/Services/Calendar/FinanceCalendarAggregator.php:26-116", "tests/Feature/Finance/FinanceCalendarTest.php:122-166"]},
+        {"id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW", "class": "H", "module": "Finance", "job": "Compare financial summaries for every Site visible to the viewer.", "owner": "SitesFinancialOverviewController and FinancialInsightsScopeResolver", "anchors": ["routes/finance.php:93-96", "resources/js/pages/finance/sites-overview/Show.tsx:1-571", "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:14-154", "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:35-70", "tests/Feature/Finance/SitesFinancialOverviewTest.php:1"]},
+        {"id": "CAP-FIN-SITE-FINANCIAL-DASHBOARD", "class": "H", "module": "Finance", "job": "Review the financial position of one authorised Site.", "owner": "SiteFinancialDashboardController and SiteFinancialDashboardService", "anchors": ["routes/finance.php:98-102", "resources/js/pages/finance/site-dashboard/Show.tsx:1-524", "app/Domain/Finance/Http/Controllers/SiteFinancialDashboardController.php:15-52", "app/Domain/Finance/Services/SiteFinancialDashboardService.php:14-144", "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:471-480"]},
+        {"id": "CAP-FIN-CLIENT-FINANCIAL-SUMMARY", "class": "H", "module": "Finance", "job": "Review the scoped costs, funding, invoices, and ledger summary for one Client.", "owner": "ClientFinancialsController and ClientFinancialSummaryService", "anchors": ["routes/finance.php:104-108", "resources/js/pages/clients/Financials.tsx:1-452", "app/Domain/Finance/Http/Controllers/ClientFinancialsController.php:14-45", "app/Domain/Finance/Services/ClientFinancialSummaryService.php:15-211", "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:256-292"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-ACCOUNTING-SYNC-FX-CONSOLIDATION",
+      "decision": "SPLIT_AND_EXCLUDE_UNREACHABLE",
+      "targets": [
+        {"id": "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION", "class": "H", "module": "Finance", "job": "Configure an accounting integration, test its connection, manage mappings, disconnect it, and manually request a sync.", "owner": "AccountingIntegrationController", "anchors": ["routes/finance.php:602-612", "resources/js/pages/finance/Integrations/Index.tsx:1-570", "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:14-241", "app/Domain/Finance/Models/FinAccountingIntegration.php:13-108", "tests/Browser/Finance/FinanceIntegrationMappingInteractionTest.php:8-72"]},
+        {"id": "CAP-FIN-XERO-ACCOUNTING-SYNC", "class": "D", "module": "Finance", "job": "Execute queued Xero account, contact, journal, and invoice synchronisation and retain sync outcomes.", "owner": "SyncAccountingIntegrationJob, GlSyncService, and XeroSyncProvider", "anchors": ["routes/finance.php:607", "app/Domain/Finance/Jobs/SyncAccountingIntegrationJob.php:14-110", "app/Domain/Finance/Services/AccountingSyncProviders/XeroSyncProvider.php:18-679", "app/Domain/Finance/Models/FinGlSyncLog.php:1", "tests/Feature/Finance/XeroAccountingSyncProviderTest.php:18-287"], "boundary": "MYOB is an explicit unsupported stub and receives no execution target."},
+        {"id": "CAP-FIN-FX-REVALUATION", "class": "H", "module": "Finance", "job": "Preview, create, and post an FX revaluation to the general ledger.", "owner": "FxRevaluationController and FxRevaluationService", "anchors": ["routes/finance.php:594-600", "resources/js/pages/finance/fx-revaluations/Index.tsx:1-351", "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:11-82", "app/Domain/Finance/Services/FxRevaluationService.php:12-190", "tests/Browser/Finance/FinanceMiscTest.php:210-214"]}
+      ],
+      "excluded": [
+        {"proposal_id": "CAP-FIN-CONSOLIDATION", "classification": "EXCLUDE_LEGACY_QUARANTINED_UNREACHABLE", "anchors": ["routes/finance.php:653-668", "app/Domain/Finance/Http/Middleware/RejectUnsupportedConsolidation.php:8-17", "tests/Feature/Finance/ConsolidationQuarantineTest.php:17-175"]},
+        {"proposal_id": "CAP-FIN-INTERCOMPANY", "classification": "EXCLUDE_LEGACY_QUARANTINED_UNREACHABLE", "anchors": ["routes/finance.php:653-672", "app/Domain/Finance/Http/Middleware/RejectUnsupportedConsolidation.php:8-17", "tests/Feature/Finance/ConsolidationQuarantineTest.php:17-175"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "decision": "RETAIN_FINAL_H",
+      "targets": [
+        {"id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE", "class": "H", "module": "HR", "job": "Create, view, update, activate, deactivate, rehire, and invite an employee profile through the canonical identity seam.", "owner": "EmployeeProfileController, EmployeeIntakeService, and HrLifecycleAccessService", "anchors": ["routes/hr.php:259-287", "resources/js/pages/hr/employees/show.tsx:1", "app/Http/Controllers/Hr/EmployeeProfileController.php:61-442", "app/Domain/Hr/Policies/HrEmployeeProfilePolicy.php:8-36", "tests/Feature/Hr/EmployeeProfileSitePrivacyTest.php:133-252"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-RECRUITMENT-CANDIDATE-HIRE",
+      "decision": "SPLIT_REQUIRED",
+      "targets": [
+        {"id": "CAP-HR-RECRUITMENT-REQUISITION-LIFECYCLE", "class": "H", "module": "HR", "job": "Create, approve, publish, synchronise, close, and unpublish a recruitment requisition.", "owner": "RecruitmentJobController and HrRecruitmentAccessService", "anchors": ["routes/hr.php:230-248", "resources/js/pages/hr/recruitment/index.tsx:1-2824", "app/Http/Controllers/Hr/RecruitmentJobController.php:21-540", "app/Domain/Hr/Models/HrJobRequisition.php:1", "tests/Feature/Hr/RecruitmentCanonicalAccessTest.php:92-229"]},
+        {"id": "CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE", "class": "H", "module": "HR", "job": "Create and maintain a candidate, move or reject applications, manage the talent pool, communications, tags, and candidate documents.", "owner": "CandidateController and HrRecruitmentAccessService", "anchors": ["routes/hr.php:151-166", "resources/js/pages/hr/candidates/show.tsx:1-2547", "app/Http/Controllers/Hr/CandidateController.php:44-916", "app/Domain/Hr/Models/HrApplication.php:1", "tests/Feature/Hr/RecruitmentCanonicalAccessTest.php:92-229"]},
+        {"id": "CAP-HR-CANDIDATE-ASSESSMENT", "class": "H", "module": "HR", "job": "Define interview kits and conduct governed interviews, scorecards, and reference checks for an application.", "owner": "CandidateController and InterviewKitController", "anchors": ["routes/hr.php:167-179", "resources/js/pages/hr/candidates/show.tsx:1-2547", "app/Http/Controllers/Hr/InterviewKitController.php:11-100", "app/Domain/Hr/Models/HrInterview.php:1", "tests/Feature/Hr/RecruitmentDeferredLifecycleTest.php:185-247"]},
+        {"id": "CAP-HR-RECRUITMENT-OFFER-HIRE-LIFECYCLE", "class": "H", "module": "HR", "job": "Create, approve, send, accept or decline an offer and convert an accepted offer through the canonical employee-intake seam.", "owner": "CandidateController, RecruitmentService, and EmployeeIntakeService", "anchors": ["routes/hr.php:206-228", "resources/js/pages/hr/candidates/create-offer.tsx:1-842", "app/Domain/Hr/Services/RecruitmentService.php:283-449", "app/Domain/Hr/Models/HrOffer.php:1", "tests/Feature/Hr/RecruitmentOfferLifecycleTest.php:51-206"]},
+        {"id": "CAP-HR-RECRUITMENT-PIPELINE-EXPORT", "class": "D", "module": "HR", "job": "Export the authorised Site-visible recruitment pipeline.", "owner": "RecruitmentExportController and HrRecruitmentAccessService", "anchors": ["routes/hr.php:141-144", "resources/js/pages/hr/recruitment/index.tsx:1-2824", "app/Http/Controllers/Hr/RecruitmentExportController.php:19-146", "app/Domain/Hr/Models/HrApplication.php:1", "tests/Feature/Hr/RecruitmentCanonicalAccessTest.php:147-169"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-REPORTING-EXPORT",
+      "decision": "SPLIT_REQUIRED",
+      "targets": [
+        {"id": "CAP-HR-WORKFORCE-REPORT-RUN", "class": "H", "module": "HR", "job": "Select and run a governed standard workforce report.", "owner": "HrReportController and HrReportingService", "anchors": ["routes/hr.php:739-745", "resources/js/pages/hr/reports/index.tsx:1-583", "app/Http/Controllers/Hr/HrReportController.php:16-159", "app/Domain/Hr/Models/HrEmployeeProfile.php:17-226", "tests/Feature/Hr/HrReportingExpandedTypesTest.php:123-210"]},
+        {"id": "CAP-HR-WORKFORCE-REPORT-EXPORT", "class": "D", "module": "HR", "job": "Generate, view, and download a persisted standard workforce report export.", "owner": "HrReportController and HrReportingService", "anchors": ["routes/hr.php:745-749", "resources/js/pages/hr/reports/show.tsx:1-172", "app/Http/Controllers/Hr/HrReportController.php:164-231", "app/Domain/Hr/Models/HrReportExport.php:1-43", "tests/Feature/Hr/HrReportAutomationTest.php:45-74"]},
+        {"id": "CAP-HR-SAVED-REPORT-LIFECYCLE", "class": "H", "module": "HR", "job": "Define, preview, save, run, and remove a creator-owned custom HR report.", "owner": "ReportBuilderController and ReportBuilderService", "anchors": ["routes/hr.php:1365-1375", "resources/js/pages/hr/reports/builder.tsx:1-601", "app/Http/Controllers/Hr/ReportBuilderController.php:14-155", "app/Domain/Hr/Models/HrSavedReport.php:1", "tests/Feature/Hr/ReportBuilderCanonicalAccessTest.php:93-229"]},
+        {"id": "CAP-HR-SAVED-REPORT-EXPORT", "class": "D", "module": "HR", "job": "Export a creator-owned saved report as an authorised CSV.", "owner": "ReportBuilderController and ReportBuilderService", "anchors": ["routes/hr.php:1373-1374", "resources/js/pages/hr/reports/saved.tsx:1-400", "app/Http/Controllers/Hr/ReportBuilderController.php:156-170", "app/Domain/Hr/Models/HrSavedReport.php:1", "tests/Feature/Hr/SavedReportActionsTest.php:57-67"]},
+        {"id": "CAP-HR-REPORT-SUBSCRIPTION", "class": "H", "module": "HR", "job": "Configure, update, pause, and resume a governed scheduled-report subscription and its recipients.", "owner": "HrReportController and HrReportingService", "anchors": ["routes/hr.php:747-752", "resources/js/pages/hr/reports/index.tsx:1-583", "app/Http/Controllers/Hr/HrReportController.php:234-383", "app/Domain/Hr/Models/HrReportSubscription.php:14-64", "tests/Feature/Hr/HrReportAutomationTest.php:45-74"]},
+        {"id": "CAP-HR-SCHEDULED-REPORT-EXECUTION", "class": "D", "module": "HR", "job": "Execute due HR report subscriptions, persist exports, and notify authorised recipients.", "owner": "RunHrScheduledReportsJob and HrReportingService", "anchors": ["routes/console.php:661-665", "app/Domain/Hr/Jobs/RunHrScheduledReportsJob.php:17-104", "app/Domain/Hr/Models/HrReportSubscription.php:14-64", "tests/Feature/Hr/HrReportAutomationTest.php:45-74"]}
+      ]
+    },
+    {
+      "source_id": "CAP-OPS-ROSTER-PLAN-PUBLISH",
+      "decision": "SPLIT_REQUIRED",
+      "targets": [
+        {"id": "CAP-OPS-ROSTER-PLANNING-WORKSPACE", "class": "H", "module": "Workforce", "job": "Review and plan a Site roster, calendar, conflicts, coverage, and open shifts.", "owner": "RosteringController and RosterPeriodService", "anchors": ["routes/operations.php:900-928", "resources/js/pages/operations/rostering/index.tsx:1-3233", "app/Http/Controllers/RosteringController.php:38-1063", "app/Models/RosterPeriod.php:1", "tests/Feature/Rostering/RosterPeriodSiteAccessTest.php:10-35"]},
+        {"id": "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE", "class": "H", "module": "Workforce", "job": "Create, duplicate, update, apply, and remove a roster template.", "owner": "RosterTemplateController", "anchors": ["routes/operations.php:930-953", "resources/js/components/rostering/templates-pane.tsx:1", "app/Http/Controllers/Operations/RosterTemplateController.php:1-463", "app/Models/RosterTemplate.php:1", "tests/Feature/Rostering/TemplateApplyTest.php:18-230"]},
+        {"id": "CAP-OPS-ROSTER-AUTO-SCHEDULE-SUGGESTIONS", "class": "H", "module": "Workforce", "job": "Generate, review, accept, dismiss, and apply roster suggestions.", "owner": "RosterSuggestionController and RosterSuggestionService", "anchors": ["routes/operations.php:983-994", "resources/js/pages/operations/rostering/suggestions/Show.tsx:1-480", "app/Domain/Rostering/AutoSchedule/RosterSuggestionService.php:12-286", "app/Models/RosterSuggestion.php:1", "tests/Feature/Rostering/SuggestionEndToEndTest.php:39-124"]},
+        {"id": "CAP-OPS-ROSTER-PERIOD-PUBLICATION", "class": "H", "module": "Workforce", "job": "Review, validate, publish, compare, republish, and unpublish a Site roster period.", "owner": "RosteringController and RosterPublishingService", "anchors": ["routes/operations.php:968-981", "resources/js/pages/operations/rostering/publish/Review.tsx:1-485", "app/Domain/Rostering/RosterPublishingService.php:12-354", "app/Models/RosterPeriod.php:1", "tests/Feature/Rostering/RosterPublishingTest.php:11-133"]}
+      ]
+    },
+    {
+      "source_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+      "decision": "SPLIT_REQUIRED",
+      "targets": [
+        {"id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION", "class": "H", "module": "Workforce", "job": "Clock in, take breaks, clock out, and create or reconcile the worker's attendance-backed draft timesheet.", "owner": "AttendanceController and AttendanceService", "anchors": ["routes/shifts.php:96-104", "resources/js/pages/attendance/index.tsx:1-1601", "app/Domain/Hr/Services/AttendanceService.php:30-273", "app/Domain/Hr/Models/HrAttendanceSession.php:1", "tests/Feature/Hr/AttendanceClockWorkflowTest.php:40-480"]},
+        {"id": "CAP-OPS-ATTENDANCE-SESSION-CORRECTION", "class": "H", "module": "Workforce", "job": "Correct a missed or inaccurate attendance session, or end a stale session under explicit manager authority.", "owner": "AttendanceController and AttendanceService", "anchors": ["routes/shifts.php:105-114", "resources/js/pages/attendance/index.tsx:1-1601", "app/Domain/Hr/Services/AttendanceService.php:274-499", "app/Domain/Hr/Models/HrAttendanceSession.php:1", "tests/Feature/Hr/AttendanceSessionSiteBoundaryTest.php:77-329"]}
+      ],
+      "merge_relations": [{"surface": "AttendanceController handover submission and acknowledgement", "target": "CAP-OPS-SHIFT-HANDOVER", "anchors": ["routes/shifts.php:121-126", "app/Services/ShiftHandoverService.php:1"]}]
+    },
+    {
+      "source_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+      "decision": "RETAIN_FINAL_H_OWNER_CORRECTED",
+      "targets": [
+        {"id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT", "class": "H", "module": "Workforce", "job": "Create or edit a shift/manual timesheet and submit or atomically resubmit it for approval.", "owner": "TimesheetController and TimesheetApprovalService", "anchors": ["routes/operations.php:1032-1050", "resources/js/pages/operations/timesheets/index.tsx:1-1325", "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:18-116", "app/Models/Timesheet.php:1", "tests/Feature/TimesheetSafetyGuardsTest.php:165-228"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL",
+      "decision": "MERGE_GUARD_ONLY",
+      "targets": [
+        {"id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "class": "H", "module": "Workforce", "job": "Select an eligible worker and assign, unassign, or auto-fill a Shift.", "owner": "ShiftController, ShiftLifecycleService, and AssignmentEligibilityGateway", "relation": "MERGE_GUARD_ONLY", "anchors": ["routes/operations.php:807-819", "resources/js/components/rostering/reassign-dialog.tsx:1", "app/Services/Eligibility/AssignmentEligibilityGateway.php:11-37", "app/Models/Shift.php:1", "tests/Unit/Services/AssignmentEligibilityGatewayTest.php:17-88"]}
+      ]
+    }
+  ],
+  "relations": [
+    {"relation": "MERGE_COMPONENT", "source_surface": "AttendanceController handover submission and acknowledgement", "target": "CAP-OPS-SHIFT-HANDOVER", "anchors": ["routes/shifts.php:121-126", "app/Http/Controllers/AttendanceController.php:509-637", "app/Services/ShiftHandoverService.php:1"]},
+    {"relation": "MERGE_GUARD_ONLY", "source": "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL", "target": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "anchors": ["app/Services/Eligibility/AssignmentEligibilityGateway.php:11-37", "app/Services/ShiftStaffEligibilityService.php:21-449"]}
+  ],
+  "counts": {
+    "source_candidates_expected": 9,
+    "source_candidates_decided": 9,
+    "source_candidates_unique": 9,
+    "current_target_proposals_expected": 12,
+    "final_target_relations": 30,
+    "final_target_ids_unique": 30,
+    "final_H": 25,
+    "final_D": 5,
+    "excluded_current_proposals": 2,
+    "merge_relations": 2,
+    "identity_unresolved": 0,
+    "route_or_page_less_D_targets": 2,
+    "execution_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  },
+  "hashes": {
+    "ordered_source_scope_sha256": "e991798cf972fc27635edecb56c767d08979d08e51f303a83caa34d5c52d6db3",
+    "ordered_target_id_sha256": "6092435da9b6af656fa78020eff55cb0fbcd56d0c13d5592ed72fb1ecc02ac46",
+    "normalized_decision_graph_sha256": "f08d3825ce6b15bff1e2ec23a79b58bd0d771d4aad232a266416c804c3200e14"
+  },
+  "unresolved_items": [],
+  "evidence_limits": [
+    "Static pinned-source identity and ownership only.",
+    "Named tests were located but not executed.",
+    "No application boot, build, browser, database, network, benchmark, ease, release, or production-readiness credit.",
+    "Quarantined consolidation/intercompany files remain inventory surfaces but receive no current feature identity or completion credit.",
+    "MYOB receives no execution target because its provider implementation is explicitly unsupported."
+  ],
+  "credits": {"source_identity_mapping": true, "runtime": false, "tests_executed": false, "browser": false, "benchmark": false, "ease": false, "completion": false},
+  "completion_test": {"exact_source_scope_reconciled": true, "all_current_proposals_disposed": true, "every_retained_target_has_route_page_controller_service_model_authority_test_anchor_or_explicit_D_absence": true, "single_tenant_site_boundary_preserved": true, "zero_credit_contract_preserved": true, "audit_completion_test_met": false},
+  "adjudication_wrote_files": false
+}

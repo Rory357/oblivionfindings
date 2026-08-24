@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-026",
+  "status": "COMPLETE_READ_ONLY_REPORT_CATALOG_IDENTITY_ADJUDICATION_NOT_FINAL_DENOMINATOR",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "observed_repository_head": "ce166f31ccda33582a17a32b1412e599257ea3a9"
+  },
+  "inputs": [
+    {
+      "path": "evidence/source/raw-run-017-canonical-identity-frontline.json",
+      "sha256": "f503ce331a80457e04caf5859c69feecc8ccb9ac3f345ff81bf5b3d2fc3d5e4e"
+    },
+    {
+      "path": "evidence/source/raw-run-018-canonical-identity-platform.json",
+      "sha256": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629"
+    },
+    {
+      "path": "evidence/source/raw-run-019-canonical-identity-adversary.json",
+      "sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"
+    },
+    {
+      "path": "evidence/source/raw-run-020-canonical-identity-frontline-reconciliation.json",
+      "sha256": "5720eee0e0677585bb960f8d7209e469d13a6d3d1087f2475659c7c514c2ee70"
+    },
+    {
+      "path": "evidence/source/raw-run-021-canonical-identity-platform-reconciliation.json",
+      "sha256": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20"
+    },
+    {
+      "path": "evidence/source/raw-run-022-canonical-identity-blocked-owner-verification.json",
+      "sha256": "05553c6e66bfae73a540302a38b121e61cd7573f628a5e89e3643b0fda0e261f"
+    },
+    {
+      "path": "evidence/source/raw-run-023-canonical-identity-cross-scope-arbitration.json",
+      "sha256": "1fb344ce088abb9c92d6f2d0d83835fed95555e0a38fb485e69170d20c2c85a9"
+    }
+  ],
+  "shared_surface": {
+    "view_route": "GET /reports/modules/{module}",
+    "export_route": "GET /reports/modules/{module}/export",
+    "route_names": [
+      "reports.modules.show",
+      "reports.modules.export"
+    ],
+    "controller": "App\\Http\\Controllers\\ModuleReportController",
+    "page": "resources/js/pages/reports/module.tsx",
+    "anchors": [
+      "routes/reports.php:23-31",
+      "app/Http/Controllers/ModuleReportController.php:14-97",
+      "app/Http/Controllers/ModuleReportController.php:103-152",
+      "resources/js/pages/reports/module.tsx:65-226"
+    ],
+    "feature_class": "D",
+    "authority_observation": "The shared route/controller checks reports.viewAny and constructs modelClass::query() without source-visible module action, approved-Site, canonical-parent, or safeguarding-sensitivity scoping.",
+    "authority_observation_anchors": [
+      "routes/reports.php:23-31",
+      "app/Http/Controllers/ModuleReportController.php:17",
+      "app/Http/Controllers/ModuleReportController.php:60",
+      "app/Http/Controllers/ModuleReportController.php:117"
+    ]
+  },
+  "mappings": [
+    {
+      "catalog_key": "clients",
+      "label": "Clients",
+      "model": "App\\Models\\Client",
+      "date_field": "created_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:14-31",
+      "view_path": "/reports/modules/clients",
+      "export_path": "/reports/modules/clients/export",
+      "module_owner": "Operations",
+      "canonical_final_id": "CAP-OPS-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Generic Client register view/CSV is an Operations report variant; it does not replace Client record lifecycle ownership.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "staff",
+      "label": "Staff / Users",
+      "model": "App\\Models\\User",
+      "date_field": "created_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:34-49",
+      "view_path": "/reports/modules/staff",
+      "export_path": "/reports/modules/staff/export",
+      "module_owner": "HR",
+      "canonical_final_id": "CAP-HR-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "User account, role, approval, and verification rows are an HR reporting variant; they do not replace employee-profile or access-administration mutation owners.",
+      "integration_dependency": "RUN-024 target-anchor completion",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "sites",
+      "label": "Sites",
+      "model": "App\\Models\\Site",
+      "date_field": "created_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:52-67",
+      "view_path": "/reports/modules/sites",
+      "export_path": "/reports/modules/sites/export",
+      "module_owner": "Sites & Locations",
+      "canonical_final_id": "CAP-SITE-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Generic Site register output is a Site reporting variant and remains separate from Site-profile mutation.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "shifts",
+      "label": "Shifts",
+      "model": "App\\Models\\Shift",
+      "date_field": "starts_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:70-86",
+      "view_path": "/reports/modules/shifts",
+      "export_path": "/reports/modules/shifts/export",
+      "module_owner": "Operations",
+      "canonical_final_id": "CAP-OPS-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Shift register output aliases the Operations shift-report family, not shift lifecycle or staffing mutations.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "timesheets",
+      "label": "Timesheets",
+      "model": "App\\Models\\Timesheet",
+      "date_field": "work_date",
+      "definition_anchor": "app/Support/ReportCatalog.php:89-107",
+      "view_path": "/reports/modules/timesheets",
+      "export_path": "/reports/modules/timesheets/export",
+      "module_owner": "Operations",
+      "canonical_final_id": "CAP-OPS-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Timesheet register output aliases Operations utilisation/service-hours reporting, not author, approval, or payroll transitions.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "incidents",
+      "label": "Incidents",
+      "model": "App\\Models\\ClientIncident",
+      "date_field": "occurred_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:110-127",
+      "view_path": "/reports/modules/incidents",
+      "export_path": "/reports/modules/incidents/export",
+      "module_owner": "Incidents",
+      "canonical_final_id": "CAP-INC-INCIDENT-REPORT-CSV-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_EXACT_RECORD_REPORT",
+      "overlap": "The generic ClientIncident register and dedicated incident CSV are variants of the same incident-reporting job.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "safeguarding",
+      "label": "Safeguarding",
+      "model": "App\\Models\\SafeguardingConcern",
+      "date_field": "reported_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:130-149",
+      "view_path": "/reports/modules/safeguarding",
+      "export_path": "/reports/modules/safeguarding/export",
+      "module_owner": "Safeguarding",
+      "canonical_final_id": "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "ESTABLISH_NEW_NARROW_MODULE_REPORT_TARGET",
+      "overlap": "This is a generic concern-register view/CSV. It does not revive CAP-SAFE-REPORT-AUDIT-EXPORT and remains distinct from external-report mutation and attachment download.",
+      "supersedes": "RUN-022 absolute negative statement that no safeguarding report route exists; RUN-022's audit-evidence exclusion remains valid.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "assets",
+      "label": "Assets",
+      "model": "App\\Models\\Asset",
+      "date_field": "created_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:152-172",
+      "view_path": "/reports/modules/assets",
+      "export_path": "/reports/modules/assets/export",
+      "module_owner": "Fleet & Assets",
+      "canonical_final_id": "CAP-FLEET-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Asset register output follows canonical Fleet & Assets record ownership. Site facility aggregates are related but distinct.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "medication_administrations",
+      "label": "Medication Administrations",
+      "model": "App\\Models\\ClientMedicationAdministration",
+      "date_field": "administered_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:175-194",
+      "view_path": "/reports/modules/medication_administrations",
+      "export_path": "/reports/modules/medication_administrations/export",
+      "module_owner": "eMAR",
+      "canonical_final_id": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Medication-administration rows are a MAR reporting variant under the reconciled medication reporting/export family.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "controlled_drug_discrepancies",
+      "label": "Controlled Drug Discrepancies",
+      "model": "App\\Models\\ClientControlledDrugDiscrepancy",
+      "date_field": "reported_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:197-216",
+      "view_path": "/reports/modules/controlled_drug_discrepancies",
+      "export_path": "/reports/modules/controlled_drug_discrepancies/export",
+      "module_owner": "eMAR",
+      "canonical_final_id": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Controlled-drug discrepancy rows are an existing medication-report variant, not the discrepancy lifecycle owner.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "fleet_trips",
+      "label": "Fleet Trips",
+      "model": "App\\Models\\FleetTrip",
+      "date_field": "started_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:219-237",
+      "view_path": "/reports/modules/fleet_trips",
+      "export_path": "/reports/modules/fleet_trips/export",
+      "module_owner": "Fleet & Assets",
+      "canonical_final_id": "CAP-FLEET-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_MODULE_REPORT_FAMILY",
+      "overlap": "Fleet-trip register output is a trip variant within the existing fleet reporting/export family.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "respite_bookings",
+      "label": "Respite Bookings",
+      "model": "App\\Models\\RespiteBooking",
+      "date_field": "start_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:240-256",
+      "view_path": "/reports/modules/respite_bookings",
+      "export_path": "/reports/modules/respite_bookings/export",
+      "module_owner": "Respite",
+      "canonical_final_id": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "ESTABLISH_NEW_NARROW_MODULE_REPORT_TARGET",
+      "overlap": "Booking register view/CSV is distinct from booking lifecycle and from sealed respite evidence-pack export.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "respite_requests",
+      "label": "Respite Requests",
+      "model": "App\\Models\\RespiteBookingRequest",
+      "date_field": "requested_start",
+      "definition_anchor": "app/Support/ReportCatalog.php:259-277",
+      "view_path": "/reports/modules/respite_requests",
+      "export_path": "/reports/modules/respite_requests/export",
+      "module_owner": "Respite",
+      "canonical_final_id": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_INTO_NEW_NARROW_MODULE_REPORT_TARGET",
+      "overlap": "Booking-request register output is the sibling variant of the same Respite reporting family, not request approval or evidence-pack ownership.",
+      "credit_supportable": false
+    },
+    {
+      "catalog_key": "audit_logs",
+      "label": "Audit Logs",
+      "model": "App\\Models\\AuditLog",
+      "date_field": "created_at",
+      "definition_anchor": "app/Support/ReportCatalog.php:280-296",
+      "view_path": "/reports/modules/audit_logs",
+      "export_path": "/reports/modules/audit_logs/export",
+      "module_owner": "Public & Settings Platform",
+      "canonical_final_id": "CAP-SET-AUDIT-HISTORY-EXPORT",
+      "feature_class": "D",
+      "resolution": "MERGE_EXISTING_EXACT_RECORD_REPORT",
+      "overlap": "The generic AuditLog CSV aliases Settings audit-history export over the same global AuditLog record. CAP-GOV-AUDIT-LOG-EXPORT is related but governance-filtered and remains distinct.",
+      "integration_dependency": "RUN-025 target-anchor completion",
+      "credit_supportable": false
+    }
+  ],
+  "target_summary": {
+    "catalog_instance_count": 14,
+    "mapped_instance_count": 14,
+    "unmapped_instance_count": 0,
+    "unique_canonical_target_count": 9,
+    "existing_or_concurrent_target_count": 7,
+    "new_narrow_target_count": 2,
+    "target_multiplicity": {
+      "CAP-OPS-REPORTING-EXPORT": 3,
+      "CAP-HR-REPORTING-EXPORT": 1,
+      "CAP-SITE-REPORTING-EXPORT": 1,
+      "CAP-INC-INCIDENT-REPORT-CSV-EXPORT": 1,
+      "CAP-SAFE-CONCERN-REPORTING-EXPORT": 1,
+      "CAP-FLEET-REPORTING-EXPORT": 2,
+      "CAP-MED-REPORT-PDF-AUDIT-EXPORTS": 2,
+      "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT": 2,
+      "CAP-SET-AUDIT-HISTORY-EXPORT": 1
+    }
+  },
+  "gap_resolution": {
+    "source_gap_id": "GLOBAL-REPORT-CATALOG-DEDUPE",
+    "prior_status": "BLOCKED",
+    "prior_count": 14,
+    "run_026_status": "RESOLVED_FOR_IDENTITY_INTEGRATION",
+    "denominator_frozen": false
+  },
+  "validation": {
+    "source_pin_tree_match": true,
+    "catalog_keys": 14,
+    "unique_catalog_keys": 14,
+    "unique_catalog_routes": 14,
+    "unique_catalog_models": 14,
+    "expected_key_set_match": true,
+    "model_blobs_missing": 0,
+    "source_anchor_paths_missing": 0,
+    "non_d_mappings": 0,
+    "runtime_lanes_executed": 0,
+    "browser_lanes_executed": 0,
+    "test_lanes_executed": 0,
+    "files_written": 0
+  },
+  "credits": {
+    "runtime": 0,
+    "browser": 0,
+    "test_execution": 0,
+    "release": 0,
+    "benchmark": 0,
+    "ease": 0,
+    "completion": 0
+  },
+  "evidence_limit": "Static pinned-source identity adjudication only. No authorization correctness, runtime reachability, browser rendering, test result, benchmark match, ease score, release proof, production-readiness conclusion, or final-denominator credit is awarded.",
+  "audit_completion_test_met": false,
+  "adjudication_wrote_files": false,
+  "materialization_wrote_files": false
+}
