@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "status": "FORMAL_VISUAL_MATRIX_MATERIALIZATION_RECONCILED_AUDIT_INCOMPLETE",
+  "generated_at": "2026-08-24T18:10:00+12:00",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "writer_boundary": "Only the root orchestrator wrote the generator, matrix, and normalized audit evidence; RUN-016 returned source/evidence in messages and reported wrote_files=false.",
+  "wave_formal_assignments_eligible": 1,
+  "cumulative_formal_assignments_eligible": 16,
+  "literal_prompt_minimum": 8,
+  "literal_prompt_minimum_met": true,
+  "planned_formal_assignments_target": 11,
+  "planned_target_met": true,
+  "all_returned": true,
+  "all_completion_tests_met": true,
+  "all_reported_no_writes": true,
+  "outstanding_required_roles_or_waves": [
+    "canonical feature identity and collision adjudication",
+    "safe current-build rendered role/Site/viewport/state coverage",
+    "full per-project upstream behavior/licence/edition triage",
+    "fresh Pass 8 cross-reviewers",
+    "final no-live-agent reconciliation"
+  ],
+  "assignment_returns": [
+    {
+      "assignment_id": "RUN-016",
+      "agent_task_path": "/root/current_visual_static_census",
+      "role": "full visual-row materialization contract and linkage reconciler",
+      "pass_lens": "Pass 4 static visual inventory and route/feature linkage support",
+      "scope": "All 2812 source-derived hero, overlay, declarative-trigger, direct-inline-trigger, and named-handler-trigger rows",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; lexical role/Site/privacy hints are not authorization evidence.",
+      "no_write_rule": "Return generator source and structured evidence in messages; do not edit repository files.",
+      "return_status": "COMPLETE_AFTER_EXECUTABLE_NO_WRITE_REPRODUCTION",
+      "evidence_count": 2812,
+      "evidence_count_basis": "Unique row-level static hero, overlay, declarative-trigger, direct-inline-trigger, and named-handler-trigger projections. Supporting RUN-013 ledgers retain their separate primary evidence_count=4276.",
+      "completion_test_met": true,
+      "wrote_files": false,
+      "root_reconciliation": "The root orchestrator applied the returned generator, passed its no-write check, materialized the exact 2812-row CSV, and independently matched the expected SHA-256.",
+      "credit_boundary": {
+        "source_materialization": "2812/2812",
+        "browser": 0,
+        "build": 0,
+        "runtime": 0,
+        "tests": 0,
+        "route_execution": 0,
+        "access_control": 0,
+        "rendered_visual_coverage": 0,
+        "final_feature_identity": 0
+      },
+      "unresolved_gaps": "Dynamic callbacks, injected handlers, runtime dispatch, exact routes, final feature identities, roles, approved-Site behavior, viewports, screenshots, accessibility, rendered states, and application build identity remain open.",
+      "normalized_payload_sha256": "d73f27b6acc470ebe5a4dab4f610bcbc3a75e3098aee0dc614f7c1922be52edf"
+    }
+  ],
+  "finalization_gate": false
+}

@@ -14,8 +14,8 @@
   "all_completion_tests_met": true,
   "all_reported_no_writes": true,
   "outstanding_required_roles_or_waves": [
-    "RUN-015 official GitHub metadata normalization",
-    "RUN-016 full visual-row materialization contract",
+    "RUN-015 official GitHub metadata normalization (later reconciled in separate register)",
+    "RUN-016 full visual-row materialization contract (later reconciled in separate register)",
     "canonical identity/collision adjudication",
     "fresh Pass 8 cross-reviewers",
     "final no-live-agent reconciliation"
@@ -53,11 +53,11 @@
       ],
       "completion_test_met": true,
       "wrote_files": false,
-      "root_reconciliation": "Primary static universes reconcile; full row materialization and rendered/browser evidence remain open.",
+      "root_reconciliation": "Primary static universes reconcile. Row materialization was open at the RUN-013 handoff and was later completed separately by RUN-016; rendered/browser evidence remains open.",
       "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
       "architecture_rule": "Single tenant, multiple Sites; roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
       "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
-      "normalized_payload_sha256": "5ec2f003d555db7db071b67bc864fd95575bc16a321572778c57616d586c6420"
+      "normalized_payload_sha256": "1cd556b731ef76a2973e269638db5659293ffe0f0b9e382cba94f7f3e036398e"
     },
     {
       "assignment_id": "RUN-014",

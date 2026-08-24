@@ -16,6 +16,7 @@ GENERATED_AT = "2026-08-24T17:43:00+12:00"
 APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 AUDIT_INPUT_COMMIT = "779fdea9d24b444738396698c2b9001c686ba144"
+VISUAL_MATRIX_SHA256 = "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84"
 
 
 def write_json(relative: str, payload: object) -> None:
@@ -36,6 +37,10 @@ def write_csv(relative: str, fields: list[str], rows: list[dict]) -> None:
 def digest(value: object) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 ROUTE_ROWS = [
@@ -355,15 +360,22 @@ VISUAL_PAYLOAD = {
         "hashes": {"declarative": "bc0f21fc8b9e858c0786d9b1f91803ee805892b533cd3c247261348d2c5fac63", "state_transitions": "1d68655c73099455736dbf5ec3ea75dcf75ae68a4a8bfdb96c1a66b9afb8ce57", "inline_handlers": "34fe8392d3fdcba8d1bcacbdd0f00c57b0c87fc2b37f901a825d4f03cf086cfd", "named_handlers": "a5fe095ec8727fa2c8d395978d7dd8f4cbd8b3568a7e7731c9bfaac629c2c07f", "excluded_bindings": "bf30e7c9839fd816664551a9a780c961e27da7738e05fe3c975721f4428a81fd"},
     },
     "static_linkage": {
-        "hero_sites": {"unique_rendered_page_root": 619, "multiple_rendered_roots": 26, "unresolved_rendered_root": 14, "direct_literal_render_owner": 645, "route_owner_inferred": 644, "direct_candidate_anchor_match": 134, "route_inferred_candidate_match": 420, "role_capability_token_hint": 135, "site_token_hint": 90, "privacy_token_hint": 43},
-        "overlay_sites": {"unique_rendered_page_root": 987, "multiple_rendered_roots": 184, "unresolved_rendered_root": 40, "direct_literal_render_owner": 1171, "route_owner_inferred": 1171, "direct_candidate_anchor_match": 347, "route_inferred_candidate_match": 854, "role_capability_token_hint": 458, "site_token_hint": 449, "privacy_token_hint": 84},
-        "limit": "Route ownership is inferred through static controller references; candidate and access-hint linkage is source-only and grants no final identity or authorization credit.",
+        "hero_sites": {"unique_rendered_page_root": 618, "multiple_rendered_roots": 27, "unresolved_rendered_root": 14, "with_literal_render_owner": 645, "direct_route_owner": 11, "route_owner_inferred": 633, "route_owner_blocked": 15, "direct_candidate_anchor_match": 134, "route_inferred_candidate_match_including_overlap": 420, "candidate_link_partition": {"direct": 134, "route_only": 364, "blocked": 161}, "role_capability_token_hint": 135, "site_token_hint": 90, "privacy_token_hint": 43},
+        "overlay_sites": {"unique_rendered_page_root": 959, "multiple_rendered_roots": 218, "unresolved_rendered_root": 34, "with_literal_render_owner": 1177, "direct_route_owner": 9, "route_owner_inferred": 1168, "route_owner_blocked": 34, "direct_candidate_anchor_match": 347, "route_inferred_candidate_match_including_overlap": 860, "candidate_link_partition": {"direct": 347, "route_only": 601, "blocked": 263}, "role_capability_token_hint": 458, "site_token_hint": 449, "privacy_token_hint": 84},
+        "trigger_sites": {
+            "declarative": {"unique_rendered_page_root": 78, "multiple_rendered_roots": 31, "unresolved_rendered_root": 6, "direct_route_owner": 7, "route_owner_inferred": 102, "route_owner_blocked": 6, "candidate_link_partition": {"direct": 41, "route_only": 40, "blocked": 34}, "target_partition": {"unique": 114, "multiple": 0, "unresolved": 1}, "role_capability_token_hint": 29, "site_token_hint": 27, "privacy_token_hint": 8},
+            "direct_inline": {"unique_rendered_page_root": 610, "multiple_rendered_roots": 65, "unresolved_rendered_root": 14, "direct_route_owner": 1, "route_owner_inferred": 674, "route_owner_blocked": 14, "candidate_link_partition": {"direct": 162, "route_only": 390, "blocked": 137}, "target_partition": {"unique": 539, "multiple": 150, "unresolved": 0}, "role_capability_token_hint": 272, "site_token_hint": 292, "privacy_token_hint": 33},
+            "named_handler": {"unique_rendered_page_root": 119, "multiple_rendered_roots": 17, "unresolved_rendered_root": 2, "direct_route_owner": 1, "route_owner_inferred": 135, "route_owner_blocked": 2, "candidate_link_partition": {"direct": 44, "route_only": 78, "blocked": 16}, "target_partition": {"unique": 120, "multiple": 18, "unresolved": 0}, "role_capability_token_hint": 69, "site_token_hint": 67, "privacy_token_hint": 5},
+        },
+        "reconciliation": "RUN-016 reran the exact machine linkage function and supersedes linkage-only arithmetic drift in the earlier RUN-013 prose handoff. Primary RUN-013 universe counts and hashes are unchanged.",
+        "limit": "Render and route ownership are static inference; candidate and access-hint linkage is source-only and grants no final identity, runtime route, authorization, or browser credit.",
     },
     "evidence_count": 4276,
     "evidence_count_basis": {"scanned_files": 1761, "hero_definitions": 57, "hero_instances": 659, "overlay_definitions": 473, "overlay_instances": 1211, "declarative_trigger_tags": 115},
     "execution_credit": {"browser": 0, "build": 0, "runtime": 0, "route_execution": 0, "tests": 0, "database": 0, "network": 0, "rendered_visual_coverage": 0, "access_control": 0},
     "completion_test_met": True,
-    "row_materialization_status": "OPEN_RUN_016_REPRODUCTION_CONTRACT_PENDING",
+    "row_materialization_status": "COMPLETE_2812_STATIC_ROWS_ZERO_BROWSER_CREDIT",
+    "row_materialization": {"artifact": "05-browser-visual-coverage-matrix.csv", "rows": 2812, "columns": 49, "sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84", "unique_source_row_keys": 2812, "unique_visual_ids": 2812, "source_row_key_list_sha256": "af2940a2faaa117438ec0653302f61614971339194e3c88eb7a126f9be12cf57", "visual_id_list_sha256": "b8a26f5641bc00655c7fc6d4cd39c29fd48b70772bfdf4d80da41465275817d7", "browser_credit": 0},
 }
 
 
@@ -457,7 +469,7 @@ WAVE_03_PAYLOAD = {
 
 ASSIGNMENTS = [
     {"assignment_id": "RUN-012", "agent_task_path": "/root/current_module_route_gap", "role": "route, navigation, and module-gap reconciler", "pass_lens": "Pass 1 repository census and reachability", "scope": "38 route files, 162 named navigation/tab files, literal render owners, prior 172 candidates, and 14 owner-backed additions", "evidence_count": 4461, "observed_heads": ["c7538c937185c78a2f14111a029ca1a6cad3b12f", "066fc516fe489048c26e4ddc7a4d4ae1267b78ed"], "completion_test_met": True, "wrote_files": False, "root_reconciliation": "All 38 route files and 162 navigation/tab files are accounted statically; 14 additions raise only the provisional discovery floor to 186."},
-    {"assignment_id": "RUN-013", "agent_task_path": "/root/current_visual_static_census", "role": "production hero, overlay, and trigger census", "pass_lens": "Pass 1 visual denominator and Pass 4 static support", "scope": "1,761 production JS/TS files; hero, overlay, material-state, and trigger universes", "evidence_count": 4276, "observed_heads": ["c7538c937185c78a2f14111a029ca1a6cad3b12f", "066fc516fe489048c26e4ddc7a4d4ae1267b78ed"], "completion_test_met": True, "wrote_files": False, "root_reconciliation": "Primary static universes reconcile; full row materialization and rendered/browser evidence remain open."},
+    {"assignment_id": "RUN-013", "agent_task_path": "/root/current_visual_static_census", "role": "production hero, overlay, and trigger census", "pass_lens": "Pass 1 visual denominator and Pass 4 static support", "scope": "1,761 production JS/TS files; hero, overlay, material-state, and trigger universes", "evidence_count": 4276, "observed_heads": ["c7538c937185c78a2f14111a029ca1a6cad3b12f", "066fc516fe489048c26e4ddc7a4d4ae1267b78ed"], "completion_test_met": True, "wrote_files": False, "root_reconciliation": "Primary static universes reconcile. Row materialization was open at the RUN-013 handoff and was later completed separately by RUN-016; rendered/browser evidence remains open."},
     {"assignment_id": "RUN-014", "agent_task_path": "/root/current_backend_data_test_census", "role": "backend, data-history, async, policy, and test census", "pass_lens": "Passes 1, 5, and 7 static support", "scope": "Application PHP, controllers, services, models, policies, async owners, migrations, schema dump, factories, seeders, and PHP tests", "evidence_count": 5648, "observed_heads": ["c7538c937185c78a2f14111a029ca1a6cad3b12f", "779fdea9d24b444738396698c2b9001c686ba144"], "completion_test_met": True, "wrote_files": False, "root_reconciliation": "Directory/declaration denominators and locators are accepted as static evidence only; schema truth, execution coverage, runtime reachability, and final findings remain open."},
 ]
 for assignment in ASSIGNMENTS:
@@ -479,7 +491,7 @@ AGENT_PAYLOAD = {
     "all_returned": True,
     "all_completion_tests_met": True,
     "all_reported_no_writes": True,
-    "outstanding_required_roles_or_waves": ["RUN-015 official GitHub metadata normalization", "RUN-016 full visual-row materialization contract", "canonical identity/collision adjudication", "fresh Pass 8 cross-reviewers", "final no-live-agent reconciliation"],
+    "outstanding_required_roles_or_waves": ["RUN-015 official GitHub metadata normalization (later reconciled in separate register)", "RUN-016 full visual-row materialization contract (later reconciled in separate register)", "canonical identity/collision adjudication", "fresh Pass 8 cross-reviewers", "final no-live-agent reconciliation"],
     "assignment_returns": ASSIGNMENTS,
     "finalization_gate": False,
 }
@@ -513,6 +525,7 @@ for path, calls, names, status, family in ROUTE_ROWS:
 
 
 def main() -> None:
+    assert sha256_file(AUDIT_DIR / "05-browser-visual-coverage-matrix.csv") == VISUAL_MATRIX_SHA256
     write_json("evidence/source/current-route-navigation-gap-wave-01.json", ROUTE_PAYLOAD)
     write_json("evidence/source/current-visual-static-census-wave-01.json", VISUAL_PAYLOAD)
     write_json("evidence/source/current-backend-data-test-census-wave-01.json", BACKEND_PAYLOAD)

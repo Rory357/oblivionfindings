@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Reconcile fresh benchmark assignments RUN-007 through RUN-009.
+"""Reconcile benchmark assignments and the official GitHub metadata snapshot.
 
-This deterministic generator reads only committed audit evidence.  It does not
+This deterministic generator reads only pinned audit evidence.  The separate
+collector owns the read-only GitHub API call.  This integration step does not
 contact benchmark projects, boot Oblivion Findings, execute application code,
 or award current benchmark/completion credit.
 """
@@ -18,7 +19,7 @@ from pathlib import Path
 
 AUDIT_DIR = Path(__file__).resolve().parents[1]
 HISTORICAL_DIR = AUDIT_DIR.parent / "oblivion-oss-comprehensive-audit-2026-08-12"
-GENERATED_AT = "2026-08-24T17:43:00+12:00"
+GENERATED_AT = "2026-08-24T18:00:00+12:00"
 APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 AUDIT_INPUT_COMMIT = "ec11042ea09d7bc56dff5b992b4d6ebfb03ad9df"
@@ -30,6 +31,7 @@ HISTORICAL_904_SHA256 = "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c94118
 HISTORICAL_902_SHA256 = "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
 GOVERNING_PROMPT_SHA256 = "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
 PROMPT_URL_OCCURRENCE_MULTISET_SHA256 = "a11def3fd47294297fb8aac9b327287059e063aeb58ccd2045d8afb9347f49f5"
+METADATA_SNAPSHOT_SHA256 = "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458"
 PROMPT_DUPLICATE_PROJECTS = {
     "glpi-project/glpi",
     "netbox-community/netbox",
@@ -76,6 +78,8 @@ assert sha256_file(project_register_path) == PROJECT_REGISTER_SHA256
 assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-01.json") == WAVE_01_SHA256
 assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-02.json") == WAVE_02_SHA256
 assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-03.json") == WAVE_03_SHA256
+metadata_snapshot_path = AUDIT_DIR / "evidence/benchmark/current-github-project-metadata-snapshot.json"
+assert sha256_file(metadata_snapshot_path) == METADATA_SNAPSHOT_SHA256
 
 with project_register_path.open(encoding="utf-8", newline="") as handle:
     historical_reader = csv.DictReader(handle)
@@ -89,6 +93,49 @@ assert len({row["project"].lower() for row in prompt_unique_projects}) == 95
 assert PROMPT_DUPLICATE_PROJECTS <= {row["project"] for row in prompt_unique_projects}
 assert sum(2 if row["project"] in PROMPT_DUPLICATE_PROJECTS else 1 for row in prompt_unique_projects) == 98
 project_index = {row["project"]: row for row in historical_projects}
+
+metadata_snapshot = read_json("evidence/benchmark/current-github-project-metadata-snapshot.json")
+assert metadata_snapshot["status"] == "CURRENT_OFFICIAL_GITHUB_METADATA_SNAPSHOT_COMPLETE_NO_TRIAGE_CREDIT"
+assert metadata_snapshot["denominator"] == {
+    "prompt_url_occurrences": 98,
+    "unique_prompt_repositories": 95,
+    "occurrence_weight_sum": 98,
+    "repeated_repositories": {
+        "glpi-project/glpi": 2,
+        "netbox-community/netbox": 2,
+        "opf/openproject": 2,
+    },
+}
+assert metadata_snapshot["result_counts"]["successful_metadata_records"] == 95
+assert metadata_snapshot["result_counts"]["failed_records"] == 0
+assert metadata_snapshot["result_counts"]["public"] == 95
+assert metadata_snapshot["result_counts"]["archived"] == 1
+assert metadata_snapshot["result_counts"]["disabled"] == 0
+assert metadata_snapshot["result_counts"]["redirected_or_case_changed_identities"] == 0
+assert len(metadata_snapshot["api_receipts"]) == 4
+assert [receipt["rows"] for receipt in metadata_snapshot["api_receipts"]] == [24, 24, 24, 23]
+assert all(receipt["http_status"] == 200 and receipt["cli_exit_code"] == 0 and receipt["graphql_error_count"] == 0 for receipt in metadata_snapshot["api_receipts"])
+assert metadata_snapshot["credit_boundary"]["upstream_full_triage_credit"] == 0
+assert metadata_snapshot["credit_boundary"]["benchmark_completion_credit"] == 0
+assert all(
+    metadata_snapshot["credit_boundary"][key] == 0
+    for key in (
+        "upstream_full_triage_credit",
+        "exact_behaviour_credit",
+        "edition_boundary_credit",
+        "root_licence_confirmation_credit",
+        "maintenance_quality_credit",
+        "selection_or_outcome_credit",
+        "feature_mapping_credit",
+        "benchmark_completion_credit",
+    )
+)
+metadata_index = {row["requested_repository"].lower(): row for row in metadata_snapshot["records"]}
+assert len(metadata_index) == 95
+assert set(metadata_index) == {row["project"].lower() for row in prompt_unique_projects}
+assert sum(row["occurrence_weight"] for row in metadata_index.values()) == 98
+assert all(row["identity_equal_case_sensitive"] for row in metadata_index.values())
+assert all(project_index[row["requested_repository"]]["canonical_url"] == row["canonical_url"] for row in metadata_index.values())
 
 wave1 = read_json("evidence/source/current-feature-discovery-wave-01.json")
 wave2 = read_json("evidence/source/current-feature-discovery-wave-02.json")
@@ -322,6 +369,7 @@ COMPARATOR_METADATA = {
 
 for comparator in COMPARATOR_RECORDS:
     project_row = project_index[comparator["project"]]
+    current_metadata = metadata_index.get(comparator["project"].lower())
     comparator.update(COMPARATOR_METADATA[comparator["domain"]])
     comparator["benchmark_project_evidence"] = {
         "canonical_url": project_row["canonical_url"],
@@ -329,9 +377,28 @@ for comparator in COMPARATOR_RECORDS:
         "commit_sha": project_row["commit_sha"],
         "historical_inspected_date": project_row["inspected_date"],
         "historical_exact_behaviour_locus": project_row["exact_behaviour_screen_workflow_inspected"],
-        "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
+        "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT" if current_metadata else "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
+        "current_github_metadata": (
+            {
+                "canonical_repository": current_metadata["canonical_repository"],
+                "default_branch": current_metadata["default_branch"],
+                "default_branch_head_sha": current_metadata["default_branch_head_sha"],
+                "default_branch_head_committed_at": current_metadata["default_branch_head_committed_at"],
+                "pushed_at": current_metadata["pushed_at"],
+                "updated_at": current_metadata["updated_at"],
+                "visibility": current_metadata["visibility"],
+                "archived": current_metadata["archived"],
+                "disabled": current_metadata["disabled"],
+                "github_license_info": current_metadata["github_license_info"],
+                "github_latest_release": current_metadata["github_latest_release"],
+                "snapshot_ended_at": metadata_snapshot["snapshot_ended_at"],
+                "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT",
+            }
+            if current_metadata
+            else None
+        ),
     }
-    comparator["unresolved_evidence"] = "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open."
+    comparator["unresolved_evidence"] = "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open."
     comparator["completion_credit"] = False
 
 assert len(COMPARATOR_RECORDS) == 8
@@ -421,7 +488,7 @@ for assignment in ASSIGNMENTS:
 
 BENCHMARK_PAYLOAD = {
     "schema_version": 1,
-    "status": "CURRENT_BENCHMARK_WAVE_01_RECONCILED_NO_COMPLETION_CREDIT",
+    "status": "CURRENT_BENCHMARK_WAVE_01_PLUS_OFFICIAL_METADATA_RECONCILED_NO_COMPLETION_CREDIT",
     "generated_at": GENERATED_AT,
     "source": {
         "application_commit": APPLICATION_COMMIT,
@@ -443,6 +510,7 @@ BENCHMARK_PAYLOAD = {
         "current_candidate_wave_03_sha256": WAVE_03_SHA256,
         "historical_final_904_sha256": HISTORICAL_904_SHA256,
         "historical_final_902_sha256": HISTORICAL_902_SHA256,
+        "current_official_github_metadata_snapshot_sha256": METADATA_SNAPSHOT_SHA256,
     },
     "project_register_current_audit": {
         "prompt_listed_url_occurrences": 98,
@@ -455,15 +523,31 @@ BENCHMARK_PAYLOAD = {
         "physical_unique_rows": 98,
         "exact_prompt_unique_rows_structurally_validated_local_only": 95,
         "historical_extra_rows_structurally_validated_local_only": 3,
-        "current_upstream_unique_repository_refreshes": 0,
-        "current_upstream_prompt_occurrence_refreshes": 0,
+        "current_official_github_metadata_unique_repository_coverage": 95,
+        "current_official_github_metadata_prompt_occurrence_coverage": 98,
+        "current_upstream_full_triage_unique_repository_completions": 0,
+        "current_upstream_full_triage_prompt_occurrence_completions": 0,
         "current_project_triage_completion_credit": 0,
-        "licence_noassertion_rows": 11,
+        "current_official_github_metadata_result_counts": metadata_snapshot["result_counts"],
+        "historical_licence_noassertion_rows": 11,
         "prompt_unique_repository_historical_outcomes": {"native_benchmark": 71, "reject": 14, "separate_future_decision": 10, "pending": 0},
         "prompt_occurrence_weighted_historical_outcomes": {"native_benchmark": 74, "reject": 14, "separate_future_decision": 10, "pending": 0},
         "historical_extra_outcomes": {"native_benchmark": 2, "reject": 1},
         "physical_row_outcomes": {"native_benchmark": 73, "reject": 15, "separate_future_decision": 10, "pending": 0},
-        "evidence_limit": "The 95 exact prompt repositories and three historical extras are committed-local provenance. The 98 prompt URL occurrences include three duplicate repository listings. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24.",
+        "evidence_limit": "Official GitHub repository metadata now covers 95/95 exact prompt repositories and all 98 occurrence-weighted entries. It establishes canonical repository identity, default-branch head, timestamps, visibility, archive/disabled flags, GitHub licenseInfo, and latestRelease fields only. It does not establish full upstream triage, root licence, edition boundary, maintenance quality, exact behavior, mapping, selection, or completion. The three historical extras were not refreshed.",
+        "metadata_credit_boundary": metadata_snapshot["credit_boundary"],
+    },
+    "official_github_metadata_snapshot": {
+        "status": metadata_snapshot["status"],
+        "snapshot_started_at": metadata_snapshot["snapshot_started_at"],
+        "snapshot_ended_at": metadata_snapshot["snapshot_ended_at"],
+        "snapshot_sha256": METADATA_SNAPSHOT_SHA256,
+        "unique_repository_coverage": "95/95",
+        "prompt_occurrence_weighted_coverage": "98/98",
+        "result_counts": metadata_snapshot["result_counts"],
+        "api_receipts": metadata_snapshot["api_receipts"],
+        "credit_boundary": metadata_snapshot["credit_boundary"],
+        "limits": metadata_snapshot["limits"],
     },
     "prompt_project_denominator_reconciliation": {
         "status": "CORRECTED_NO_COMPLETION_CREDIT",
@@ -531,8 +615,8 @@ BENCHMARK_PAYLOAD = {
         "completion_percentage": None,
         "reason": "The denominator is not frozen; observer relations, neutralizer challenges, and comparator packets are evidence slices, not final per-feature mappings.",
     },
-    "evidence_count": 1348,
-    "evidence_count_basis": "Agent-reported evidence counts summed across RUN-007 (127), RUN-008 (1189), and RUN-009 (32); overlap was not deduplicated.",
+    "evidence_count": 1545,
+    "evidence_count_basis": "Agent-reported evidence counts summed across RUN-007 (127), RUN-008 (1189), RUN-009 (32), and RUN-015 metadata evidence (197); overlap was not deduplicated.",
     "runtime_gates": None,
     "completion_credit": False,
 }
@@ -557,6 +641,61 @@ AGENT_PAYLOAD = {
     "contradictions_and_reconciliation": ["RUN-009 initially returned completion_test_met=false; a bounded follow-up returned all requested packets and a replacement completion audit with assignment-only completion_test_met=true.", "Historical verified benchmark labels and RUN-007 observer strength labels are not promoted into current candidate credit.", "RUN-007 and the first orchestration pass described the register as 97 prompt projects plus one supplemental. Literal prompt reconciliation supersedes that claim with 98 URL occurrences, 95 unique prompt repositories, three repeated repositories, and three historical-extra register rows."],
     "live_agent_finalization_state": "NOT_EVALUATED_FOR_FINALIZATION; audit remains active and fresh Pass 8 has not run.",
     "assignment_returns": ASSIGNMENTS,
+    "finalization_gate": False,
+}
+
+
+METADATA_ASSIGNMENT = {
+    "assignment_id": "RUN-015",
+    "agent_task_path": "/root/current_module_route_gap",
+    "role": "official GitHub project-metadata normalizer",
+    "repository": "oblivionfindings workspace; governing prompt and application pins control the audit universe",
+    "application_commit": APPLICATION_COMMIT,
+    "architecture_rule": "Single tenant, multiple Sites; metadata evidence does not establish application roles, action authority, approved-Site scope, canonical ownership, direct-object concealment, or privacy behavior.",
+    "pass_lens": "Pass 3 project-universe metadata prerequisite",
+    "scope": "All 98 literal GitHub URL occurrences at governing prompt lines 496-515, normalized to 95 unique repositories",
+    "evidence_schema": "Prompt and application pins, occurrence normalization hashes, official API receipts, per-repository metadata, evidence count, explicit credit boundary, completion test, and write attestation",
+    "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+    "completion_test": "Account for every literal prompt occurrence and unique repository through successful official GitHub metadata records while awarding no full-triage or benchmark credit.",
+    "return_status": "COMPLETE_METADATA_PREREQUISITE_ONLY",
+    "evidence_count": 197,
+    "evidence_count_basis": metadata_snapshot["evidence_count_basis"],
+    "observed_head": "779fdea9d24b444738396698c2b9001c686ba144",
+    "snapshot_started_at": metadata_snapshot["snapshot_started_at"],
+    "snapshot_ended_at": metadata_snapshot["snapshot_ended_at"],
+    "completion_test_met": True,
+    "wrote_files": False,
+    "official_api_receipt_count": len(metadata_snapshot["api_receipts"]),
+    "official_api_http_statuses": [receipt["http_status"] for receipt in metadata_snapshot["api_receipts"]],
+    "credit_boundary": metadata_snapshot["credit_boundary"],
+    "unresolved_gaps": "Full upstream triage, repository-root licence and edition boundaries, exact behavior, maintenance-quality adjudication, target mapping, selection, and completion remain open for every prompt repository.",
+    "root_reconciliation": "Accepted as official GitHub metadata prerequisite coverage for 95/95 unique repositories and 98/98 occurrence-weighted entries only; all full-triage and benchmark credits remain zero.",
+}
+METADATA_ASSIGNMENT["normalized_payload_sha256"] = digest(METADATA_ASSIGNMENT)
+
+METADATA_AGENT_PAYLOAD = {
+    "schema_version": 1,
+    "status": "FORMAL_BENCHMARK_METADATA_WAVE_RECONCILED_AUDIT_INCOMPLETE",
+    "generated_at": GENERATED_AT,
+    "application_commit": APPLICATION_COMMIT,
+    "writer_boundary": "Only the root orchestrator wrote the collector, snapshot, and integration artifacts; RUN-015 returned evidence in messages and reported wrote_files=false.",
+    "wave_formal_assignments_eligible": 1,
+    "cumulative_formal_assignments_eligible": 15,
+    "literal_prompt_minimum": 8,
+    "literal_prompt_minimum_met": True,
+    "planned_formal_assignments_target": 11,
+    "planned_target_met": True,
+    "all_returned": True,
+    "all_completion_tests_met": True,
+    "all_reported_no_writes": True,
+    "outstanding_required_roles_or_waves": [
+        "RUN-016 full visual-row materialization",
+        "canonical identity/collision adjudication",
+        "full per-project upstream behavior/licence/edition triage",
+        "fresh Pass 8 cross-reviewers",
+        "final no-live-agent reconciliation",
+    ],
+    "assignment_returns": [METADATA_ASSIGNMENT],
     "finalization_gate": False,
 }
 
@@ -651,12 +790,39 @@ CURRENT_REGISTER_FIELDS = historical_fields + [
     "current_prompt_occurrence_count",
     "current_local_structural_validation",
     "current_upstream_refresh_status",
+    "current_metadata_snapshot_status",
+    "current_canonical_identity",
+    "current_default_branch",
+    "current_default_branch_head_sha",
+    "current_head_committed_at",
+    "current_pushed_at",
+    "current_updated_at",
+    "current_visibility",
+    "current_archived",
+    "current_disabled",
+    "current_github_license_spdx",
+    "current_github_license_name",
+    "current_latest_release_tag",
+    "current_latest_release_published_at",
+    "current_metadata_snapshot_observed_at",
+    "current_metadata_credit_boundary",
     "current_target_specific_mapping_credit",
     "current_evidence_limit",
 ]
+
+
+def github_value(value: object) -> str:
+    if value is None:
+        return "GITHUB_API_NULL"
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
+
+
 current_register_rows = []
 for row in historical_projects:
     current = dict(row)
+    metadata = metadata_index.get(row["project"].lower())
     if row["project"] in HISTORICAL_EXTRA_PROJECTS:
         membership = HISTORICAL_EXTRA_PROJECTS[row["project"]]
         occurrence_count = 0
@@ -668,25 +834,64 @@ for row in historical_projects:
             "current_audit_prompt_denominator_membership": membership,
             "current_prompt_occurrence_count": occurrence_count,
             "current_local_structural_validation": "HISTORICAL_ROW_STRUCTURALLY_VALIDATED_COMMITTED_LOCAL_ONLY",
-            "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
+            "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT" if metadata else "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
+            "current_metadata_snapshot_status": metadata["metadata_status"] if metadata else "NOT_IN_PROMPT_METADATA_SNAPSHOT",
+            "current_canonical_identity": metadata["canonical_repository"] if metadata else "NOT_REFRESHED",
+            "current_default_branch": github_value(metadata["default_branch"]) if metadata else "NOT_REFRESHED",
+            "current_default_branch_head_sha": github_value(metadata["default_branch_head_sha"]) if metadata else "NOT_REFRESHED",
+            "current_head_committed_at": github_value(metadata["default_branch_head_committed_at"]) if metadata else "NOT_REFRESHED",
+            "current_pushed_at": github_value(metadata["pushed_at"]) if metadata else "NOT_REFRESHED",
+            "current_updated_at": github_value(metadata["updated_at"]) if metadata else "NOT_REFRESHED",
+            "current_visibility": github_value(metadata["visibility"]) if metadata else "NOT_REFRESHED",
+            "current_archived": github_value(metadata["archived"]) if metadata else "NOT_REFRESHED",
+            "current_disabled": github_value(metadata["disabled"]) if metadata else "NOT_REFRESHED",
+            "current_github_license_spdx": github_value(metadata["github_license_info"]["spdx_id"]) if metadata else "NOT_REFRESHED",
+            "current_github_license_name": github_value(metadata["github_license_info"]["name"]) if metadata else "NOT_REFRESHED",
+            "current_latest_release_tag": github_value(metadata["github_latest_release"]["tag"]) if metadata else "NOT_REFRESHED",
+            "current_latest_release_published_at": github_value(metadata["github_latest_release"]["published_at"]) if metadata else "NOT_REFRESHED",
+            "current_metadata_snapshot_observed_at": metadata_snapshot["snapshot_ended_at"] if metadata else "NOT_REFRESHED",
+            "current_metadata_credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT" if metadata else "NO_CURRENT_METADATA_CREDIT",
             "current_target_specific_mapping_credit": "false",
-            "current_evidence_limit": "Historical provenance only; current maintenance, ref reachability, licence, edition boundary, behavior and target parity were not reverified upstream.",
+            "current_evidence_limit": (
+                "Official GitHub repository metadata only; root licence, edition boundary, maintenance quality, exact behavior, target parity, mapping, selection and completion were not established."
+                if metadata
+                else "Historical provenance only; current metadata, maintenance, ref reachability, licence, edition boundary, behavior and target parity were not refreshed."
+            ),
         }
     )
     current_register_rows.append(current)
+
+assert len(current_register_rows) == 98
+assert sum(row["current_metadata_snapshot_status"] == "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS" for row in current_register_rows) == 95
+assert sum(row["current_metadata_snapshot_status"] == "NOT_IN_PROMPT_METADATA_SNAPSHOT" for row in current_register_rows) == 3
+assert Counter(row["current_audit_prompt_denominator_membership"] for row in current_register_rows) == {
+    "IN_PROMPT_UNIQUE_95": 95,
+    "HISTORICAL_EXTRA_OUTSIDE_PROMPT": 2,
+    "SUPPLEMENTAL_OBSERVER_PROJECT_OUTSIDE_PROMPT": 1,
+}
+assert sum(int(row["current_prompt_occurrence_count"]) for row in current_register_rows) == 98
+assert all(row[field] != "" for row in current_register_rows for field in CURRENT_REGISTER_FIELDS[-19:])
+assert all(row["current_target_specific_mapping_credit"] == "false" for row in current_register_rows)
+assert all(current[field] == historical[field] for current, historical in zip(current_register_rows, historical_projects) for field in historical_fields)
+assert BENCHMARK_PAYLOAD["project_register_current_audit"]["current_upstream_full_triage_unique_repository_completions"] == 0
+assert BENCHMARK_PAYLOAD["current_feature_gate"]["verified_benchmark_or_documented_no_credible_match"] == 0
+assert BENCHMARK_PAYLOAD["completion_credit"] is False
 
 
 def main() -> None:
     write_json("evidence/benchmark/current-benchmark-wave-01.json", BENCHMARK_PAYLOAD)
     write_json("evidence/benchmark/current-benchmark-agent-register.json", AGENT_PAYLOAD)
+    write_json("evidence/benchmark/current-benchmark-metadata-agent-register.json", METADATA_AGENT_PAYLOAD)
     write_json(
         "evidence/benchmark/current-prompt-project-denominator-reconciliation.json",
         {
             "schema_version": 1,
-            "status": "PROMPT_PROJECT_DENOMINATOR_RECONCILED_NO_UPSTREAM_OR_COMPLETION_CREDIT",
+            "status": "PROMPT_PROJECT_DENOMINATOR_RECONCILED_WITH_SEPARATE_OFFICIAL_METADATA_NO_TRIAGE_OR_COMPLETION_CREDIT",
             "generated_at": GENERATED_AT,
             **BENCHMARK_PAYLOAD["prompt_project_denominator_reconciliation"],
-            "credit_boundary": "This corrects the project denominator only. It grants zero current upstream, licence, activity, behaviour, benchmark-selection, feature-mapping, or audit-completion credit.",
+            "official_github_metadata_snapshot_ref": "evidence/benchmark/current-github-project-metadata-snapshot.json@" + METADATA_SNAPSHOT_SHA256,
+            "official_github_metadata_coverage": {"unique_repositories": "95/95", "prompt_occurrences": "98/98"},
+            "credit_boundary": "The denominator correction and separate official GitHub metadata snapshot grant metadata-prerequisite coverage only. Full upstream triage, root licence, edition boundary, maintenance quality, exact behaviour, benchmark selection, feature mapping, and audit-completion credit remain zero.",
         },
     )
     write_csv("03-feature-to-benchmark-matrix.csv", MATRIX_FIELDS, matrix_rows)

@@ -119,30 +119,110 @@
   },
   "static_linkage": {
     "hero_sites": {
-      "unique_rendered_page_root": 619,
-      "multiple_rendered_roots": 26,
+      "unique_rendered_page_root": 618,
+      "multiple_rendered_roots": 27,
       "unresolved_rendered_root": 14,
-      "direct_literal_render_owner": 645,
-      "route_owner_inferred": 644,
+      "with_literal_render_owner": 645,
+      "direct_route_owner": 11,
+      "route_owner_inferred": 633,
+      "route_owner_blocked": 15,
       "direct_candidate_anchor_match": 134,
-      "route_inferred_candidate_match": 420,
+      "route_inferred_candidate_match_including_overlap": 420,
+      "candidate_link_partition": {
+        "direct": 134,
+        "route_only": 364,
+        "blocked": 161
+      },
       "role_capability_token_hint": 135,
       "site_token_hint": 90,
       "privacy_token_hint": 43
     },
     "overlay_sites": {
-      "unique_rendered_page_root": 987,
-      "multiple_rendered_roots": 184,
-      "unresolved_rendered_root": 40,
-      "direct_literal_render_owner": 1171,
-      "route_owner_inferred": 1171,
+      "unique_rendered_page_root": 959,
+      "multiple_rendered_roots": 218,
+      "unresolved_rendered_root": 34,
+      "with_literal_render_owner": 1177,
+      "direct_route_owner": 9,
+      "route_owner_inferred": 1168,
+      "route_owner_blocked": 34,
       "direct_candidate_anchor_match": 347,
-      "route_inferred_candidate_match": 854,
+      "route_inferred_candidate_match_including_overlap": 860,
+      "candidate_link_partition": {
+        "direct": 347,
+        "route_only": 601,
+        "blocked": 263
+      },
       "role_capability_token_hint": 458,
       "site_token_hint": 449,
       "privacy_token_hint": 84
     },
-    "limit": "Route ownership is inferred through static controller references; candidate and access-hint linkage is source-only and grants no final identity or authorization credit."
+    "trigger_sites": {
+      "declarative": {
+        "unique_rendered_page_root": 78,
+        "multiple_rendered_roots": 31,
+        "unresolved_rendered_root": 6,
+        "direct_route_owner": 7,
+        "route_owner_inferred": 102,
+        "route_owner_blocked": 6,
+        "candidate_link_partition": {
+          "direct": 41,
+          "route_only": 40,
+          "blocked": 34
+        },
+        "target_partition": {
+          "unique": 114,
+          "multiple": 0,
+          "unresolved": 1
+        },
+        "role_capability_token_hint": 29,
+        "site_token_hint": 27,
+        "privacy_token_hint": 8
+      },
+      "direct_inline": {
+        "unique_rendered_page_root": 610,
+        "multiple_rendered_roots": 65,
+        "unresolved_rendered_root": 14,
+        "direct_route_owner": 1,
+        "route_owner_inferred": 674,
+        "route_owner_blocked": 14,
+        "candidate_link_partition": {
+          "direct": 162,
+          "route_only": 390,
+          "blocked": 137
+        },
+        "target_partition": {
+          "unique": 539,
+          "multiple": 150,
+          "unresolved": 0
+        },
+        "role_capability_token_hint": 272,
+        "site_token_hint": 292,
+        "privacy_token_hint": 33
+      },
+      "named_handler": {
+        "unique_rendered_page_root": 119,
+        "multiple_rendered_roots": 17,
+        "unresolved_rendered_root": 2,
+        "direct_route_owner": 1,
+        "route_owner_inferred": 135,
+        "route_owner_blocked": 2,
+        "candidate_link_partition": {
+          "direct": 44,
+          "route_only": 78,
+          "blocked": 16
+        },
+        "target_partition": {
+          "unique": 120,
+          "multiple": 18,
+          "unresolved": 0
+        },
+        "role_capability_token_hint": 69,
+        "site_token_hint": 67,
+        "privacy_token_hint": 5
+      }
+    },
+    "reconciliation": "RUN-016 reran the exact machine linkage function and supersedes linkage-only arithmetic drift in the earlier RUN-013 prose handoff. Primary RUN-013 universe counts and hashes are unchanged.",
+    "limit": "Render and route ownership are static inference; candidate and access-hint linkage is source-only and grants no final identity, runtime route, authorization, or browser credit."
   },
   "evidence_count": 4276,
   "evidence_count_basis": {
@@ -165,5 +245,16 @@
     "access_control": 0
   },
   "completion_test_met": true,
-  "row_materialization_status": "OPEN_RUN_016_REPRODUCTION_CONTRACT_PENDING"
+  "row_materialization_status": "COMPLETE_2812_STATIC_ROWS_ZERO_BROWSER_CREDIT",
+  "row_materialization": {
+    "artifact": "05-browser-visual-coverage-matrix.csv",
+    "rows": 2812,
+    "columns": 49,
+    "sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "unique_source_row_keys": 2812,
+    "unique_visual_ids": 2812,
+    "source_row_key_list_sha256": "af2940a2faaa117438ec0653302f61614971339194e3c88eb7a126f9be12cf57",
+    "visual_id_list_sha256": "b8a26f5641bc00655c7fc6d4cd39c29fd48b70772bfdf4d80da41465275817d7",
+    "browser_credit": 0
+  }
 }

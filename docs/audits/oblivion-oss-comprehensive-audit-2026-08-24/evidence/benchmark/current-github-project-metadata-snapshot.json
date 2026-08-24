@@ -1,0 +1,2874 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_OFFICIAL_GITHUB_METADATA_SNAPSHOT_COMPLETE_NO_TRIAGE_CREDIT",
+  "snapshot_started_at": "2026-08-24T05:54:28.044554Z",
+  "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+  "pins": {
+    "governing_prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "prompt_line_range": "496-515",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "method": {
+    "source": "Authenticated read-only api.github.com GraphQL repository queries via gh CLI",
+    "prompt_url_pattern": "literal https://github.com/<owner>/<repo>",
+    "ordered_occurrence_normalization": "Original prompt order, exact URL case, LF separators, final LF",
+    "ordered_url_occurrence_list_sha256": "2dfd95c017a64f57b312e5869ae486b65eb50a6751276b67b3835ff2055cbb73",
+    "ordered_repository_occurrence_list_sha256": "f975b21784e8ac28f8541a17d1f3676623755a8023236599f1bdfd32188d2142",
+    "sorted_lower_occurrence_multiset_sha256": "a11def3fd47294297fb8aac9b327287059e063aeb58ccd2045d8afb9347f49f5",
+    "batch_size": 24,
+    "clone_or_checkout_performed": false,
+    "archive_download_performed": false,
+    "non_official_mirror_used": false
+  },
+  "denominator": {
+    "prompt_url_occurrences": 98,
+    "unique_prompt_repositories": 95,
+    "occurrence_weight_sum": 98,
+    "repeated_repositories": {
+      "glpi-project/glpi": 2,
+      "netbox-community/netbox": 2,
+      "opf/openproject": 2
+    }
+  },
+  "result_counts": {
+    "successful_metadata_records": 95,
+    "failed_records": 0,
+    "redirected_or_case_changed_identities": 0,
+    "public": 95,
+    "archived": 1,
+    "disabled": 0,
+    "github_license_info_null_or_noassertion": 23,
+    "latest_release_null": 12
+  },
+  "api_receipts": [
+    {
+      "batch": 1,
+      "row_start": 1,
+      "row_end": 24,
+      "rows": 24,
+      "http_status": 200,
+      "cli_exit_code": 0,
+      "graphql_error_count": 0,
+      "github_request_id": "1B66:0C59:102412C:137938D:6A8BDC93",
+      "started_at": "2026-08-24T05:54:28.044554Z",
+      "ended_at": "2026-08-24T05:54:30.371155Z"
+    },
+    {
+      "batch": 2,
+      "row_start": 25,
+      "row_end": 48,
+      "rows": 24,
+      "http_status": 200,
+      "cli_exit_code": 0,
+      "graphql_error_count": 0,
+      "github_request_id": "25F2:3C711C:21D2C6B:2866ACB:6A8BDC95",
+      "started_at": "2026-08-24T05:54:30.371155Z",
+      "ended_at": "2026-08-24T05:54:33.172876Z"
+    },
+    {
+      "batch": 3,
+      "row_start": 49,
+      "row_end": 72,
+      "rows": 24,
+      "http_status": 200,
+      "cli_exit_code": 0,
+      "graphql_error_count": 0,
+      "github_request_id": "3234:F8C94:1DBA32C:2447445:6A8BDC98",
+      "started_at": "2026-08-24T05:54:33.173875Z",
+      "ended_at": "2026-08-24T05:54:35.831441Z"
+    },
+    {
+      "batch": 4,
+      "row_start": 73,
+      "row_end": 95,
+      "rows": 23,
+      "http_status": 200,
+      "cli_exit_code": 0,
+      "graphql_error_count": 0,
+      "github_request_id": "3E48:3E4824:1D9B787:242CEC9:6A8BDC9B",
+      "started_at": "2026-08-24T05:54:35.832441Z",
+      "ended_at": "2026-08-24T05:54:38.618975Z"
+    }
+  ],
+  "records": [
+    {
+      "ordinal": 1,
+      "requested_repository": "frappe/hrms",
+      "canonical_repository": "frappe/hrms",
+      "canonical_url": "https://github.com/frappe/hrms",
+      "occurrence_indices": [
+        1
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "51c2d3bde2d2797ad929eaeef27311c64d5a1b33",
+      "default_branch_head_committed_at": "2026-08-20T13:44:59Z",
+      "pushed_at": "2026-08-23T09:41:07Z",
+      "updated_at": "2026-08-24T01:21:33Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v15.63.3",
+        "published_at": "2026-08-20T14:06:01Z",
+        "url": "https://github.com/frappe/hrms/releases/tag/v15.63.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 2,
+      "requested_repository": "horilla/horilla-hr",
+      "canonical_repository": "horilla/horilla-hr",
+      "canonical_url": "https://github.com/horilla/horilla-hr",
+      "occurrence_indices": [
+        2
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "2.0",
+      "default_branch_head_sha": "d3443753e46f65a0b6793db4291b19ab141cf74b",
+      "default_branch_head_committed_at": "2026-08-19T11:45:01Z",
+      "pushed_at": "2026-08-24T03:11:41Z",
+      "updated_at": "2026-08-21T11:07:40Z",
+      "github_license_info": {
+        "spdx_id": "LGPL-2.1",
+        "name": "GNU Lesser General Public License v2.1"
+      },
+      "github_latest_release": {
+        "tag": "1.6.1",
+        "published_at": "2026-07-29T08:59:56Z",
+        "url": "https://github.com/horilla/horilla-hr/releases/tag/1.6.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 3,
+      "requested_repository": "orangehrm/orangehrm",
+      "canonical_repository": "orangehrm/orangehrm",
+      "canonical_url": "https://github.com/orangehrm/orangehrm",
+      "occurrence_indices": [
+        3
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "56e23b3b09e7af29317a0943523b825843fff527",
+      "default_branch_head_committed_at": "2026-06-28T23:42:20Z",
+      "pushed_at": "2026-06-28T23:52:36Z",
+      "updated_at": "2026-08-22T00:07:03Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v5.9",
+        "published_at": "2026-06-28T23:46:59Z",
+        "url": "https://github.com/orangehrm/orangehrm/releases/tag/v5.9"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 4,
+      "requested_repository": "odoo/odoo",
+      "canonical_repository": "odoo/odoo",
+      "canonical_url": "https://github.com/odoo/odoo",
+      "occurrence_indices": [
+        4
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "19.0",
+      "default_branch_head_sha": "5b8e455975e2b45c13e20e8ff5873903bb27ac5d",
+      "default_branch_head_committed_at": "2026-08-24T04:16:48Z",
+      "pushed_at": "2026-08-24T05:51:19Z",
+      "updated_at": "2026-08-24T05:51:37Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 5,
+      "requested_repository": "TimefoldAI/timefold-solver",
+      "canonical_repository": "TimefoldAI/timefold-solver",
+      "canonical_url": "https://github.com/TimefoldAI/timefold-solver",
+      "occurrence_indices": [
+        5
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "f92ba1afc1e8c14627702d7f4a890862c09e51ef",
+      "default_branch_head_committed_at": "2026-08-24T05:30:33Z",
+      "pushed_at": "2026-08-24T05:30:35Z",
+      "updated_at": "2026-08-24T05:30:37Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.5.0",
+        "published_at": "2026-08-12T13:20:37Z",
+        "url": "https://github.com/TimefoldAI/timefold-solver/releases/tag/v2.5.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 6,
+      "requested_repository": "kimai/kimai",
+      "canonical_repository": "kimai/kimai",
+      "canonical_url": "https://github.com/kimai/kimai",
+      "occurrence_indices": [
+        6
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "1f421c276badbf9eeff40852de305a1e4c1e829f",
+      "default_branch_head_committed_at": "2026-08-19T21:06:07Z",
+      "pushed_at": "2026-08-24T03:36:19Z",
+      "updated_at": "2026-08-23T19:28:29Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "2.65.0",
+        "published_at": "2026-08-11T15:26:06Z",
+        "url": "https://github.com/kimai/kimai/releases/tag/2.65.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 7,
+      "requested_repository": "lennystepn-hue/schichtplaner",
+      "canonical_repository": "lennystepn-hue/schichtplaner",
+      "canonical_url": "https://github.com/lennystepn-hue/schichtplaner",
+      "occurrence_indices": [
+        7
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "91a91bbfb33ff6ad2aee0832cca3a38643f1c1f2",
+      "default_branch_head_committed_at": "2026-03-02T16:21:17Z",
+      "pushed_at": "2026-03-02T16:22:27Z",
+      "updated_at": "2026-08-22T13:13:44Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 8,
+      "requested_repository": "frappe/erpnext",
+      "canonical_repository": "frappe/erpnext",
+      "canonical_url": "https://github.com/frappe/erpnext",
+      "occurrence_indices": [
+        8
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "64486f34e804ac1b5e956d1bcf3bc18c29932cb4",
+      "default_branch_head_committed_at": "2026-08-23T17:05:22Z",
+      "pushed_at": "2026-08-24T03:04:50Z",
+      "updated_at": "2026-08-24T05:40:42Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v16.32.3",
+        "published_at": "2026-08-18T09:57:10Z",
+        "url": "https://github.com/frappe/erpnext/releases/tag/v16.32.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 9,
+      "requested_repository": "bigcapitalhq/bigcapital",
+      "canonical_repository": "bigcapitalhq/bigcapital",
+      "canonical_url": "https://github.com/bigcapitalhq/bigcapital",
+      "occurrence_indices": [
+        9
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "125639d751a9bbe3428c813ba44bb03708ade76e",
+      "default_branch_head_committed_at": "2026-08-23T21:47:46Z",
+      "pushed_at": "2026-08-24T01:19:26Z",
+      "updated_at": "2026-08-23T21:47:51Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v0.25.32",
+        "published_at": "2026-08-19T23:36:13Z",
+        "url": "https://github.com/bigcapitalhq/bigcapital/releases/tag/v0.25.32"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 10,
+      "requested_repository": "Dolibarr/dolibarr",
+      "canonical_repository": "Dolibarr/dolibarr",
+      "canonical_url": "https://github.com/Dolibarr/dolibarr",
+      "occurrence_indices": [
+        10
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "827f3d92c4c78c30e8719aa09f92edaa1447341b",
+      "default_branch_head_committed_at": "2026-08-22T22:20:58Z",
+      "pushed_at": "2026-08-24T02:29:53Z",
+      "updated_at": "2026-08-23T22:51:49Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "24.0.0",
+        "published_at": "2026-08-20T19:49:15Z",
+        "url": "https://github.com/Dolibarr/dolibarr/releases/tag/24.0.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 11,
+      "requested_repository": "ledgersmb/LedgerSMB",
+      "canonical_repository": "ledgersmb/LedgerSMB",
+      "canonical_url": "https://github.com/ledgersmb/LedgerSMB",
+      "occurrence_indices": [
+        11
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "91cee95127dbf033510a65e857b28c8ae32ea146",
+      "default_branch_head_committed_at": "2026-08-23T06:55:58Z",
+      "pushed_at": "2026-08-24T01:25:51Z",
+      "updated_at": "2026-08-23T20:22:06Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "1.13.7",
+        "published_at": "2026-07-06T14:15:26Z",
+        "url": "https://github.com/ledgersmb/LedgerSMB/releases/tag/1.13.7"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 12,
+      "requested_repository": "openmrs/openmrs-core",
+      "canonical_repository": "openmrs/openmrs-core",
+      "canonical_url": "https://github.com/openmrs/openmrs-core",
+      "occurrence_indices": [
+        12
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "02f1d0a61c96aaa89c4dcc13b25ed44f3f7781b3",
+      "default_branch_head_committed_at": "2026-08-22T20:34:53Z",
+      "pushed_at": "2026-08-23T20:07:05Z",
+      "updated_at": "2026-08-24T03:12:14Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "2.7.6",
+        "published_at": "2025-09-12T14:19:48Z",
+        "url": "https://github.com/openmrs/openmrs-core/releases/tag/2.7.6"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 13,
+      "requested_repository": "openmrs/openmrs-esm-patient-chart",
+      "canonical_repository": "openmrs/openmrs-esm-patient-chart",
+      "canonical_url": "https://github.com/openmrs/openmrs-esm-patient-chart",
+      "occurrence_indices": [
+        13
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "c86f342bb0183c2ae81fa929f8f4eb9f696b3a57",
+      "default_branch_head_committed_at": "2026-08-20T20:57:18Z",
+      "pushed_at": "2026-08-22T04:26:10Z",
+      "updated_at": "2026-08-20T20:57:42Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v12.3.4",
+        "published_at": "2026-06-26T10:18:11Z",
+        "url": "https://github.com/openmrs/openmrs-esm-patient-chart/releases/tag/v12.3.4"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 14,
+      "requested_repository": "openmrs/openmrs-esm-patient-management",
+      "canonical_repository": "openmrs/openmrs-esm-patient-management",
+      "canonical_url": "https://github.com/openmrs/openmrs-esm-patient-management",
+      "occurrence_indices": [
+        14
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "c64fb3366119833e9e09a0eb31d580c9e1558d8b",
+      "default_branch_head_committed_at": "2026-08-19T20:26:31Z",
+      "pushed_at": "2026-08-21T20:17:42Z",
+      "updated_at": "2026-08-19T20:30:13Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v11.1.0",
+        "published_at": "2026-06-26T10:39:12Z",
+        "url": "https://github.com/openmrs/openmrs-esm-patient-management/releases/tag/v11.1.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 15,
+      "requested_repository": "openmrs/openmrs-esm-form-engine-lib",
+      "canonical_repository": "openmrs/openmrs-esm-form-engine-lib",
+      "canonical_url": "https://github.com/openmrs/openmrs-esm-form-engine-lib",
+      "occurrence_indices": [
+        15
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "c09b32580a1366927f239704bfbf73f773ce454d",
+      "default_branch_head_committed_at": "2026-08-22T00:55:28Z",
+      "pushed_at": "2026-08-22T00:55:29Z",
+      "updated_at": "2026-08-22T00:55:37Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v4.2.1",
+        "published_at": "2026-06-18T10:24:51Z",
+        "url": "https://github.com/openmrs/openmrs-esm-form-engine-lib/releases/tag/v4.2.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 16,
+      "requested_repository": "openmrs/openmrs-module-fhir2",
+      "canonical_repository": "openmrs/openmrs-module-fhir2",
+      "canonical_url": "https://github.com/openmrs/openmrs-module-fhir2",
+      "occurrence_indices": [
+        16
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "cf803e321ff50af71c008ef59a1b8330025f6094",
+      "default_branch_head_committed_at": "2026-08-18T12:35:34Z",
+      "pushed_at": "2026-08-18T15:25:17Z",
+      "updated_at": "2026-08-18T12:37:03Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "2.5.1",
+        "published_at": "2026-08-18T15:19:20Z",
+        "url": "https://github.com/openmrs/openmrs-module-fhir2/releases/tag/2.5.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 17,
+      "requested_repository": "openmrs/openmrs-esm-task-list",
+      "canonical_repository": "openmrs/openmrs-esm-task-list",
+      "canonical_url": "https://github.com/openmrs/openmrs-esm-task-list",
+      "occurrence_indices": [
+        17
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": true,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "f22e24d0cf933b3e2268844e4aa68364c3d2d475",
+      "default_branch_head_committed_at": "2026-05-11T23:28:35Z",
+      "pushed_at": "2026-05-13T10:53:18Z",
+      "updated_at": "2026-05-14T13:21:46Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v1.0.1",
+        "published_at": "2026-02-11T18:08:47Z",
+        "url": "https://github.com/openmrs/openmrs-esm-task-list/releases/tag/v1.0.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 18,
+      "requested_repository": "ohcnetwork/care",
+      "canonical_repository": "ohcnetwork/care",
+      "canonical_url": "https://github.com/ohcnetwork/care",
+      "occurrence_indices": [
+        18
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "9a397f07ca5405dbaecd6143327fc228678dc2dc",
+      "default_branch_head_committed_at": "2026-08-17T11:22:27Z",
+      "pushed_at": "2026-08-23T20:39:59Z",
+      "updated_at": "2026-08-21T07:54:21Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v3.0.0",
+        "published_at": "2025-02-12T08:05:33Z",
+        "url": "https://github.com/ohcnetwork/care/releases/tag/v3.0.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 19,
+      "requested_repository": "ohcnetwork/care_fe",
+      "canonical_repository": "ohcnetwork/care_fe",
+      "canonical_url": "https://github.com/ohcnetwork/care_fe",
+      "occurrence_indices": [
+        19
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "e41471c20c4929026d248dd83d09d994b172aea4",
+      "default_branch_head_committed_at": "2026-08-23T13:59:55Z",
+      "pushed_at": "2026-08-24T03:28:33Z",
+      "updated_at": "2026-08-23T14:00:15Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v3.0.32",
+        "published_at": "2025-12-23T07:22:37Z",
+        "url": "https://github.com/ohcnetwork/care_fe/releases/tag/v3.0.32"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 20,
+      "requested_repository": "medplum/medplum",
+      "canonical_repository": "medplum/medplum",
+      "canonical_url": "https://github.com/medplum/medplum",
+      "occurrence_indices": [
+        20
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "b3be0208ce4726712d5643cb28020ae0771b43da",
+      "default_branch_head_committed_at": "2026-08-21T22:39:53Z",
+      "pushed_at": "2026-08-22T00:58:07Z",
+      "updated_at": "2026-08-23T11:00:22Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v5.1.31",
+        "published_at": "2026-08-20T20:55:22Z",
+        "url": "https://github.com/medplum/medplum/releases/tag/v5.1.31"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 21,
+      "requested_repository": "Bahmni/bahmni-core",
+      "canonical_repository": "Bahmni/bahmni-core",
+      "canonical_url": "https://github.com/Bahmni/bahmni-core",
+      "occurrence_indices": [
+        21
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "64d7fe4e3d8d11b00ffc364cf56dddfec0ef4217",
+      "default_branch_head_committed_at": "2026-08-17T12:47:47Z",
+      "pushed_at": "2026-08-21T08:31:02Z",
+      "updated_at": "2026-08-20T05:05:48Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "1.3.0",
+        "published_at": "2025-10-10T02:14:09Z",
+        "url": "https://github.com/Bahmni/bahmni-core/releases/tag/1.3.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 22,
+      "requested_repository": "Bahmni/openmrs-module-ipd-frontend",
+      "canonical_repository": "Bahmni/openmrs-module-ipd-frontend",
+      "canonical_url": "https://github.com/Bahmni/openmrs-module-ipd-frontend",
+      "occurrence_indices": [
+        22
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+      "default_branch_head_committed_at": "2026-08-10T04:57:38Z",
+      "pushed_at": "2026-08-19T07:46:45Z",
+      "updated_at": "2026-08-10T04:57:45Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 23,
+      "requested_repository": "Bahmni/openmrs-module-medicationadministration",
+      "canonical_repository": "Bahmni/openmrs-module-medicationadministration",
+      "canonical_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+      "occurrence_indices": [
+        23
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+      "default_branch_head_committed_at": "2026-06-25T06:57:22Z",
+      "pushed_at": "2026-07-24T05:03:29Z",
+      "updated_at": "2026-06-25T06:57:27Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "1.1.0",
+        "published_at": "2025-10-10T02:29:51Z",
+        "url": "https://github.com/Bahmni/openmrs-module-medicationadministration/releases/tag/1.1.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 24,
+      "requested_repository": "openemr/openemr",
+      "canonical_repository": "openemr/openemr",
+      "canonical_url": "https://github.com/openemr/openemr",
+      "occurrence_indices": [
+        24
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "ea142c463ec5c1fbd29b9f2992033b36e41bb1da",
+      "default_branch_head_committed_at": "2026-08-23T05:43:32Z",
+      "pushed_at": "2026-08-24T05:36:15Z",
+      "updated_at": "2026-08-24T05:39:04Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v8_3_0",
+        "published_at": "2026-08-18T07:21:44Z",
+        "url": "https://github.com/openemr/openemr/releases/tag/v8_3_0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 25,
+      "requested_repository": "earthians/marley",
+      "canonical_repository": "earthians/marley",
+      "canonical_url": "https://github.com/earthians/marley",
+      "occurrence_indices": [
+        25
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "e24bc491047212b86488cf203a3457236387ca1e",
+      "default_branch_head_committed_at": "2026-08-21T06:15:35Z",
+      "pushed_at": "2026-08-23T15:37:30Z",
+      "updated_at": "2026-08-21T06:15:46Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v16.5.2",
+        "published_at": "2026-08-13T16:15:22Z",
+        "url": "https://github.com/earthians/marley/releases/tag/v16.5.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 26,
+      "requested_repository": "medic/cht-core",
+      "canonical_repository": "medic/cht-core",
+      "canonical_url": "https://github.com/medic/cht-core",
+      "occurrence_indices": [
+        26
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "4bc9caccb9cc4911e094c94c6064023d463f5562",
+      "default_branch_head_committed_at": "2026-08-21T20:03:52Z",
+      "pushed_at": "2026-08-24T04:50:04Z",
+      "updated_at": "2026-08-21T20:04:48Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "5.2.0",
+        "published_at": "2026-06-26T13:41:12Z",
+        "url": "https://github.com/medic/cht-core/releases/tag/5.2.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 27,
+      "requested_repository": "opensrp/fhircore",
+      "canonical_repository": "opensrp/fhircore",
+      "canonical_url": "https://github.com/opensrp/fhircore",
+      "occurrence_indices": [
+        27
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "9e8675d41a133230eaf6bf7fd79370c8d34fe326",
+      "default_branch_head_committed_at": "2026-07-24T15:24:39Z",
+      "pushed_at": "2026-08-17T12:47:24Z",
+      "updated_at": "2026-08-15T15:25:44Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.2.2-opensrp",
+        "published_at": "2025-11-10T05:24:44Z",
+        "url": "https://github.com/opensrp/fhircore/releases/tag/v2.2.2-opensrp"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 28,
+      "requested_repository": "dimagi/commcare-hq",
+      "canonical_repository": "dimagi/commcare-hq",
+      "canonical_url": "https://github.com/dimagi/commcare-hq",
+      "occurrence_indices": [
+        28
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "f391f622123f52c8943098d1228986f6999cddb8",
+      "default_branch_head_committed_at": "2026-08-21T16:15:03Z",
+      "pushed_at": "2026-08-21T19:03:16Z",
+      "updated_at": "2026-08-21T16:15:16Z",
+      "github_license_info": {
+        "spdx_id": "BSD-3-Clause",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 29,
+      "requested_repository": "dimagi/commcare-android",
+      "canonical_repository": "dimagi/commcare-android",
+      "canonical_url": "https://github.com/dimagi/commcare-android",
+      "occurrence_indices": [
+        29
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "5be6b48cefd0e28606a7ab6b82382863e510a77e",
+      "default_branch_head_committed_at": "2026-08-21T12:58:24Z",
+      "pushed_at": "2026-08-24T03:49:46Z",
+      "updated_at": "2026-08-21T12:59:15Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "commcare_2.64.0",
+        "published_at": "2026-08-17T13:31:00Z",
+        "url": "https://github.com/dimagi/commcare-android/releases/tag/commcare_2.64.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 30,
+      "requested_repository": "primeroIMS/primero",
+      "canonical_repository": "primeroIMS/primero",
+      "canonical_url": "https://github.com/primeroIMS/primero",
+      "occurrence_indices": [
+        30
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "4b95bf947480e7cdd1fca197b1c7ef7188a9bd8e",
+      "default_branch_head_committed_at": "2026-08-19T17:20:02Z",
+      "pushed_at": "2026-08-19T17:57:22Z",
+      "updated_at": "2026-08-19T18:01:05Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v2.15.2",
+        "published_at": "2026-08-23T07:32:51Z",
+        "url": "https://github.com/primeroIMS/primero/releases/tag/v2.15.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 31,
+      "requested_repository": "OpenSPP/OpenSPP2",
+      "canonical_repository": "OpenSPP/OpenSPP2",
+      "canonical_url": "https://github.com/OpenSPP/OpenSPP2",
+      "occurrence_indices": [
+        31
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "19.0",
+      "default_branch_head_sha": "4123d6ecb4b2e6a390787f34ed77b90d2cf193be",
+      "default_branch_head_committed_at": "2026-08-24T05:02:36Z",
+      "pushed_at": "2026-08-24T05:40:56Z",
+      "updated_at": "2026-08-24T05:02:46Z",
+      "github_license_info": {
+        "spdx_id": "LGPL-3.0",
+        "name": "GNU Lesser General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "2026.08",
+        "published_at": "2026-08-05T06:27:00Z",
+        "url": "https://github.com/OpenSPP/OpenSPP2/releases/tag/2026.08"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 32,
+      "requested_repository": "hapifhir/hapi-fhir",
+      "canonical_repository": "hapifhir/hapi-fhir",
+      "canonical_url": "https://github.com/hapifhir/hapi-fhir",
+      "occurrence_indices": [
+        32
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "0d7494bf98fa1e5c9686bf43c3b04c0b447272ff",
+      "default_branch_head_committed_at": "2026-08-19T21:14:05Z",
+      "pushed_at": "2026-08-23T16:51:32Z",
+      "updated_at": "2026-08-24T03:01:34Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v8.10.1",
+        "published_at": "2026-07-22T21:11:09Z",
+        "url": "https://github.com/hapifhir/hapi-fhir/releases/tag/v8.10.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 33,
+      "requested_repository": "hapifhir/hapi-fhir-jpaserver-starter",
+      "canonical_repository": "hapifhir/hapi-fhir-jpaserver-starter",
+      "canonical_url": "https://github.com/hapifhir/hapi-fhir-jpaserver-starter",
+      "occurrence_indices": [
+        33
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "07edf2a06fdc2024209ebf64b2d85129c19ffa75",
+      "default_branch_head_committed_at": "2026-08-04T20:13:27Z",
+      "pushed_at": "2026-08-22T01:12:19Z",
+      "updated_at": "2026-08-22T07:17:07Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "helm-v0.24.0",
+        "published_at": "2026-08-04T11:14:22Z",
+        "url": "https://github.com/hapifhir/hapi-fhir-jpaserver-starter/releases/tag/helm-v0.24.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 34,
+      "requested_repository": "jembi/openhim-core-js",
+      "canonical_repository": "jembi/openhim-core-js",
+      "canonical_url": "https://github.com/jembi/openhim-core-js",
+      "occurrence_indices": [
+        34
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "b62a2e4dbdc644128aa47da7fb73d9c6277dbb27",
+      "default_branch_head_committed_at": "2026-04-15T08:48:14Z",
+      "pushed_at": "2026-07-15T08:24:05Z",
+      "updated_at": "2026-08-04T15:30:43Z",
+      "github_license_info": {
+        "spdx_id": "MPL-2.0",
+        "name": "Mozilla Public License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v8.5.0",
+        "published_at": "2024-09-16T13:14:58Z",
+        "url": "https://github.com/jembi/openhim-core-js/releases/tag/v8.5.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 35,
+      "requested_repository": "jembi/openhim-console",
+      "canonical_repository": "jembi/openhim-console",
+      "canonical_url": "https://github.com/jembi/openhim-console",
+      "occurrence_indices": [
+        35
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "13160e45879dc91f92a5a60c7ed49706ad1ea990",
+      "default_branch_head_committed_at": "2026-03-13T07:42:38Z",
+      "pushed_at": "2026-07-15T05:53:59Z",
+      "updated_at": "2026-03-13T07:42:43Z",
+      "github_license_info": {
+        "spdx_id": "MPL-2.0",
+        "name": "Mozilla Public License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v1.18.2",
+        "published_at": "2023-06-26T13:54:51Z",
+        "url": "https://github.com/jembi/openhim-console/releases/tag/v1.18.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 36,
+      "requested_repository": "intrahealth/client-registry",
+      "canonical_repository": "intrahealth/client-registry",
+      "canonical_url": "https://github.com/intrahealth/client-registry",
+      "occurrence_indices": [
+        36
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "7569452055dc6de2719e1e362e78a7d7973856d4",
+      "default_branch_head_committed_at": "2025-04-01T15:50:02Z",
+      "pushed_at": "2025-04-01T15:50:34Z",
+      "updated_at": "2026-04-23T21:21:44Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "3.0.0",
+        "published_at": "2021-07-15T17:36:45Z",
+        "url": "https://github.com/intrahealth/client-registry/releases/tag/3.0.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 37,
+      "requested_repository": "openreferral/specification",
+      "canonical_repository": "openreferral/specification",
+      "canonical_url": "https://github.com/openreferral/specification",
+      "occurrence_indices": [
+        37
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "3.3",
+      "default_branch_head_sha": "3a2666980ff5f83bdd97e8ffafef6cbf573861d3",
+      "default_branch_head_committed_at": "2026-08-19T09:09:24Z",
+      "pushed_at": "2026-08-19T09:27:36Z",
+      "updated_at": "2026-07-17T18:50:50Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v3.3",
+        "published_at": "2026-08-19T09:27:36Z",
+        "url": "https://github.com/openreferral/specification/releases/tag/v3.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 38,
+      "requested_repository": "fleetbase/fleetbase",
+      "canonical_repository": "fleetbase/fleetbase",
+      "canonical_url": "https://github.com/fleetbase/fleetbase",
+      "occurrence_indices": [
+        38
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "65236685409aab16bf263d517a87c878e591a4bd",
+      "default_branch_head_committed_at": "2026-08-19T04:57:55Z",
+      "pushed_at": "2026-08-21T12:45:51Z",
+      "updated_at": "2026-08-23T22:58:25Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v0.7.55",
+        "published_at": "2026-08-19T04:58:29Z",
+        "url": "https://github.com/fleetbase/fleetbase/releases/tag/v0.7.55"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 39,
+      "requested_repository": "fleetbase/fleetops",
+      "canonical_repository": "fleetbase/fleetops",
+      "canonical_url": "https://github.com/fleetbase/fleetops",
+      "occurrence_indices": [
+        39
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "4e0fc5fe32d6765d35f880c85d494b28c974d1cd",
+      "default_branch_head_committed_at": "2026-08-17T07:09:57Z",
+      "pushed_at": "2026-08-23T13:38:58Z",
+      "updated_at": "2026-08-20T07:04:33Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v0.6.60",
+        "published_at": "2026-08-17T07:10:26Z",
+        "url": "https://github.com/fleetbase/fleetops/releases/tag/v0.6.60"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 40,
+      "requested_repository": "traccar/traccar",
+      "canonical_repository": "traccar/traccar",
+      "canonical_url": "https://github.com/traccar/traccar",
+      "occurrence_indices": [
+        40
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "e3589c55dc185ccdee4d6db169d0caffcd575782",
+      "default_branch_head_committed_at": "2026-08-23T17:01:08Z",
+      "pushed_at": "2026-08-23T17:02:02Z",
+      "updated_at": "2026-08-24T05:40:57Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v6.15.2",
+        "published_at": "2026-08-23T17:06:07Z",
+        "url": "https://github.com/traccar/traccar/releases/tag/v6.15.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 41,
+      "requested_repository": "traccar/traccar-web",
+      "canonical_repository": "traccar/traccar-web",
+      "canonical_url": "https://github.com/traccar/traccar-web",
+      "occurrence_indices": [
+        41
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "6b9aa7632e26df774a6c65549f1d39169cb9c836",
+      "default_branch_head_committed_at": "2026-08-23T17:00:17Z",
+      "pushed_at": "2026-08-23T17:00:46Z",
+      "updated_at": "2026-08-23T17:00:34Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 42,
+      "requested_repository": "hargata/lubelog",
+      "canonical_repository": "hargata/lubelog",
+      "canonical_url": "https://github.com/hargata/lubelog",
+      "occurrence_indices": [
+        42
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "d5a5832045267ac3d9c31addb280c774120ab0a3",
+      "default_branch_head_committed_at": "2026-08-19T14:26:47Z",
+      "pushed_at": "2026-08-19T14:38:39Z",
+      "updated_at": "2026-08-24T04:46:54Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v1.7.1",
+        "published_at": "2026-08-19T14:38:39Z",
+        "url": "https://github.com/hargata/lubelog/releases/tag/v1.7.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 43,
+      "requested_repository": "OCA/fleet",
+      "canonical_repository": "OCA/fleet",
+      "canonical_url": "https://github.com/OCA/fleet",
+      "occurrence_indices": [
+        43
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "18.0",
+      "default_branch_head_sha": "08953b7fbd10d766f5c816cadd98f1000fcf995c",
+      "default_branch_head_committed_at": "2026-07-24T18:30:03Z",
+      "pushed_at": "2026-07-24T18:31:01Z",
+      "updated_at": "2026-08-19T21:43:28Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 44,
+      "requested_repository": "grokability/snipe-it",
+      "canonical_repository": "grokability/snipe-it",
+      "canonical_url": "https://github.com/grokability/snipe-it",
+      "occurrence_indices": [
+        44
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "93b0696d69582761176e4de06e99d0d6034be6af",
+      "default_branch_head_committed_at": "2026-08-20T12:08:34Z",
+      "pushed_at": "2026-08-22T20:32:56Z",
+      "updated_at": "2026-08-24T03:52:54Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v8.7.2",
+        "published_at": "2026-08-19T21:06:58Z",
+        "url": "https://github.com/grokability/snipe-it/releases/tag/v8.7.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 45,
+      "requested_repository": "glpi-project/glpi",
+      "canonical_repository": "glpi-project/glpi",
+      "canonical_url": "https://github.com/glpi-project/glpi",
+      "occurrence_indices": [
+        45,
+        60
+      ],
+      "occurrence_weight": 2,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "11.0/bugfixes",
+      "default_branch_head_sha": "12dbfbc3a114c893139e4839f54081f2180c839e",
+      "default_branch_head_committed_at": "2026-08-24T05:22:24Z",
+      "pushed_at": "2026-08-24T05:22:24Z",
+      "updated_at": "2026-08-24T05:22:47Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "11.0.8",
+        "published_at": "2026-06-24T08:55:48Z",
+        "url": "https://github.com/glpi-project/glpi/releases/tag/11.0.8"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 46,
+      "requested_repository": "inventree/InvenTree",
+      "canonical_repository": "inventree/InvenTree",
+      "canonical_url": "https://github.com/inventree/InvenTree",
+      "occurrence_indices": [
+        46
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "528bb085d7ccde10d76a8c78580d4659cabbe45c",
+      "default_branch_head_committed_at": "2026-08-23T08:53:33Z",
+      "pushed_at": "2026-08-23T21:02:10Z",
+      "updated_at": "2026-08-24T05:22:56Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "1.5.1",
+        "published_at": "2026-08-19T03:21:08Z",
+        "url": "https://github.com/inventree/InvenTree/releases/tag/1.5.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 47,
+      "requested_repository": "Grashjs/cmms",
+      "canonical_repository": "Grashjs/cmms",
+      "canonical_url": "https://github.com/Grashjs/cmms",
+      "occurrence_indices": [
+        47
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "fbec690fdbb8033d4796e8f5f73e4358a3360629",
+      "default_branch_head_committed_at": "2026-08-24T01:03:33Z",
+      "pushed_at": "2026-08-24T01:09:05Z",
+      "updated_at": "2026-08-24T01:04:16Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v1.8.0",
+        "published_at": "2026-07-31T20:09:08Z",
+        "url": "https://github.com/Grashjs/cmms/releases/tag/v1.8.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 48,
+      "requested_repository": "netbox-community/netbox",
+      "canonical_repository": "netbox-community/netbox",
+      "canonical_url": "https://github.com/netbox-community/netbox",
+      "occurrence_indices": [
+        48,
+        79
+      ],
+      "occurrence_weight": 2,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "43fe81f9e833228c9869f7ddadb67e6c5f145060",
+      "default_branch_head_committed_at": "2026-08-22T05:06:32Z",
+      "pushed_at": "2026-08-23T00:11:56Z",
+      "updated_at": "2026-08-24T02:29:01Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v4.6.8",
+        "published_at": "2026-08-11T13:38:22Z",
+        "url": "https://github.com/netbox-community/netbox/releases/tag/v4.6.8"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 49,
+      "requested_repository": "open-condo-software/condo",
+      "canonical_repository": "open-condo-software/condo",
+      "canonical_url": "https://github.com/open-condo-software/condo",
+      "occurrence_indices": [
+        49
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "7de0bfec25b3ffe3c8311ea8673a493f5ff6795f",
+      "default_branch_head_committed_at": "2026-08-21T15:24:21Z",
+      "pushed_at": "2026-08-23T09:41:42Z",
+      "updated_at": "2026-08-23T17:41:12Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "release-v5.22.0",
+        "published_at": "2026-08-19T04:25:57Z",
+        "url": "https://github.com/open-condo-software/condo/releases/tag/release-v5.22.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 50,
+      "requested_repository": "grocy/grocy",
+      "canonical_repository": "grocy/grocy",
+      "canonical_url": "https://github.com/grocy/grocy",
+      "occurrence_indices": [
+        50
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "acd061e2cde09fc5bc4e34673021039b25ab7067",
+      "default_branch_head_committed_at": "2026-08-16T18:24:14Z",
+      "pushed_at": "2026-08-16T18:24:20Z",
+      "updated_at": "2026-08-24T03:55:29Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v4.6.0",
+        "published_at": "2026-03-06T17:35:19Z",
+        "url": "https://github.com/grocy/grocy/releases/tag/v4.6.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 51,
+      "requested_repository": "opendcim/openDCIM",
+      "canonical_repository": "opendcim/openDCIM",
+      "canonical_url": "https://github.com/opendcim/openDCIM",
+      "occurrence_indices": [
+        51
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "d0ed4ae53260d57eee49e6a8cdc7e6eea3344bb9",
+      "default_branch_head_committed_at": "2026-08-14T21:28:42Z",
+      "pushed_at": "2026-08-14T21:28:44Z",
+      "updated_at": "2026-08-21T22:08:22Z",
+      "github_license_info": {
+        "spdx_id": null,
+        "name": null
+      },
+      "github_latest_release": {
+        "tag": "23.04",
+        "published_at": "2023-10-15T12:27:49Z",
+        "url": "https://github.com/opendcim/openDCIM/releases/tag/23.04"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 52,
+      "requested_repository": "xeokit/xeokit-sdk",
+      "canonical_repository": "xeokit/xeokit-sdk",
+      "canonical_url": "https://github.com/xeokit/xeokit-sdk",
+      "occurrence_indices": [
+        52
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "d0204fd3a76af161c5b6b15e2eb5787becc30a60",
+      "default_branch_head_committed_at": "2026-08-20T08:04:41Z",
+      "pushed_at": "2026-08-20T08:04:45Z",
+      "updated_at": "2026-08-23T14:13:38Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.6.113",
+        "published_at": "2026-08-20T08:04:45Z",
+        "url": "https://github.com/xeokit/xeokit-sdk/releases/tag/v2.6.113"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 53,
+      "requested_repository": "braedonsaunders/beaconhs",
+      "canonical_repository": "braedonsaunders/beaconhs",
+      "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+      "occurrence_indices": [
+        53
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+      "default_branch_head_committed_at": "2026-08-17T19:24:26Z",
+      "pushed_at": "2026-08-17T19:24:36Z",
+      "updated_at": "2026-08-22T17:38:34Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 54,
+      "requested_repository": "intuitem/ciso-assistant-community",
+      "canonical_repository": "intuitem/ciso-assistant-community",
+      "canonical_url": "https://github.com/intuitem/ciso-assistant-community",
+      "occurrence_indices": [
+        54
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+      "default_branch_head_committed_at": "2026-08-23T15:31:06Z",
+      "pushed_at": "2026-08-24T05:13:14Z",
+      "updated_at": "2026-08-23T15:31:23Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v3.21.2",
+        "published_at": "2026-08-20T21:51:43Z",
+        "url": "https://github.com/intuitem/ciso-assistant-community/releases/tag/v3.21.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 55,
+      "requested_repository": "MeyerThorsten/QAtrial",
+      "canonical_repository": "MeyerThorsten/QAtrial",
+      "canonical_url": "https://github.com/MeyerThorsten/QAtrial",
+      "occurrence_indices": [
+        55
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "b10fab722caf9561bcf4fdb03cc9733156992635",
+      "default_branch_head_committed_at": "2026-04-17T11:57:18Z",
+      "pushed_at": "2026-04-17T11:57:22Z",
+      "updated_at": "2026-08-21T15:22:35Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 56,
+      "requested_repository": "SmartQHSE/hse-calculators",
+      "canonical_repository": "SmartQHSE/hse-calculators",
+      "canonical_url": "https://github.com/SmartQHSE/hse-calculators",
+      "occurrence_indices": [
+        56
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "324829cf05f2b99363a4d4d0d59e008c4a300032",
+      "default_branch_head_committed_at": "2026-04-23T07:53:18Z",
+      "pushed_at": "2026-04-23T07:53:20Z",
+      "updated_at": "2026-05-27T12:24:39Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 57,
+      "requested_repository": "opf/openproject",
+      "canonical_repository": "opf/openproject",
+      "canonical_url": "https://github.com/opf/openproject",
+      "occurrence_indices": [
+        57,
+        87
+      ],
+      "occurrence_weight": 2,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dev",
+      "default_branch_head_sha": "b0d4b794a74c062ecbcfa889a74cf7767441aee5",
+      "default_branch_head_committed_at": "2026-08-24T03:23:36Z",
+      "pushed_at": "2026-08-24T05:43:11Z",
+      "updated_at": "2026-08-24T03:24:14Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v17.7.2",
+        "published_at": "2026-08-13T12:25:20Z",
+        "url": "https://github.com/opf/openproject/releases/tag/v17.7.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 58,
+      "requested_repository": "itflow-org/itflow",
+      "canonical_repository": "itflow-org/itflow",
+      "canonical_url": "https://github.com/itflow-org/itflow",
+      "occurrence_indices": [
+        58
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "0262707ef029ffb294df197e10d9b918adb0c85d",
+      "default_branch_head_committed_at": "2026-08-10T16:10:21Z",
+      "pushed_at": "2026-08-20T08:30:46Z",
+      "updated_at": "2026-08-20T11:25:21Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v26.08",
+        "published_at": "2026-08-04T19:31:09Z",
+        "url": "https://github.com/itflow-org/itflow/releases/tag/v26.08"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 59,
+      "requested_repository": "zammad/zammad",
+      "canonical_repository": "zammad/zammad",
+      "canonical_url": "https://github.com/zammad/zammad",
+      "occurrence_indices": [
+        59
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "bb927f6a77e5353e4e686db6da636fe999696402",
+      "default_branch_head_committed_at": "2026-08-24T05:19:59Z",
+      "pushed_at": "2026-08-24T05:53:26Z",
+      "updated_at": "2026-08-24T05:48:38Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 60,
+      "requested_repository": "freescout-help-desk/freescout",
+      "canonical_repository": "freescout-help-desk/freescout",
+      "canonical_url": "https://github.com/freescout-help-desk/freescout",
+      "occurrence_indices": [
+        61
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dist",
+      "default_branch_head_sha": "a9572ca50a6b0ab7142b77f1d1f82971ef4e3896",
+      "default_branch_head_committed_at": "2026-08-24T05:28:51Z",
+      "pushed_at": "2026-08-24T05:48:49Z",
+      "updated_at": "2026-08-24T05:39:03Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "1.8.236",
+        "published_at": "2026-08-24T05:48:49Z",
+        "url": "https://github.com/freescout-help-desk/freescout/releases/tag/1.8.236"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 61,
+      "requested_repository": "faveosuite/faveo-helpdesk",
+      "canonical_repository": "faveosuite/faveo-helpdesk",
+      "canonical_url": "https://github.com/faveosuite/faveo-helpdesk",
+      "occurrence_indices": [
+        62
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "development",
+      "default_branch_head_sha": "6568aa45f89b78028b05cddfb2d37c171d2fbab1",
+      "default_branch_head_committed_at": "2024-10-03T09:20:47Z",
+      "pushed_at": "2026-05-28T04:24:21Z",
+      "updated_at": "2026-08-22T01:06:16Z",
+      "github_license_info": {
+        "spdx_id": "OSL-3.0",
+        "name": "Open Software License 3.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.0.3",
+        "published_at": "2023-10-31T12:07:41Z",
+        "url": "https://github.com/faveosuite/faveo-helpdesk/releases/tag/v2.0.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 62,
+      "requested_repository": "Combodo/iTop",
+      "canonical_repository": "Combodo/iTop",
+      "canonical_url": "https://github.com/Combodo/iTop",
+      "occurrence_indices": [
+        63
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "4bd5c22d3693f7c7367ab881a4c7719ac620c94d",
+      "default_branch_head_committed_at": "2026-08-22T07:45:34Z",
+      "pushed_at": "2026-08-22T07:45:35Z",
+      "updated_at": "2026-08-23T19:02:39Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "3.2.3-2",
+        "published_at": "2026-08-06T11:34:23Z",
+        "url": "https://github.com/Combodo/iTop/releases/tag/3.2.3-2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 63,
+      "requested_repository": "thingsboard/thingsboard",
+      "canonical_repository": "thingsboard/thingsboard",
+      "canonical_url": "https://github.com/thingsboard/thingsboard",
+      "occurrence_indices": [
+        64
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "a98c1e4fad0ace99bbab641296ef4286f2517358",
+      "default_branch_head_committed_at": "2026-08-20T10:03:06Z",
+      "pushed_at": "2026-08-20T12:02:45Z",
+      "updated_at": "2026-08-24T04:13:58Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v4.3.1.3",
+        "published_at": "2026-06-30T07:16:22Z",
+        "url": "https://github.com/thingsboard/thingsboard/releases/tag/v4.3.1.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 64,
+      "requested_repository": "openremote/openremote",
+      "canonical_repository": "openremote/openremote",
+      "canonical_url": "https://github.com/openremote/openremote",
+      "occurrence_indices": [
+        65
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "c11b6dc346f4cef0400fc72b58c9993a70830e02",
+      "default_branch_head_committed_at": "2026-08-21T07:39:45Z",
+      "pushed_at": "2026-08-24T01:15:56Z",
+      "updated_at": "2026-08-22T08:02:23Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "1.29.0",
+        "published_at": "2026-08-10T10:03:18Z",
+        "url": "https://github.com/openremote/openremote/releases/tag/1.29.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 65,
+      "requested_repository": "chirpstack/chirpstack",
+      "canonical_repository": "chirpstack/chirpstack",
+      "canonical_url": "https://github.com/chirpstack/chirpstack",
+      "occurrence_indices": [
+        66
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "3b5c7e755a235482ed3b8ba23e655594bcc37001",
+      "default_branch_head_committed_at": "2026-08-12T08:09:17Z",
+      "pushed_at": "2026-08-12T08:09:26Z",
+      "updated_at": "2026-08-23T01:51:41Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v4.19.1",
+        "published_at": "2026-08-04T08:36:26Z",
+        "url": "https://github.com/chirpstack/chirpstack/releases/tag/v4.19.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 66,
+      "requested_repository": "edgexfoundry/edgex-go",
+      "canonical_repository": "edgexfoundry/edgex-go",
+      "canonical_url": "https://github.com/edgexfoundry/edgex-go",
+      "occurrence_indices": [
+        67
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "c3e5490eb473795610f4f108d8e8c1a08abba7e1",
+      "default_branch_head_committed_at": "2026-08-15T03:56:21Z",
+      "pushed_at": "2026-08-21T19:32:34Z",
+      "updated_at": "2026-08-23T17:41:00Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v4.0.2",
+        "published_at": "2026-05-29T02:31:11Z",
+        "url": "https://github.com/edgexfoundry/edgex-go/releases/tag/v4.0.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 67,
+      "requested_repository": "edgexfoundry/device-sdk-go",
+      "canonical_repository": "edgexfoundry/device-sdk-go",
+      "canonical_url": "https://github.com/edgexfoundry/device-sdk-go",
+      "occurrence_indices": [
+        68
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "71eac3ea65cf19f4737c569a63d2974c7fa7b4b4",
+      "default_branch_head_committed_at": "2026-08-06T10:45:46Z",
+      "pushed_at": "2026-08-21T04:52:47Z",
+      "updated_at": "2026-08-19T05:32:45Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v4.0.2",
+        "published_at": "2026-05-25T06:29:59Z",
+        "url": "https://github.com/edgexfoundry/device-sdk-go/releases/tag/v4.0.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 68,
+      "requested_repository": "eclipse-ditto/ditto",
+      "canonical_repository": "eclipse-ditto/ditto",
+      "canonical_url": "https://github.com/eclipse-ditto/ditto",
+      "occurrence_indices": [
+        69
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "4e3576844b73fb5e00d1b501f5d7ee6511a7fdc1",
+      "default_branch_head_committed_at": "2026-08-18T18:32:56Z",
+      "pushed_at": "2026-08-21T10:36:12Z",
+      "updated_at": "2026-08-19T16:45:05Z",
+      "github_license_info": {
+        "spdx_id": "EPL-2.0",
+        "name": "Eclipse Public License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "3.9.6",
+        "published_at": "2026-07-29T06:13:51Z",
+        "url": "https://github.com/eclipse-ditto/ditto/releases/tag/3.9.6"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 69,
+      "requested_repository": "node-red/node-red",
+      "canonical_repository": "node-red/node-red",
+      "canonical_url": "https://github.com/node-red/node-red",
+      "occurrence_indices": [
+        70
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "1f38dc899b1d6d24b05369023ef2d83b808cd55d",
+      "default_branch_head_committed_at": "2026-08-13T15:42:27Z",
+      "pushed_at": "2026-08-16T12:33:31Z",
+      "updated_at": "2026-08-23T18:55:25Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "5.0.4",
+        "published_at": "2026-07-30T21:50:35Z",
+        "url": "https://github.com/node-red/node-red/releases/tag/5.0.4"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 70,
+      "requested_repository": "home-assistant/core",
+      "canonical_repository": "home-assistant/core",
+      "canonical_url": "https://github.com/home-assistant/core",
+      "occurrence_indices": [
+        71
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dev",
+      "default_branch_head_sha": "207c4f049baf23444113e68d3eb9d1a009d704d6",
+      "default_branch_head_committed_at": "2026-08-24T05:09:04Z",
+      "pushed_at": "2026-08-24T05:09:06Z",
+      "updated_at": "2026-08-24T05:11:07Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "2026.8.3",
+        "published_at": "2026-08-21T20:45:05Z",
+        "url": "https://github.com/home-assistant/core/releases/tag/2026.8.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 71,
+      "requested_repository": "home-assistant/frontend",
+      "canonical_repository": "home-assistant/frontend",
+      "canonical_url": "https://github.com/home-assistant/frontend",
+      "occurrence_indices": [
+        72
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dev",
+      "default_branch_head_sha": "2eb3b025d87e4d80c78fe33fa768b6c1b41d0ba3",
+      "default_branch_head_committed_at": "2026-08-24T04:58:23Z",
+      "pushed_at": "2026-08-24T04:58:24Z",
+      "updated_at": "2026-08-24T04:59:24Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "20260729.7",
+        "published_at": "2026-08-14T08:00:46Z",
+        "url": "https://github.com/home-assistant/frontend/releases/tag/20260729.7"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 72,
+      "requested_repository": "blakeblackshear/frigate",
+      "canonical_repository": "blakeblackshear/frigate",
+      "canonical_url": "https://github.com/blakeblackshear/frigate",
+      "occurrence_indices": [
+        73
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dev",
+      "default_branch_head_sha": "ad79e666eb666d0c858cb95071f6af75f3f29866",
+      "default_branch_head_committed_at": "2026-08-22T16:08:24Z",
+      "pushed_at": "2026-08-23T23:29:12Z",
+      "updated_at": "2026-08-24T05:50:01Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v0.17.2",
+        "published_at": "2026-06-28T12:12:11Z",
+        "url": "https://github.com/blakeblackshear/frigate/releases/tag/v0.17.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 73,
+      "requested_repository": "ZoneMinder/zoneminder",
+      "canonical_repository": "ZoneMinder/zoneminder",
+      "canonical_url": "https://github.com/ZoneMinder/zoneminder",
+      "occurrence_indices": [
+        74
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "bde61e7af60c7f3f176a7b2741fb1d52bd836c1d",
+      "default_branch_head_committed_at": "2026-08-22T19:30:46Z",
+      "pushed_at": "2026-08-22T19:32:47Z",
+      "updated_at": "2026-08-24T04:57:18Z",
+      "github_license_info": {
+        "spdx_id": "GPL-2.0",
+        "name": "GNU General Public License v2.0"
+      },
+      "github_latest_release": {
+        "tag": "1.38.4",
+        "published_at": "2026-08-11T01:25:49Z",
+        "url": "https://github.com/ZoneMinder/zoneminder/releases/tag/1.38.4"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 74,
+      "requested_repository": "osdp-dev/libosdp",
+      "canonical_repository": "osdp-dev/libosdp",
+      "canonical_url": "https://github.com/osdp-dev/libosdp",
+      "occurrence_indices": [
+        75
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "f80d6ab2ea7797659c4de7150ef0062442154d69",
+      "default_branch_head_committed_at": "2026-08-17T19:22:17Z",
+      "pushed_at": "2026-08-17T19:29:48Z",
+      "updated_at": "2026-08-21T00:22:30Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "v3.2.6",
+        "published_at": "2026-08-04T08:08:39Z",
+        "url": "https://github.com/osdp-dev/libosdp/releases/tag/v3.2.6"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 75,
+      "requested_repository": "zabbix/zabbix",
+      "canonical_repository": "zabbix/zabbix",
+      "canonical_url": "https://github.com/zabbix/zabbix",
+      "occurrence_indices": [
+        76
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "e574e1ad01c11858e42ff506f55f6f78ebae0943",
+      "default_branch_head_committed_at": "2026-08-23T17:20:05Z",
+      "pushed_at": "2026-08-23T17:30:43Z",
+      "updated_at": "2026-08-24T04:36:55Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 76,
+      "requested_repository": "librenms/librenms",
+      "canonical_repository": "librenms/librenms",
+      "canonical_url": "https://github.com/librenms/librenms",
+      "occurrence_indices": [
+        77
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "9212d2599feff10c58d43b2200ef46b0c2e6d3dc",
+      "default_branch_head_committed_at": "2026-08-23T17:01:46Z",
+      "pushed_at": "2026-08-23T17:01:47Z",
+      "updated_at": "2026-08-23T17:03:29Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "26.8.1",
+        "published_at": "2026-08-19T09:29:18Z",
+        "url": "https://github.com/librenms/librenms/releases/tag/26.8.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 77,
+      "requested_repository": "OpenNMS/opennms",
+      "canonical_repository": "OpenNMS/opennms",
+      "canonical_url": "https://github.com/OpenNMS/opennms",
+      "occurrence_indices": [
+        78
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "e9f333dee36c81fac411b6ce8d2a07d1424a77c5",
+      "default_branch_head_committed_at": "2026-08-21T19:16:51Z",
+      "pushed_at": "2026-08-22T15:50:06Z",
+      "updated_at": "2026-08-21T19:17:19Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "opennms-36.0.3-1",
+        "published_at": "2026-08-12T15:47:33Z",
+        "url": "https://github.com/OpenNMS/opennms/releases/tag/opennms-36.0.3-1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 78,
+      "requested_repository": "louislam/uptime-kuma",
+      "canonical_repository": "louislam/uptime-kuma",
+      "canonical_url": "https://github.com/louislam/uptime-kuma",
+      "occurrence_indices": [
+        80
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "34f2b6c6dd0a1039799fdb37a9735feb3a517d71",
+      "default_branch_head_committed_at": "2026-08-24T03:32:06Z",
+      "pushed_at": "2026-08-24T03:32:09Z",
+      "updated_at": "2026-08-24T05:54:07Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "2.5.3",
+        "published_at": "2026-08-22T09:20:48Z",
+        "url": "https://github.com/louislam/uptime-kuma/releases/tag/2.5.3"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 79,
+      "requested_repository": "wazuh/wazuh",
+      "canonical_repository": "wazuh/wazuh",
+      "canonical_url": "https://github.com/wazuh/wazuh",
+      "occurrence_indices": [
+        81
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "f83861461173de20da5e569229113687a495ffce",
+      "default_branch_head_committed_at": "2026-08-14T23:38:01Z",
+      "pushed_at": "2026-08-23T20:38:58Z",
+      "updated_at": "2026-08-24T05:49:35Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v4.14.7",
+        "published_at": "2026-07-30T16:32:45Z",
+        "url": "https://github.com/wazuh/wazuh/releases/tag/v4.14.7"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 80,
+      "requested_repository": "fleetdm/fleet",
+      "canonical_repository": "fleetdm/fleet",
+      "canonical_url": "https://github.com/fleetdm/fleet",
+      "occurrence_indices": [
+        82
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "70538eea8df127088a2b3d6954fd950b63a0b4dd",
+      "default_branch_head_committed_at": "2026-08-24T01:41:12Z",
+      "pushed_at": "2026-08-24T05:50:45Z",
+      "updated_at": "2026-08-24T02:08:12Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "fleet-v4.90.1",
+        "published_at": "2026-08-15T00:03:08Z",
+        "url": "https://github.com/fleetdm/fleet/releases/tag/fleet-v4.90.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 81,
+      "requested_repository": "Ylianst/MeshCentral",
+      "canonical_repository": "Ylianst/MeshCentral",
+      "canonical_url": "https://github.com/Ylianst/MeshCentral",
+      "occurrence_indices": [
+        83
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "b09b1d60328de8e2d2f7387561ed51c64011c82a",
+      "default_branch_head_committed_at": "2026-08-12T17:42:20Z",
+      "pushed_at": "2026-08-12T17:43:42Z",
+      "updated_at": "2026-08-24T02:47:51Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "1.2.5",
+        "published_at": "2026-08-12T17:43:43Z",
+        "url": "https://github.com/Ylianst/MeshCentral/releases/tag/1.2.5"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 82,
+      "requested_repository": "OneUptime/oneuptime",
+      "canonical_repository": "OneUptime/oneuptime",
+      "canonical_url": "https://github.com/OneUptime/oneuptime",
+      "occurrence_indices": [
+        84
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "58e6b626648096229e5f0db041456a47f69d1941",
+      "default_branch_head_committed_at": "2026-08-24T01:30:48Z",
+      "pushed_at": "2026-08-24T01:34:34Z",
+      "updated_at": "2026-08-24T01:31:02Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "12.0.17",
+        "published_at": "2026-08-22T22:08:26Z",
+        "url": "https://github.com/OneUptime/oneuptime/releases/tag/12.0.17"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 83,
+      "requested_repository": "OpenSlides/OpenSlides",
+      "canonical_repository": "OpenSlides/OpenSlides",
+      "canonical_url": "https://github.com/OpenSlides/OpenSlides",
+      "occurrence_indices": [
+        85
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "1402e0968ee580d41c0bbe3618451991afffa4d5",
+      "default_branch_head_committed_at": "2026-08-19T12:20:46Z",
+      "pushed_at": "2026-08-21T09:49:22Z",
+      "updated_at": "2026-08-23T13:08:33Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "4.3.1",
+        "published_at": "2026-07-14T15:58:25Z",
+        "url": "https://github.com/OpenSlides/OpenSlides/releases/tag/4.3.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 84,
+      "requested_repository": "makeplane/plane",
+      "canonical_repository": "makeplane/plane",
+      "canonical_url": "https://github.com/makeplane/plane",
+      "occurrence_indices": [
+        86
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "preview",
+      "default_branch_head_sha": "e056bbf9eb6b511cdc0a5823b1bd6922e561a485",
+      "default_branch_head_committed_at": "2026-08-16T18:06:30Z",
+      "pushed_at": "2026-08-23T14:56:46Z",
+      "updated_at": "2026-08-24T05:53:29Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v1.4.2",
+        "published_at": "2026-08-23T14:39:21Z",
+        "url": "https://github.com/makeplane/plane/releases/tag/v1.4.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 85,
+      "requested_repository": "moodle/moodle",
+      "canonical_repository": "moodle/moodle",
+      "canonical_url": "https://github.com/moodle/moodle",
+      "occurrence_indices": [
+        88
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb",
+      "default_branch_head_committed_at": "2026-08-18T16:04:03Z",
+      "pushed_at": "2026-08-18T16:21:56Z",
+      "updated_at": "2026-08-23T20:01:05Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": null,
+        "published_at": null,
+        "url": null
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 86,
+      "requested_repository": "frappe/lms",
+      "canonical_repository": "frappe/lms",
+      "canonical_url": "https://github.com/frappe/lms",
+      "occurrence_indices": [
+        89
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "e8ee44870dae2f9dcd9ebca99c8b97d1a239e6fc",
+      "default_branch_head_committed_at": "2026-08-20T08:12:47Z",
+      "pushed_at": "2026-08-21T16:23:03Z",
+      "updated_at": "2026-08-23T09:51:08Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.61.0",
+        "published_at": "2026-07-30T13:05:05Z",
+        "url": "https://github.com/frappe/lms/releases/tag/v2.61.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 87,
+      "requested_repository": "paperless-ngx/paperless-ngx",
+      "canonical_repository": "paperless-ngx/paperless-ngx",
+      "canonical_url": "https://github.com/paperless-ngx/paperless-ngx",
+      "occurrence_indices": [
+        90
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "dev",
+      "default_branch_head_sha": "08a7f6ccc09086237398f925559fc48308b89e9d",
+      "default_branch_head_committed_at": "2026-08-24T04:56:30Z",
+      "pushed_at": "2026-08-24T04:58:07Z",
+      "updated_at": "2026-08-24T05:20:47Z",
+      "github_license_info": {
+        "spdx_id": "GPL-3.0",
+        "name": "GNU General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v3.0.5",
+        "published_at": "2026-08-01T21:59:04Z",
+        "url": "https://github.com/paperless-ngx/paperless-ngx/releases/tag/v3.0.5"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 88,
+      "requested_repository": "documenso/documenso",
+      "canonical_repository": "documenso/documenso",
+      "canonical_url": "https://github.com/documenso/documenso",
+      "occurrence_indices": [
+        91
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "75330166cc00b29c14399bc2e391e4b4d8080c00",
+      "default_branch_head_committed_at": "2026-08-19T10:34:18Z",
+      "pushed_at": "2026-08-24T04:16:37Z",
+      "updated_at": "2026-08-24T05:20:31Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v2.17.0",
+        "published_at": "2026-08-19T11:01:04Z",
+        "url": "https://github.com/documenso/documenso/releases/tag/v2.17.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 89,
+      "requested_repository": "novuhq/novu",
+      "canonical_repository": "novuhq/novu",
+      "canonical_url": "https://github.com/novuhq/novu",
+      "occurrence_indices": [
+        92
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "next",
+      "default_branch_head_sha": "596b388c205aaefc18d48357d643905bc7a14e55",
+      "default_branch_head_committed_at": "2026-08-24T05:43:53Z",
+      "pushed_at": "2026-08-24T05:43:55Z",
+      "updated_at": "2026-08-24T05:45:17Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "v3.19.0",
+        "published_at": "2026-08-07T14:56:21Z",
+        "url": "https://github.com/novuhq/novu/releases/tag/v3.19.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 90,
+      "requested_repository": "keycloak/keycloak",
+      "canonical_repository": "keycloak/keycloak",
+      "canonical_url": "https://github.com/keycloak/keycloak",
+      "occurrence_indices": [
+        93
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "1b145dcbe076ee05396b8ae9424c362fd03ecbce",
+      "default_branch_head_committed_at": "2026-08-23T19:51:59Z",
+      "pushed_at": "2026-08-24T01:01:39Z",
+      "updated_at": "2026-08-24T03:42:37Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "26.7.2",
+        "published_at": "2026-08-19T05:26:20Z",
+        "url": "https://github.com/keycloak/keycloak/releases/tag/26.7.2"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 91,
+      "requested_repository": "apache/superset",
+      "canonical_repository": "apache/superset",
+      "canonical_url": "https://github.com/apache/superset",
+      "occurrence_indices": [
+        94
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "9f505eb0cbbc39b78f512765d82fd63cf5ad70e6",
+      "default_branch_head_committed_at": "2026-08-22T22:02:20Z",
+      "pushed_at": "2026-08-23T22:47:04Z",
+      "updated_at": "2026-08-24T04:13:39Z",
+      "github_license_info": {
+        "spdx_id": "Apache-2.0",
+        "name": "Apache License 2.0"
+      },
+      "github_latest_release": {
+        "tag": "6.1.0",
+        "published_at": "2026-05-13T18:32:25Z",
+        "url": "https://github.com/apache/superset/releases/tag/6.1.0"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 92,
+      "requested_repository": "formbricks/formbricks",
+      "canonical_repository": "formbricks/formbricks",
+      "canonical_url": "https://github.com/formbricks/formbricks",
+      "occurrence_indices": [
+        95
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "main",
+      "default_branch_head_sha": "b66c1dd978af618a0e402bd3343b456bed68594c",
+      "default_branch_head_committed_at": "2026-08-22T13:41:54Z",
+      "pushed_at": "2026-08-23T08:29:19Z",
+      "updated_at": "2026-08-23T22:27:59Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "5.3.4",
+        "published_at": "2026-08-11T11:36:45Z",
+        "url": "https://github.com/formbricks/formbricks/releases/tag/5.3.4"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 93,
+      "requested_repository": "excalidraw/excalidraw",
+      "canonical_repository": "excalidraw/excalidraw",
+      "canonical_url": "https://github.com/excalidraw/excalidraw",
+      "occurrence_indices": [
+        96
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "master",
+      "default_branch_head_sha": "e160ff7ba0641fba729c528482de5277ffb19c58",
+      "default_branch_head_committed_at": "2026-08-16T15:30:01Z",
+      "pushed_at": "2026-08-22T21:27:32Z",
+      "updated_at": "2026-08-24T05:54:00Z",
+      "github_license_info": {
+        "spdx_id": "MIT",
+        "name": "MIT License"
+      },
+      "github_latest_release": {
+        "tag": "v0.18.1",
+        "published_at": "2026-04-21T08:43:20Z",
+        "url": "https://github.com/excalidraw/excalidraw/releases/tag/v0.18.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 94,
+      "requested_repository": "mealie-recipes/mealie",
+      "canonical_repository": "mealie-recipes/mealie",
+      "canonical_url": "https://github.com/mealie-recipes/mealie",
+      "occurrence_indices": [
+        97
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "mealie-next",
+      "default_branch_head_sha": "e01629a37ca518f5a8d480907edf8071fd5498ec",
+      "default_branch_head_committed_at": "2026-08-24T04:36:52Z",
+      "pushed_at": "2026-08-24T04:49:55Z",
+      "updated_at": "2026-08-24T04:49:59Z",
+      "github_license_info": {
+        "spdx_id": "AGPL-3.0",
+        "name": "GNU Affero General Public License v3.0"
+      },
+      "github_latest_release": {
+        "tag": "v3.23.1",
+        "published_at": "2026-08-18T14:41:51Z",
+        "url": "https://github.com/mealie-recipes/mealie/releases/tag/v3.23.1"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    },
+    {
+      "ordinal": 95,
+      "requested_repository": "TandoorRecipes/recipes",
+      "canonical_repository": "TandoorRecipes/recipes",
+      "canonical_url": "https://github.com/TandoorRecipes/recipes",
+      "occurrence_indices": [
+        98
+      ],
+      "occurrence_weight": 1,
+      "identity_equal_case_sensitive": true,
+      "archived": false,
+      "disabled": false,
+      "visibility": "PUBLIC",
+      "default_branch": "develop",
+      "default_branch_head_sha": "4759ecf6fcf4f37f39582f21691931d2641bb6e5",
+      "default_branch_head_committed_at": "2026-08-20T17:08:09Z",
+      "pushed_at": "2026-08-20T17:08:11Z",
+      "updated_at": "2026-08-23T14:34:44Z",
+      "github_license_info": {
+        "spdx_id": "NOASSERTION",
+        "name": "Other"
+      },
+      "github_latest_release": {
+        "tag": "2.6.13",
+        "published_at": "2026-07-05T12:56:29Z",
+        "url": "https://github.com/TandoorRecipes/recipes/releases/tag/2.6.13"
+      },
+      "metadata_status": "OFFICIAL_GITHUB_METADATA_SNAPSHOT_SUCCESS"
+    }
+  ],
+  "evidence_count": 197,
+  "evidence_count_basis": "98 literal prompt occurrences plus 95 repository metadata records plus four official API batch receipts; pins and derived hashes are not double-counted.",
+  "credit_boundary": {
+    "metadata_prerequisite_coverage": "95/95 unique repositories and 98/98 occurrence-weighted prompt entries",
+    "upstream_full_triage_credit": 0,
+    "exact_behaviour_credit": 0,
+    "edition_boundary_credit": 0,
+    "root_licence_confirmation_credit": 0,
+    "maintenance_quality_credit": 0,
+    "selection_or_outcome_credit": 0,
+    "feature_mapping_credit": 0,
+    "benchmark_completion_credit": 0
+  },
+  "limits": [
+    "GitHub licenseInfo is metadata only and does not establish the repository root licence or edition boundary.",
+    "A null latestRelease field does not prove that no tags, prereleases, or other release artifacts exist.",
+    "Archived, pushed, updated, commit, and release timestamps are provenance signals, not a maintenance-quality decision.",
+    "No exact feature behaviour, screen, workflow, selection outcome, neutral requirement, or Oblivion mapping is established by this snapshot."
+  ]
+}

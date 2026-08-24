@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_METADATA_VISUAL_WAVE_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T18:15:10+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=metadata-visual-01#progress",
+  "dashboard_sha256": "56a6fd46843035472e2bb54a6f835380d7acef587b90b070b9ff5d1f7293fe3d",
+  "dashboard_generator_sha256": "d57a74e926d963dbdea092ab57a69699212eda7220561b5b2211346ca5239001",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_wave_content_observed": {
+    "grouped_candidate_floor": 186,
+    "formal_assignments_reconciled": 16,
+    "official_github_metadata_unique_repository_coverage": "95/95",
+    "official_github_metadata_occurrence_weighted_coverage": "98/98",
+    "full_project_triage_unique_repository_completions": "0/95",
+    "visual_matrix_rows": 2812,
+    "visual_matrix_columns": 49,
+    "visual_matrix_sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "runtime_tests_credited": 0,
+    "rendered_visual_instances_credited": 0,
+    "current_source_browser_routes_credited": 0,
+    "benchmark_mappings_promoted": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "document_scroll_width": 1425,
+      "document_client_width": 1425,
+      "document_horizontal_overflow": false,
+      "metadata_panel_content_observed": true,
+      "visual_matrix_content_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "document_client_width": 375,
+      "body_width": 375,
+      "document_horizontal_overflow": false,
+      "metadata_panel_content_observed": true,
+      "visual_matrix_content_observed": true,
+      "table_wrap_count": 6,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 27,
+    "http_200": 27,
+    "failures": []
+  },
+  "generator_determinism": {
+    "benchmark_integration_outputs_checked": 6,
+    "benchmark_integration_outputs_identical_sha256": true,
+    "visual_normalization_outputs_checked": 2,
+    "visual_normalization_outputs_identical_sha256": true,
+    "static_integration_outputs_checked": 6,
+    "static_integration_outputs_identical_sha256": true,
+    "dashboard_successive_run_identical_sha256": true,
+    "visual_generator_second_check_only_completion_test_met": true,
+    "visual_generator_second_check_only_wrote_file": false,
+    "visual_generator_second_check_only_rows": 2812,
+    "visual_generator_second_check_only_sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84"
+  },
+  "artifact_pins": {
+    "visual_matrix_generator_sha256": "24a2cfbb5f77103ab7de6b8a68357f19eb305cd2b41df3c60f9dab675239a7ff",
+    "official_github_metadata_snapshot_sha256": "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458",
+    "benchmark_register_sha256": "eda79bf19ef37ee30204da547b3526536f1988118d63e8e851529952114e2129"
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current-build application browser, rendered visual, route, workflow, benchmark-mapping, runtime, test, build, release, or audit-completion credit."
+}

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "CURRENT_BENCHMARK_WAVE_01_RECONCILED_NO_COMPLETION_CREDIT",
-  "generated_at": "2026-08-24T17:43:00+12:00",
+  "status": "CURRENT_BENCHMARK_WAVE_01_PLUS_OFFICIAL_METADATA_RECONCILED_NO_COMPLETION_CREDIT",
+  "generated_at": "2026-08-24T18:00:00+12:00",
   "source": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -21,7 +21,8 @@
     "current_candidate_wave_02_sha256": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
     "current_candidate_wave_03_sha256": "7eec5a50d8f38184696a827bafb35c4e1c1f94fc8104abc7d075f502ce7f4c42",
     "historical_final_904_sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
-    "historical_final_902_sha256": "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
+    "historical_final_902_sha256": "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f",
+    "current_official_github_metadata_snapshot_sha256": "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458"
   },
   "project_register_current_audit": {
     "prompt_listed_url_occurrences": 98,
@@ -34,10 +35,22 @@
     "physical_unique_rows": 98,
     "exact_prompt_unique_rows_structurally_validated_local_only": 95,
     "historical_extra_rows_structurally_validated_local_only": 3,
-    "current_upstream_unique_repository_refreshes": 0,
-    "current_upstream_prompt_occurrence_refreshes": 0,
+    "current_official_github_metadata_unique_repository_coverage": 95,
+    "current_official_github_metadata_prompt_occurrence_coverage": 98,
+    "current_upstream_full_triage_unique_repository_completions": 0,
+    "current_upstream_full_triage_prompt_occurrence_completions": 0,
     "current_project_triage_completion_credit": 0,
-    "licence_noassertion_rows": 11,
+    "current_official_github_metadata_result_counts": {
+      "successful_metadata_records": 95,
+      "failed_records": 0,
+      "redirected_or_case_changed_identities": 0,
+      "public": 95,
+      "archived": 1,
+      "disabled": 0,
+      "github_license_info_null_or_noassertion": 23,
+      "latest_release_null": 12
+    },
+    "historical_licence_noassertion_rows": 11,
     "prompt_unique_repository_historical_outcomes": {
       "native_benchmark": 71,
       "reject": 14,
@@ -60,7 +73,103 @@
       "separate_future_decision": 10,
       "pending": 0
     },
-    "evidence_limit": "The 95 exact prompt repositories and three historical extras are committed-local provenance. The 98 prompt URL occurrences include three duplicate repository listings. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24."
+    "evidence_limit": "Official GitHub repository metadata now covers 95/95 exact prompt repositories and all 98 occurrence-weighted entries. It establishes canonical repository identity, default-branch head, timestamps, visibility, archive/disabled flags, GitHub licenseInfo, and latestRelease fields only. It does not establish full upstream triage, root licence, edition boundary, maintenance quality, exact behavior, mapping, selection, or completion. The three historical extras were not refreshed.",
+    "metadata_credit_boundary": {
+      "metadata_prerequisite_coverage": "95/95 unique repositories and 98/98 occurrence-weighted prompt entries",
+      "upstream_full_triage_credit": 0,
+      "exact_behaviour_credit": 0,
+      "edition_boundary_credit": 0,
+      "root_licence_confirmation_credit": 0,
+      "maintenance_quality_credit": 0,
+      "selection_or_outcome_credit": 0,
+      "feature_mapping_credit": 0,
+      "benchmark_completion_credit": 0
+    }
+  },
+  "official_github_metadata_snapshot": {
+    "status": "CURRENT_OFFICIAL_GITHUB_METADATA_SNAPSHOT_COMPLETE_NO_TRIAGE_CREDIT",
+    "snapshot_started_at": "2026-08-24T05:54:28.044554Z",
+    "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+    "snapshot_sha256": "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458",
+    "unique_repository_coverage": "95/95",
+    "prompt_occurrence_weighted_coverage": "98/98",
+    "result_counts": {
+      "successful_metadata_records": 95,
+      "failed_records": 0,
+      "redirected_or_case_changed_identities": 0,
+      "public": 95,
+      "archived": 1,
+      "disabled": 0,
+      "github_license_info_null_or_noassertion": 23,
+      "latest_release_null": 12
+    },
+    "api_receipts": [
+      {
+        "batch": 1,
+        "row_start": 1,
+        "row_end": 24,
+        "rows": 24,
+        "http_status": 200,
+        "cli_exit_code": 0,
+        "graphql_error_count": 0,
+        "github_request_id": "1B66:0C59:102412C:137938D:6A8BDC93",
+        "started_at": "2026-08-24T05:54:28.044554Z",
+        "ended_at": "2026-08-24T05:54:30.371155Z"
+      },
+      {
+        "batch": 2,
+        "row_start": 25,
+        "row_end": 48,
+        "rows": 24,
+        "http_status": 200,
+        "cli_exit_code": 0,
+        "graphql_error_count": 0,
+        "github_request_id": "25F2:3C711C:21D2C6B:2866ACB:6A8BDC95",
+        "started_at": "2026-08-24T05:54:30.371155Z",
+        "ended_at": "2026-08-24T05:54:33.172876Z"
+      },
+      {
+        "batch": 3,
+        "row_start": 49,
+        "row_end": 72,
+        "rows": 24,
+        "http_status": 200,
+        "cli_exit_code": 0,
+        "graphql_error_count": 0,
+        "github_request_id": "3234:F8C94:1DBA32C:2447445:6A8BDC98",
+        "started_at": "2026-08-24T05:54:33.173875Z",
+        "ended_at": "2026-08-24T05:54:35.831441Z"
+      },
+      {
+        "batch": 4,
+        "row_start": 73,
+        "row_end": 95,
+        "rows": 23,
+        "http_status": 200,
+        "cli_exit_code": 0,
+        "graphql_error_count": 0,
+        "github_request_id": "3E48:3E4824:1D9B787:242CEC9:6A8BDC9B",
+        "started_at": "2026-08-24T05:54:35.832441Z",
+        "ended_at": "2026-08-24T05:54:38.618975Z"
+      }
+    ],
+    "credit_boundary": {
+      "metadata_prerequisite_coverage": "95/95 unique repositories and 98/98 occurrence-weighted prompt entries",
+      "upstream_full_triage_credit": 0,
+      "exact_behaviour_credit": 0,
+      "edition_boundary_credit": 0,
+      "root_licence_confirmation_credit": 0,
+      "maintenance_quality_credit": 0,
+      "selection_or_outcome_credit": 0,
+      "feature_mapping_credit": 0,
+      "benchmark_completion_credit": 0
+    },
+    "limits": [
+      "GitHub licenseInfo is metadata only and does not establish the repository root licence or edition boundary.",
+      "A null latestRelease field does not prove that no tags, prereleases, or other release artifacts exist.",
+      "Archived, pushed, updated, commit, and release timestamps are provenance signals, not a maintenance-quality decision.",
+      "No exact feature behaviour, screen, workflow, selection outcome, neutral requirement, or Oblivion mapping is established by this snapshot."
+    ]
   },
   "prompt_project_denominator_reconciliation": {
     "status": "CORRECTED_NO_COMPLETION_CREDIT",
@@ -671,9 +780,31 @@
           "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
           "historical_inspected_date": "2026-08-13",
           "historical_exact_behaviour_locus": "Portal enablement/authentication is audited; sessions are distinct; documents are session/patient scoped and CSRF-protected. Primary source: https://github.com/openemr/openemr/blob/312b5d042f7fa49cc78ebed041155fba339a991c/src/Controllers/Portal/PatientPortalLoginController.php#L124-L249 Wave-4: [CAP-CLIN-OBSERVATION-REGISTER-RECORD] OpenEMR checks observation-form permission, lists and loads patient/encounter observations, validates submitted observations, binds patient/encounter/user context, and saves transactionally. Primary sources: https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L75-L139; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L180-L220; https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L242-L354.",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "openemr/openemr",
+            "default_branch": "master",
+            "default_branch_head_sha": "ea142c463ec5c1fbd29b9f2992033b36e41bb1da",
+            "default_branch_head_committed_at": "2026-08-23T05:43:32Z",
+            "pushed_at": "2026-08-24T05:36:15Z",
+            "updated_at": "2026-08-24T05:39:04Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "GPL-3.0",
+              "name": "GNU General Public License v3.0"
+            },
+            "github_latest_release": {
+              "tag": "v8_3_0",
+              "published_at": "2026-08-18T07:21:44Z",
+              "url": "https://github.com/openemr/openemr/releases/tag/v8_3_0"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -702,9 +833,31 @@
           "commit_sha": "c514bcd8c742053f08ef17741b5c9868cd2186f8",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Motion transitions are constrained; agenda hierarchy rejects cycles; meeting archive blocks ongoing polls/speakers. Primary source: https://github.com/OpenSlides/openslides-backend/blob/3917202ccf26efe7efaee81fd56c822ec182a810/docs/actions/motion.set_state.md#L9-L46",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "OpenSlides/OpenSlides",
+            "default_branch": "main",
+            "default_branch_head_sha": "1402e0968ee580d41c0bbe3618451991afffa4d5",
+            "default_branch_head_committed_at": "2026-08-19T12:20:46Z",
+            "pushed_at": "2026-08-21T09:49:22Z",
+            "updated_at": "2026-08-23T13:08:33Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "MIT",
+              "name": "MIT License"
+            },
+            "github_latest_release": {
+              "tag": "4.3.1",
+              "published_at": "2026-07-14T15:58:25Z",
+              "url": "https://github.com/OpenSlides/OpenSlides/releases/tag/4.3.1"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -733,9 +886,31 @@
           "commit_sha": "c514bcd8c742053f08ef17741b5c9868cd2186f8",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Motion transitions are constrained; agenda hierarchy rejects cycles; meeting archive blocks ongoing polls/speakers. Primary source: https://github.com/OpenSlides/openslides-backend/blob/3917202ccf26efe7efaee81fd56c822ec182a810/docs/actions/motion.set_state.md#L9-L46",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "OpenSlides/OpenSlides",
+            "default_branch": "main",
+            "default_branch_head_sha": "1402e0968ee580d41c0bbe3618451991afffa4d5",
+            "default_branch_head_committed_at": "2026-08-19T12:20:46Z",
+            "pushed_at": "2026-08-21T09:49:22Z",
+            "updated_at": "2026-08-23T13:08:33Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "MIT",
+              "name": "MIT License"
+            },
+            "github_latest_release": {
+              "tag": "4.3.1",
+              "published_at": "2026-07-14T15:58:25Z",
+              "url": "https://github.com/OpenSlides/OpenSlides/releases/tag/4.3.1"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -767,9 +942,31 @@
           "commit_sha": "7de18df3532a96883e1098dea0a4b4dba70909fd",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Incidents retain chronology/root-cause and corrective actions move to separately verified completion. Primary source: https://github.com/braedonsaunders/beaconhs/blob/7de18df3532a96883e1098dea0a4b4dba70909fd/packages/db/src/schema/corrective-actions.ts#L32-L123",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "braedonsaunders/beaconhs",
+            "default_branch": "main",
+            "default_branch_head_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+            "default_branch_head_committed_at": "2026-08-17T19:24:26Z",
+            "pushed_at": "2026-08-17T19:24:36Z",
+            "updated_at": "2026-08-22T17:38:34Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "AGPL-3.0",
+              "name": "GNU Affero General Public License v3.0"
+            },
+            "github_latest_release": {
+              "tag": null,
+              "published_at": null,
+              "url": null
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -798,9 +995,31 @@
           "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Risk, controls, evidence, findings and acceptance have distinct owners, states, expiry and revocation. Primary source: https://github.com/intuitem/ciso-assistant-community/blob/1ba187b0117f4dba9e00605bd7d5319ded61cee3/backend/core/models.py#L6930-L7013",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "intuitem/ciso-assistant-community",
+            "default_branch": "main",
+            "default_branch_head_sha": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+            "default_branch_head_committed_at": "2026-08-23T15:31:06Z",
+            "pushed_at": "2026-08-24T05:13:14Z",
+            "updated_at": "2026-08-23T15:31:23Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "NOASSERTION",
+              "name": "Other"
+            },
+            "github_latest_release": {
+              "tag": "v3.21.2",
+              "published_at": "2026-08-20T21:51:43Z",
+              "url": "https://github.com/intuitem/ciso-assistant-community/releases/tag/v3.21.2"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -831,9 +1050,31 @@
           "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Referrals move through accepted/rejected/done/revoked states, check consent and link service completion. Primary source: https://github.com/primeroIMS/primero/blob/9cea249d502269c258028844884d51e9a89bd00a/app/models/referral.rb#L31-L99",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "primeroIMS/primero",
+            "default_branch": "main",
+            "default_branch_head_sha": "4b95bf947480e7cdd1fca197b1c7ef7188a9bd8e",
+            "default_branch_head_committed_at": "2026-08-19T17:20:02Z",
+            "pushed_at": "2026-08-19T17:57:22Z",
+            "updated_at": "2026-08-19T18:01:05Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "NOASSERTION",
+              "name": "Other"
+            },
+            "github_latest_release": {
+              "tag": "v2.15.2",
+              "published_at": "2026-08-23T07:32:51Z",
+              "url": "https://github.com/primeroIMS/primero/releases/tag/v2.15.2"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -863,9 +1104,10 @@
           "commit_sha": "e97865c3212334a6b3112177ee0aa81620173f81",
           "historical_inspected_date": "2026-08-13",
           "historical_exact_behaviour_locus": "Wave-4: [CAP-SET-OUTBOUND-WEBHOOK-CONFIG] Frappe defines, validates, signs and dispatches configurable webhooks, records delivery status, and schedules retries on failure. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L8-L34; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L42-L72; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L84-L101; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.json#L154-L165; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L67-L106; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L155-L213; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/integrations/doctype/webhook/webhook.py#L339-L359. [CAP-SET-ROLE-ASSIGNMENTS] Frappe renders the role editor only with qualifying write permission, persists role tables, and provides direct add-role and remove-role methods. Primary sources: https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L74-L100; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L316-L319; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.js#L478-L488; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.py#L718-L734; https://github.com/frappe/frappe/blob/e97865c3212334a6b3112177ee0aa81620173f81/frappe/core/doctype/user/user.json#L250-L257.",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
+          "current_github_metadata": null
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       },
       {
@@ -894,9 +1136,31 @@
           "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
           "historical_inspected_date": "2026-08-12",
           "historical_exact_behaviour_locus": "Bank matching locks source transactions, validates matchable membership/amount and commits match/unmatch transactionally. Primary source: https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L39-L172",
-          "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT"
+          "current_upstream_refresh_status": "OFFICIAL_GITHUB_METADATA_ONLY_NO_FULL_TRIAGE_CREDIT",
+          "current_github_metadata": {
+            "canonical_repository": "bigcapitalhq/bigcapital",
+            "default_branch": "develop",
+            "default_branch_head_sha": "125639d751a9bbe3428c813ba44bb03708ade76e",
+            "default_branch_head_committed_at": "2026-08-23T21:47:46Z",
+            "pushed_at": "2026-08-24T01:19:26Z",
+            "updated_at": "2026-08-23T21:47:51Z",
+            "visibility": "PUBLIC",
+            "archived": false,
+            "disabled": false,
+            "github_license_info": {
+              "spdx_id": "AGPL-3.0",
+              "name": "GNU Affero General Public License v3.0"
+            },
+            "github_latest_release": {
+              "tag": "v0.25.32",
+              "published_at": "2026-08-19T23:36:13Z",
+              "url": "https://github.com/bigcapitalhq/bigcapital/releases/tag/v0.25.32"
+            },
+            "snapshot_ended_at": "2026-08-24T05:54:38.619975Z",
+            "credit_boundary": "METADATA_PREREQUISITE_ONLY_NO_BEHAVIOUR_LICENCE_ROOT_EDITION_MAPPING_SELECTION_OR_TRIAGE_CREDIT"
+          }
         },
-        "unresolved_evidence": "Fresh official-upstream inspection, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
+        "unresolved_evidence": "Exact upstream behavior, repository-root licence, edition boundary, maintenance-quality adjudication, final candidate identity, full target-specific neutralization, representative role/Site/direct-object runtime behavior, recovery and failure evidence remain open.",
         "completion_credit": false
       }
     ],
@@ -915,8 +1179,8 @@
     "completion_percentage": null,
     "reason": "The denominator is not frozen; observer relations, neutralizer challenges, and comparator packets are evidence slices, not final per-feature mappings."
   },
-  "evidence_count": 1348,
-  "evidence_count_basis": "Agent-reported evidence counts summed across RUN-007 (127), RUN-008 (1189), and RUN-009 (32); overlap was not deduplicated.",
+  "evidence_count": 1545,
+  "evidence_count_basis": "Agent-reported evidence counts summed across RUN-007 (127), RUN-008 (1189), RUN-009 (32), and RUN-015 metadata evidence (197); overlap was not deduplicated.",
   "runtime_gates": null,
   "completion_credit": false
 }
