@@ -1,0 +1,212 @@
+{
+  "schema": "RUN-068-HR-FINANCE-INDEPENDENT-EXACT-FILE-REVIEW-1",
+  "reviewed_packet": {
+    "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+    "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118",
+    "bytes": 71194,
+    "hash_match": true,
+    "producer": "/root/run063_med_clinical_reissue_review",
+    "reviewer": "/root/final_formal_dashboard_preflight",
+    "different_independent_reviewer": true,
+    "framing": "UTF-8_NO_BOM_EXACTLY_ONE_TERMINAL_LF"
+  },
+  "checklist": {
+    "path": "evidence/benchmark/raw-run-066e-hr-finance-corrected-reseal-review-checklist-wave-03.json",
+    "sha256": "bed40804fd86a3468f9e4a0a17cea9c8291242b92e4b4b69df5991aee8d8e7da",
+    "bytes": 11772,
+    "hash_match": true
+  },
+  "recomputation": {
+    "mechanical_checks": "624/624_PASS",
+    "array_jcs": "5/5_MATCH",
+    "manifest_jcs": "1/1_MATCH",
+    "legacy_project_hashes": "6/6_MATCH",
+    "legacy_facet_hashes": "12/12_MATCH",
+    "claim_text_hashes": "108/108_MATCH",
+    "claim_binding_hashes": "108/108_MATCH",
+    "source_facet_links": "12/12_MATCH_CHECKLIST_BOUNDARY",
+    "claims": "108/108",
+    "coverage_fields": "67/67",
+    "expanded_facet_locus_edges": "50/50",
+    "claim_locus_edges": "428/428",
+    "derived_results": "12/12",
+    "unmapped_claims": 0,
+    "unresolved_references": 0,
+    "ownership_violations": 0,
+    "coverage_gaps": 0,
+    "coverage_duplicates": 0,
+    "hash_collisions": 0
+  },
+  "ftc": {
+    "order": "FTC-01..FTC-24",
+    "project_check_instances": 144,
+    "passed": 144,
+    "failed": 0,
+    "projects": [
+      {
+        "id": "PRJ-HF-ERP",
+        "repository": "frappe/erpnext",
+        "classification": "DIRECT_HR_BASE_OWNER_AND_ADJACENT_FIN_RECONCILIATION",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD"
+      },
+      {
+        "id": "PRJ-HF-HORILLA",
+        "repository": "horilla/horilla-hr",
+        "classification": "DIRECT_BOUNDED_HR_WORK_HISTORY",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD"
+      },
+      {
+        "id": "PRJ-HF-BIGCAP",
+        "repository": "bigcapitalhq/bigcapital",
+        "classification": "DIRECT_FIN_BANK_MATCHING_NOT_ALLOCATION_HISTORY",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD"
+      },
+      {
+        "id": "PRJ-HF-HRMS",
+        "repository": "frappe/hrms",
+        "classification": "EXCLUDED_OWNER_COLLISION",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD"
+      },
+      {
+        "id": "PRJ-HF-ORANGE",
+        "repository": "orangehrm/orangehrm",
+        "classification": "EXCLUDED_REACTIVATION_NOT_REHIRE",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD"
+      },
+      {
+        "id": "PRJ-HF-ODOO",
+        "repository": "odoo/odoo",
+        "classification": "EXCLUDED_EDITION_SOURCE_BINDING",
+        "profile": "AAAAAAAAAAAAAAAAAAAAAAAA",
+        "decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD"
+      }
+    ]
+  },
+  "facets": [
+    {
+      "id": "FAC-HR-CREATE",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-INVITE",
+      "result": "N",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-HISTORY",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-REHIRE",
+      "result": "N",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-SET-ACTIVE",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-UPDATE",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-HR-VIEW",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-FIN-SUGGEST",
+      "result": "S",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-FIN-CONFIRM",
+      "result": "S+A",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-FIN-REJECT",
+      "result": "N",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-FIN-HISTORY",
+      "result": "N",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    },
+    {
+      "id": "FAC-FIN-REPLAY",
+      "result": "N",
+      "decision": "ACCEPT_FORMAL_UPSTREAM_FACET_RECORD"
+    }
+  ],
+  "counts": {
+    "accepted_project_records": 6,
+    "accepted_selected_classification_records": 3,
+    "accepted_exclusion_classification_records": 3,
+    "accepted_prompt_repositories": 6,
+    "accepted_prompt_occurrence_weight": 6,
+    "accepted_facet_records": 12,
+    "facet_results": {
+      "S": 6,
+      "S+A": 1,
+      "N": 5
+    },
+    "formal_target_edges": 0,
+    "final_no_matches": 0,
+    "NCM": 0
+  },
+  "defects": [],
+  "verdict": "GO_6_OF_6_FORMAL_UPSTREAM_PROJECT_RECORDS_AND_12_OF_12_BOUNDED_FACET_RECORDS_ACCEPTED_ZERO_DOWNSTREAM_CREDIT",
+  "generator_ready": {
+    "upstream_project_and_facet_record_layer_only": true,
+    "neutral_comparison_or_mapping_layer": false
+  },
+  "credit_boundary": {
+    "formal_upstream_project_record_acceptance": true,
+    "formal_upstream_facet_record_acceptance": true,
+    "project_selection": false,
+    "facet_selection": false,
+    "neutral_requirements": false,
+    "current_product_comparison": false,
+    "target_mapping": false,
+    "benchmark": false,
+    "final_no_match": false,
+    "NCM": false,
+    "runtime": false,
+    "browser": false,
+    "tests": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "read_only": true,
+    "writes": false,
+    "only_packet_and_checklist_read": true,
+    "application_source": false,
+    "other_audit_artifacts": false,
+    "memory": false,
+    "sessions": false,
+    "VCS": false,
+    "network": false,
+    "browser": false,
+    "application_runtime": false,
+    "tests": false,
+    "build": false,
+    "database": false,
+    "current_product_comparison": false,
+    "mapping_or_NCM": false,
+    "no_inference": true
+  }
+}

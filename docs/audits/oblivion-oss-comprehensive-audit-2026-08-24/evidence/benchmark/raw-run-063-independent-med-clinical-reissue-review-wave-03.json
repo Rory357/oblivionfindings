@@ -1,0 +1,272 @@
+{
+  "schema": "RUN-063-MED-CLINICAL-REISSUE-INDEPENDENT-REVIEW-1",
+  "verdict": "NO_GO_FORMAL_ACCEPTANCE_0_OF_8",
+  "reviewed_packet": {
+    "path": "evidence/benchmark/raw-run-061b-fresh-upstream-only-med-clinical-reissue-wave-03.json",
+    "id": "RUN-061B-1",
+    "sha256": "14952a9e4e328efed5adfe9a25829193538e40576c974a31c9d05a585323e2d5",
+    "hash_match": true,
+    "generator_ready": false,
+    "formal_acceptance": false
+  },
+  "input_hashes": {
+    "evidence/benchmark/raw-run-059d-independent-med-clinical-cross-review-wave-03.json": "e6153109317a1441a7d7bb36206cf59a0932f1a98a3bcbcad3bc3f51d423a06b",
+    "evidence/benchmark/raw-run-058b-formal-upstream-med-clinical-wave-03.json": "9499356df5e63e70636f3b16083002bcf200b5bf5397acedf690b00728f1b00a",
+    "evidence/benchmark/current-prompt-project-denominator-reconciliation.json": "51180ed25968ea7dd28bc6bdc39ccc575e3777c8ce210a8a78dd874316d5f5c9",
+    "06-open-source-benchmark-register.csv": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "evidence/benchmark/current-upstream-project-triage-wave-01.json": "ea0bb6bde44aa8f227d6e4133788e8fcb08c3069e2aecab4e0bc194cee2f3651",
+    "evidence/benchmark/current-upstream-partial-resolution-wave-01.json": "6c7c5eb6532a4ec4bcc45ebcb4f2cfd9ff7af6156c68064db58ce5dfeeb2e305",
+    "evidence/benchmark/current-upstream-facet-refinement-wave-02.json": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e",
+    "evidence/benchmark/current-github-project-metadata-snapshot.json": "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458"
+  },
+  "input_hash_result": {
+    "matched": "9/9",
+    "mismatched": 0,
+    "metadata_hash_correction": {
+      "initial_erroneous": "606e20e0da8ae40dfa3f7a0b6534a7f07d61f32c353c6e48ae9764d2af305499",
+      "authoritative_and_actual": "7bbbeb263436ecbf6d409e5c1f88c2f3866147045208f551884e8917f0ba7458",
+      "status": "CORRECTED_MATCH"
+    }
+  },
+  "input_boundary": {
+    "review_files_read": "9/9 named artifacts only",
+    "RUN061B_inputs_reconstructed": "8/8 through input_base plus input_dirs",
+    "RUN061B_current_product_or_neutral_comparison_input": false,
+    "RUN058B_cross_read_contradiction_removed": true,
+    "RUN061B_no_cross_read": "SELF_ATTESTED_NOT_INDEPENDENTLY_OBSERVABLE",
+    "sealed_input_hash_inventory": "INCOMPLETE_059D_ONLY",
+    "responsible_producer_identity": "MISSING_RUN_LABEL_ONLY",
+    "distinct_normalizer_identity": "MISSING",
+    "FTC-01": "FAIL"
+  },
+  "denominator": {
+    "prompt_projects": 8,
+    "prompt_weight_sum": 8,
+    "each_prompt_weight": 1,
+    "historical_extra": {
+      "id": "P09",
+      "repo": "Bahmni/openmrs-module-ipd",
+      "weight": 0
+    },
+    "csv_and_reconciliation_match": true
+  },
+  "integrity": {
+    "unique_ids": {
+      "projects": "9/9",
+      "paths": "31/31",
+      "loci": "48/48",
+      "relations": "10/10"
+    },
+    "stored_sha256": {
+      "project_records": "9/9_MATCH",
+      "relations": "10/10_MATCH",
+      "inputs_unique": "19/19",
+      "digests_unique": "19/19",
+      "method_observed": "SHA-256 of UTF-8 hash_input without newline"
+    },
+    "joins": {
+      "path_to_project": "31/31",
+      "locus_to_path": "48/48",
+      "relation_locus_edges": "52/52",
+      "cross_project_locus_errors": 0,
+      "project_metadata_locus_edges": "13/13",
+      "all_loci_referenced": "48/48",
+      "duplicate_locus_atoms": 0
+    },
+    "metadata": {
+      "P01_P08_snapshot_and_triage_checks": "128/128",
+      "later_heads": "P03,P04 exact and separated with NO_ANCESTRY_INFERENCE",
+      "P09": "intentional historical UNKNOWN outside snapshot"
+    },
+    "loci": {
+      "relation_loci_bounded": "35/35",
+      "whole_file_metadata_loci": 5,
+      "RUN059D_required_bounds": [
+        "L48=#L49-L249",
+        "L50=#L67-L93",
+        "L51=#L124-L145",
+        "L52=#L234-L248"
+      ]
+    }
+  },
+  "correction_closure": {
+    "retained_pass": [
+      "FTC-04",
+      "FTC-08",
+      "FTC-09",
+      "FTC-11",
+      "FTC-13",
+      "FTC-14",
+      "FTC-15",
+      "FTC-16",
+      "FTC-17",
+      "FTC-18",
+      "FTC-20",
+      "FTC-22",
+      "FTC-24"
+    ],
+    "closed": [
+      "FTC-02",
+      "FTC-03",
+      "FTC-05",
+      "FTC-06",
+      "FTC-07",
+      "FTC-10",
+      "FTC-12",
+      "FTC-19",
+      "FTC-21"
+    ],
+    "still_failed": [
+      "FTC-01",
+      "FTC-23"
+    ],
+    "notes": [
+      "P07 licence is accurately NOT_ESTABLISHED at L43 and remains quarantined; this is not provenance clearance",
+      "P07 edition L44 and P08 licence/edition L46/L47 are exact",
+      "CARE transaction overclaim is removed as CARE U",
+      "R06 retains only P04 loci and explicitly removes P05,P07",
+      "all 10 facets carry exact relation locus links and 12 semantic fields"
+    ]
+  },
+  "dedupe": {
+    "FTC-23": "FAIL",
+    "positive": [
+      "stable IDs",
+      "normalized unique path/locus atoms",
+      "19 stored digests reproduce",
+      "all joins validate"
+    ],
+    "blocking": [
+      "no declared canonicalization, ordering, encoding, or dedupe-validation result",
+      "relation link order is not canonical: R10 uses P01,P02,P05,P04; R02 uses L28,L27,L29",
+      "project digests omit repo, metadata, licence/edition text and loci; relation digests omit target, facet and all 12 semantic fields",
+      "raw one-letter disposition/target/link codes have no dictionary, so hash_input cannot be deterministically regenerated from records"
+    ]
+  },
+  "ftc_profiles": {
+    "A": {
+      "applies_to": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08"
+      ],
+      "pass": [
+        "FTC-02..FTC-22",
+        "FTC-24"
+      ],
+      "fail": [
+        "FTC-01",
+        "FTC-23"
+      ],
+      "na": []
+    },
+    "H": {
+      "applies_to": [
+        "P09"
+      ],
+      "pass": [
+        "FTC-02",
+        "FTC-05",
+        "FTC-21",
+        "FTC-24"
+      ],
+      "fail": [
+        "FTC-01",
+        "FTC-23"
+      ],
+      "na": [
+        "FTC-03",
+        "FTC-04",
+        "FTC-06..FTC-20",
+        "FTC-22"
+      ],
+      "reason": "outside formal prompt denominator"
+    }
+  },
+  "project_schema": [
+    "id",
+    "repo",
+    "weight",
+    "raw_disposition",
+    "formal_verdict",
+    "ftc_profile",
+    "stored_sha256"
+  ],
+  "projects": [
+    ["P01", "openmrs/openmrs-core", 1, "C", "REJECTED", "A", "2b57bdd86ab66a22df05477c06e07b5d2766f3797f6722376d5cf8559c5d3ca8"],
+    ["P02", "openmrs/openmrs-esm-form-engine-lib", 1, "A", "REJECTED", "A", "a1bd4e91e8ddaa1413f57c9029b04cd382135240cb23e92cba3d14e5a9b6148d"],
+    ["P03", "openmrs/openmrs-esm-patient-chart", 1, "A", "REJECTED", "A", "560b4ed10039c2d48632ac8f73d7e8d071e909db416c1bfac0c2294596f742a2"],
+    ["P04", "openemr/openemr", 1, "C", "REJECTED", "A", "e07cbb62f838113ab27aacb910dc1771d5154fdba895002bc9d55983dfa3c4c4"],
+    ["P05", "ohcnetwork/care", 1, "C", "REJECTED", "A", "ccadbe30083df2f01c75479025f82c23f686bf8d8ed5ed91beef96ca64d48f2c"],
+    ["P06", "ohcnetwork/care_fe", 1, "A", "REJECTED", "A", "1d06584ff0167bacc92a76f687de45d732674c02b9630c5ee255200232352410"],
+    ["P07", "Bahmni/openmrs-module-medicationadministration", 1, "Q", "QUARANTINED_PROVENANCE", "A", "a255dd11a198dd780bc0e6a8186ebcd6255ebaf40927a1f92154f442ca6f3f10"],
+    ["P08", "Bahmni/openmrs-module-ipd-frontend", 1, "A", "REJECTED", "A", "f7dba03f3166f5e7982194686be2c4fe12705acfac0c5c8298b2a158e4b441b3"],
+    ["P09", "Bahmni/openmrs-module-ipd", 0, "H", "HISTORICAL_ONLY_OUTSIDE_FORMAL_DENOMINATOR", "H", "b9c21259e8364ec2120080ad5ba2346de30538101ad3ff6a02b1e46540488785"]
+  ],
+  "relation_schema": [
+    "id",
+    "target_code",
+    "facet",
+    "outcome",
+    "stored_sha256"
+  ],
+  "relations": [
+    ["R01", "M", "balance_check", "N", "62e652640e18fea800d0d50e26cc071ec5f4823c045352402b53f15285bcea8f"],
+    ["R02", "M", "view", "N", "0058b1f4e8a54f01986ce389742596ac530cbd8b5423fdf2a257fb8f8a7aeb3a"],
+    ["R03", "M", "register_movement", "N", "7362bc1b6a48b24676670107c80fdacad13273610f7bc3aaeadf718cad32f439"],
+    ["R04", "M", "discrepancy_resolution", "N", "5d3c576b0d1a2ec9ecd36e773bd48656fa54938c7c526dc91b3090084bcb32fc"],
+    ["R05", "M", "destruction_projection", "N", "e66e6a4c176bd75860a72242d23f0b1a4e9c28d3ecdb3505e26013f4fb96d9a4"],
+    ["R06", "M", "witness_authority", "N", "8e8fcaea6a3c1ad391701e49eebb5c73bdd88ac742a4f3f6aeafe9c78223fd43"],
+    ["R07", "O", "create_register", "C", "559823e71372633781d870ec0eb44b865f95405131415cfd735a89be1ae84545"],
+    ["R08", "O", "amendment", "C", "a89151693cb5816d156af3566e9c869ccd6d1dc585b3861c536a33321aee2a04"],
+    ["R09", "O", "care_context_template_hierarchy_filtering", "P", "eed99a83a2e83e3260c1e900d9cb1e882464c6f66c4a9a9840cf688e549de05d"],
+    ["R10", "E", "initial_event_record", "N", "dcf97d2a91c1d1073e443646f33fac031223eb5a304f6ccf0fec4bf71ec22e87"]
+  ],
+  "formal_decision_counts": {
+    "accepted": 0,
+    "rejected": 7,
+    "quarantined": 1,
+    "historical_outside_denominator": 1
+  },
+  "credit_boundary": {
+    "formal_upstream_triage_acceptance": false,
+    "selection": false,
+    "mapping": false,
+    "NCM": false,
+    "final_no_match": false,
+    "benchmark": false,
+    "current_product_comparison": false,
+    "runtime": false,
+    "browser": false,
+    "test": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "completion": false
+  },
+  "architecture": {
+    "operating_organisations": 1,
+    "multiple_Sites": true,
+    "upstream_tenant_facility_company_or_organization_scope_inherited": false
+  },
+  "review_attestation": {
+    "read_only": true,
+    "writes": false,
+    "VCS": false,
+    "network": false,
+    "browser": false,
+    "application_source": false,
+    "application_runtime": false,
+    "tests": false,
+    "build": false,
+    "database": false,
+    "current_product_comparison": false,
+    "memory_files": false,
+    "evidence_outside_named_files_used": false
+  }
+}

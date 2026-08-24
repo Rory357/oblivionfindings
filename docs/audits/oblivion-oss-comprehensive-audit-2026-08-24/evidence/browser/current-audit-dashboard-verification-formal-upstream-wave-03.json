@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "run_id": "RUN-070-DASHBOARD-VERIFY",
+  "status": "PASS_AUDIT_DASHBOARD_ONLY_ZERO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-25T06:53:34+12:00",
+  "audit_application_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "dashboard": {
+    "url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-ef7fde0d#benchmarks",
+    "path": "audit-dashboard.html",
+    "sha256": "ef7fde0d3fc9c6765944795cc3f88e337a5a63d764f749e15b9fa05640e19467",
+    "title": "Oblivion Findings current-source audit",
+    "heading": "Fresh current-source audit",
+    "anchor_count": 111
+  },
+  "generator": {
+    "path": "generators/build-current-audit-dashboard.py",
+    "sha256": "3255fb229a7de7d3b4044cbc086ba85c48b0ff908c9e2ca45542caf42f586508",
+    "double_run_hash_1": "ef7fde0d3fc9c6765944795cc3f88e337a5a63d764f749e15b9fa05640e19467",
+    "double_run_hash_2": "ef7fde0d3fc9c6765944795cc3f88e337a5a63d764f749e15b9fa05640e19467",
+    "deterministic": true
+  },
+  "formal_upstream_integration": {
+    "run_id": "RUN-070",
+    "integrator": {
+      "path": "generators/integrate-formal-upstream-triage-wave-03.py",
+      "sha256": "a59537e78aede3e2543d56a08cc14be01fde5c116ba56ccfa947820eb2a5469e"
+    },
+    "normalized_output": {
+      "path": "evidence/benchmark/current-formal-upstream-triage-wave-03.json",
+      "sha256": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277"
+    },
+    "agent_register": {
+      "path": "evidence/benchmark/current-formal-upstream-triage-agent-register.json",
+      "sha256": "6c1ac20161f965fde680ff26d9363d79e0a257b3d3af6604be567156f155ce33"
+    },
+    "accepted_prompt_project_records": 9,
+    "prompt_unique_repositories": 95,
+    "accepted_prompt_occurrence_weight": 10,
+    "prompt_occurrences": 98,
+    "accepted_bounded_facet_records": 12,
+    "formal_target_edges": 0,
+    "final_no_matches": 0,
+    "ncm": 0,
+    "canonical_matrix_credit": "0/340",
+    "medication_clinical_status": "NO_GO"
+  },
+  "responsive_correction": {
+    "initial_dashboard_sha256": "ce917e1e2c50aaf75c9bf9ed688bfc7893f0380645208f56b466cc4b8d0ab3fc",
+    "initial_mobile_document_client_width": 375,
+    "initial_mobile_document_scroll_width": 579,
+    "cause": "Thirty-one inline SHA-256 code elements in the formal-upstream evidence list retained unbreakable intrinsic width.",
+    "generator_fix": ".list code{overflow-wrap:anywhere}",
+    "final_mobile_document_client_width": 375,
+    "final_mobile_document_scroll_width": 375,
+    "uncontained_overflow_elements_after_fix": 0,
+    "independent_read_only_diagnosis": true
+  },
+  "browser_checks": [
+    {
+      "requested_viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "actual_viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document_client_width": 1425,
+      "document_scroll_width": 1425,
+      "body_client_width": 1425,
+      "body_scroll_width": 1425,
+      "page_horizontal_overflow": false,
+      "uncontained_overflow_elements": 0,
+      "table_wrappers": 6,
+      "intentional_inner_table_scroll_wrappers": 0,
+      "required_text_checks_passed": 7,
+      "required_text_checks_total": 7,
+      "anchor_count": 111
+    },
+    {
+      "requested_viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "actual_viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document_client_width": 375,
+      "document_scroll_width": 375,
+      "body_client_width": 375,
+      "body_scroll_width": 375,
+      "page_horizontal_overflow": false,
+      "uncontained_overflow_elements": 0,
+      "navigation_client_width": 375,
+      "navigation_scroll_width": 771,
+      "navigation_internal_scroll_intentional": true,
+      "table_wrappers": 6,
+      "intentional_inner_table_scroll_wrappers": 6,
+      "table_wrapper_client_width": 311,
+      "table_wrapper_scroll_width": 680,
+      "formal_evidence_panel_client_width": 345,
+      "formal_evidence_panel_scroll_width": 345,
+      "required_text_checks_passed": 7,
+      "required_text_checks_total": 7,
+      "anchor_count": 111
+    }
+  ],
+  "required_text_checks": {
+    "RUN-070": true,
+    "9 / 95": true,
+    "10 / 98": true,
+    "12 bounded facet records": true,
+    "0 / 340": true,
+    "medication/clinical remains NO-GO": true,
+    "RUN-070 audit-dashboard verification": true
+  },
+  "link_check": {
+    "anchor_count": 111,
+    "local_file_link_occurrences": 103,
+    "unique_local_file_links": 98,
+    "missing_local_files": 0
+  },
+  "immutability_and_determinism": {
+    "integration_output_hash_1": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277",
+    "integration_output_hash_2": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277",
+    "agent_register_hash_1": "6c1ac20161f965fde680ff26d9363d79e0a257b3d3af6604be567156f155ce33",
+    "agent_register_hash_2": "6c1ac20161f965fde680ff26d9363d79e0a257b3d3af6604be567156f155ce33",
+    "dashboard_hash_1": "ef7fde0d3fc9c6765944795cc3f88e337a5a63d764f749e15b9fa05640e19467",
+    "dashboard_hash_2": "ef7fde0d3fc9c6765944795cc3f88e337a5a63d764f749e15b9fa05640e19467",
+    "canonical_matrix_sha256_before_and_after": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "benchmark_register_sha256_before_and_after": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "all_checks_passed": true
+  },
+  "console": {
+    "warnings_or_errors": 0
+  },
+  "screenshot": {
+    "retained": false,
+    "credit": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_browser_verification": true,
+    "formal_upstream_project_record_acceptance": true,
+    "formal_upstream_facet_record_acceptance": true,
+    "project_selection_credit": false,
+    "facet_selection_credit": false,
+    "current_build_application_browser_credit": false,
+    "current_source_route_credit": false,
+    "current_source_responsive_credit": false,
+    "current_source_visual_credit": false,
+    "current_source_workflow_credit": false,
+    "finding_credit": false,
+    "mapping_credit": false,
+    "final_no_match_credit": false,
+    "NCM_credit": false,
+    "ease_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "audit_artifact_only": true,
+    "application_route_or_workflow_executed": false,
+    "application_source_modified": false,
+    "application_runtime_used": false,
+    "tests_run": false,
+    "build_run": false,
+    "database_used": false,
+    "network_used": false,
+    "meaningful_external_mutation": false,
+    "viewport_override_reset": true,
+    "verified_tab_marked_deliverable": true
+  }
+}

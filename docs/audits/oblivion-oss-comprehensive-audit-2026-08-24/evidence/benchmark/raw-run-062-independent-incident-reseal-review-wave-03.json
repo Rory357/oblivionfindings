@@ -1,0 +1,200 @@
+{
+  "schema": "RUN-062-INCIDENT-RESEAL-REVIEW-1",
+  "overall_verdict": "NO_GO",
+  "decision": "KEEP_GENERATOR_READY_FALSE_AND_FORMAL_ACCEPTANCE_FALSE",
+  "review_provenance": {
+    "decision_author": "/root/run062_incident_reseal_review/clean_allowed_input_review",
+    "different_reviewer": true,
+    "forwarded_by": "/root/run062_incident_reseal_review",
+    "forwarder_disclosure": "The forwarder hashed 06-open-source-benchmark-register.csv while locating the prompt. The clean decision author did not read or hash it, and this verdict does not rely on that read."
+  },
+  "schemas": {
+    "RUN-058C": "RUN-058C-1",
+    "RUN-059A": "RUN-059A-1",
+    "RUN-061A-N": "RUN-061A-N-1"
+  },
+  "hashes": {
+    "matched": 8,
+    "mismatched": 0,
+    "RUN-058C": "e5c14d45133c9a491767e0db0b87c40ded0fc56674f88a3092dc8899592da2eb",
+    "RUN-059A": "7901f8399c4d431dbc0a9465e23d8d65ecf073e824af34e030cdfae23a654558",
+    "RUN-061A-N": "73a52b2bfb951ab3c10aeaa7dd976764b7793affff7c2442f0cee699ed79f6d5",
+    "prompt": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "matrix": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "triage": "ea0bb6bde44aa8f227d6e4133788e8fcb08c3069e2aecab4e0bc194cee2f3651",
+    "facet": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e",
+    "denominator": "51180ed25968ea7dd28bc6bdc39ccc575e3777c8ce210a8a78dd874316d5f5c9"
+  },
+  "membership": {
+    "prompt_url_occurrences": 98,
+    "unique_repositories": 95,
+    "target_members": {
+      "braedonsaunders/beaconhs": 1,
+      "OneUptime/oneuptime": 1,
+      "opf/openproject": 2
+    },
+    "target_occurrence_weight": 4,
+    "triage_records_matched": 3,
+    "matrix_target_rows": 1,
+    "facet_target_rows": 2
+  },
+  "correction_closure": {
+    "RUN-059A_substantive_project_corrections": "12/12_CLOSED",
+    "metadata_expansion": "3/3_COMPLETE",
+    "bounded_loci_and_atom_maps": "COMPLETE",
+    "edition_boundaries": "COMPLETE",
+    "collision_and_unknown_quarantines": "COMPLETE",
+    "common_sealed_envelope": "INCOMPLETE",
+    "determinism_correction": "INCOMPLETE"
+  },
+  "record_integrity": {
+    "declared_counts_match": true,
+    "projects": 3,
+    "direct_locators": 1,
+    "adjacent_nonpromotable": 2,
+    "loci": 27,
+    "expanded_loci_structurally_valid": "27/27",
+    "claims": 17,
+    "claim_locus_edges_valid": "25/25",
+    "quarantines": 11,
+    "unique_quarantine_ids": "11/11",
+    "aspects": 7,
+    "aspect_claim_edges_valid": "23/23",
+    "metadata_records_complete": "3/3",
+    "immutable_heads": "3/3",
+    "immutable_behavior_refs": "3/3",
+    "hash_inputs_valid_and_unique": "27/27",
+    "stored_project_claim_aspect_sha256": "0/27",
+    "dedupe_validation_present": false,
+    "declared_lexicographic_serialization_demonstrated": false
+  },
+  "projects": [
+    {
+      "id": "PRJ-INC-BEACONHS",
+      "repo": "braedonsaunders/beaconhs",
+      "relation": "DIRECT_EXACT_OBJECT_LOCATOR_FOR_LATER_COMPARISON_ONLY",
+      "promotable": false,
+      "counts": {
+        "loci": 14,
+        "claims": 10,
+        "claim_locus_edges": 14,
+        "quarantines": 3
+      },
+      "substantive_verdict": "CORRECTIONS_CLOSED_AND_REFERENCES_INTERNALLY_CONSISTENT",
+      "formal_verdict": "REJECT_CURRENT_RESEAL",
+      "failed_checks": [
+        "FTC-01",
+        "FTC-23"
+      ]
+    },
+    {
+      "id": "PRJ-INC-ONEUPTIME",
+      "repo": "OneUptime/oneuptime",
+      "relation": "ADJACENT_OPERATIONAL_INCIDENT_NONPROMOTABLE",
+      "promotable": false,
+      "counts": {
+        "loci": 8,
+        "claims": 4,
+        "claim_locus_edges": 7,
+        "quarantines": 3
+      },
+      "substantive_verdict": "CORRECTIONS_CLOSED_AND_REFERENCES_INTERNALLY_CONSISTENT",
+      "formal_verdict": "REJECT_CURRENT_RESEAL",
+      "failed_checks": [
+        "FTC-01",
+        "FTC-23"
+      ]
+    },
+    {
+      "id": "PRJ-INC-OPENPROJECT",
+      "repo": "opf/openproject",
+      "relation": "ADJACENT_GENERIC_WORKFLOW_NONPROMOTABLE",
+      "promotable": false,
+      "counts": {
+        "loci": 5,
+        "claims": 3,
+        "claim_locus_edges": 4,
+        "quarantines": 5
+      },
+      "substantive_verdict": "CORRECTIONS_CLOSED_AND_REFERENCES_INTERNALLY_CONSISTENT",
+      "formal_verdict": "REJECT_CURRENT_RESEAL",
+      "failed_checks": [
+        "FTC-01",
+        "FTC-23"
+      ]
+    }
+  ],
+  "ftc_readiness": {
+    "ready_checks": 22,
+    "blocked_checks": 2,
+    "ready_ranges": [
+      "FTC-02..FTC-22",
+      "FTC-24"
+    ],
+    "failures": {
+      "FTC-01": [
+        "No top-level packet date",
+        "No explicit files_read inventory",
+        "No explicit files_outside_list_read=false attestation",
+        "No explicit responsible_agent_identity",
+        "RUN-059A is named in chain but its SHA-256 is not pinned"
+      ],
+      "FTC-23": [
+        "hash_outputs_present=false",
+        "Zero stored SHA-256 outputs for 27 project, claim and aspect inputs",
+        "No sealed dedupe-validation result",
+        "Raw keys are not lexicographically serialized",
+        "Terminal LF conflicts with the declared no-whitespace rule"
+      ]
+    },
+    "project_check_instances": {
+      "total": 72,
+      "ready": 66,
+      "blocked": 6
+    }
+  },
+  "output_ready_counts": {
+    "generator_ready": false,
+    "formal_acceptance": false,
+    "formal_projects": 0,
+    "formal_facets": 0,
+    "formal_edges": 0,
+    "final_no_matches": 0,
+    "NCM": 0
+  },
+  "credits": {
+    "formal_upstream_triage": false,
+    "current_comparison": false,
+    "target_mapping": false,
+    "benchmark": false,
+    "final_no_match": false,
+    "NCM": false,
+    "runtime": false,
+    "browser": false,
+    "release": false,
+    "pass": false,
+    "completion": false
+  },
+  "required_before_go": [
+    "Add the complete FTC-01 envelope: packet date, exact files-read/no-cross-read attestation, responsible identity and RUN-059A hash pin.",
+    "Canonicalize the substantive records, store all required SHA-256 outputs and record deterministic dedupe validation.",
+    "Reseal the changed packet and have another independent reviewer assess that exact new hash; this review cannot pre-accept a future artifact."
+  ],
+  "scope_qualification": "Immutable-locus resolution was not live-refetched; the conclusion uses the sealed RUN-058C/RUN-059A evidence and structural expansion checks only.",
+  "attestation": {
+    "strict_allowed_input_only": true,
+    "different_from_RUN-058C_producer": true,
+    "different_from_RUN-059A_corrector": true,
+    "produced_RUN-061A": false,
+    "memory_used": false,
+    "VCS_used": false,
+    "network_used": false,
+    "browser_used": false,
+    "application_source_read": false,
+    "application_runtime_used": false,
+    "tests_build_or_database_used": false,
+    "writes": false,
+    "current_product_comparison": false,
+    "mapping_or_NCM_decision": false
+  }
+}

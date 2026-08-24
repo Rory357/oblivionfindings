@@ -1,0 +1,919 @@
+{
+  "acceptance_gate": {
+    "future_artifacts_preaccepted": false,
+    "required_controls": [
+      "FTC-01",
+      "FTC-02",
+      "FTC-03",
+      "FTC-04",
+      "FTC-05",
+      "FTC-06",
+      "FTC-07",
+      "FTC-08",
+      "FTC-09",
+      "FTC-10",
+      "FTC-11",
+      "FTC-12",
+      "FTC-13",
+      "FTC-14",
+      "FTC-15",
+      "FTC-16",
+      "FTC-17",
+      "FTC-18",
+      "FTC-19",
+      "FTC-20",
+      "FTC-21",
+      "FTC-22",
+      "FTC-23",
+      "FTC-24"
+    ],
+    "required_result": "ALL_24_ACCEPTED_PER_PROJECT_BY_DIFFERENT_REVIEWER_OF_EXACT_PACKET_HASH",
+    "scope_if_passed": "FORMAL_UPSTREAM_PROJECT_OR_FACET_RECORD_TRIAGE_ONLY"
+  },
+  "as_of_date": "2026-08-25",
+  "contradictions": [
+    {
+      "detail": "RUN-058B read current-facet-neutral-comparison-wave-02.json while attesting current-product comparison false.",
+      "effect": "ENTIRE_PACKET_INVALID_FOR_FORMAL_ACCEPTANCE",
+      "id": "CONTRADICTION-RUN-058B-NO-CROSS-READ"
+    },
+    {
+      "detail": "RUN-058C declared generator_ready true without satisfying all controls; RUN-065/RUN-066 later seal and accept three project records only.",
+      "effect": "INITIAL_PACKET_NOT_ACCEPTED_CORRECTED_RESEAL_SUPERSEDES_FOR_PROJECT_RECORD_ONLY",
+      "id": "CONTRADICTION-RUN-058C-GENERATOR-READY"
+    },
+    {
+      "detail": "The earlier reseal failed FTC-01, FTC-10 and FTC-23. RUN-067B/RUN-068 later close those defects and accept six project plus twelve facet records; downstream selection, comparison, mapping and NCM credit remain zero.",
+      "effect": "HISTORICAL_NO_GO_SUPERSEDED_FOR_BOUNDED_PROJECT_AND_FACET_RECORD_ACCEPTANCE_ONLY",
+      "id": "BOUNDARY-RUN-061B-HR-FINANCE"
+    },
+    {
+      "detail": "The normalized packet reproduces all V2 and legacy digests, but independent review cannot re-prove FTC-01, FTC-02 through FTC-22, or FTC-24 from the allowed evidence boundary.",
+      "effect": "ZERO_MED_CLINICAL_FORMAL_PROJECT_OR_FACET_ACCEPTANCE",
+      "id": "BOUNDARY-RUN-067C-MED-CLINICAL"
+    },
+    {
+      "detail": "S, S+A, N and selected-project vocabulary are later-comparison labels only.",
+      "effect": "ZERO_SELECTION_MAPPING_OR_NCM_CREDIT",
+      "id": "BOUNDARY-RUN-058A-VOCABULARY"
+    }
+  ],
+  "counts": {
+    "NCM": 0,
+    "final_no_matches": 0,
+    "formal_facets_accepted": 12,
+    "formal_projects_accepted": 9,
+    "formal_target_edges": 0,
+    "matrix_rows_changed": 0,
+    "register_rows_changed": 0
+  },
+  "credit_boundary": {
+    "NCM_credit": false,
+    "audit_complete": false,
+    "benchmark_credit": false,
+    "browser_credit": false,
+    "certification_credit": false,
+    "clinical_safety_credit": false,
+    "completion_credit": false,
+    "current_product_comparison_credit": false,
+    "ease_credit": false,
+    "facet_selection_credit": false,
+    "final_no_match_credit": false,
+    "finding_credit": false,
+    "formal_upstream_facet_record_acceptance": true,
+    "formal_upstream_project_record_acceptance": true,
+    "neutral_requirements_credit": false,
+    "pass_credit": false,
+    "project_selection_credit": false,
+    "release_credit": false,
+    "rendered_visual_credit": false,
+    "responsive_credit": false,
+    "runtime_credit": false,
+    "target_mapping_credit": false,
+    "test_execution_credit": false,
+    "workflow_credit": false
+  },
+  "denominator_reconciliation": {
+    "accepted_prompt_occurrence_weight": 10,
+    "accepted_prompt_repositories": 9,
+    "normalized_project_list_sha256": "464beffff0916810b37e5595d82b75ed48247fb09584d830e359758a3b8c1601",
+    "prompt_unique_repositories": 95,
+    "prompt_url_occurrences": 98,
+    "wave_historical_extras": 1,
+    "wave_initial_project_records": 18,
+    "wave_prompt_occurrence_weight": 18,
+    "wave_prompt_repositories": 17,
+    "wave_unique_repositories": 18
+  },
+  "formal_project_record_acceptance": {
+    "NCM": 0,
+    "accepted_prompt_occurrence_weight": 10,
+    "accepted_prompt_repositories": [
+      "bigcapitalhq/bigcapital",
+      "braedonsaunders/beaconhs",
+      "frappe/erpnext",
+      "frappe/hrms",
+      "horilla/horilla-hr",
+      "odoo/odoo",
+      "oneuptime/oneuptime",
+      "opf/openproject",
+      "orangehrm/orangehrm"
+    ],
+    "accepted_records": 9,
+    "facet_scope": "Bounded HR/finance upstream facet-triage records only; S, S+A and N are not target mappings or final no-matches.",
+    "final_no_matches": 0,
+    "formal_facet_ids": [
+      "FAC-FIN-CONFIRM",
+      "FAC-FIN-HISTORY",
+      "FAC-FIN-REJECT",
+      "FAC-FIN-REPLAY",
+      "FAC-FIN-SUGGEST",
+      "FAC-HR-CREATE",
+      "FAC-HR-HISTORY",
+      "FAC-HR-INVITE",
+      "FAC-HR-REHIRE",
+      "FAC-HR-SET-ACTIVE",
+      "FAC-HR-UPDATE",
+      "FAC-HR-VIEW"
+    ],
+    "formal_facets": 12,
+    "formal_target_edges": 0,
+    "lineages": {
+      "HR_FINANCE": {
+        "accepted_exclusion_classification_records": 3,
+        "accepted_records": 6,
+        "accepted_selected_classification_records": 3,
+        "independent_review": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "source_packet": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json"
+      },
+      "INCIDENT": {
+        "accepted_records": 3,
+        "adjacent_nonpromotable_records": 2,
+        "direct_records": 1,
+        "independent_review": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+        "source_packet": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json"
+      },
+      "MED_CLINICAL": {
+        "accepted_records": 0,
+        "independent_review": "evidence/benchmark/raw-run-069-independent-med-clinical-exact-file-review-wave-03.json",
+        "source_packet": "evidence/benchmark/raw-run-067c-corrected-med-clinical-normalizer-wave-03.json",
+        "structurally_valid_prompt_records": 8,
+        "verdict": "NO_GO_FORMAL_RECORD_LAYER"
+      }
+    }
+  },
+  "governing_pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "architecture": "single operating organisation across multiple Sites",
+    "denominator_sha256": "51180ed25968ea7dd28bc6bdc39ccc575e3777c8ce210a8a78dd874316d5f5c9",
+    "matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "prompt": {
+      "bytes": 88305,
+      "manifest_path": "evidence/source/audit-run-manifest.json",
+      "manifest_sha256": "f3f70f7b68b38c27e7c0c37f204515df28322c53285e5a2c8dcb463250ca735b",
+      "provided_filename": "oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+      "verification": "MANIFEST_WITNESS_ONLY_NOT_REHASHED"
+    },
+    "register_sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91"
+  },
+  "input_manifest": [
+    {
+      "bytes": 25868,
+      "path": "evidence/benchmark/raw-run-058a-formal-upstream-hr-finance-wave-03.json",
+      "role": "hr_finance_producer",
+      "sha256": "3a2dd623bdf7fb64f177e425de24ac65e1f5cf1c38161124e66974251a79473a"
+    },
+    {
+      "bytes": 15043,
+      "path": "evidence/benchmark/raw-run-058b-formal-upstream-med-clinical-wave-03.json",
+      "role": "med_clinical_producer_invalidated",
+      "sha256": "9499356df5e63e70636f3b16083002bcf200b5bf5397acedf690b00728f1b00a"
+    },
+    {
+      "bytes": 15049,
+      "path": "evidence/benchmark/raw-run-058c-formal-upstream-incident-adversary-wave-03.json",
+      "role": "incident_producer",
+      "sha256": "e5c14d45133c9a491767e0db0b87c40ded0fc56674f88a3092dc8899592da2eb"
+    },
+    {
+      "bytes": 10817,
+      "path": "evidence/benchmark/raw-run-059a-independent-incident-cross-review-wave-03.json",
+      "role": "incident_review",
+      "sha256": "7901f8399c4d431dbc0a9465e23d8d65ecf073e824af34e030cdfae23a654558"
+    },
+    {
+      "bytes": 9166,
+      "path": "evidence/benchmark/raw-run-059c-independent-hr-finance-cross-review-wave-03.json",
+      "role": "hr_finance_review",
+      "sha256": "4c9187043b060d71fcef13e46e81da9c6dc1ab023b83d1c1aa448abeb0be7fb5"
+    },
+    {
+      "bytes": 8574,
+      "path": "evidence/benchmark/raw-run-059d-independent-med-clinical-cross-review-wave-03.json",
+      "role": "med_clinical_review",
+      "sha256": "e6153109317a1441a7d7bb36206cf59a0932f1a98a3bcbcad3bc3f51d423a06b"
+    },
+    {
+      "bytes": 13189,
+      "path": "evidence/benchmark/raw-run-061a-corrected-incident-reseal-draft-wave-03.json",
+      "role": "incident_reseal_draft",
+      "sha256": "73a52b2bfb951ab3c10aeaa7dd976764b7793affff7c2442f0cee699ed79f6d5"
+    },
+    {
+      "bytes": 6850,
+      "path": "evidence/benchmark/raw-run-062-independent-incident-reseal-review-wave-03.json",
+      "role": "incident_reseal_review",
+      "sha256": "17cfb9e2653f52db6b3b29efc39a0ea38da5c92e7fbc27ef4908358be3410634"
+    },
+    {
+      "bytes": 13996,
+      "path": "evidence/benchmark/raw-run-061b-fresh-upstream-only-med-clinical-reissue-wave-03.json",
+      "role": "med_clinical_reissue",
+      "sha256": "14952a9e4e328efed5adfe9a25829193538e40576c974a31c9d05a585323e2d5"
+    },
+    {
+      "bytes": 9922,
+      "path": "evidence/benchmark/raw-run-063-independent-med-clinical-reissue-review-wave-03.json",
+      "role": "med_clinical_reissue_review",
+      "sha256": "bc565a5ba96dd8a484734a51cda9c548d5f2f478594752f13b5a0e60d0a5817d"
+    },
+    {
+      "bytes": 13920,
+      "path": "evidence/benchmark/raw-run-063-fresh-incident-reseal-draft-wave-03.json",
+      "role": "incident_fresh_reseal_draft",
+      "sha256": "95014a45c22c239b20efcdd4988bf27f70925d606b68d72cd3e68f639048eeac"
+    },
+    {
+      "bytes": 6404,
+      "path": "evidence/benchmark/raw-run-064a-independent-fresh-incident-reseal-review-wave-03.json",
+      "role": "incident_fresh_reseal_review",
+      "sha256": "d86289cae95b8cc06a654932cbd62ba3a39e22e89174aa0f9d7351f5c8f66810"
+    },
+    {
+      "bytes": 13843,
+      "path": "evidence/benchmark/raw-run-061b-corrected-hr-finance-reseal-draft-wave-03.json",
+      "role": "hr_finance_reseal_draft",
+      "sha256": "2ddc6bdc84efd13c11ec5ecd2087e669b96f05e80036d39e9d961bbdc72a2607"
+    },
+    {
+      "bytes": 8283,
+      "path": "evidence/benchmark/raw-run-064b-independent-hr-finance-reseal-review-wave-03.json",
+      "role": "hr_finance_reseal_review",
+      "sha256": "c2402847e3b766077ccc9b1e7279990354dd120e682dc258ed6bcc77829763b7"
+    },
+    {
+      "bytes": 13569,
+      "path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+      "role": "incident_corrected_reseal",
+      "sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec"
+    },
+    {
+      "bytes": 4229,
+      "path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+      "role": "incident_corrected_reseal_review",
+      "sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864"
+    },
+    {
+      "bytes": 8494,
+      "path": "evidence/benchmark/raw-run-066a-formal-integration-adversarial-check-wave-03.json",
+      "role": "formal_integration_adversarial_check",
+      "sha256": "6d63d4155ab5d5f47a7a48186104cbccc03bcc2593759690e09c9d06a7649faa"
+    },
+    {
+      "bytes": 7014,
+      "path": "evidence/benchmark/raw-run-066b-hr-finance-provenance-recovery-wave-03.json",
+      "role": "hr_finance_provenance_recovery",
+      "sha256": "2cc60e46c54bddfb1345bcce3ebf646655f0381e2ea9a9ca0fd262b9ea2ea1f4"
+    },
+    {
+      "bytes": 7707,
+      "path": "evidence/benchmark/raw-run-066c-med-clinical-correction-feasibility-wave-03.json",
+      "role": "med_clinical_correction_feasibility",
+      "sha256": "ac7a3f3fef25e7f281bf21092e116c90164f70d705e87f1db8d138f31f99d8f3"
+    },
+    {
+      "bytes": 11772,
+      "path": "evidence/benchmark/raw-run-066e-hr-finance-corrected-reseal-review-checklist-wave-03.json",
+      "role": "hr_finance_review_checklist",
+      "sha256": "bed40804fd86a3468f9e4a0a17cea9c8291242b92e4b4b69df5991aee8d8e7da"
+    },
+    {
+      "bytes": 4344,
+      "path": "evidence/benchmark/raw-run-066d-med-clinical-provenance-recovery-wave-03.json",
+      "role": "med_clinical_provenance_recovery",
+      "sha256": "889b86a6795f2c7d29c42fc2dbc388ea22fcd99b5216c251f350644be3a1b83d"
+    },
+    {
+      "bytes": 1533,
+      "path": "evidence/benchmark/raw-run-066f-hr-finance-claim-contract-check-wave-03.json",
+      "role": "hr_finance_claim_contract_check",
+      "sha256": "4a14433ec43f03db81a7afa4d8a701ced7b98a643d2179d25fa80907385efd6f"
+    },
+    {
+      "bytes": 9965,
+      "path": "evidence/benchmark/raw-run-066g-med-clinical-normalizer-review-checklist-wave-03.json",
+      "role": "med_clinical_review_checklist",
+      "sha256": "aab0aba3512c8bee0b099e59f667a0b99138636da0f2e04c0be8ee3a1f08f39c"
+    },
+    {
+      "bytes": 753,
+      "path": "evidence/benchmark/raw-run-066h-hr-finance-claim-implementation-check-wave-03.json",
+      "role": "hr_finance_claim_implementation_check",
+      "sha256": "d61e70c48651cdcd5cdfc24d0663514fcfe2d27e318995ce90885789f9b501e8"
+    },
+    {
+      "bytes": 71194,
+      "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+      "role": "hr_finance_corrected_reseal",
+      "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+    },
+    {
+      "bytes": 36027,
+      "path": "evidence/benchmark/raw-run-067c-corrected-med-clinical-normalizer-wave-03.json",
+      "role": "med_clinical_corrected_normalizer",
+      "sha256": "f426c34d459474f84d9c9901ce2b931256ac8560dca6885821572b142126d29b"
+    },
+    {
+      "bytes": 6358,
+      "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+      "role": "hr_finance_corrected_reseal_review",
+      "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+    },
+    {
+      "bytes": 19943,
+      "path": "evidence/benchmark/raw-run-069-independent-med-clinical-exact-file-review-wave-03.json",
+      "role": "med_clinical_corrected_normalizer_review",
+      "sha256": "6cc20e6aca377e645979fe1c5fa08f58a7192590f3061e3606469fb556c6c46e"
+    }
+  ],
+  "matrix_immutability": {
+    "after_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "before_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "byte_identical": true,
+    "credited_rows": "0/340",
+    "promoted_mappings_or_final_no_matches": 0
+  },
+  "normalized_project_attempts": [
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "HISTORICAL_EXTRA_OUTSIDE_PROMPT",
+      "display_repository": "Bahmni/openmrs-module-ipd",
+      "downstream_credit": false,
+      "effective_disposition": "HISTORICAL_ONLY_OUTSIDE_FORMAL_DENOMINATOR",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "REJECT_FROM_FORMAL_DENOMINATOR_RETAIN_HISTORICAL_COLLISION_ONLY",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "bahmni/openmrs-module-ipd",
+      "prompt_occurrence_weight": 0,
+      "raw_disposition": "EXCLUDED_OBJECT_COLLISION",
+      "stable_attempt_id": "UPSTREAM-W03-001"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "Bahmni/openmrs-module-ipd-frontend",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_NONPROMOTABLE",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "bahmni/openmrs-module-ipd-frontend",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "EXCLUDED_OBJECT_COLLISION",
+      "stable_attempt_id": "UPSTREAM-W03-002"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "Bahmni/openmrs-module-medicationadministration",
+      "downstream_credit": false,
+      "effective_disposition": "QUARANTINED_PROVENANCE_LICENCE_NOT_ESTABLISHED",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "QUARANTINE_PROVENANCE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "bahmni/openmrs-module-medicationadministration",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "EXCLUDED_OBJECT_COLLISION",
+      "stable_attempt_id": "UPSTREAM-W03-003"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-BIGCAP",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-BIGCAP",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "bigcapitalhq/bigcapital",
+      "downstream_credit": false,
+      "effective_disposition": "DIRECT_FIN_BANK_MATCHING_NOT_ALLOCATION_HISTORY",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "CORRECTABLE_NOT_FORMALLY_ACCEPTED",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "bigcapitalhq/bigcapital",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "SELECT_FORMAL_MATCHING_ONLY",
+      "stable_attempt_id": "UPSTREAM-W03-004"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-INC-BEACONHS",
+        "path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+        "reviewer_identity": "/root/run061_formal_integration_contract",
+        "role": "incident_corrected_reseal_review",
+        "sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+        "record_hash": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8",
+        "record_hash_domain": "INCIDENT_COMPLETE_PROJECT_RECORD_SHA256",
+        "record_id": "PRJ-INC-BEACONHS",
+        "role": "incident_corrected_reseal",
+        "sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "braedonsaunders/beaconhs",
+      "downstream_credit": false,
+      "effective_disposition": "DIRECT_EXACT_OBJECT_LOCATOR_FOR_LATER_COMPARISON_ONLY",
+      "formal_acceptance_decision": "ACCEPT_BOUNDED_FORMAL_UPSTREAM_TRIAGE_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "DIRECT_HS_OBJECT_TRIAGE_SUBSTANCE_ACCEPTED_CORRECTABLE_NOT_FORMALLY_ACCEPTED",
+      "lineage": "INCIDENT",
+      "normalized_repository": "braedonsaunders/beaconhs",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "DIRECT_EXACT_OBJECT_LOCATOR_FOR_LATER_COMPARISON_ONLY",
+      "stable_attempt_id": "UPSTREAM-W03-005"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-ERP",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-ERP",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "frappe/erpnext",
+      "downstream_credit": false,
+      "effective_disposition": "DIRECT_HR_BASE_OWNER_AND_ADJACENT_FIN_RECONCILIATION",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "CORRECTABLE_NOT_FORMALLY_ACCEPTED",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "frappe/erpnext",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "SELECT_FORMAL",
+      "stable_attempt_id": "UPSTREAM-W03-006"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-HRMS",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-HRMS",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "frappe/hrms",
+      "downstream_credit": false,
+      "effective_disposition": "EXCLUDED_OWNER_COLLISION",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "OWNER_COLLISION_EXCLUSION_SUBSTANCE_ACCEPTED_NOT_FORMAL",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "frappe/hrms",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "EXCLUDE_OWNER_COLLISION",
+      "stable_attempt_id": "UPSTREAM-W03-007"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-HORILLA",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-HORILLA",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "horilla/horilla-hr",
+      "downstream_credit": false,
+      "effective_disposition": "DIRECT_BOUNDED_HR_WORK_HISTORY",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_PROJECT_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "CORRECTABLE_NOT_FORMALLY_ACCEPTED",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "horilla/horilla-hr",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "SELECT_FORMAL_HISTORY_ONLY",
+      "stable_attempt_id": "UPSTREAM-W03-008"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-ODOO",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-ODOO",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "odoo/odoo",
+      "downstream_credit": false,
+      "effective_disposition": "EXCLUDED_EDITION_SOURCE_BINDING",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "EDITION_SOURCE_BINDING_EXCLUSION_ACCEPTED_NOT_FORMAL",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "odoo/odoo",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "EXCLUDE_EDITION_SOURCE_BINDING",
+      "stable_attempt_id": "UPSTREAM-W03-009"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "ohcnetwork/care",
+      "downstream_credit": false,
+      "effective_disposition": "CANDIDATE_LATER_COMPARISON",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "ohcnetwork/care",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "CANDIDATE_LATER_COMPARISON",
+      "stable_attempt_id": "UPSTREAM-W03-010"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "ohcnetwork/care_fe",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_NONPROMOTABLE",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "ohcnetwork/care_fe",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "ADJACENT_NONPROMOTABLE",
+      "stable_attempt_id": "UPSTREAM-W03-011"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-INC-ONEUPTIME",
+        "path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+        "reviewer_identity": "/root/run061_formal_integration_contract",
+        "role": "incident_corrected_reseal_review",
+        "sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+        "record_hash": "8388b65a4191f2b9f025cd6338c093bd687e365dfc31e6ae0d76f052ff2f1932",
+        "record_hash_domain": "INCIDENT_COMPLETE_PROJECT_RECORD_SHA256",
+        "record_id": "PRJ-INC-ONEUPTIME",
+        "role": "incident_corrected_reseal",
+        "sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "OneUptime/oneuptime",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_OPERATIONAL_INCIDENT_NONPROMOTABLE",
+      "formal_acceptance_decision": "ACCEPT_ADJACENT_CLASSIFICATION_FORMAL_UPSTREAM_TRIAGE_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "ADJACENT_OPERATIONAL_INCIDENT_CLASSIFICATION_ACCEPTED_CURRENT_CLAIM_RECORD_QUARANTINED",
+      "lineage": "INCIDENT",
+      "normalized_repository": "oneuptime/oneuptime",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "ADJACENT_OPERATIONAL_INCIDENT_NONPROMOTABLE",
+      "stable_attempt_id": "UPSTREAM-W03-012"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "openemr/openemr",
+      "downstream_credit": false,
+      "effective_disposition": "CANDIDATE_LATER_COMPARISON",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "openemr/openemr",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "CANDIDATE_LATER_COMPARISON",
+      "stable_attempt_id": "UPSTREAM-W03-013"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "openmrs/openmrs-core",
+      "downstream_credit": false,
+      "effective_disposition": "CANDIDATE_LATER_COMPARISON",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "openmrs/openmrs-core",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "CANDIDATE_LATER_COMPARISON",
+      "stable_attempt_id": "UPSTREAM-W03-014"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "openmrs/openmrs-esm-form-engine-lib",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_NONPROMOTABLE",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "openmrs/openmrs-esm-form-engine-lib",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "ADJACENT_NONPROMOTABLE",
+      "stable_attempt_id": "UPSTREAM-W03-015"
+    },
+    {
+      "accepted_record_review": null,
+      "accepted_record_source": null,
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "openmrs/openmrs-esm-patient-chart",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_NONPROMOTABLE",
+      "formal_acceptance_decision": null,
+      "formal_project_record_accepted": false,
+      "initial_review_disposition": "CORRECT_AND_REISSUE",
+      "lineage": "MED_CLINICAL",
+      "normalized_repository": "openmrs/openmrs-esm-patient-chart",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "ADJACENT_NONPROMOTABLE",
+      "stable_attempt_id": "UPSTREAM-W03-016"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-INC-OPENPROJECT",
+        "path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+        "reviewer_identity": "/root/run061_formal_integration_contract",
+        "role": "incident_corrected_reseal_review",
+        "sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+        "record_hash": "f2c2826f6bc704b8a94b11c6b9df0cbf5774a6216245e4070db887bd4bd9d395",
+        "record_hash_domain": "INCIDENT_COMPLETE_PROJECT_RECORD_SHA256",
+        "record_id": "PRJ-INC-OPENPROJECT",
+        "role": "incident_corrected_reseal",
+        "sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "opf/openproject",
+      "downstream_credit": false,
+      "effective_disposition": "ADJACENT_GENERIC_WORKFLOW_NONPROMOTABLE",
+      "formal_acceptance_decision": "ACCEPT_ADJACENT_CLASSIFICATION_FORMAL_UPSTREAM_TRIAGE_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "ADJACENT_GENERIC_WORKFLOW_CLASSIFICATION_ACCEPTED_CURRENT_CLAIM_RECORD_QUARANTINED",
+      "lineage": "INCIDENT",
+      "normalized_repository": "opf/openproject",
+      "prompt_occurrence_weight": 2,
+      "raw_disposition": "ADJACENT_GENERIC_WORKFLOW_NONPROMOTABLE",
+      "stable_attempt_id": "UPSTREAM-W03-017"
+    },
+    {
+      "accepted_record_review": {
+        "decision_project_id": "PRJ-HF-ORANGE",
+        "path": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+        "reviewer_identity": "/root/final_formal_dashboard_preflight",
+        "role": "hr_finance_corrected_reseal_review",
+        "sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a"
+      },
+      "accepted_record_source": {
+        "path": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+        "record_hash": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+        "record_hash_domain": "HR_PROJECTS_ARRAY_JCS_SHA256_PLUS_PROJECT_ID",
+        "record_id": "PRJ-HF-ORANGE",
+        "role": "hr_finance_corrected_reseal",
+        "sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118"
+      },
+      "denominator_membership": "IN_PROMPT_UNIQUE_95",
+      "display_repository": "orangehrm/orangehrm",
+      "downstream_credit": false,
+      "effective_disposition": "EXCLUDED_REACTIVATION_NOT_REHIRE",
+      "formal_acceptance_decision": "ACCEPT_FORMAL_UPSTREAM_EXCLUSION_RECORD",
+      "formal_project_record_accepted": true,
+      "initial_review_disposition": "REACTIVATION_EXCLUSION_SUBSTANCE_ACCEPTED_NOT_FORMAL",
+      "lineage": "HR_FINANCE",
+      "normalized_repository": "orangehrm/orangehrm",
+      "prompt_occurrence_weight": 1,
+      "raw_disposition": "EXCLUDE_REACTIVATION_NOT_REHIRE",
+      "stable_attempt_id": "UPSTREAM-W03-018"
+    }
+  ],
+  "register_immutability": {
+    "after_sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "before_sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "byte_identical": true
+  },
+  "reproducibility": {
+    "generator_path": "generators/integrate-formal-upstream-triage-wave-03.py",
+    "generator_sha256": "a59537e78aede3e2543d56a08cc14be01fde5c116ba56ccfa947820eb2a5469e",
+    "live_timestamp": false,
+    "serialization": "UTF-8, LF, sorted keys, two-space indentation, terminal LF"
+  },
+  "review_summary": {
+    "hr_finance": {
+      "accepted_checks": 112,
+      "correction_required_checks": 16,
+      "facets": 12,
+      "formal_facets_accepted": 0,
+      "formal_projects_accepted": 0,
+      "project_check_instances": 144,
+      "projects": 6,
+      "rejected_checks": 16
+    },
+    "hr_finance_corrected_reseal": {
+      "accepted_check_instances": 144,
+      "blocked_check_instances": 0,
+      "claim_bearing_source_fields": 67,
+      "claims": 108,
+      "facets": 12,
+      "formal_facets_accepted": 12,
+      "formal_projects_accepted": 6,
+      "formal_target_edges": 0,
+      "project_check_instances": 144,
+      "projects": 6,
+      "verdict": "GO_BOUNDED_UPSTREAM_PROJECT_AND_FACET_RECORDS_ONLY"
+    },
+    "hr_finance_reseal": {
+      "accepted_check_instances": 126,
+      "blocked_controls": [
+        "FTC-01",
+        "FTC-10",
+        "FTC-23"
+      ],
+      "facets": 12,
+      "formal_facets_accepted": 0,
+      "formal_projects_accepted": 0,
+      "project_check_instances": 144,
+      "projects": 6,
+      "rejected_check_instances": 18,
+      "source_facet_links_matching": 11,
+      "source_facet_links_total": 12,
+      "verdict": "NO_GO_CORRECT_AND_RESEAL"
+    },
+    "incident": {
+      "accepted_checks": 54,
+      "aspects": 7,
+      "correction_required_checks": 10,
+      "formal_projects_accepted": 0,
+      "project_check_instances": 72,
+      "projects": 3,
+      "rejected_checks": 8
+    },
+    "incident_corrected_reseal": {
+      "accepted_check_instances": 72,
+      "adjacent_formal_records": 2,
+      "blocked_check_instances": 0,
+      "direct_formal_records": 1,
+      "formal_facets_accepted": 0,
+      "formal_projects_accepted": 3,
+      "project_check_instances": 72,
+      "projects": 3,
+      "verdict": "GO_BOUNDED_UPSTREAM_PROJECT_RECORDS_ONLY"
+    },
+    "incident_fresh_reseal": {
+      "accepted_check_instances": 69,
+      "blocked_check_instances": 3,
+      "blocked_controls": [
+        "FTC-23"
+      ],
+      "formal_projects_accepted": 0,
+      "project_check_instances": 72,
+      "projects": 3,
+      "verdict": "NO_GO_TERMINAL_LF_DECLARATION_MISMATCH"
+    },
+    "incident_reseal": {
+      "blocked_check_instances": 6,
+      "blocked_controls": [
+        "FTC-01",
+        "FTC-23"
+      ],
+      "formal_projects_accepted": 0,
+      "project_check_instances": 72,
+      "projects": 3,
+      "ready_check_instances": 66,
+      "substantive_corrections_closed": 3,
+      "verdict": "NO_GO"
+    },
+    "med_clinical_corrected_normalizer": {
+      "accepted_check_instances": 8,
+      "blocked_check_instances": 184,
+      "blocked_controls": [
+        "FTC-01",
+        "FTC-02..FTC-22",
+        "FTC-24"
+      ],
+      "formal_facets_accepted": 0,
+      "formal_projects_accepted": 0,
+      "historical_extras": 1,
+      "project_check_instances": 192,
+      "project_v2_hashes_reproduced": 9,
+      "projects": 9,
+      "prompt_projects": 8,
+      "relation_v2_hashes_reproduced": 10,
+      "relations": 10,
+      "verdict": "NO_GO_MISSING_DURABLE_NORMALIZER_SESSION_TURN_AND_NORMATIVE_CONTROL_DEFINITIONS"
+    },
+    "med_clinical_invalidated_packet": {
+      "facets": 10,
+      "formal_projects_accepted": 0,
+      "historical_extras": 1,
+      "invalidating_control": "FTC-01_DIRECT_NO_CROSS_READ_CONTRADICTION",
+      "packet_ftc_accepted": 13,
+      "packet_ftc_correction_required": 9,
+      "packet_ftc_rejected": 2,
+      "project_records": 9,
+      "prompt_records": 8
+    },
+    "med_clinical_reissue": {
+      "formal_projects_accepted": 0,
+      "historical_extras": 1,
+      "projects": 9,
+      "prompt_projects": 8,
+      "quarantined_prompt_projects": 1,
+      "rejected_prompt_projects": 7,
+      "relations": 10,
+      "verdict": "NO_GO_FTC_01_FTC_23_ZERO_OF_8_FORMALLY_ACCEPTED"
+    }
+  },
+  "run_id": "RUN-070",
+  "schema_version": "1.0",
+  "status": "9_FORMAL_UPSTREAM_PROJECT_RECORDS_12_FORMAL_FACETS_ACCEPTED_ZERO_TARGET_EDGE_ZERO_DOWNSTREAM_CREDIT",
+  "target_inventory": {
+    "initial_facet_aspect_subrecords": 29,
+    "scope": "Initial RUN-058A/B/C facet and aspect records only; later loci, claims and correction records excluded.",
+    "target_count": 6,
+    "target_ids": [
+      "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "CAP-MED-CD-REGISTER-BALANCE"
+    ],
+    "target_list_sha256": "dcea716f75cecf079e22e3afce580bdeefe48868a687c55e13b2d3fd1af74e9d"
+  }
+}
