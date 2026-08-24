@@ -1,0 +1,686 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-053",
+  "generated_at": "2026-08-25T02:05:42.9401496+12:00",
+  "role": "AGENT_A_IDENTITY_STRIPPED_OBSERVED_BEHAVIOUR_HANDOFF",
+  "responsible_agent_identity": "/root/run053_agent_a_sanitizer",
+  "orchestrator_writer_identity": "/root",
+  "status": "TWENTY_FOUR_BLIND_BEHAVIOUR_PACKETS_READY_FOR_FRESH_AGENT_B_ZERO_CREDIT",
+  "governing_prompt": {
+    "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "bytes": 88305,
+    "clean_specification_rule": "Agent A records observed product behaviour; Agent B rewrites only the blind behaviour payload as neutral user needs, states, and acceptance criteria; Agent C compares that neutral specification with current-product evidence."
+  },
+  "parent_observation_packet": {
+    "run_id": "RUN-047",
+    "sha256": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e",
+    "observed_behaviour_atoms": 73,
+    "explicit_limitation_atoms": 72
+  },
+  "lineage_correction": {
+    "superseded_packet_relation": "NOT_DERIVED_FROM_OBSERVED_BEHAVIOUR",
+    "reason": "A prior neutral packet did not consume the sanitized observed behaviour and is not an input to this blind handoff.",
+    "semantic_correction": "All observed couplings and object boundaries are preserved for fresh neutralization; contextual improvements are excluded."
+  },
+  "agent_a_input_boundary": {
+    "consulted_upstream_observation_evidence": true,
+    "consulted_current_application_source": false,
+    "consulted_current_application_runtime": false,
+    "performed_current_product_comparison": false,
+    "wrote_neutral_requirements": false,
+    "selected_formal_benchmark_edges": false,
+    "orchestrator_only_repository_writer": true
+  },
+  "blind_payload_contract": {
+    "packet_identity": "Opaque packet IDs only; feature IDs, facet keys, benchmark project identities, and source identities are withheld from Agent B.",
+    "stable_atom_id_rule": "Within each packet, field name plus one-based list position is the stable blind atom identity.",
+    "preserved": [
+      "observed user-visible behaviour",
+      "observed states and transitions",
+      "observed information hierarchy",
+      "observed feedback and recovery",
+      "explicit limitations and unknowns",
+      "whether the observed slice is exact, partial, or adjacent only"
+    ],
+    "removed": [
+      "project and repository names",
+      "URLs, revisions, licences, and edition identities",
+      "source paths, classes, methods, fields, schemas, and framework names",
+      "source-specific labels and copied wording",
+      "feature IDs, facet keys, and formal selection outcomes",
+      "current-product facts and proposed design"
+    ],
+    "source_atom_crosswalk": "NOT_MATERIALIZED_UNTIL_FRESH_AGENT_B_RETURNS",
+    "packet_set_sha256": "066d6b5c095ffdf66579da90f30f186dcb839666c19ff5c894bf1c5c26a3078c",
+    "canonical_hash_rule": "SHA-256 of UTF-8 JSON for packets only, sorted keys, compact separators, and non-ASCII characters preserved",
+    "semantic_coverage_counts": {
+      "observed_job_boundaries": 24,
+      "observed_user_visible_behaviour_atoms": 69,
+      "observed_state_and_transition_atoms": 35,
+      "observed_information_architecture_atoms": 25,
+      "observed_feedback_and_recovery_atoms": 33,
+      "explicit_limitation_and_unknown_atoms": 66
+    },
+    "redaction_validation": {
+      "feature_or_facet_identifiers": 0,
+      "urls": 0,
+      "revision_hashes": 0,
+      "project_or_repository_names": 0,
+      "source_implementation_identifiers": 0,
+      "domain_words_service_period_or_destruction_method_are_not_implementation_identifiers": true
+    }
+  },
+  "counts": {
+    "blind_packets": 24,
+    "exact_observed_behaviour_packets": 8,
+    "partial_adjacent_behaviour_packets": 4,
+    "insufficient_adjacent_behaviour_packets": 12,
+    "formal_edges": 0,
+    "final_no_matches": 0
+  },
+  "packets": [
+    {
+      "blind_packet_id": "A53-001",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No distinct re-engagement transaction was observed; only returning an existing worker profile and its linked access account to an active condition appeared as adjacent behaviour.",
+      "observed_user_visible_behaviour": [
+        "Returning an existing worker profile to an active condition also restores its linked access account.",
+        "A separate adjacent lifecycle action can clear the current departure association."
+      ],
+      "observed_states_and_transitions": [
+        "A departed or inactive profile can return to active.",
+        "The linked access account changes from disabled to enabled."
+      ],
+      "observed_information_architecture": [
+        "Reactivation operates on the existing worker profile and linked access account."
+      ],
+      "observed_feedback_and_recovery": [
+        "No distinct re-engagement confirmation or consequences summary was evidenced."
+      ],
+      "explicit_limitations": [
+        "No new service period, effective date, reason, or distinct authority was established.",
+        "Contract, entitlement, and downstream effects were not established.",
+        "Simple reactivation was the only pinned behaviour."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-002",
+      "observation_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "Confirm selected unmatched bank items against reference records after validating source eligibility, reference identity, and total amounts; allocation, settlement, and journal posting were not observed.",
+      "observed_user_visible_behaviour": [
+        "A user can submit one or more unmatched bank items with proposed reference records.",
+        "Missing, excluded, or already-linked sources are rejected.",
+        "Invalid reference choices and materially different totals are rejected.",
+        "Successful confirmation creates the selected links."
+      ],
+      "observed_states_and_transitions": [
+        "Eligible source items move from unmatched to matched.",
+        "Invalid submissions remain unmatched."
+      ],
+      "observed_information_architecture": [
+        "One confirmation can contain multiple source items and reference entries."
+      ],
+      "observed_feedback_and_recovery": [
+        "Validation failures prevent confirmation.",
+        "Returning the original result for a repeated submission was not evidenced."
+      ],
+      "explicit_limitations": [
+        "User authority, actor attribution, and durable decision history were not established.",
+        "Repeat-request behaviour was not established.",
+        "Payment-allocation and settlement equivalence was not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-003",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No physical balance-check workflow was observed; only displayed and sortable on-hand quantity with destroyed lots excluded was found.",
+      "observed_user_visible_behaviour": [
+        "An inventory list displays and sorts each lot by current on-hand quantity.",
+        "Destroyed lots are omitted from active inventory."
+      ],
+      "observed_states_and_transitions": [
+        "Active lots leave the active list after destruction."
+      ],
+      "observed_information_architecture": [
+        "Quantity is displayed per inventory lot."
+      ],
+      "observed_feedback_and_recovery": [
+        "No count result, mismatch warning, or reconciliation feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "No physical count, expected-versus-observed comparison, checker, witness, effective time, or pass/fail state was established.",
+        "The inventory was not established as controlled-medication-specific."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-004",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Replace a changed clinical observation with a linked new version while retaining the prior version and its change explanation.",
+      "observed_user_visible_behaviour": [
+        "Changing an existing clinical observation requires an explanation.",
+        "A change creates a replacement version while retaining the prior version instead of silently overwriting it."
+      ],
+      "observed_states_and_transitions": [
+        "An observation can have not-final, final, and amended meanings.",
+        "Amending a final observation creates an amended replacement and retires the prior version without erasing it."
+      ],
+      "observed_information_architecture": [
+        "Successive versions are linked so earlier content remains traceable."
+      ],
+      "observed_feedback_and_recovery": [
+        "The change explanation is retained with the superseded version.",
+        "The prior version provides historical recovery evidence."
+      ],
+      "explicit_limitations": [
+        "No visible confirmation, approval, signature, or explanation-quality check was established.",
+        "Concurrent changes and repeat-submission behaviour were not established.",
+        "Complete preservation of complex attachments was not proven.",
+        "The end-user provenance display was not inspected."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-005",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No invitation lifecycle was observed; the adjacent action creates and links an enabled access account from a worker email without evidenced delivery, expiry, acceptance, resend, or cancellation states.",
+      "observed_user_visible_behaviour": [
+        "An authorized worker-profile edit can create and enable a linked access account from the worker email.",
+        "The linked account receives worker access and can receive additional access restrictions."
+      ],
+      "observed_states_and_transitions": [
+        "A worker profile without an account becomes a profile with an enabled linked account."
+      ],
+      "observed_information_architecture": [
+        "Account creation is attached to the worker profile."
+      ],
+      "observed_feedback_and_recovery": [
+        "No invitation-delivery or acceptance feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "No invitation issuance, one-time link, delivery state, expiry, acceptance, resend, cancellation, or recovery was established.",
+        "Welcome and credential-setup behaviour was not inspected."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-006",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No controlled-medication register view was observed; only a generic lot inventory view and a separate controlled-medication marker were found.",
+      "observed_user_visible_behaviour": [
+        "An access-controlled inventory view can be restricted by facility or storage location.",
+        "It shows lot identity, expiry, and on-hand quantity.",
+        "A separate prescribing record can mark a medicine as controlled."
+      ],
+      "observed_states_and_transitions": [
+        "No controlled-register lifecycle state was observed."
+      ],
+      "observed_information_architecture": [
+        "Stock visibility and controlled classification appear in separate areas with no evidenced joined view."
+      ],
+      "observed_feedback_and_recovery": [
+        "No missing-register, balance-discrepancy, or restricted-record feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "No controlled-register entries, chronological running balance, person or prescription provenance, or controlled-specific visibility was established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-007",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No stable settlement replay or immutable provenance chain was observed; only duplicate rejection, current reference timestamps, and match or unmatch events with current-link removal were found.",
+      "observed_user_visible_behaviour": [
+        "A repeated attempt against an already-matched source is rejected.",
+        "A current match shows its referenced record and timestamps.",
+        "Removing a match removes the current relationship."
+      ],
+      "observed_states_and_transitions": [
+        "Unmatched becomes matched, and matched can return to unmatched."
+      ],
+      "observed_information_architecture": [
+        "Only current link identity and timestamps are exposed."
+      ],
+      "observed_feedback_and_recovery": [
+        "Repeating a completed action does not return the original result.",
+        "No retained recovery trail remains after unmatching."
+      ],
+      "explicit_limitations": [
+        "Original-result replay, changed-content conflict feedback, and settlement identity were not established.",
+        "Actor, reason, and immutable provenance were not established.",
+        "Current-link removal loses the observed match history."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-008",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "With distinct closure authority and record visibility, close and lock an incident, refresh its visible state, and permit later reopen or unlock; no review or remediation prerequisite gate was observed.",
+      "observed_user_visible_behaviour": [
+        "Closure uses distinct authority and record-visibility checks.",
+        "Closing ends active work, marks the incident closed, and locks it.",
+        "Detail and list views refresh after closure.",
+        "Closed records show closure time, locked state, current status, and activity history."
+      ],
+      "observed_states_and_transitions": [
+        "An active incident becomes closed and locked.",
+        "A later non-closed state can clear closure and unlock the record.",
+        "A separately authorized edit can also unlock a closed record."
+      ],
+      "observed_information_architecture": [
+        "Closure state and activity history are visible from incident detail, with corresponding status in the list."
+      ],
+      "observed_feedback_and_recovery": [
+        "Refreshed detail and list state provide success feedback.",
+        "Reopening or separate unlocking provides reversal, though no governed recovery flow was evidenced."
+      ],
+      "explicit_limitations": [
+        "Review progress, pending work, and corrective actions do not gate closure.",
+        "No closure rationale, confirmation, approval, signature, or effectiveness decision was required.",
+        "The closer identity was not established as visibly retained.",
+        "Closure and activity-history recording were not proven as one recoverable outcome.",
+        "Closure immutability was not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-009",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Create one new clinical observation within an existing person, care-interaction, and form context, saving the primary observation and immediate subordinate observations as one outcome; this does not create a register or template definition.",
+      "observed_user_visible_behaviour": [
+        "A new observation begins with the active person, care interaction, and practitioner context.",
+        "Saving is accepted only with the relevant form authority and a valid active request.",
+        "The primary observation and subordinate observations are validated and saved as one outcome.",
+        "Successful saving returns the persisted observation."
+      ],
+      "observed_states_and_transitions": [
+        "A new template becomes a validated saved observation.",
+        "Subordinate observations become associated with the saved parent and care context."
+      ],
+      "observed_information_architecture": [
+        "A primary observation can contain subordinate observations."
+      ],
+      "observed_feedback_and_recovery": [
+        "Validation failure prevents the grouped save.",
+        "A failed grouped save leaves no partial parent-and-child result."
+      ],
+      "explicit_limitations": [
+        "Durable success history was not established.",
+        "Repeat submission and interrupted retry behaviour were not established.",
+        "Location scope was not established.",
+        "Runtime maturity was not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-010",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No controlled-medication discrepancy case or resolution was observed; only generic stock adjustments and related lot actions were found.",
+      "observed_user_visible_behaviour": [
+        "Users with adjustment authority can adjust, consume, return, or edit inventory lots."
+      ],
+      "observed_states_and_transitions": [
+        "Inventory quantity can change through generic stock actions."
+      ],
+      "observed_information_architecture": [
+        "Adjustment actions are attached to inventory lots."
+      ],
+      "observed_feedback_and_recovery": [
+        "No discrepancy alert, recount result, escalation, or resolution confirmation was evidenced."
+      ],
+      "explicit_limitations": [
+        "No discrepancy case, unsafe-activity hold, recount, original-balance preservation, investigation, or governed resolution was established.",
+        "No controlled-medication-specific authority or witness behaviour was established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-011",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Create a worker profile after lifecycle, date, contact, and reporting-line validation, with an optional side effect that creates and links an enabled access account from the worker email.",
+      "observed_user_visible_behaviour": [
+        "Creating a worker assigns a generated staff identifier.",
+        "Lifecycle state, dates, email, reporting relationships, and preferred contact details are validated.",
+        "HR-authorized roles can create, view, and update the profile.",
+        "A linked access account can be created automatically when a usable worker email exists."
+      ],
+      "observed_states_and_transitions": [
+        "New worker details become a validated worker profile, optionally with a linked enabled access account."
+      ],
+      "observed_information_architecture": [
+        "The worker profile and linked access account are related but distinguishable records."
+      ],
+      "observed_feedback_and_recovery": [
+        "Invalid lifecycle, date, email, reporting, or contact data prevents completion.",
+        "No specific recovery presentation was evidenced."
+      ],
+      "explicit_limitations": [
+        "Record-level access behaviour was not fully established.",
+        "Location scope, sensitive-field privacy, concurrent creation, and repeat submission were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-012",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Update validated worker-profile fields and synchronize selected identity, role, image, and access-restriction changes to the linked access account.",
+      "observed_user_visible_behaviour": [
+        "HR-authorized users can edit worker-profile details.",
+        "Updates revalidate lifecycle state, dates, email, reporting relationships, account uniqueness, and preferred contacts.",
+        "Selected profile details, image, role, and access restrictions are synchronized to a linked access account."
+      ],
+      "observed_states_and_transitions": [
+        "An existing profile becomes an updated validated profile.",
+        "Linked-account details change with corresponding worker-profile fields."
+      ],
+      "observed_information_architecture": [
+        "Worker and linked-account details are coordinated from the worker-profile update flow."
+      ],
+      "observed_feedback_and_recovery": [
+        "Invalid profile or relationship data prevents the update.",
+        "No stale-edit recovery behaviour was evidenced."
+      ],
+      "explicit_limitations": [
+        "Concurrent edit handling, repeat submissions, and complete durable history were not established.",
+        "Sensitive-field and location-specific authority were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-013",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No authenticated witness authority or attestation was observed; an adjacent medication-destruction form accepts and reports free-text witness information under administrator access.",
+      "observed_user_visible_behaviour": [
+        "Medication-inventory administration authority is needed to mark a lot destroyed.",
+        "The destruction form accepts witness information as free text.",
+        "A destruction report displays the entered witness text."
+      ],
+      "observed_states_and_transitions": [
+        "No witness request, acceptance, refusal, or confirmation state was observed."
+      ],
+      "observed_information_architecture": [
+        "Witness text is stored as part of destruction details and repeated in reporting."
+      ],
+      "observed_feedback_and_recovery": [
+        "No identity validation, second-person confirmation, refusal, or unavailable-witness feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "The witness was not an authenticated accountable identity.",
+        "No distinct witness authority, competency, independence, signature, or separation from the acting user was established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-014",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No durable payment-allocation history was observed; current bank-match relationships retain reference identity, amount, and timestamps and disappear when unmatched.",
+      "observed_user_visible_behaviour": [
+        "A current match identifies the originating transaction, linked record, amount, and timestamps.",
+        "Removing a match makes the current link disappear."
+      ],
+      "observed_states_and_transitions": [
+        "A linked source returns to unlinked when the current match is removed."
+      ],
+      "observed_information_architecture": [
+        "Only the current relationship between a source transaction and a referenced record is represented."
+      ],
+      "observed_feedback_and_recovery": [
+        "No retained history view or restoration path was evidenced after removal."
+      ],
+      "explicit_limitations": [
+        "Actor, reason, previous state, settlement identity, and review decision were not retained.",
+        "Removal did not establish durable allocation history.",
+        "Bank matching was not proven equivalent to payment-allocation history."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-015",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Present an incident's investigation evidence, review-progress checklist, and awaiting-review lifecycle state without an enforced review-completion action, reviewer outcome, approval, or signature.",
+      "observed_user_visible_behaviour": [
+        "Incident detail exposes progression through reporting, investigation, review, closure, and reopening.",
+        "Selecting a lifecycle state saves immediately.",
+        "A visible progress checklist covers incident facts, affected people, reconstructed chronology, contributing causes, root-cause analysis, preventative work, and closure.",
+        "The investigation area shows chronology, contributing causes, root cause, owned and due preventative work, and linked corrective actions."
+      ],
+      "observed_states_and_transitions": [
+        "A reported incident can move through investigation and review toward closure.",
+        "A closed incident can move to reopened."
+      ],
+      "observed_information_architecture": [
+        "Lifecycle status, investigation evidence, review progress, and corrective work are presented together around one incident."
+      ],
+      "observed_feedback_and_recovery": [
+        "No explicit success confirmation, undo, or error surface was evidenced for immediate state changes."
+      ],
+      "explicit_limitations": [
+        "The checklist and review state do not enforce a closure gate.",
+        "No formal review-completion action, reviewer, outcome, approval, signature, or effectiveness decision was established.",
+        "Runtime maturity was not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-016",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "Change a worker's lifecycle state and disable or restore the linked access account with that state; simple reactivation is not a distinct re-engagement transaction.",
+      "observed_user_visible_behaviour": [
+        "Worker lifecycle meanings distinguish active work, inactivity, suspension, and departure.",
+        "Marking a worker departed requires a departure date.",
+        "Departure is blocked while active workers still report to that person.",
+        "A non-active lifecycle state disables the linked access account; returning to active restores it."
+      ],
+      "observed_states_and_transitions": [
+        "An active worker can move to inactive, suspended, or departed.",
+        "A non-active worker can return to active.",
+        "The linked account's enabled state follows the worker lifecycle state."
+      ],
+      "observed_information_architecture": [
+        "Worker lifecycle state and linked-account state are visibly coupled."
+      ],
+      "observed_feedback_and_recovery": [
+        "A missing departure date or active reporting relationships block the departure transition."
+      ],
+      "explicit_limitations": [
+        "Separate approval, future-effective transition, and durable lifecycle history were not established.",
+        "Reactivation was not evidenced as a distinct re-engagement transaction.",
+        "Concurrent and repeated state changes were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-017",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No standalone atomic clinical-event creation was observed; the rejected adjacent behaviour creates a compound care interaction containing many clinical facts and requests.",
+      "observed_user_visible_behaviour": [
+        "A care interaction can group clinical observations, requests, diagnoses, conditions, allergies, participants, location, and visit context.",
+        "Adding a new interaction and editing an existing one use different access levels."
+      ],
+      "observed_states_and_transitions": [
+        "New and existing interaction states are distinguished."
+      ],
+      "observed_information_architecture": [
+        "The observed object is a compound care-interaction container rather than a standalone event."
+      ],
+      "observed_feedback_and_recovery": [
+        "No specific confirmation, failure recovery, or standalone-event completion feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "No exact atomic event-record behaviour was observed.",
+        "Event fields, categories, provenance, and completion state were not established.",
+        "The bounded search was not exhaustive."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-018",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No controlled-medication destruction lifecycle projection was observed; only generic lot destruction capture and a date-ranged report were found.",
+      "observed_user_visible_behaviour": [
+        "An authorized administrator can mark a medication lot destroyed with date, method, witness text, and notes.",
+        "A date-filtered report shows destroyed lots, on-hand quantity, method, witness text, and notes."
+      ],
+      "observed_states_and_transitions": [
+        "An active lot becomes destroyed and leaves active inventory."
+      ],
+      "observed_information_architecture": [
+        "Destruction details are captured on the lot and surfaced in a separate date-ranged report."
+      ],
+      "observed_feedback_and_recovery": [
+        "The report provides post-action visibility.",
+        "No correction or reversal path was evidenced."
+      ],
+      "explicit_limitations": [
+        "The behaviour was generic medication inventory, not a controlled-medication register.",
+        "Partial destruction, before-and-after balance, and immutable correction were not established.",
+        "Witness identity and authority were not validated."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-019",
+      "observation_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "Render tracked work-information changes in both profile and list history views with an explicit empty state; complete worker lifecycle history was not observed.",
+      "observed_user_visible_behaviour": [
+        "A change feed is available from both a worker-profile context and a worker-list context.",
+        "The feed presents an explicit empty state when there are no tracked changes."
+      ],
+      "observed_states_and_transitions": [
+        "Work-information changes add entries to the activity feed."
+      ],
+      "observed_information_architecture": [
+        "The same activity history is reachable from individual and list-level contexts."
+      ],
+      "observed_feedback_and_recovery": [
+        "An empty-history message distinguishes no changes from a loading or display failure."
+      ],
+      "explicit_limitations": [
+        "Only work-information changes were evidenced.",
+        "Personal-profile, activation, invitation, termination, and re-engagement coverage were not established.",
+        "Tamper resistance, retention, export, and location filtering were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-020",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No pre-confirmation suggestion-rejection action was observed; the adjacent action removes an already-confirmed current match.",
+      "observed_user_visible_behaviour": [
+        "Suggested candidates are presented.",
+        "An already-confirmed link can be removed.",
+        "No distinct action for rejecting a suggestion was observed."
+      ],
+      "observed_states_and_transitions": [
+        "A confirmed item can return to unmatched.",
+        "No proposed-to-rejected transition was established."
+      ],
+      "observed_information_architecture": [
+        "Candidate suggestions and current matches exist, but rejection history does not."
+      ],
+      "observed_feedback_and_recovery": [
+        "No rejection confirmation, reconsideration, or suppression feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "No rejected state, candidate identity, reason, reviewer, or rejection timestamp was retained.",
+        "Removing a confirmed match is not equivalent to rejecting a proposal."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-021",
+      "observation_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "observed_job_boundary": "List worker profiles with an active-work default and lifecycle indicators, then expose grouped summary, profile, and relationship information under the evidenced read authority.",
+      "observed_user_visible_behaviour": [
+        "The worker list initially emphasizes people currently active at work.",
+        "Lifecycle indicators distinguish active work, inactivity, departure, and suspension.",
+        "Worker details are organized into summary, profile, and relationship information.",
+        "General worker and HR roles can read, while editing remains limited to HR roles in the observed scope."
+      ],
+      "observed_states_and_transitions": [
+        "The view itself performs no lifecycle transition."
+      ],
+      "observed_information_architecture": [
+        "Users move from a lifecycle-oriented worker list into grouped worker details."
+      ],
+      "observed_feedback_and_recovery": [
+        "No concealed-denial or missing-record feedback was evidenced."
+      ],
+      "explicit_limitations": [
+        "Field-level privacy and complete record-level access evaluation were not established.",
+        "Location scope and concealed denial were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-022",
+      "observation_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "Select clinical observation records by active person, care interaction, and form context, seed top-level records, and attach immediate children; configurable template applicability and arbitrary-depth hierarchy were not observed.",
+      "observed_user_visible_behaviour": [
+        "Opening a new or existing observation uses the active person, care interaction, and selected form context.",
+        "When no record resolves, the user is presented with an empty observation template.",
+        "Lists show top-level observations for the active context, newest first, with immediate children grouped beneath them."
+      ],
+      "observed_states_and_transitions": [
+        "The surface distinguishes an unresolved or new record from a resolved existing record."
+      ],
+      "observed_information_architecture": [
+        "Filtering combines person, care-interaction, and form context.",
+        "The observed hierarchy contains top-level records and immediate children."
+      ],
+      "observed_feedback_and_recovery": [
+        "Falling back to an empty template is the only evidenced unresolved-record behaviour."
+      ],
+      "explicit_limitations": [
+        "Deeper hierarchies were not established.",
+        "A configurable care-plan or template hierarchy was not established.",
+        "One record lookup did not also prove care-interaction scoping.",
+        "Location scope and privacy behaviour were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-023",
+      "observation_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "No append-only controlled-medication ledger movement was observed; only generic inventory activity and a separate controlled-medication classification were found.",
+      "observed_user_visible_behaviour": [
+        "Generic inventory supports purchase, transfer, adjustment, consumption, destruction, return, edit, and dispensing activities.",
+        "Dispensing is blocked when inventory is unavailable.",
+        "Controlled-medication classification exists separately from inventory activity."
+      ],
+      "observed_states_and_transitions": [
+        "Lot quantity changes through several generic stock actions."
+      ],
+      "observed_information_architecture": [
+        "Inventory activity and controlled-medication classification are separate."
+      ],
+      "observed_feedback_and_recovery": [
+        "Insufficient stock prevents dispensing.",
+        "No controlled-register correction or recovery path was evidenced."
+      ],
+      "explicit_limitations": [
+        "No controlled-medication movement record joined movement type, balance before and after, actor, recipient, reason, and witness.",
+        "All-or-nothing movement, concurrent activity, correction semantics, and location-owned register behaviour were not established."
+      ]
+    },
+    {
+      "blind_packet_id": "A53-024",
+      "observation_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "observed_job_boundary": "Return and rank likely financial-reference candidates for selected unmatched bank items using amount and calendar-date closeness; receipt-to-invoice allocation equivalence was not observed.",
+      "observed_user_visible_behaviour": [
+        "Selecting unmatched bank items produces ranked candidate records.",
+        "Candidate categories span several receivable, payable, expense, accounting, and cash-movement records.",
+        "Same-amount, same-day candidates are ranked as strongest; remaining candidates are presented as other possibilities."
+      ],
+      "observed_states_and_transitions": [
+        "Unmatched items gain reviewable suggestions but remain unmatched until separately confirmed."
+      ],
+      "observed_information_architecture": [
+        "Suggestions are grouped around the selected source transaction and ordered by closeness."
+      ],
+      "observed_feedback_and_recovery": [
+        "The visible rationale is limited to amount and date similarity."
+      ],
+      "explicit_limitations": [
+        "Role authority and privacy scope were not established.",
+        "Confidence explanation, rule provenance, and reviewer history were not established.",
+        "Bank-match suggestion behaviour was not proven equivalent to payment-allocation review."
+      ]
+    }
+  ],
+  "credit_boundary": {
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "external_mutations_attestation": "No application, runtime, database, benchmark repository, browser session, or external system was mutated. Only the orchestrator wrote this permitted audit artifact."
+}
