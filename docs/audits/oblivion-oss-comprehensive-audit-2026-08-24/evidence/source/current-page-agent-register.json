@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "status": "FORMAL_PAGE_ADJUDICATION_WAVE_01_RECONCILED_AUDIT_INCOMPLETE",
+  "generated_at": "2026-08-24T17:07:21+12:00",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "writer_boundary": "Only the root orchestrator wrote audit artifacts; RUN-010 returned evidence in a message and reported wrote_files=false.",
+  "wave_formal_assignments_eligible": 2,
+  "cumulative_formal_assignments_eligible": 11,
+  "literal_prompt_minimum": 8,
+  "literal_prompt_minimum_met": true,
+  "planned_formal_assignments_target": 11,
+  "planned_target_met": true,
+  "all_returned": true,
+  "all_completion_tests_met": true,
+  "all_reported_no_writes": true,
+  "assignment_returns": [
+    {
+      "assignment_id": "RUN-010",
+      "agent_task_path": "/root/page_candidate_adjudication",
+      "role": "Inertia page/support candidate adjudicator",
+      "repository": "oblivionfindings workspace; application commit pin controls source identity",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; page identity does not relax roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, or privacy.",
+      "scope": "All 25 unrendered/unimported resolver candidates plus all 11 missing backend render targets",
+      "pass_lens": "Pass 1 page reachability and denominator adjudication",
+      "evidence_schema": "Pins, reproduction counts, per-path classification/evidence/anchors/confidence, denominator recommendation, execution credit, completion test, and write attestation",
+      "benchmark_subset": null,
+      "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+      "completion_test": "Classify every one of 25 candidates and every one of 11 missing render targets with exact current-source ownership evidence and no unresolved rows.",
+      "return_status": "COMPLETE_STATIC_SOURCE_ADJUDICATION_NO_RUNTIME_CREDIT",
+      "evidence_count": 36,
+      "evidence_count_basis": "25 candidate adjudications plus 11 missing-render-target adjudications.",
+      "observed_audit_head": "NOT_REPORTED; pinned application subtrees matched the source commit",
+      "completion_test_met": true,
+      "wrote_files": false,
+      "runtime_gates": null,
+      "unresolved_gaps": "Framework-expanded route reachability, route-to-page-to-FEATURE-ID mapping, build resolution, browser observation, deployment identity, and release evidence remain open.",
+      "root_reconciliation": "Accept 711 as the committed-source file-backed Inertia page-root denominator only; retain 11 missing literals as backend liabilities with zero page/runtime credit; quarantine the unreproduced 3,392 count and keep the final prompt page-classification gate open.",
+      "normalized_payload_sha256": "97522fce09c3c22dfa51f79f8f339742d76eceb5e4d3e480697593ec1a29ad2b"
+    },
+    {
+      "assignment_id": "RUN-011",
+      "agent_task_path": "/root/benchmark_integration_review",
+      "role": "Independent page-denominator reconciliation reviewer",
+      "repository": "oblivionfindings workspace; application commit pin controls source identity",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; page identity does not relax roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, or privacy.",
+      "scope": "Adversarially reconcile all 25 candidate rows, 11 missing-render liabilities, public summaries, generator output, agent register, and dashboard wording",
+      "pass_lens": "Pass 1 independent denominator and evidence-quality challenge; not final Pass 8",
+      "evidence_schema": "Pins, exact arithmetic, per-defect anchors, prompt taxonomy, credit boundary, evidence count/basis, unresolved gaps, GO/NO-GO, completion test, and write attestation",
+      "benchmark_subset": null,
+      "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+      "completion_test": "Verify 25/25 candidate and 11/11 liability representation, 711+227+25=963, 20+3+2=25, prompt-taxonomy arithmetic, zero candidate roots, exact ownership wording, and zero runtime/build/browser/application credit.",
+      "return_status": "GO_AFTER_BOUNDED_CORRECTION_FOLLOWUP",
+      "evidence_count": 54,
+      "evidence_count_basis": "25 candidate adjudications plus 11 liabilities plus eight artifact-consistency surfaces plus ten cross-cutting controls.",
+      "observed_audit_head": "201ccff705669c61dcb7dcafbcfd36b725b98546",
+      "initial_no_go": {
+        "completion_test_met": false,
+        "evidence_count": 49,
+        "defects": [
+          "RUN-010's 3,392 JS/TS count was not reproducible.",
+          "Two training-record replacement-owner descriptions were not exact anchors.",
+          "The 25 candidate rows lacked a separate governing-prompt taxonomy.",
+          "The phrase 100% source-classified could be confused with the prompt's final page gate.",
+          "The executive summary described 227 paths as all remaining non-roots rather than 227 of 252."
+        ]
+      },
+      "corrected_followup": {
+        "verdict": "GO",
+        "completion_test_met": true,
+        "remaining_mismatches_or_overclaims": []
+      },
+      "completion_test_met": true,
+      "wrote_files": false,
+      "runtime_gates": null,
+      "unresolved_gaps": "Final prompt classification of 711 roots, framework reachability, route/page-to-FEATURE-ID mapping, build resolution, current-build application browser proof, deployment/release identity, fresh Pass 8, and final all-results/no-live-agent reconciliation remain open.",
+      "root_reconciliation": "GO for the bounded static page batch after the five evidence corrections; 711 is source-only and no broader completion credit is awarded.",
+      "normalized_payload_sha256": "e440bdf12f5ae7d9b2dfdfedd07bd3b2f2719553e0bb84a6e5e770e600968823"
+    }
+  ],
+  "contradictions_and_reconciliation": [
+    "RUN-011 initially returned NO-GO with five bounded evidence defects; the root corrected those defects and the same independent reviewer returned a replacement GO with completion_test_met=true."
+  ],
+  "outstanding_required_roles_or_waves": [
+    "canonical route/page-to-FEATURE-ID reconciliation",
+    "final prompt classification of 711 roots",
+    "fresh Pass 8 cross-reviewers",
+    "final all-results-represented and no-live-agent reconciliation"
+  ],
+  "live_agent_finalization_state": "RUN-010 and corrected RUN-011 returned; planned assignment target is met, but the audit remains active and fresh Pass 8 has not run.",
+  "finalization_gate": false
+}

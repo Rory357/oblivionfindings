@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T17:08:14+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=page-wave-01-final",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_counts_observed": {
+    "formal_assignments": 11,
+    "planned_formal_assignments_target": 11,
+    "resolver_tsx_paths_partitioned_for_static_render_import_identity": 963,
+    "static_file_backed_page_roots": 711,
+    "imported_support_paths": 227,
+    "alias_generated_legacy_candidates": 20,
+    "dead_candidates": 3,
+    "demo_debug_candidates": 2,
+    "unresolved_candidates": 0,
+    "missing_backend_render_literals": 11,
+    "prompt_taxonomy_for_25_candidates": {
+      "Redirect/legacy": 10,
+      "Duplicate": 10,
+      "Dead/unreachable": 3,
+      "Out of product scope": 2
+    },
+    "final_prompt_classification_of_711_roots": "OPEN",
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_horizontal_overflow": false,
+      "page_partition_heading_observed": true,
+      "page_root_card_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 539,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "page_partition_heading_observed": true,
+      "page_root_card_observed": true,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 13,
+    "http_200": 13,
+    "failures": []
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current-build application browser, route, workflow, benchmark, runtime, test, build, release, or audit-completion credit."
+}

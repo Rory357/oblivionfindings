@@ -88,6 +88,23 @@ Three formal read-only assignments returned 62 grouped user-observable candidate
 | 61 | `CAP-OPS-REPORTING-EXPORT` | Operations | D | Run governed operations reports and exports | Operations reporting owners |
 | 62 | `CAP-OPS-CALENDAR-SYNC` | Operations | H | Synchronise authorised operational calendar obligations | Calendar sync owner |
 
+## Static Inertia page-root denominator
+
+RUN-010 completed the manual source adjudication that was open after the first semantic wave. All 963 non-test TSX paths in the committed Inertia resolver are now partitioned for static render/import identity:
+
+| Partition | Count | Current source classification |
+|---|---:|---|
+| Existing literal backend render roots | 711 | Current static file-backed Inertia page roots |
+| Unrendered but imported | 227 | Support/component paths, not independent page roots |
+| Unrendered and unimported: alias/generated/legacy | 20 | Superseded by canonical routes, pages, redirects, or embedded surfaces |
+| Unrendered and unimported: dead/unreachable | 3 | No importer, route, or backend render owner found |
+| Unrendered and unimported: test/demo/story | 2 | Debug/starter surfaces, not current page roots |
+| **Resolver total** | **963** | **963/963 partitioned for static render/import identity** |
+
+The separate backend scan contains 11 literal render names with no file: four are in retired unreachable methods and seven are in unrouted stubs. They are backend liabilities with zero page-root or runtime credit; they do not enlarge the 711-file denominator.
+
+This denominator is limited to committed file-backed Inertia roots at the application pin. Final prompt classification of the 711 roots, framework-expanded route reachability, build resolution, browser observation, deployment identity, release status, and route/page-to-`FEATURE-ID` coverage remain open. The 25 candidate rows additionally carry the prompt taxonomy (`Redirect/legacy`, `Duplicate`, `Dead/unreachable`, or `Out of product scope`) in the structured evidence.
+
 
 ## Provisional P1 source claims
 

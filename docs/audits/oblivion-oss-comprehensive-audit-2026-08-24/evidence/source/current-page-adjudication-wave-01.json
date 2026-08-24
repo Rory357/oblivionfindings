@@ -1,0 +1,492 @@
+{
+  "schema_version": 1,
+  "status": "COMPLETE_STATIC_SOURCE_ADJUDICATION_NO_RUNTIME_CREDIT",
+  "generated_at": "2026-08-24T17:07:21+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "current_subtrees_match_pin": true
+  },
+  "methods": [
+    "Reproduced the non-test resources/js/pages/**/*.tsx Inertia glob.",
+    "Resolved static import, export-from, dynamic-import, relative, alias, extension, and index references for the candidate partition; no global JS/TS file-count denominator is credited.",
+    "Scanned committed PHP for executable literal Inertia::render(...) and inertia(...) calls and excluded the commented ClientController call at line 2408.",
+    "Reconciled exact path literals, component exports, controller methods, route registrations, redirects, canonical replacements, and source-only tests.",
+    "Performed no application boot, test, build, database, network, or browser work."
+  ],
+  "reproduction": {
+    "resolver_non_test_tsx": 963,
+    "php_render_callsites": 745,
+    "nonliteral_php_render_callsites": 0,
+    "unique_backend_render_names": 722,
+    "existing_backend_render_roots": 711,
+    "missing_backend_render_targets": 11,
+    "resolver_partition": {
+      "matched_backend_render_roots": 711,
+      "unrendered_imported": 227,
+      "unrendered_unimported": 25,
+      "sum": 963
+    },
+    "matches_prior_census": true
+  },
+  "candidate_adjudication": [
+    {
+      "path": "resources/js/pages/Governance/Components/WidgetCard.tsx",
+      "classification": "dead/unreachable candidate",
+      "evidence": "Default-exported WidgetCard component has no page shell and no resolved importer, backend render name, exact path reference, or route owner.",
+      "closest_ownership_anchors": [
+        "routes/governance.php:24",
+        "app/Domain/Governance/Http/Controllers/DashboardController.php:29",
+        "resources/js/pages/Governance/Dashboard.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Dead/unreachable"
+    },
+    {
+      "path": "resources/js/pages/catering/products/index.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The products GET returns JSON for API use and otherwise redirects to the current meal planner; no render/import targets this legacy page.",
+      "closest_ownership_anchors": [
+        "routes/catering.php:49",
+        "app/Http/Controllers/Catering/ProductController.php:25",
+        "resources/js/pages/catering/meal-planner.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/catering/recipes/edit.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "RecipeController states the standalone editor was folded into catering and redirects non-JSON edit requests to the meal planner.",
+      "closest_ownership_anchors": [
+        "routes/catering.php:36",
+        "app/Http/Controllers/Catering/RecipeController.php:34-46",
+        "resources/js/pages/sites/meal-planner/_recipe-edit-dialog.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/catering/recipes/index.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The recipes index route redirects to the meal planner and no importer or backend render targets this file.",
+      "closest_ownership_anchors": [
+        "routes/catering.php:29",
+        "app/Http/Controllers/Catering/RecipeController.php:13-19",
+        "app/Http/Controllers/Catering/DashboardController.php:41"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/catering/recipes/show.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The recipe show route redirects to the meal planner and no importer or backend render targets this file.",
+      "closest_ownership_anchors": [
+        "routes/catering.php:34",
+        "app/Http/Controllers/Catering/RecipeController.php:22-25",
+        "resources/js/pages/sites/meal-planner/index.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/catering/tags/index.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "DietaryTagController says the page was folded into Meal Planner; non-JSON GET redirects while JSON remains for the embedded manager.",
+      "closest_ownership_anchors": [
+        "routes/catering.php:62",
+        "app/Http/Controllers/Catering/DietaryTagController.php:12-16",
+        "resources/js/pages/sites/meal-planner/_library-dialogs.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/clients/assignments.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "Both client route families render operations/clients/assignments; no importer or render targets this older duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:174",
+        "routes/operations.php:368",
+        "app/Http/Controllers/ClientAssignmentController.php:38",
+        "resources/js/pages/operations/clients/assignments.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/create.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "Both client create URLs are owned by ClientController::create and render operations/clients/create.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:90",
+        "routes/operations.php:236",
+        "app/Http/Controllers/ClientController.php:2413-2420",
+        "resources/js/pages/operations/clients/create.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/documents.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientDocumentController renders operations/clients/documents; no importer or render targets this duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:34",
+        "routes/operations.php:148",
+        "app/Http/Controllers/ClientDocumentController.php:54",
+        "resources/js/pages/operations/clients/documents.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/edit.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientController's contract says no standalone edit Inertia page exists; it returns modal JSON or redirects to the canonical client surface.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:105",
+        "routes/operations.php:253",
+        "app/Http/Controllers/ClientController.php:2632-2726",
+        "resources/js/pages/operations/clients/_create-dialog.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/clients/incidents.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientIncidentController renders operations/clients/incidents; no importer or render targets this duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:221",
+        "routes/operations.php:594",
+        "app/Http/Controllers/ClientIncidentController.php:44",
+        "resources/js/pages/operations/clients/incidents.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/index.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientController::index renders operations/clients/index; no importer or render targets this duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:31",
+        "routes/operations.php:110",
+        "app/Http/Controllers/ClientController.php:241",
+        "resources/js/pages/operations/clients/index.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/medical-simple.tsx",
+      "classification": "test/demo/story",
+      "evidence": "The page labels itself Medical Profile (Debug); no route/controller renders it and the current medical GET redirects to eMAR.",
+      "closest_ownership_anchors": [
+        "resources/js/pages/clients/medical-simple.tsx:43",
+        "app/Http/Controllers/ClientMedicalController.php:89-93"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Out of product scope"
+    },
+    {
+      "path": "resources/js/pages/clients/medical.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The exact file is read only by a source test and is not imported/rendered; both medical route families redirect through EmarUrl::medications.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:42",
+        "routes/operations.php:167",
+        "app/Http/Controllers/ClientMedicalController.php:93",
+        "app/Support/EmarUrl.php"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/clients/portal-users.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientPortalUserController renders operations/clients/portal-users; no importer or render targets this duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:148",
+        "routes/operations.php:334",
+        "app/Http/Controllers/ClientPortalUserController.php:26",
+        "resources/js/pages/operations/clients/portal-users.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/clients/risks.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "ClientRiskController renders operations/clients/risks; no importer or render targets this duplicate.",
+      "closest_ownership_anchors": [
+        "routes/clients.php:243",
+        "routes/operations.php:615",
+        "app/Http/Controllers/ClientRiskController.php:26",
+        "resources/js/pages/operations/clients/risks.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/emar/Placeholder.tsx",
+      "classification": "dead/unreachable candidate",
+      "evidence": "Generic Coming Soon component has no importer, backend render, or exact reference; current eMAR routes render concrete pages.",
+      "closest_ownership_anchors": [
+        "routes/emar.php:59",
+        "app/Http/Controllers/Emar/EmarController.php:796",
+        "resources/js/pages/emar/Index.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Dead/unreachable"
+    },
+    {
+      "path": "resources/js/pages/integrations/unifi.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "Legacy integration URLs permanently redirect to Security Devices, whose controller renders security-devices/integrations/unifi.",
+      "closest_ownership_anchors": [
+        "routes/integrations.php:15",
+        "routes/settings.php:358",
+        "routes/security-devices.php:511",
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:185",
+        "resources/js/pages/security-devices/integrations/unifi.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/operations/clients/medical.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The file is read only by a source test and is not imported/rendered; the operations medical GET redirects to the canonical eMAR URL.",
+      "closest_ownership_anchors": [
+        "routes/operations.php:167",
+        "app/Http/Controllers/ClientMedicalController.php:93",
+        "app/Support/EmarUrl.php",
+        "resources/js/pages/emar/Medications.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/portal/messages/show.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "The live show route remains, but PortalMessageController renders the unified portal/messages page with active-conversation props.",
+      "closest_ownership_anchors": [
+        "routes/portal.php:152",
+        "app/Http/Controllers/Portal/PortalMessageController.php:88",
+        "app/Http/Controllers/Portal/PortalMessageController.php:206",
+        "resources/js/pages/portal/messages.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Redirect/legacy"
+    },
+    {
+      "path": "resources/js/pages/settings/sso.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "GET /settings/sso renders settings/sso-config; group mapping separately renders settings/sso-groups.",
+      "closest_ownership_anchors": [
+        "routes/settings.php:282",
+        "app/Http/Controllers/Settings/SsoConfigController.php:15",
+        "app/Http/Controllers/Settings/SsoGroupController.php:23",
+        "resources/js/pages/settings/sso-config.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/sites/_readiness-panel.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "Named support export has no importer/render; the current Site profile imports and renders tabs/readiness.",
+      "closest_ownership_anchors": [
+        "routes/assets.php:35",
+        "app/Http/Controllers/Sites/SiteProfileController.php:40",
+        "resources/js/pages/sites/show.tsx:69",
+        "resources/js/pages/sites/tabs/readiness.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/sites/capacity/Index.tsx",
+      "classification": "dead/unreachable candidate",
+      "evidence": "No capacity route or controller render exists; capacity is exposed in the current Sites index and unified Site profile.",
+      "closest_ownership_anchors": [
+        "routes/assets.php:34-35",
+        "app/Http/Controllers/Sites/SiteProfileController.php:40",
+        "resources/js/pages/sites/index.tsx:1719",
+        "resources/js/pages/sites/show.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Dead/unreachable"
+    },
+    {
+      "path": "resources/js/pages/system/users/Index.tsx",
+      "classification": "alias/generated/legacy",
+      "evidence": "System UsersController::index renders settings/users/index; create and show have separate current ownership.",
+      "closest_ownership_anchors": [
+        "routes/system.php:64",
+        "app/Http/Controllers/System/UsersController.php:135",
+        "resources/js/pages/settings/users/index.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Duplicate"
+    },
+    {
+      "path": "resources/js/pages/welcome.tsx",
+      "classification": "test/demo/story",
+      "evidence": "Stock Laravel starter content has no importer or backend render; the public root route renders home.",
+      "closest_ownership_anchors": [
+        "routes/web.php:68-69",
+        "resources/js/pages/home.tsx"
+      ],
+      "confidence": "high",
+      "prompt_classification": "Out of product scope"
+    }
+  ],
+  "candidate_class_counts": {
+    "page root": 0,
+    "imported support/component": 0,
+    "test/demo/story": 2,
+    "dead/unreachable candidate": 3,
+    "alias/generated/legacy": 20,
+    "unresolved": 0,
+    "total": 25
+  },
+  "prompt_class_counts_for_25_candidates": {
+    "Redirect/legacy": 10,
+    "Duplicate": 10,
+    "Dead/unreachable": 3,
+    "Out of product scope": 2
+  },
+  "missing_render_target_adjudication": [
+    {
+      "target": "hr/recruitment/jobs",
+      "render_call": "app/Http/Controllers/Hr/RecruitmentJobController.php:95",
+      "classification": "retired_unreachable_render_literal",
+      "route_evidence": "GET /hr/recruitment/jobs is a closure redirect to hr/recruitment/index?tab=requisitions; the controller index is not routed.",
+      "canonical_owner": "app/Http/Controllers/Hr/RecruitmentController.php:65 -> resources/js/pages/hr/recruitment/index.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "hr/recruitment/kits",
+      "render_call": "app/Http/Controllers/Hr/InterviewKitController.php:32",
+      "classification": "retired_unreachable_render_literal",
+      "route_evidence": "GET /hr/recruitment/kits is a closure redirect to hr/recruitment/index?tab=kits; the controller index is not routed.",
+      "canonical_owner": "app/Http/Controllers/Hr/RecruitmentController.php:65 -> resources/js/pages/hr/recruitment/index.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "hr/training/index",
+      "render_call": "app/Http/Controllers/Hr/TrainingDashboardController.php:139",
+      "classification": "retired_unreachable_render_literal",
+      "route_evidence": "No route references TrainingDashboardController; current training URLs use TrainingController::catalog.",
+      "canonical_owner": "app/Http/Controllers/Hr/TrainingController.php:118 -> resources/js/pages/hr/training/catalog.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "operations/timesheets/approvals",
+      "render_call": "app/Http/Controllers/TimesheetController.php:47",
+      "classification": "retired_unreachable_render_literal",
+      "route_evidence": "The GET route redirects to operations/timesheets/index?tab=submitted; TimesheetController::approvals is not routed.",
+      "canonical_owner": "app/Http/Controllers/TimesheetController.php:347 -> resources/js/pages/operations/timesheets/index.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/competencies/index",
+      "render_call": "app/Http/Controllers/Training/CompetencyAssessmentController.php:10",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references CompetencyAssessmentController; current competency routes use HR competency owners.",
+      "canonical_owner": "app/Http/Controllers/Hr/CompetencyController.php:43 -> resources/js/pages/hr/performance/competencies/index.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/competencies/show",
+      "render_call": "app/Http/Controllers/Training/CompetencyAssessmentController.php:11",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references CompetencyAssessmentController::show.",
+      "canonical_owner": "routes/hr.php:950-963 and app/Http/Controllers/Hr/CompetencyController.php",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/inductions/index",
+      "render_call": "app/Http/Controllers/Training/InductionController.php:10",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references InductionController; current induction routes use StaffInductionController.",
+      "canonical_owner": "routes/training.php:87-97 and app/Http/Controllers/Training/StaffInductionController.php",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/inductions/show",
+      "render_call": "app/Http/Controllers/Training/InductionController.php:11",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references InductionController::show; the current staff induction surface redirects to HR onboarding.",
+      "canonical_owner": "app/Http/Controllers/Training/StaffInductionController.php -> hr.onboarding.index",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/records/index",
+      "render_call": "app/Http/Controllers/Training/TrainingRecordController.php:10",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references TrainingRecordController; current record presentation is consolidated under HR training.",
+      "canonical_owner": "app/Http/Controllers/Hr/TrainingController.php:118 -> resources/js/pages/hr/training/catalog.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/records/user",
+      "render_call": "app/Http/Controllers/Training/TrainingRecordController.php:11",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references TrainingRecordController::userRecords.",
+      "canonical_owner": "NOT_EXACTLY_ESTABLISHED; nearest current surface: routes/hr.php:357,1392 -> app/Http/Controllers/Hr/TrainingController.php:118 -> resources/js/pages/hr/training/catalog.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    },
+    {
+      "target": "training/records/show",
+      "render_call": "app/Http/Controllers/Training/TrainingRecordController.php:12",
+      "classification": "unrouted_stub_render_literal",
+      "route_evidence": "No route references TrainingRecordController::show.",
+      "canonical_owner": "NOT_EXACTLY_ESTABLISHED; nearest current surface: routes/hr.php:357,1392 -> app/Http/Controllers/Hr/TrainingController.php:118 -> resources/js/pages/hr/training/catalog.tsx",
+      "file_exists": false,
+      "confidence": "high"
+    }
+  ],
+  "recommended_denominator": {
+    "name": "current static file-backed Inertia page-root denominator",
+    "value": 711,
+    "basis": "All 963 resolver TSX paths are partitioned for static render/import identity: 711 existing literal backend render roots, 227 imported support paths, and none of the 25 unrendered/unimported candidates is a page root. Eleven missing render names occur in retired or unrouted methods and have no page file.",
+    "backend_target_liability_count": 11,
+    "backend_target_liability_credit": 0,
+    "limits": "Committed-source denominator only; final prompt classification of the 711 roots, framework route reachability, browser, build, runtime, deployment, release, and FEATURE-ID mapping remain open."
+  },
+  "root_reconciliation_corrections": [
+    "RUN-010 reported an enumeration of 3,392 JS/TS source files. RUN-011 could not reproduce that number, so it is quarantined and supplies no denominator or completion credit.",
+    "The training/records/user and training/records/show replacement owner was not exactly established; only exact nearest-current-surface anchors are retained.",
+    "Internal candidate classes are supplemented by the governing prompt taxonomy. This wave does not classify all 711 roots under that taxonomy."
+  ],
+  "execution_credit": {
+    "application_runtime": 0,
+    "tests": 0,
+    "build": 0,
+    "database": 0,
+    "network": 0,
+    "browser": 0
+  },
+  "evidence_count": 36,
+  "evidence_count_semantics": "25 candidate adjudications plus 11 missing-render-target adjudications",
+  "completion_test_met": true,
+  "wrote_files": false
+}

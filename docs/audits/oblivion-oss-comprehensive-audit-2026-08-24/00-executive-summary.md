@@ -47,7 +47,7 @@ The direct old-tree/current-tree change set is 2,372 additions, 2,991 modificati
 Three formal read-only assignments returned and reported no file writes. The orchestrator reconciled their current-source evidence into a partial semantic census and a grouped capability-discovery register:
 
 - 3,217 static route declaration callsites across the 38 route files. This is a source locator, not a framework/provider runtime-route denominator.
-- 963 non-test TSX files in the current Inertia resolver: 711 matched backend render roots, 227 unrendered imported paths, and 25 unrendered/unimported paths. The 25 require manual adjudication before a page denominator can be frozen.
+- 963 non-test TSX files in the current Inertia resolver: 711 matched backend render roots, 227 unrendered imported paths, and 25 unrendered/unimported paths. That first partition required the RUN-010 manual adjudication recorded below before a source denominator could be accepted.
 - 62 grouped capability candidates across Clients, Care & Clinical, eMAR, Incidents & Safeguarding, HR, Workforce, Frontline Workspaces, and Operations: 54 H, eight D, and zero M candidates. This is not the final canonical feature denominator.
 - Three provisional eMAR P1 source claims—`MED-RBAC-01`, `MED-CD-SCOPE-01`, and `MED-CD-ATOMICITY-01`—require independent current-source review and the matching role/Site, runtime, failure, or concurrency gates before they can become final findings.
 
@@ -63,13 +63,23 @@ Nine additional P1 source claims were retained provisionally, bringing the curre
 
 ## First current benchmark wave
 
-Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles. That brings the fresh run to nine reconciled formal assignments. It exceeds the prompt's numerical minimum of eight, but the planned current-run universe of 11, fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
+Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles, bringing the fresh run to nine reconciled formal assignments at that stage. RUN-010 and the corrected independent RUN-011 page reconciliation below bring the current total to 11. The prompt's numerical minimum of eight and the planned current-run target of 11 are met, but fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
 
 The historical project register remains 98 physical rows: 97 projects in the prompt denominator plus supplemental `frappe/frappe`. All 98 rows passed committed-local structural checks, but zero of the 97 prompt projects was refreshed against current upstream activity, ref reachability, licence, edition boundary, or behaviour on 24 August 2026. The historical rows are provenance, not current project-triage credit.
 
 RUN-007 returned 30 provisional observer relations across 29 of the 172 grouped candidates. RUN-008 challenged 15 samples—five semantic/UI collisions failed, five retained only a partial neutral requirement, and five survived a narrow static requirement—and identified nine collision/composite groups. RUN-009 completed eight high-risk comparison packets: zero copied-baseline classifications, two stronger-native-control observations, four Oblivion-specific gaps, and two domains with no credible comparison at the packet level.
 
 None of those slices selects a final current benchmark or establishes a feature-level `No credible match`. The candidate denominator is not frozen, current upstream evidence is absent, and zero current mappings are promoted. No runtime, application-browser, test, compliance, remediation, or completion credit follows.
+
+## Static Inertia page adjudication
+
+RUN-010 reproduced the 963-path resolver partition and classified every one of the 25 previously unrendered/unimported TSX candidates: 20 are alias/generated/legacy paths superseded by canonical routes or surfaces, three are dead/unreachable candidates, two are debug/starter demo paths, and zero is a current page root. It separately reconciled all 11 backend render literals with no matching file: four occur in retired unreachable methods and seven in unrouted stubs.
+
+The accepted **committed-source file-backed Inertia page-root denominator is 711**. Of the 252 non-roots, 227 are imported support/components and 25 are the adjudicated candidates. All 963 resolver TSX paths are partitioned for static render/import identity, and the 25-candidate sublane has no unresolved row. The 11 missing render literals remain backend liabilities with zero page or runtime credit. Final prompt classification of the 711 roots and reachability remain open.
+
+An independent reconciliation could not reproduce RUN-010's reported global enumeration of 3,392 JS/TS source files, so that count is quarantined and supports no denominator or credit. Two training-record stubs also retain exact nearest-current-surface anchors without claiming an established replacement owner.
+
+RUN-011 initially returned NO-GO on five bounded evidence defects, including the unreproduced source count and over-broad wording. After correction, the same independent no-write reviewer returned GO across 54 checks. This closes only the bounded static file identity question and brings the fresh run to 11 reconciled formal no-write assignments. Framework-expanded route reachability, build resolution, route/page-to-feature mapping, signed-in application observation, deployment identity, and release behavior remain unproved; no runtime, build, test, database, network, or application-browser work occurred.
 
 ## Current official New Zealand source baseline
 
@@ -86,7 +96,9 @@ The official HISO PDF asset was identified, but direct retrieval returned 403, s
 - `evidence/source/current-feature-discovery-wave-01.json`: the 62 grouped source-discovery candidates and provisional finding register.
 - `evidence/source/formal-source-wave-01-agent-register.json`: normalized RUN-001 through RUN-003 returns, no-write attestations, and orchestrator reconciliation.
 - `evidence/source/current-feature-discovery-wave-02.json`: 110 additional grouped source-discovery candidates and nine provisional finding rows.
-- `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the cumulative 6/11 formal-assignment state.
+- `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the six-assignment snapshot toward the planned target of 11.
+- `evidence/source/current-page-adjudication-wave-01.json`: all 25 page/support candidates, all 11 missing render targets, exact classifications and ownership anchors, and the bounded 711-page source denominator.
+- `evidence/source/current-page-agent-register.json`: normalized RUN-010 and corrected RUN-011 returns, no-write attestations, initial NO-GO traceability, replacement GO, and the cumulative 11-assignment state.
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and zero-credit evidence.
 - `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
@@ -99,13 +111,14 @@ The official HISO PDF asset was identified, but direct retrieval returned 403, s
 - `generators/integrate-source-wave-01.py`: deterministic normalization for the first formal semantic/source wave and dashboard.
 - `generators/integrate-source-wave-02.py`: deterministic normalization for the second formal source wave.
 - `generators/integrate-benchmark-wave-01.py`: deterministic normalization for the first current benchmark wave and interim required CSVs.
+- `generators/integrate-page-adjudication-wave-01.py`: deterministic normalization for the RUN-010 page/support and missing-render adjudication.
 - `generators/build-current-audit-dashboard.py`: aggregate dashboard builder over the normalized current evidence.
 
 The collector was rerun twice with identical output hashes. It did not boot Laravel, access a database, run tests or a build, use a browser, or mutate an external system.
 
 ## Immediate work order
 
-1. Finish manual page/support adjudication, framework-route evidence, and canonical backend/data/test ownership; the current semantic wave is partial.
+1. Preserve the 711-file static page-root denominator and finish framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership; the semantic/runtime graph remains partial.
 2. Continue module discovery and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, visual states, and all eight pass ledgers.
 4. Refresh all 97 prompt projects from official upstream evidence and finish one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen; the first A/B/C evidence wave grants zero mapping credit.
