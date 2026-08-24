@@ -53,6 +53,14 @@ Three formal read-only assignments returned and reported no file writes. The orc
 
 Static backend, migration, test, and page-visual locators were also reconciled. Their directory, declaration, history, and callsite scopes remain deliberately separate and receive no execution or completion credit.
 
+## Second formal source wave
+
+RUN-004 through RUN-006 also returned read-only and reported no file writes. They add 110 grouped candidates across Finance, Governance, Health & Safety, Privacy, Safeguarding, Complaints & Feedback, Sites & Locations, Fleet & Assets, Security Devices, IT & Support, Integrations, Control Room, and Public & Settings Platform: 91 H, 18 D, and one bounded-negative M candidate.
+
+The two discovery waves now contain 172 unique grouped rows: 145 H, 26 D, and one M. This remains a partial discovery register, not a frozen feature denominator. The protected-disclosure M row records that no dedicated owner was found in the bounded static search; it is not proof that no external or undocumented process exists.
+
+Nine additional P1 source claims were retained provisionally, bringing the current provisional register to 12. The new claims cover governance meeting/resolution visibility, board-pack distribution, quorum/decision snapshots, H&S register Site scope, privacy report permission separation, safeguarding intake provenance, safeguarding alert identity and projection durability, and outbound webhook destination safety. None is a final finding, verified exploit, remediated issue, or closed gate.
+
 ## Evidence created in this batch
 
 - `inventory.json`: the full current committed-file census, including Git object IDs, byte sizes, and conservative path categories.
@@ -61,10 +69,15 @@ Static backend, migration, test, and page-visual locators were also reconciled. 
 - `evidence/source/current-static-semantic-census.json`: route, page, backend, async, migration, test, and bounded page-visual source locators with explicit denominator limits.
 - `evidence/source/current-feature-discovery-wave-01.json`: the 62 grouped source-discovery candidates and provisional finding register.
 - `evidence/source/formal-source-wave-01-agent-register.json`: normalized RUN-001 through RUN-003 returns, no-write attestations, and orchestrator reconciliation.
+- `evidence/source/current-feature-discovery-wave-02.json`: 110 additional grouped source-discovery candidates and nine provisional finding rows.
+- `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the cumulative 6/11 formal-assignment state.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
+- `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
 - `generators/build-current-source-census.py`: the deterministic static collector. It reads committed Git objects and writes only inside this audit directory.
 - `generators/integrate-source-wave-01.py`: deterministic normalization for the first formal semantic/source wave and dashboard.
+- `generators/integrate-source-wave-02.py`: deterministic normalization for the second formal source wave.
+- `generators/build-current-audit-dashboard.py`: aggregate dashboard builder over the normalized current evidence.
 
 The collector was rerun twice with identical output hashes. It did not boot Laravel, access a database, run tests or a build, use a browser, or mutate an external system.
 

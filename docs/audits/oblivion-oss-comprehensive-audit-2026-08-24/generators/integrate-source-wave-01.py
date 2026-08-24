@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
 from collections import Counter
 from pathlib import Path
 from string import Template
@@ -589,6 +590,9 @@ def main() -> None:
         "audit-dashboard.html",
         DASHBOARD_TEMPLATE.substitute(application_short=APPLICATION_COMMIT[:12], generated_at=GENERATED_AT),
     )
+    dashboard_builder = Path(__file__).with_name("build-current-audit-dashboard.py")
+    if dashboard_builder.exists():
+        runpy.run_path(str(dashboard_builder), run_name="__main__")
 
 
 if __name__ == "__main__":

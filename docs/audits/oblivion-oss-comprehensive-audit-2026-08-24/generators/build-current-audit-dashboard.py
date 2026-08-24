@@ -1,4 +1,60 @@
-<!doctype html>
+#!/usr/bin/env python3
+"""Build the current audit progress dashboard from normalized evidence JSON."""
+
+from __future__ import annotations
+
+import html
+import json
+from pathlib import Path
+from string import Template
+
+
+AUDIT_DIR = Path(__file__).resolve().parents[1]
+GENERATED_AT = "2026-08-24T16:20:11+12:00"
+
+
+def read_json(relative: str) -> dict:
+    return json.loads((AUDIT_DIR / relative).read_text(encoding="utf-8"))
+
+
+wave1 = read_json("evidence/source/current-feature-discovery-wave-01.json")
+wave2 = read_json("evidence/source/current-feature-discovery-wave-02.json")
+semantic = read_json("evidence/source/current-static-semantic-census.json")
+agents = read_json("evidence/source/formal-source-wave-02-agent-register.json")
+
+candidates = wave1["candidates"] + wave2["candidates"]
+candidate_ids = [row["candidate_id"] for row in candidates]
+assert len(candidates) == 172
+assert len(set(candidate_ids)) == 172
+
+class_counts = {key: sum(1 for row in candidates if row["feature_class"] == key) for key in ("H", "D", "M")}
+assert class_counts == {"H": 145, "D": 26, "M": 1}
+
+module_labels = sorted({row["module"] for row in candidates})
+findings = wave1["provisional_findings"] + wave2["provisional_findings"]
+assert len(findings) == 12
+
+finding_rows = "".join(
+    "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">independent review pending</td></tr>".format(
+        html.escape(row["finding_id"]),
+        html.escape(row["source_claim"]),
+    )
+    for row in findings
+)
+
+module_rows = "".join(
+    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+        html.escape(module),
+        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "H"),
+        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "D"),
+        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "M"),
+        sum(1 for row in candidates if row["module"] == module),
+    )
+    for module in module_labels
+)
+
+
+TEMPLATE = Template(r"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -14,21 +70,41 @@
   </style>
 </head>
 <body>
-  <header><div class="eyebrow">Oblivion Findings · comprehensive audit restart</div><div class="hero"><div><h1>Fresh current-source audit</h1><p>Evidence is pinned to application commit <span class="mono">a0493442b9e3</span>. Historical percentages remain provenance only.</p></div><div class="badge">IN PROGRESS · NOT COMPREHENSIVE</div></div></header>
+  <header><div class="eyebrow">Oblivion Findings · comprehensive audit restart</div><div class="hero"><div><h1>Fresh current-source audit</h1><p>Evidence is pinned to application commit <span class="mono">$application_short</span>. Historical percentages remain provenance only.</p></div><div class="badge">IN PROGRESS · NOT COMPREHENSIVE</div></div></header>
   <nav aria-label="Audit sections"><div><a href="#progress">Progress</a><a href="#pages">Pages</a><a href="#modules">Modules</a><a href="#findings">Provisional findings</a><a href="#gaps">Gaps</a></div></nav>
   <main>
     <div class="notice" role="status"><strong>No completion claim:</strong> 172 grouped rows are discovery candidates, not a frozen feature denominator. Runtime routes, tests, benchmark credit, task/ease scores, journeys, visual states, and all-pass modules remain zero or unestablished.</div>
     <section id="progress" class="cards" aria-label="Current audit progress">
-      <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div><div class="card"><strong>3,217</strong><span>static route callsites</span><small>not runtime routes</small></div><div class="card"><strong>963</strong><span>resolver TSX paths</span><small>page denominator open</small></div><div class="card"><strong>172</strong><span>grouped candidates</span><small>145 H · 26 D · 1 M</small></div>
-      <div class="card"><strong>6 / 11</strong><span>formal assignments</span><small>minimum not met</small></div><div class="card"><strong class="partial">12</strong><span>provisional P1 claims</span><small>none final</small></div><div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>not executed</small></div><div class="card"><strong class="zero">0</strong><span>all-pass modules</span><small>denominator still open</small></div>
+      <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div><div class="card"><strong>$route_calls</strong><span>static route callsites</span><small>not runtime routes</small></div><div class="card"><strong>$resolver_count</strong><span>resolver TSX paths</span><small>page denominator open</small></div><div class="card"><strong>$candidate_count</strong><span>grouped candidates</span><small>$h_count H · $d_count D · $m_count M</small></div>
+      <div class="card"><strong>$assignment_count / 11</strong><span>formal assignments</span><small>minimum not met</small></div><div class="card"><strong class="partial">$finding_count</strong><span>provisional P1 claims</span><small>none final</small></div><div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>not executed</small></div><div class="card"><strong class="zero">0</strong><span>all-pass modules</span><small>denominator still open</small></div>
     </section>
     <section id="pages" class="panel"><h2>Current Inertia page partition</h2><p>The resolver partition is exact source evidence; the 25 unimported candidates still need manual adjudication.</p><div class="table-wrap"><table><thead><tr><th>Partition</th><th>Count</th><th>Credit</th></tr></thead><tbody><tr><td>Matched backend render roots</td><td>711</td><td class="partial">source locator</td></tr><tr><td>Unrendered but imported</td><td>227</td><td class="partial">ownership classification pending</td></tr><tr><td>Unrendered and unimported</td><td>25</td><td class="partial">manual adjudication pending</td></tr><tr><td><strong>Resolver total</strong></td><td><strong>963</strong></td><td class="zero">not a final denominator</td></tr></tbody></table></div></section>
     <div class="split"><section class="panel"><h2>Formal source waves</h2><p>All six assignments returned and reported no file writes.</p><ul class="list"><li>RUN-001: semantic route/page/backend/data/test census</li><li>RUN-002–003: 62 grouped candidates</li><li>RUN-004: Finance and Governance — 33 candidates</li><li>RUN-005: H&amp;S, Privacy, Safeguarding, Complaints — 36 candidates</li><li>RUN-006: Site/Fleet/Devices/IT/Integrations/Control Room/Settings — 41 candidates</li></ul></section><section class="panel"><h2>Execution credit</h2><p>Static evidence is not runtime evidence.</p><ul class="list"><li><span class="zero">0</span> framework route executions</li><li><span class="zero">0</span> current application tests</li><li><span class="zero">0</span> current-build browser routes</li><li><span class="zero">0</span> benchmark mappings promoted</li><li><span class="zero">0</span> completed Pass 1–8 modules</li></ul></section></div>
-    <section id="modules" class="panel"><h2>Current discovery labels</h2><p>21 module labels across two partial waves. Conceptual overlaps still need collision and ownership adjudication.</p><div class="table-wrap"><table><thead><tr><th>Module label</th><th>H</th><th>D</th><th>M</th><th>Total</th></tr></thead><tbody><tr><td>Care &amp; Clinical</td><td>7</td><td>1</td><td>0</td><td>8</td></tr><tr><td>Clients</td><td>7</td><td>1</td><td>0</td><td>8</td></tr><tr><td>Complaints &amp; Feedback</td><td>3</td><td>0</td><td>1</td><td>4</td></tr><tr><td>Control Room</td><td>5</td><td>1</td><td>0</td><td>6</td></tr><tr><td>Finance</td><td>12</td><td>2</td><td>0</td><td>14</td></tr><tr><td>Fleet &amp; Assets</td><td>7</td><td>1</td><td>0</td><td>8</td></tr><tr><td>Frontline Workspaces</td><td>5</td><td>0</td><td>0</td><td>5</td></tr><tr><td>Governance</td><td>16</td><td>3</td><td>0</td><td>19</td></tr><tr><td>HR</td><td>8</td><td>1</td><td>0</td><td>9</td></tr><tr><td>Health &amp; Safety</td><td>16</td><td>1</td><td>0</td><td>17</td></tr><tr><td>IT &amp; Support</td><td>4</td><td>1</td><td>0</td><td>5</td></tr><tr><td>Incidents &amp; Safeguarding</td><td>5</td><td>2</td><td>0</td><td>7</td></tr><tr><td>Integrations</td><td>0</td><td>3</td><td>0</td><td>3</td></tr><tr><td>Operations</td><td>6</td><td>1</td><td>0</td><td>7</td></tr><tr><td>Privacy</td><td>6</td><td>3</td><td>0</td><td>9</td></tr><tr><td>Public &amp; Settings Platform</td><td>4</td><td>1</td><td>0</td><td>5</td></tr><tr><td>Safeguarding</td><td>6</td><td>0</td><td>0</td><td>6</td></tr><tr><td>Security Devices</td><td>7</td><td>1</td><td>0</td><td>8</td></tr><tr><td>Sites &amp; Locations</td><td>5</td><td>1</td><td>0</td><td>6</td></tr><tr><td>Workforce</td><td>8</td><td>0</td><td>0</td><td>8</td></tr><tr><td>eMAR</td><td>8</td><td>2</td><td>0</td><td>10</td></tr></tbody></table></div></section>
-    <section id="findings" class="panel"><h2>Provisional current-source P1 claims</h2><p>None is a final finding, verified exploit, remediated issue, or closed gate.</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Static concern</th><th>Status</th></tr></thead><tbody><tr><td class="mono">MED-RBAC-01</td><td>Broad medications.orders.manage routing appears to reach controlled-drug, destruction, and stock operations even though dedicated controlled capabilities exist; cited controller methods do not visibly enforce the exact controlled action capability.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">MED-CD-SCOPE-01</td><td>Controlled-drug and destruction paths appear to accept independently supplied client, medication, Site, or witness identifiers without consistently routing every relationship through the canonical medication scope decision service before disclosure or mutation.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">MED-CD-ATOMICITY-01</td><td>Controlled-drug entry and stock update appear not to share one encompassing transaction with owner-first locking; destruction relationship checks appear later than the first mutation boundary.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">GOV-EXECUTIVE-VISIBILITY-01</td><td>Meeting and resolution index, calendar, and direct reads do not visibly enforce executive-session or committee visibility for broad governance viewers.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">GOV-BOARD-PACK-VISIBILITY-01</td><td>Board-pack list, show, manifest, attachment metadata, and read tracking appear broader than the explicit recipient distribution boundary.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">GOV-RESOLUTION-QUORUM-01</td><td>Resolution eligibility, conflicts, quorum, final vote, and close outcome are not visibly bound to one canonical locked decision snapshot.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">HS-REGISTER-SITE-SCOPE-01</td><td>First aid, worker participation, hazardous substances, emergency drills, and PPE appear to use optional Site filters rather than approved-Site scope on all list, picker, direct-object, and write paths.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">PRIV-REPORT-DOMAIN-RBAC-01</td><td>Privacy reports appear to expose breach, retention, legal-hold, and PIA aggregates and exports with privacy.viewRequests rather than their distinct domain permissions.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">SAFE-INTAKE-CANONICAL-SCOPE-01</td><td>Safeguarding intake and update appear to trust submitted Site, person, and incident identifiers without canonical reconciliation before downstream projection.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">SAFE-ALERT-DEDUP-IDENTITY-01</td><td>Control Room alert deduplication appears able to collapse distinct safeguarding concerns because concern identity is not part of the generic deduplication key.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">SAFE-PROJECTION-DURABILITY-01</td><td>Safeguarding intake projections are after-commit catch-and-log operations, while the inspected recovery owner does not visibly include safeguarding sources.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">SET-API-WEBHOOK-DESTINATION-01</td><td>API webhook testing appears to issue server-side POST, HEAD, and GET requests to administrator-supplied URLs without the repository-native public-address and redirect destination policy.</td><td class="partial">independent review pending</td></tr></tbody></table></div></section>
+    <section id="modules" class="panel"><h2>Current discovery labels</h2><p>$module_count module labels across two partial waves. Conceptual overlaps still need collision and ownership adjudication.</p><div class="table-wrap"><table><thead><tr><th>Module label</th><th>H</th><th>D</th><th>M</th><th>Total</th></tr></thead><tbody>$module_rows</tbody></table></div></section>
+    <section id="findings" class="panel"><h2>Provisional current-source P1 claims</h2><p>None is a final finding, verified exploit, remediated issue, or closed gate.</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Static concern</th><th>Status</th></tr></thead><tbody>$finding_rows</tbody></table></div></section>
     <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Runtime route and final page denominators</li><li>Final H/D/M identity and collision adjudication</li><li>Complete backend/data/test ownership</li><li>97-project observer, neutralizer, and comparator evidence</li><li>Task scripts and ten ease dimensions per H feature</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Hero, overlay, trigger, and material-state universes</li><li>Safe current-build browser/runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8, freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
     <section class="panel"><h2>Evidence files</h2><ul class="list"><li><a href="00-executive-summary.md">Executive summary</a></li><li><a href="01-repository-module-map.md">Wave 01 module map</a></li><li><a href="02-repository-module-map-wave-02.md">Wave 02 module map</a></li><li><a href="evidence/source/current-static-semantic-census.json">Semantic census JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-01.json">Feature wave 01 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-02.json">Feature wave 02 JSON</a></li><li><a href="evidence/source/formal-source-wave-02-agent-register.json">Formal wave 02 register</a></li><li><a href="13-unresolved-questions-and-evidence-gaps.md">Unresolved evidence gaps</a></li></ul></section>
-    <p class="footer">Generated deterministically at 2026-08-24T16:20:11+12:00. Audit artifacts only; no application remediation is authorised.</p>
+    <p class="footer">Generated deterministically at $generated_at. Audit artifacts only; no application remediation is authorised.</p>
   </main>
 </body>
 </html>
+""")
+
+
+dashboard = TEMPLATE.substitute(
+    application_short=wave1["source"]["application_commit"][:12],
+    route_calls=f"{semantic['routes']['static_route_declaration_callsites']:,}",
+    resolver_count=f"{semantic['inertia_pages']['resolver_non_test_tsx']:,}",
+    candidate_count=f"{len(candidates):,}",
+    h_count=class_counts["H"],
+    d_count=class_counts["D"],
+    m_count=class_counts["M"],
+    assignment_count=agents["cumulative_formal_assignments_eligible"],
+    finding_count=len(findings),
+    module_count=len(module_labels),
+    module_rows=module_rows,
+    finding_rows=finding_rows,
+    generated_at=GENERATED_AT,
+)
+
+(AUDIT_DIR / "audit-dashboard.html").write_text(dashboard.rstrip() + "\n", encoding="utf-8", newline="\n")

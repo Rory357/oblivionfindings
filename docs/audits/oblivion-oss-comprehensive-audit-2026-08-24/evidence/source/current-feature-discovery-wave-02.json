@@ -1,0 +1,2138 @@
+{
+  "schema_version": 1,
+  "status": "DISCOVERY_WAVE_02_PARTIAL_NOT_CANONICAL",
+  "generated_at": "2026-08-24T16:20:11+12:00",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "5ff93c3719fbc8870d23111f0fc9811b16eec06a",
+    "non_audit_product_diff_from_application_commit": 0
+  },
+  "candidate_count": 110,
+  "class_counts": {
+    "D": 18,
+    "H": 91,
+    "M": 1
+  },
+  "module_counts": {
+    "Complaints & Feedback": 4,
+    "Control Room": 6,
+    "Finance": 14,
+    "Fleet & Assets": 8,
+    "Governance": 19,
+    "Health & Safety": 17,
+    "IT & Support": 5,
+    "Integrations": 3,
+    "Privacy": 9,
+    "Public & Settings Platform": 5,
+    "Safeguarding": 6,
+    "Security Devices": 8,
+    "Sites & Locations": 6
+  },
+  "assignment_counts": {
+    "RUN-004": 33,
+    "RUN-005": 36,
+    "RUN-006": 41
+  },
+  "cumulative_discovery_counts": {
+    "candidate_count": 172,
+    "class_counts": {
+      "H": 145,
+      "D": 26,
+      "M": 1
+    },
+    "rule": "Wave 01 plus Wave 02 grouped rows; still not a frozen canonical feature denominator."
+  },
+  "candidates": [
+    {
+      "ordinal": 1,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-DASHBOARD-INSIGHTS",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Review organisation, Site, and Client financial position and obligations",
+      "canonical_owner": "FinancialInsightsScopeResolver and finance dashboard aggregators",
+      "production_anchors": [
+        "routes/finance.php:69-108"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:128"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 2,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-LEDGER-CHART-PERIODS",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Maintain ledger charts, periods, centres, streams, and currencies",
+      "canonical_owner": "ChartOfAccountsService and ledger administration controllers",
+      "production_anchors": [
+        "routes/finance.php:134-205"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/FinanceChartVerificationTest.php:1"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 3,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-JOURNAL-POST-REVERSE-RECUR",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Draft, post, reverse, and review manual or recurring journals",
+      "canonical_owner": "JournalPostingService and RecurringJournalService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/JournalPostingService.php:21-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/JournalPostingReversalInvariantTest.php:81"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 4,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-AP-VENDOR-PO-BILL-CREDIT",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Manage suppliers, purchase orders, bills, credit notes, and approvals",
+      "canonical_owner": "AccountsPayableService and AP controllers",
+      "production_anchors": [
+        "app/Domain/Finance/Services/AccountsPayableService.php:116-801"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/BillSpendApprovalGateTest.php:156"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 5,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-PAYMENT-RUN-SETTLEMENT",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Prepare, approve, export, settle, and reconcile supplier payment runs",
+      "canonical_owner": "PaymentRunService and PaymentSettlementRecorder",
+      "production_anchors": [
+        "routes/finance.php:304-336"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/BillAndPaymentRunJournalPostingTest.php:184"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 6,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-AR-QUOTE-INVOICE-BILLING",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Manage quotes, billing entries, invoices, statements, and receipts",
+      "canonical_owner": "QuoteLifecycleService and AccountsReceivableService",
+      "production_anchors": [
+        "routes/finance.php:347-415"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/QuoteConversionIntegrityTest.php:92"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 7,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Review allocation history and confirm or reject payment matches",
+      "canonical_owner": "PaymentMatchingService and settlement owners",
+      "production_anchors": [
+        "app/Domain/Finance/Services/PaymentMatchingService.php:300-421"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:360"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 8,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-BANK-FEED-RECON-EFTPOS",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Import bank activity, reconcile statements, and settle EFTPOS batches",
+      "canonical_owner": "BankReconciliationService, BankFeedService, and EftposReconciliationService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/BankReconciliationService.php:34-629"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/BankReconciliationAggregateTest.php:117"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 9,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-GST-IRD-COMPLIANCE",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Prepare, file, and amend GST and IRD obligations",
+      "canonical_owner": "GstReturnService, IrdFilingService, and NzComplianceService",
+      "production_anchors": [
+        "routes/finance.php:530-547"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/IrdFilingCanonicalAccessTest.php:72"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 10,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-FIXED-ASSET-LIFECYCLE",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Register, capitalise, depreciate, and dispose of fixed assets",
+      "canonical_owner": "FixedAssetService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/FixedAssetService.php:26-362"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/FixedAssetDisposalIntegrityTest.php:60"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 11,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-CLIENT-PETTY-DONOR-FUNDS",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Govern Client money, petty cash, and restricted donor funds",
+      "canonical_owner": "ClientFundTransactionService, PettyCashService, and DonorFundService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/ClientFundTransactionService.php:144-304"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/ClientFundGovernanceTest.php:100"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 12,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-BUDGET-ACTUAL-FORECAST",
+      "module": "Finance",
+      "feature_class": "H",
+      "user_job": "Compare budgets to actuals and create cash-flow forecasts",
+      "canonical_owner": "BudgetActualsService, BudgetVarianceService, and CashFlowForecastService",
+      "production_anchors": [
+        "routes/finance.php:628-640"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/BudgetActualsLiveGlTest.php:16"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 13,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-REPORT-AUDIT-EXPORT",
+      "module": "Finance",
+      "feature_class": "D",
+      "user_job": "Produce financial statements, list exports, and encrypted audit packs",
+      "canonical_owner": "FinancialReportService and AuditExportService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/AuditExportService.php:27-146"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/AuditExportSecurityTest.php:8"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 14,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-FIN-ACCOUNTING-SYNC-FX-CONSOLIDATION",
+      "module": "Finance",
+      "feature_class": "D",
+      "user_job": "Configure accounting sync, FX revaluation, and supported consolidation",
+      "canonical_owner": "Accounting providers, FxRevaluationService, ConsolidationService, and IntercompanyService",
+      "production_anchors": [
+        "app/Domain/Finance/Services/AccountingSyncProviders/XeroSyncProvider.php:27-319"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Finance/ConsolidationQuarantineTest.php:17"
+      ],
+      "site_role_privacy_note": "Exact finance action authority remains distinct from approved-Site and Client/object scope. Global finance scope broadens visibility only; it never replaces posting, approval, bank, tax, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 15,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-DASHBOARD-REPORT-EVIDENCE",
+      "module": "Governance",
+      "feature_class": "D",
+      "user_job": "Review board, committee, risk, compliance, and evidence-pack reporting",
+      "canonical_owner": "DashboardAggregatorService, ReportController, and AuditEvidencePackService",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/ReportController.php:27-183"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceReportsTest.php:20"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 16,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Schedule meetings and manage agendas, attendance, minutes, and status",
+      "canonical_owner": "GovernanceMeetingController and governance workflow services",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php:41-152"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceNestedBindingIntegrityTest.php:39"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 17,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Generate, distribute, read, and download board packs",
+      "canonical_owner": "BoardPackBuilderService and BoardPackController",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceBoardPacksTest.php:24"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 18,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Draft resolutions, declare conflicts, vote, enforce quorum, and close outcomes",
+      "canonical_owner": "VotingService and ResolutionController",
+      "production_anchors": [
+        "app/Domain/Governance/Services/VotingService.php:29-187"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceResolutionsTest.php:39"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 19,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-BOARD-MEMBER-INTEREST-EVALUATION",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Administer board membership, interests, and evaluations",
+      "canonical_owner": "Board member, interest, and evaluation controllers",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/BoardEvaluationController.php:14-173"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceBoardMemberSelfServiceTest.php:22"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 20,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-RISK-REGISTER-TREATMENT",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Score risks, add treatments, accept, and close records",
+      "canonical_owner": "RiskRegisterController and RiskScoringService",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/RiskRegisterController.php:31-277"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceRiskRegisterTest.php:23"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 21,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-COMPLIANCE-OBLIGATION-EVIDENCE",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Manage compliance obligations, evidence, and notifiable records",
+      "canonical_owner": "ComplianceController and ComplianceEngineService",
+      "production_anchors": [
+        "app/Domain/Governance/Services/ComplianceEngineService.php:67-203"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceComplianceTest.php:26"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 22,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-POLICY-VERSION-ATTESTATION",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Draft, approve, version, and attest governance policies",
+      "canonical_owner": "GovernancePolicyController and policy",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernancePolicyController.php:15-258"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Governance/GovernancePoliciesTest.php:6"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 23,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Create, progress, block, complete, and escalate governance actions",
+      "canonical_owner": "ActionItemController and GovernanceWorkflowService",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/ActionItemController.php:13-122"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceActionItemsTest.php:20"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 24,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-STRATEGY-PLAN-GOALS",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Create strategic plans, goals, versions, and approvals",
+      "canonical_owner": "StrategicPlanController and policy",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/StrategicPlanController.php:19-167"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceStrategyTest.php:20"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 25,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-BUDGET-ALLOCATIONS-ADJUSTMENTS",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Manage governance budgets, allocations, actuals, and approvals",
+      "canonical_owner": "BudgetController and GovernanceNestedMutationService",
+      "production_anchors": [
+        "app/Domain/Governance/Services/GovernanceNestedMutationService.php:143-406"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceNestedBindingIntegrityTest.php:81"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 26,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-CEO-BOARD-REPORT",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Draft, submit, present, and evidence CEO board reports",
+      "canonical_owner": "CeoBoardReportController and policy",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/CeoBoardReportController.php:18-206"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Governance/GovernanceMiscTest.php:116"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 27,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-SPEND-APPROVAL",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Request, decide, and evidence board or committee spend approval",
+      "canonical_owner": "SpendApprovalCommandService",
+      "production_anchors": [
+        "app/Domain/Governance/Services/SpendApprovalCommandService.php:109-345"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/SpendApprovalAuthorityTest.php:53"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 28,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-PERFORMANCE-REVIEW",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Run board and CEO performance reviews and approvals",
+      "canonical_owner": "PerformanceReviewService and controller",
+      "production_anchors": [
+        "app/Domain/Governance/Services/PerformanceReviewService.php:22-373"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernancePerformanceReviewTest.php:21"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 29,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-DOCUMENT-LIBRARY",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Store, browse, download, and remove governance documents",
+      "canonical_owner": "GovernanceDocumentController and policy",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernanceDocumentController.php:12-112"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Governance/GovernanceMiscTest.php:6"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 30,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-CLINICAL-INDICATOR-SNAPSHOT",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Review clinical governance indicators and record snapshots",
+      "canonical_owner": "ClinicalGovernanceController and automation service",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php:20-88"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/ClinicalGovernanceAutomationTest.php:37"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 31,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-TE-TIRITI-OBLIGATION",
+      "module": "Governance",
+      "feature_class": "H",
+      "user_job": "Record and maintain Te Tiriti governance obligations",
+      "canonical_owner": "TeTiritiController",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/TeTiritiController.php:12-73"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Governance/GovernanceMiscTest.php:146"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 32,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-AUDIT-LOG-EXPORT",
+      "module": "Governance",
+      "feature_class": "D",
+      "user_job": "Review and export cross-module governance audit evidence",
+      "canonical_owner": "GovernanceAuditLogController and GovernanceAuditService",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernanceAuditLogController.php:21-70"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceSpendApprovalsTest.php:231"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 33,
+      "assignment_id": "RUN-004",
+      "candidate_id": "CAP-GOV-SETTINGS-CONTROL",
+      "module": "Governance",
+      "feature_class": "D",
+      "user_job": "Configure governance escalation, spend, and workflow settings",
+      "canonical_owner": "GovernanceSettingController",
+      "production_anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernanceSettingController.php:90-109"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Governance/GovernanceSpendApprovalsTest.php:214"
+      ],
+      "site_role_privacy_note": "Meeting, committee, distribution, voting, conflict, quorum, approval, and document audiences are separate object boundaries even for holders of broad governance view permissions.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 34,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-DASHBOARD-ANALYTICS",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Review Site-scoped safety KPIs, trends, and attention worklists",
+      "canonical_owner": "HealthSafetyDashboardController and analytics services",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/HealthSafetyDashboardController.php:52-67"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HealthSafetyDashboardControllerTest.php:43-84"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 35,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-EVENT-REGISTER-HANDOVER",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Find safety events and accept incident handover",
+      "canonical_owner": "HsEventController and HsEventService",
+      "production_anchors": [
+        "app/Services/HealthSafety/HsEventService.php:269-322"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsHandoverAcceptanceTest.php:37-94"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 36,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Record notifiable decisions, WorkSafe notice, and Site preservation",
+      "canonical_owner": "HsEventService and HsWorksafeDecisionController",
+      "production_anchors": [
+        "app/Services/HealthSafety/HsEventService.php:322-663"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsEventWorksafeTest.php:197-256"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 37,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-INVESTIGATION-ASSURANCE",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Investigate, review, rework, and independently approve completion",
+      "canonical_owner": "HsInvestigationService",
+      "production_anchors": [
+        "app/Services/HealthSafety/HsInvestigationService.php:185-332"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsInvestigationAssuranceTest.php:28-83"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 38,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Create, complete, verify, close, and evidence corrective actions",
+      "canonical_owner": "HsCorrectiveActionService",
+      "production_anchors": [
+        "app/Services/HealthSafety/HsCorrectiveActionService.php:53-592"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsCorrectiveActionEvidenceTest.php:31-99"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 39,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Close safety events or approve narrow independent exceptions",
+      "canonical_owner": "HsEventClosureService",
+      "production_anchors": [
+        "app/Services/HealthSafety/HsEventClosureService.php:251-590"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsEventClosureTest.php:41-128"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 40,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Create, review, activate, supersede, and archive risk assessments",
+      "canonical_owner": "HsRiskAssessmentController and service",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/HsRiskAssessmentController.php:140-313"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsRiskAssessmentSiteAccessTest.php:30-128"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 41,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "module": "Health & Safety",
+      "feature_class": "D",
+      "user_job": "Produce board, WorkSafe, investigation, action, and risk evidence views",
+      "canonical_owner": "HsGovernanceReportController and export services",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/HsGovernanceReportController.php:25-100"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HsGovernanceTest.php:220-315"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 42,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-FIRST-AID-REGISTER",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Record first aid, follow-up, evidence, and linked incidents",
+      "canonical_owner": "FirstAidController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/FirstAidController.php:55-115"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/FirstAidControllerTest.php:84-148"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 43,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-RESTRAINT-REGISTER",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Record restraint, support-plan, review, and linked evidence",
+      "canonical_owner": "RestraintController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/RestraintController.php:448-883"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/RestraintRegisterTest.php:151-238"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 44,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-SAFE-WORK-PROCEDURES",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Draft, approve, acknowledge, version, and archive procedures",
+      "canonical_owner": "SafeWorkProcedureController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php:143-338"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/SafeWorkProcedureTest.php:118-208"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 45,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-WORKER-PARTICIPATION",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Manage representatives, committees, meetings, and consultation evidence",
+      "canonical_owner": "WorkerParticipationController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:63-147"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/WorkerParticipationTest.php:149-254"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 46,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Maintain substances, SDS history, storage, exposure, and escalation",
+      "canonical_owner": "HazardousSubstanceController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/HazardousSubstanceController.php:211-435"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/HazardousSubstanceControllerTest.php:138-220"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 47,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-EMERGENCY-DRILLS",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Schedule, execute, evidence, and review emergency drills",
+      "canonical_owner": "EmergencyDrillController and DrillComplianceService",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/EmergencyDrillController.php:49-170"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/EmergencyDrillTest.php:103-216"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 48,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-WORKPLACE-INJURY-RTW",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Record injury and govern return-to-work plans and capacity",
+      "canonical_owner": "ReturnToWorkController and WorkplaceInjuryJourneyService",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/ReturnToWorkController.php:485-837"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/InjuriesControllerTest.php:150-259"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 49,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-LONE-WORKER-SAFETY",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Monitor lone-worker sessions, check-ins, location, and alerts",
+      "canonical_owner": "LoneWorkerController and LoneWorkerSignalService",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/LoneWorkerController.php:227-778"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/LoneWorkerSiteAccessTest.php:30-158"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 50,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-HS-PPE-REGISTER",
+      "module": "Health & Safety",
+      "feature_class": "H",
+      "user_job": "Manage PPE inventory, allocations, inspection, and disposal evidence",
+      "canonical_owner": "PpeController",
+      "production_anchors": [
+        "app/Http/Controllers/HealthSafety/PpeController.php:37-112"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/HealthSafety/PpeRegisterTest.php:179-267"
+      ],
+      "site_role_privacy_note": "Generic hazards authority must be combined with approved-Site scope and the exact lifecycle action. Health, location, worker, Client, and evidence records require minimum-necessary disclosure.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 51,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-DASHBOARD-WORKLIST",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Review privacy requests, breaches, holds, retention, and deadlines",
+      "canonical_owner": "PrivacyDashboardController",
+      "production_anchors": [
+        "app/Http/Controllers/PrivacyDashboardController.php:35-67"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:1754-1769"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 52,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-DSR-LIFECYCLE",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Intake, verify, assign, extend, complete, or refuse a DSR",
+      "canonical_owner": "DataSubjectRequestLifecycleService",
+      "production_anchors": [
+        "app/Domain/Privacy/Services/DataSubjectRequestLifecycleService.php:74-284"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Privacy/DataSubjectRequestLifecycleTest.php:59-103"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 53,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-DSR-DATA-EXPORT",
+      "module": "Privacy",
+      "feature_class": "D",
+      "user_job": "Produce a governed linked-subject privacy export",
+      "canonical_owner": "DataSubjectRequestController export",
+      "production_anchors": [
+        "app/Http/Controllers/DataSubjectRequestController.php:274-397"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:2574-2655"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 54,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-RETENTION-POLICY-EXECUTION",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Define, preview, approve, execute, and evidence retention",
+      "canonical_owner": "RetentionExecutionService and RetentionOwnerRegistry",
+      "production_anchors": [
+        "app/Domain/Privacy/Retention/RetentionExecutionService.php:30-125"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Privacy/EnforceDataRetentionJobTest.php:65-159"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 55,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-LEGAL-HOLD",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Create, review, and release legal holds",
+      "canonical_owner": "LegalHoldController and retention enforcement",
+      "production_anchors": [
+        "app/Http/Controllers/LegalHoldController.php:17-152"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:1142-1215"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 56,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-BREACH-LIFECYCLE",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Report, investigate, notify, and resolve privacy breaches",
+      "canonical_owner": "DataBreachController",
+      "production_anchors": [
+        "app/Http/Controllers/DataBreachController.php:76-238"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:1014-1028"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 57,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-PIA-LIFECYCLE",
+      "module": "Privacy",
+      "feature_class": "H",
+      "user_job": "Create, assess, review, and approve privacy impact assessments",
+      "canonical_owner": "DPIAController",
+      "production_anchors": [
+        "app/Http/Controllers/DPIAController.php:68-188"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:1280-1372"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 58,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+      "module": "Privacy",
+      "feature_class": "D",
+      "user_job": "Upload, download, and remove private privacy evidence",
+      "canonical_owner": "PrivacyAttachmentController",
+      "production_anchors": [
+        "app/Http/Controllers/PrivacyAttachmentController.php:31-109"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Privacy/PrivacyAttachmentTest.php:44-120"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 59,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "module": "Privacy",
+      "feature_class": "D",
+      "user_job": "View and export cross-domain privacy compliance reports",
+      "canonical_owner": "PrivacyReportController",
+      "production_anchors": [
+        "app/Http/Controllers/PrivacyReportController.php:21-94"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/PrivacyControllerTest.php:1858-1924"
+      ],
+      "site_role_privacy_note": "Privacy permissions are explicit application-wide action authorities, but viewRequests does not silently replace breach, retention, legal-hold, PIA, attachment, or export authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 60,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Raise, assign, and triage a safeguarding concern",
+      "canonical_owner": "SafeguardingConcernController and lifecycle owners",
+      "production_anchors": [
+        "app/Http/Controllers/SafeguardingConcernController.php:213-252"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SafeguardingConcernControllerTest.php:228-301"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 61,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Restrict, preview, request, and decide governed declassification",
+      "canonical_owner": "SafeguardingSensitivityService",
+      "production_anchors": [
+        "app/Services/Safeguarding/SafeguardingSensitivityService.php:35-287"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Safeguarding/SafeguardingSensitivityGovernanceTest.php:113-235"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 62,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-INVESTIGATION-RISK",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Open investigations and record safeguarding risk",
+      "canonical_owner": "Safeguarding investigation and risk controllers",
+      "production_anchors": [
+        "app/Http/Controllers/SafeguardingInvestigationController.php:15-62"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:51-99"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 63,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-EXTERNAL-REPORT",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Record reports to external safeguarding authorities",
+      "canonical_owner": "SafeguardingExternalReportController",
+      "production_anchors": [
+        "app/Http/Controllers/SafeguardingExternalReportController.php:16-62"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:104-120"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 64,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-EVIDENCE-ACTION-PLAN",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Manage need-to-know evidence and protective action plans",
+      "canonical_owner": "Safeguarding attachment and action-plan controllers",
+      "production_anchors": [
+        "app/Http/Controllers/SafeguardingAttachmentController.php:21-75"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Safeguarding/SafeguardingNestedAuthorizationTest.php:94-175"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 65,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-SAFE-TERMINAL-PROJECTION",
+      "module": "Safeguarding",
+      "feature_class": "H",
+      "user_job": "Complete a safeguarding terminal transition across linked owners",
+      "canonical_owner": "SafeguardingTerminalTransitionService",
+      "production_anchors": [
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:45-225"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Safeguarding/SafeguardingTerminalTransitionTest.php:37-168"
+      ],
+      "site_role_privacy_note": "Need-to-know sensitivity, reporter/assignee ownership, exact action capability, approved Site, canonical person/incident provenance, and concealed direct IDs are independent gates.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 66,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+      "module": "Complaints & Feedback",
+      "feature_class": "H",
+      "user_job": "Record and respond to Site complaints or feedback",
+      "canonical_owner": "SiteComplianceController",
+      "production_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php:415-548"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/SiteComplianceWorkflowTest.php:287-359"
+      ],
+      "site_role_privacy_note": "Complaint and feedback records inherit their canonical Site, stay, Client, staff, and confidentiality owners; a generic case or feedback permission is not a whistleblowing control.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 67,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-COMPLAINT-RESPITE-STAY",
+      "module": "Complaints & Feedback",
+      "feature_class": "H",
+      "user_job": "Record respite complaints and HDC escalation state",
+      "canonical_owner": "RespiteStayController and evidence-pack owner",
+      "production_anchors": [
+        "app/Http/Controllers/Respite/RespiteStayController.php:544-574"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Respite/RespiteNzWorkflowCompletionTest.php:319-370"
+      ],
+      "site_role_privacy_note": "Complaint and feedback records inherit their canonical Site, stay, Client, staff, and confidentiality owners; a generic case or feedback permission is not a whistleblowing control.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 68,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-COMPLAINT-HR-CASEWORK",
+      "module": "Complaints & Feedback",
+      "feature_class": "H",
+      "user_job": "Manage confidential grievance and complaint casework",
+      "canonical_owner": "HrCaseController and HrCaseAccessService",
+      "production_anchors": [
+        "app/Http/Controllers/Hr/HrCaseController.php:359-375"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Hr/AuditFixPayrollCasesTest.php:238-257"
+      ],
+      "site_role_privacy_note": "Complaint and feedback records inherit their canonical Site, stay, Client, staff, and confidentiality owners; a generic case or feedback permission is not a whistleblowing control.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 69,
+      "assignment_id": "RUN-005",
+      "candidate_id": "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+      "module": "Complaints & Feedback",
+      "feature_class": "M",
+      "user_job": "Govern confidential protected disclosures and anti-retaliation evidence",
+      "canonical_owner": "No dedicated current-source owner found",
+      "production_anchors": [
+        "app/Http/Controllers/Hr/HrCaseController.php:36-42"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Hr/HrCasesPageContractTest.php:66-129"
+      ],
+      "site_role_privacy_note": "Complaint and feedback records inherit their canonical Site, stay, Client, staff, and confidentiality owners; a generic case or feedback permission is not a whistleblowing control.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 70,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-PROFILE-LIFECYCLE",
+      "module": "Sites & Locations",
+      "feature_class": "H",
+      "user_job": "Create, edit, archive, and restore an operational Site",
+      "canonical_owner": "SiteController, SiteProfileData, and UserSiteAccessService",
+      "production_anchors": [
+        "app/Services/Sites/SiteProfileData.php:30-102"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/SiteProfileAuthorizationTest.php:72-145"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 71,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-CALENDAR-RESOURCE-SCHEDULING",
+      "module": "Sites & Locations",
+      "feature_class": "H",
+      "user_job": "Schedule, approve, and maintain Site events and resources",
+      "canonical_owner": "SiteCalendarController and SiteCalendarService",
+      "production_anchors": [
+        "app/Services/Sites/SiteCalendarService.php:14-179"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/Calendar/SiteCalendarWorkflowTest.php:97-250"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 72,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-PLAN-ROOM-HARDWARE",
+      "module": "Sites & Locations",
+      "feature_class": "H",
+      "user_job": "Maintain Site plans, rooms, zones, hardware, and emergency layout",
+      "canonical_owner": "SiteTypePlanService and SitePhysicalRoomService",
+      "production_anchors": [
+        "app/Services/Sites/SitePhysicalRoomService.php:28-448"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/SitePhysicalRoomBridgeTest.php:48-221"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 73,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-CHECKLIST-HAZARD-COMPLIANCE",
+      "module": "Sites & Locations",
+      "feature_class": "H",
+      "user_job": "Complete Site checklists, hazards, inspections, and compliance evidence",
+      "canonical_owner": "SiteChecklistRunExecutionService and compliance owners",
+      "production_anchors": [
+        "app/Services/Sites/SiteChecklistRunExecutionService.php:37-200"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Checklists/ChecklistRunOwnershipTest.php:231-448"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 74,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-VAULT-VENDOR-LEDGER",
+      "module": "Sites & Locations",
+      "feature_class": "H",
+      "user_job": "Manage Site vendors, credentials, contacts, and ledger entries",
+      "canonical_owner": "SiteCredentialController and HouseLedgerService",
+      "production_anchors": [
+        "app/Http/Controllers/Sites/SiteCredentialController.php:38-469"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/SiteAccessVaultCanonicalAccessTest.php:63-166"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 75,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SITE-REPORTING-EXPORT",
+      "module": "Sites & Locations",
+      "feature_class": "D",
+      "user_job": "Review and export Site, facility, checklist, and vendor reports",
+      "canonical_owner": "SiteReportingController",
+      "production_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php:153-432"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SitesModuleIntegrationTest.php:435"
+      ],
+      "site_role_privacy_note": "Every Site object, picker, count, download, and mutation requires exact action authority plus approved-Site scope and canonical parent binding.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 76,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-ASSET-VEHICLE-REGISTER",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Maintain asset and vehicle registers with custody provenance",
+      "canonical_owner": "Asset and Vehicle controllers with AssetMutationIntegrityService",
+      "production_anchors": [
+        "app/Services/Assets/AssetMutationIntegrityService.php:14-61"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/AssetMutationBoundaryTest.php:49-342"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 77,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-VEHICLE-BOOKING",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Book, approve, check out, return, reject, or cancel a vehicle",
+      "canonical_owner": "VehicleBookingController and VehicleBookingAccessService",
+      "production_anchors": [
+        "app/Services/Fleet/VehicleBookingAccessService.php:30-127"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/VehicleBookingSitePrivacyTest.php:139-353"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 78,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-MAINTENANCE-COMPLIANCE",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Run checks, inspections, maintenance, and work orders",
+      "canonical_owner": "WorkOrderController and fleet maintenance owners",
+      "production_anchors": [
+        "app/Http/Controllers/FleetAssets/WorkOrderController.php:170-248"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/FleetMaintenanceWiringTest.php:39-113"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 79,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-KEY-HANDOVER",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Transfer keys and create, accept, or dispute handover",
+      "canonical_owner": "KeyController and HandoverController",
+      "production_anchors": [
+        "app/Http/Controllers/FleetAssets/HandoverController.php:195-506"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/FleetHandoverMutationIntegrityTest.php:36-124"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 80,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-RESIDENT-TRANSPORT",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Run resident transport and govern medication custody in transit",
+      "canonical_owner": "ResidentTransportJourneyService and scope",
+      "production_anchors": [
+        "app/Services/Fleet/ResidentTransportJourneyService.php:47-431"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/ResidentTransportJourneySecurityTest.php:146-832"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 81,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-TRACKING-GEOFENCE-REALTIME",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "View consented resident tracking, geofences, and panic state",
+      "canonical_owner": "ResidentTrackingController and realtime authorization owners",
+      "production_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:575-986"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/FleetRealtimePrivacyTest.php:40-154"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 82,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-INCIDENT-OUTING-MILEAGE",
+      "module": "Fleet & Assets",
+      "feature_class": "H",
+      "user_job": "Record fleet incidents, outings, return, and mileage outcomes",
+      "canonical_owner": "Fleet incident, outing, and mileage controllers",
+      "production_anchors": [
+        "routes/fleet-assets.php:274-330"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/FleetAssets/FleetIncidentTest.php:55-140"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 83,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-FLEET-REPORTING-EXPORT",
+      "module": "Fleet & Assets",
+      "feature_class": "D",
+      "user_job": "Review and export fleet trips, maintenance, cost, and access reports",
+      "canonical_owner": "FleetAssets ReportController",
+      "production_anchors": [
+        "app/Http/Controllers/FleetAssets/ReportController.php:24-648"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/FleetAssets/FleetReportPeriodTest.php:19-46"
+      ],
+      "site_role_privacy_note": "Global Site scope broadens visibility only; asset, vehicle, booking, custody, Client, driver, witness, and transport relationships retain exact action and canonical ownership checks.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 84,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Register, assign, release, link, and decommission devices",
+      "canonical_owner": "DeviceRegistryService and SecurityDevicesAccessService",
+      "production_anchors": [
+        "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:35-1272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SecurityDevices/DeviceCustodyAuthorizationTest.php:33-137"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 85,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-GROUP-TOPOLOGY",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Build device groups, rules, links, and topology",
+      "canonical_owner": "DeviceGroupController and relationship services",
+      "production_anchors": [
+        "app/Domain/SecurityDevices/Services/DeviceGroupAutoRuleService.php:50-214"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SecurityDevices/DeviceGroupControllerTest.php:110-160"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 86,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-GOVERNED-COMMAND",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Request, approve, dispatch, and reconcile device commands",
+      "canonical_owner": "DeviceManagementAuthorizationService and GovernedCommandDispatchService",
+      "production_anchors": [
+        "app/Domain/SecurityDevices/Management/Services/GovernedCommandDispatchService.php:48-508"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SecurityDevices/DeviceManagementAuthorizationTest.php:65-266"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 87,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-ACCESS-CONTROL",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Version access schedules and issue or revoke credentials",
+      "canonical_owner": "AccessControlLifecycleService",
+      "production_anchors": [
+        "app/Domain/SecurityDevices/AccessControl/Services/AccessControlLifecycleService.php:26-378"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SecurityDevices/AccessControlWorkflowTest.php:144-451"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 88,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-MONITORING-POLICY",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Author monitors, coverage, maintenance, and retention policies",
+      "canonical_owner": "NativeMonitoringDefinitionService and monitoring policy owners",
+      "production_anchors": [
+        "app/Domain/Monitoring/Services/NativeMonitoringDefinitionService.php:86-282"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Monitoring/MonitoringPolicyAuthoringServiceTest.php:27-312"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 89,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-DISCOVERY-COLLECTOR",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Define discovery scope and govern Site-scoped collectors",
+      "canonical_owner": "Discovery services and MonitoringCollectorLifecycleController",
+      "production_anchors": [
+        "app/Domain/Monitoring/Services/NativeMonitoringDefinitionService.php:240-282"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Monitoring/DiscoveryRunTest.php:135-482"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 90,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-PROVIDER-INTEGRATIONS",
+      "module": "Security Devices",
+      "feature_class": "H",
+      "user_job": "Configure UniFi, Queclink, and Milesight provider workflows",
+      "canonical_owner": "Integration controllers and IntegrationSecretManager",
+      "production_anchors": [
+        "app/Services/Integration/IntegrationSecretManager.php:41-600"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Integrations/UnifiTransportSecurityTest.php:51-166"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 91,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SEC-REPORTING-EXPORT",
+      "module": "Security Devices",
+      "feature_class": "D",
+      "user_job": "Export visible device, event, and maintenance registers",
+      "canonical_owner": "SecurityDevices ReportsController",
+      "production_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php:65-237"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/SecurityDevices/ReportsExportTest.php:47-190"
+      ],
+      "site_role_privacy_note": "Device visibility follows approved Site and current or historical custody. Command, telemetry, access, provider, and report permissions remain action-specific and privacy-sensitive.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 92,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-IT-SELF-SERVICE-TICKET-KB",
+      "module": "IT & Support",
+      "feature_class": "H",
+      "user_job": "Raise and track owned support work and use published knowledge",
+      "canonical_owner": "ItTicketController, ItWorkAccessService, and policy",
+      "production_anchors": [
+        "app/Domain/It/Services/ItWorkAccessService.php:78-356"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/It/ItTicketAuthzTest.php:37-172"
+      ],
+      "site_role_privacy_note": "Self-service ownership and agent action authority remain distinct. Child work, attachments, queues, teams, linked records, and reports inherit canonical Site and parent visibility.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 93,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "module": "IT & Support",
+      "feature_class": "H",
+      "user_job": "Triage, assign, merge, approve, and complete authorised IT work",
+      "canonical_owner": "ItTicketTriageService and work-task services",
+      "production_anchors": [
+        "app/Domain/It/Services/ItTicketTriageService.php:51-397"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/It/ItWorkAccessControllerTest.php:113-409"
+      ],
+      "site_role_privacy_note": "Self-service ownership and agent action authority remain distinct. Child work, attachments, queues, teams, linked records, and reports inherit canonical Site and parent visibility.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 94,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-IT-PROVISIONING-LIFECYCLE",
+      "module": "IT & Support",
+      "feature_class": "H",
+      "user_job": "Create, approve, fulfil, fail, or cancel provisioning requests",
+      "canonical_owner": "ItProvisioningRequestLifecycleService",
+      "production_anchors": [
+        "app/Domain/It/Services/ItProvisioningRequestLifecycleService.php:32-392"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/It/ItProvisioningTest.php:150-248"
+      ],
+      "site_role_privacy_note": "Self-service ownership and agent action authority remain distinct. Child work, attachments, queues, teams, linked records, and reports inherit canonical Site and parent visibility.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 95,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-IT-CHANGE-PROBLEM-MAJOR-INCIDENT",
+      "module": "IT & Support",
+      "feature_class": "H",
+      "user_job": "Manage service setup, changes, problems, and major incidents",
+      "canonical_owner": "IT service, change, problem, and major-incident services",
+      "production_anchors": [
+        "app/Domain/It/Services/ItMajorIncidentService.php:33-397"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/It/ItWorkAccessControllerTest.php:441-477"
+      ],
+      "site_role_privacy_note": "Self-service ownership and agent action authority remain distinct. Child work, attachments, queues, teams, linked records, and reports inherit canonical Site and parent visibility.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 96,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-IT-REPORTING-EXPORT",
+      "module": "IT & Support",
+      "feature_class": "D",
+      "user_job": "Review and export scoped IT and reliability reports",
+      "canonical_owner": "ItReportsController",
+      "production_anchors": [
+        "app/Http/Controllers/It/ItReportsController.php:40-712"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/It/ItReportsTest.php:93-266"
+      ],
+      "site_role_privacy_note": "Self-service ownership and agent action authority remain distinct. Child work, attachments, queues, teams, linked records, and reports inherit canonical Site and parent visibility.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 97,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+      "module": "Integrations",
+      "feature_class": "D",
+      "user_job": "Receive signed provider events and project them idempotently",
+      "canonical_owner": "WebhookReceiverController and provider binding/projector services",
+      "production_anchors": [
+        "app/Http/Controllers/Api/WebhookReceiverController.php:41-222"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Integrations/WebhookReceiverTest.php:51-298"
+      ],
+      "site_role_privacy_note": "Inbound signatures and canonical provider bindings and outbound destination safety are distinct controls. An integrations permission does not authorize arbitrary network traversal.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 98,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-INT-SITE-PROVIDER-SYNC-SECRETS",
+      "module": "Integrations",
+      "feature_class": "D",
+      "user_job": "Configure Site provider connections, secrets, mappings, and sync",
+      "canonical_owner": "SiteIntegrationController and IntegrationSecretManager",
+      "production_anchors": [
+        "app/Http/Controllers/Sites/SiteIntegrationController.php:94-603"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Sites/SiteIntegrationMutationSafetyTest.php:74-189"
+      ],
+      "site_role_privacy_note": "Inbound signatures and canonical provider bindings and outbound destination safety are distinct controls. An integrations permission does not authorize arbitrary network traversal.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 99,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-INT-ADMIN-CONNECTIONS",
+      "module": "Integrations",
+      "feature_class": "D",
+      "user_job": "Manage API keys, outbound webhooks, calendars, and mailboxes",
+      "canonical_owner": "ApiSettingsController and integration settings owners",
+      "production_anchors": [
+        "routes/settings.php:201-219"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Settings/ApiSettingsInteractionTest.php:22-116"
+      ],
+      "site_role_privacy_note": "Inbound signatures and canonical provider bindings and outbound destination safety are distinct controls. An integrations permission does not authorize arbitrary network traversal.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 100,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+      "module": "Control Room",
+      "feature_class": "H",
+      "user_job": "Inspect, acknowledge, triage, resolve, close, or reopen alerts",
+      "canonical_owner": "ControlRoomAlertAccessService and lifecycle service",
+      "production_anchors": [
+        "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:45-777"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomAlertViewScopeTest.php:29-188"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 101,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+      "module": "Control Room",
+      "feature_class": "H",
+      "user_job": "Work follow-ups, alert tasks, escalations, and H&S transfer",
+      "canonical_owner": "Control Room task/escalation owners",
+      "production_anchors": [
+        "routes/control-room.php:143-180"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomNestedRecordAuthorizationTest.php:63-216"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 102,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-SHIFT-HANDOVER",
+      "module": "Control Room",
+      "feature_class": "H",
+      "user_job": "Prepare, hand over, accept, and acknowledge complete shift state",
+      "canonical_owner": "ControlRoomHandoverScopeService and shift handover service",
+      "production_anchors": [
+        "app/Services/ControlRoom/ControlRoomHandoverScopeService.php:65-547"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomShiftHandoverScopeTest.php:57-487"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 103,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-COMMUNICATION-COLLABORATION",
+      "module": "Control Room",
+      "feature_class": "H",
+      "user_job": "Broadcast, message, discuss, watch, and record time",
+      "canonical_owner": "ControlRoomMessagingController and collaboration owners",
+      "production_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:24-304"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomMessagingAuthorizationTest.php:110-307"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 104,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-EVIDENCE-REPORT-SLA",
+      "module": "Control Room",
+      "feature_class": "D",
+      "user_job": "Build evidence packs and export scoped SLA reports",
+      "canonical_owner": "ControlRoomEvidenceController and ControlRoomReportService",
+      "production_anchors": [
+        "app/Services/ControlRoom/ControlRoomReportService.php:38-641"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomReportScopeTest.php:40-143"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 105,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS",
+      "module": "Control Room",
+      "feature_class": "H",
+      "user_job": "Use live maps and manage playbooks, signals, queues, and recovery",
+      "canonical_owner": "Device visibility, playbook, and settings owners",
+      "production_anchors": [
+        "routes/control-room.php:329-408"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ControlRoom/ControlRoomOperationalSurfaceSiteIsolationTest.php:275-534"
+      ],
+      "site_role_privacy_note": "Alert action authority, canonical Site precedence, source-record visibility, nested-parent binding, minimum-necessary audiences, and handover completeness remain separate.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 106,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SET-PERSONAL-ACCOUNT-SECURITY",
+      "module": "Public & Settings Platform",
+      "feature_class": "H",
+      "user_job": "Maintain own profile, password, preferences, and two-factor setup",
+      "canonical_owner": "Profile, password, appearance, and two-factor controllers",
+      "production_anchors": [
+        "routes/settings.php:33-60"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Settings/ProfileUpdateTest.php:9-117"
+      ],
+      "site_role_privacy_note": "Personal settings are self-owned; organisation administration is explicit. Public tokens/forms must not disclose internal Site, staff, Client, or secret state.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 107,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SET-ACCESS-ROLE-USER-SSO",
+      "module": "Public & Settings Platform",
+      "feature_class": "H",
+      "user_job": "Administer roles, users, sessions, membership, and SSO mappings",
+      "canonical_owner": "Access, roles, users, and SSO controllers",
+      "production_anchors": [
+        "app/Http/Controllers/Settings/AccessController.php:53-271"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/System/AccessControlControllerTest.php:31-111"
+      ],
+      "site_role_privacy_note": "Personal settings are self-owned; organisation administration is explicit. Public tokens/forms must not disclose internal Site, staff, Client, or secret state.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 108,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SET-ORG-NOTIFICATION-CONFIG",
+      "module": "Public & Settings Platform",
+      "feature_class": "H",
+      "user_job": "Configure terminology, notifications, email, security, and modules",
+      "canonical_owner": "Dedicated settings controllers",
+      "production_anchors": [
+        "app/Http/Controllers/Settings/NotificationPreferencesController.php:15-238"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Settings/SecurityPolicyEnforcementTest.php:14-80"
+      ],
+      "site_role_privacy_note": "Personal settings are self-owned; organisation administration is explicit. Public tokens/forms must not disclose internal Site, staff, Client, or secret state.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 109,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-SET-DATA-PRIVACY-AUDIT",
+      "module": "Public & Settings Platform",
+      "feature_class": "D",
+      "user_job": "Configure data governance and review or export audit history",
+      "canonical_owner": "DataSettingsController and AuditLogSettingsController",
+      "production_anchors": [
+        "app/Http/Controllers/Settings/AuditLogSettingsController.php:14-118"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Settings/AuditLogsInteractionTest.php:42-94"
+      ],
+      "site_role_privacy_note": "Personal settings are self-owned; organisation administration is explicit. Public tokens/forms must not disclose internal Site, staff, Client, or secret state.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    },
+    {
+      "ordinal": 110,
+      "assignment_id": "RUN-006",
+      "candidate_id": "CAP-PUB-MARKETING-CONTACT-CAREERS",
+      "module": "Public & Settings Platform",
+      "feature_class": "H",
+      "user_job": "Read public pages and submit contact or token-bound career forms",
+      "canonical_owner": "Public routes, ContactController, and careers controllers",
+      "production_anchors": [
+        "routes/web.php:68-124"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Hr/CareersPortalTest.php:15-143"
+      ],
+      "site_role_privacy_note": "Personal settings are self-owned; organisation administration is explicit. Public tokens/forms must not disclose internal Site, staff, Client, or secret state.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, or completion credit."
+    }
+  ],
+  "provisional_findings": [
+    {
+      "finding_id": "GOV-EXECUTIVE-VISIBILITY-01",
+      "provisional_severity": "P1",
+      "source_claim": "Meeting and resolution index, calendar, and direct reads do not visibly enforce executive-session or committee visibility for broad governance viewers.",
+      "anchors": [
+        "app/Domain/Governance/Http/Controllers/GovernanceMeetingController.php:41-152",
+        "app/Domain/Governance/Http/Controllers/ResolutionController.php:26-84"
+      ],
+      "required_gate": "Independent policy review and negative direct-ID, calendar, committee, executive-session, picker, and attachment tests.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "GOV-BOARD-PACK-VISIBILITY-01",
+      "provisional_severity": "P1",
+      "source_claim": "Board-pack list, show, manifest, attachment metadata, and read tracking appear broader than the explicit recipient distribution boundary.",
+      "anchors": [
+        "app/Domain/Governance/Http/Controllers/BoardPackController.php:23-90",
+        "app/Domain/Governance/Http/Controllers/BoardPackController.php:194-247"
+      ],
+      "required_gate": "Independent policy review and recipient/non-recipient negative tests including executive packs and supplementary attachments.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "GOV-RESOLUTION-QUORUM-01",
+      "provisional_severity": "P1",
+      "source_claim": "Resolution eligibility, conflicts, quorum, final vote, and close outcome are not visibly bound to one canonical locked decision snapshot.",
+      "anchors": [
+        "app/Domain/Governance/Services/VotingService.php:29-187",
+        "app/Domain/Governance/Models/Resolution.php:186-212"
+      ],
+      "required_gate": "Independent design review plus sequential and concurrent eligibility, conflict, quorum, vote-close, replay, and immutable-evidence tests.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "HS-REGISTER-SITE-SCOPE-01",
+      "provisional_severity": "P1",
+      "source_claim": "First aid, worker participation, hazardous substances, emergency drills, and PPE appear to use optional Site filters rather than approved-Site scope on all list, picker, direct-object, and write paths.",
+      "anchors": [
+        "app/Http/Controllers/HealthSafety/FirstAidController.php:55-85",
+        "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:63-147",
+        "app/Http/Controllers/HealthSafety/PpeController.php:37-112"
+      ],
+      "required_gate": "Independent per-controller review and representative foreign-Site list, picker, direct-ID, export, and write denial tests.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "PRIV-REPORT-DOMAIN-RBAC-01",
+      "provisional_severity": "P1",
+      "source_claim": "Privacy reports appear to expose breach, retention, legal-hold, and PIA aggregates and exports with privacy.viewRequests rather than their distinct domain permissions.",
+      "anchors": [
+        "routes/privacy.php:145-154",
+        "app/Http/Controllers/PrivacyReportController.php:21-174"
+      ],
+      "required_gate": "Independent field-flow review and a per-report/per-export capability denial matrix.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "SAFE-INTAKE-CANONICAL-SCOPE-01",
+      "provisional_severity": "P1",
+      "source_claim": "Safeguarding intake and update appear to trust submitted Site, person, and incident identifiers without canonical reconciliation before downstream projection.",
+      "anchors": [
+        "app/Http/Controllers/SafeguardingConcernController.php:217-252",
+        "app/Http/Controllers/SafeguardingConcernController.php:1090-1127"
+      ],
+      "required_gate": "Confirm reporter product policy and run adversarial foreign-Site, person, incident, update, and projection tests.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "SAFE-ALERT-DEDUP-IDENTITY-01",
+      "provisional_severity": "P1",
+      "source_claim": "Control Room alert deduplication appears able to collapse distinct safeguarding concerns because concern identity is not part of the generic deduplication key.",
+      "anchors": [
+        "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:116-136",
+        "app/Services/ControlRoom/ComprehensiveAlertBridgeService.php:249-301"
+      ],
+      "required_gate": "Create distinct same-client and personless concerns within the window and prove distinct concern-owned alerts and custody chains.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "SAFE-PROJECTION-DURABILITY-01",
+      "provisional_severity": "P1",
+      "source_claim": "Safeguarding intake projections are after-commit catch-and-log operations, while the inspected recovery owner does not visibly include safeguarding sources.",
+      "anchors": [
+        "app/Observers/SafeguardingConcernObserver.php:19-35",
+        "app/Observers/SafeguardingConcernObserver.php:166-249",
+        "app/Services/ControlRoom/SafetySignalDeliveryRecoveryService.php:26-75"
+      ],
+      "required_gate": "Inject H&S and Control Room projection failures, verify durable retry/reconciliation ownership, and assert idempotent recovery.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    },
+    {
+      "finding_id": "SET-API-WEBHOOK-DESTINATION-01",
+      "provisional_severity": "P1",
+      "source_claim": "API webhook testing appears to issue server-side POST, HEAD, and GET requests to administrator-supplied URLs without the repository-native public-address and redirect destination policy.",
+      "anchors": [
+        "app/Http/Controllers/Settings/ApiSettingsController.php:132-211",
+        "app/Http/Controllers/Settings/ApiSettingsController.php:321-360",
+        "app/Domain/Hr/Services/HrWebhookDestinationPolicy.php:59-151"
+      ],
+      "required_gate": "Independent security review plus authorized loopback, private, reserved, metadata, redirect, DNS-rebinding, and egress-control tests.",
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_AND_MATCHING_RUNTIME_REVIEW"
+    }
+  ],
+  "limits": [
+    "Wave 02 adds 110 grouped candidates; it does not freeze a feature denominator.",
+    "The one M row is a bounded negative protected-disclosure search, not proof that no external process exists.",
+    "The nine P1 claims remain provisional until independent review and their exact Site, role, direct-object, failure, transaction, or concurrency gates.",
+    "No runtime, test execution, browser, benchmark, task/ease, release, remediation, closure, or all-pass credit is awarded."
+  ]
+}
