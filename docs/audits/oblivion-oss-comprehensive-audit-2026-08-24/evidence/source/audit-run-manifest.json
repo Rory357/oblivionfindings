@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "audit_date": "2026-08-24",
+  "status": "IN_PROGRESS_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "generated_at": "2026-08-24T15:40:41+12:00",
+  "governing_prompt": {
+    "provided_filename": "oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "bytes": 88305,
+    "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+  },
+  "source_pins": {
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_output_parent_commit": "cf578b357e3662e1f6902478a5623f1f54414fb2",
+    "head_at_generation": "cf578b357e3662e1f6902478a5623f1f54414fb2",
+    "origin_main_observed": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "superseded_audit_source_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "superseded_to_current_source_relation": {
+      "merge_base": "229be24b9f6d22805b29e17339c57d05eb160017",
+      "superseded_commit_is_ancestor": false,
+      "superseded_side_commits": 3,
+      "current_side_commits": 715,
+      "comparison_kind": "direct committed-tree diff; no ancestry assumed"
+    }
+  },
+  "source_governance_inputs": [
+    {
+      "path": "AGENTS.md",
+      "git_object_id": "b1e17f55a79b78dbacf6d1c79ba5d1a547501b50",
+      "bytes": 1081,
+      "sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"
+    },
+    {
+      "path": "docs/architecture/single-tenant-application.md",
+      "git_object_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+      "bytes": 1936,
+      "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c"
+    }
+  ],
+  "writer_boundary": {
+    "orchestrator_only_writes": true,
+    "generator": "generators/build-current-source-census.py",
+    "permitted_output_root": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24",
+    "unexpected_dirty_paths_outside_output": []
+  },
+  "execution_boundaries": {
+    "laravel_booted": false,
+    "database_accessed": false,
+    "tests_executed": false,
+    "build_executed": false,
+    "browser_executed_by_generator": false,
+    "external_system_mutation": false
+  },
+  "current_stage": "current-source denominator and stale-source reconciliation",
+  "completion_claim": false
+}

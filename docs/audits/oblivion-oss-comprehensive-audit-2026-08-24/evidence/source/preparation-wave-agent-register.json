@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "audit_status": "IN_PROGRESS_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "audit_output_parent_commit": "cf578b357e3662e1f6902478a5623f1f54414fb2",
+  "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "architecture_rule": "Single tenant, multiple Sites; assess Site access, role/action capability, canonical ownership, direct-object concealment, and privacy boundaries, not tenant isolation.",
+  "writer_boundary": {
+    "subagent_writes_authorized": false,
+    "subagent_reported_writes": 0,
+    "orchestrator_integrated_after_all_returns": true
+  },
+  "assignments": [
+    {
+      "assignment_id": "PREP-001",
+      "task_path": "/root/handover_followup_review",
+      "display_name": "Lorentz the 2nd",
+      "scope": "Adversarial completion-gate accounting and stale-claim review of the committed 2026-08-12 audit bundle.",
+      "pass_lens": ["P8", "completion-gates"],
+      "write_rule": "Read-only; no edits, staging, commits, browser, tests, or application execution.",
+      "return_status": "returned_and_reconciled",
+      "returned_evidence_count": 26,
+      "count_basis": "One row for each literal or derived completion gate reviewed.",
+      "principal_result": "NO-GO: the historical bundle is correctly blocked and cannot establish current-main completion.",
+      "unresolved_gaps": [
+        "Current semantic denominators not established",
+        "Historical accepted route/page mapping below 100%",
+        "Historical benchmark coverage 500/904",
+        "Historical substantive task/ease coverage 0/790",
+        "Historical all-pass module coverage 0/25"
+      ],
+      "output_message_hash": null,
+      "final_assignment_credit": false,
+      "credit_note": "Preparation return was not captured as a canonical structured output payload and therefore does not count toward the final minimum-assignment gate."
+    },
+    {
+      "assignment_id": "PREP-002",
+      "task_path": "/root/journey_gate_plan",
+      "display_name": "Plato the 2nd",
+      "scope": "Current-main Git divergence, raw path census, journey-anchor drift, and exact rebuild-chain review.",
+      "pass_lens": ["P1", "P2", "P5", "P6", "P7"],
+      "write_rule": "Read-only; no edits, staging, commits, browser, tests, or application execution.",
+      "return_status": "returned_and_reconciled",
+      "returned_evidence_count": 8,
+      "count_basis": "One current-source anchor-drift result for each historical common/safety journey.",
+      "principal_result": "All eight journey maps require current-source reconstruction; the old source commit is a non-ancestor tree with a 5,438-path direct diff to the application base.",
+      "unresolved_gaps": [
+        "Fresh static and runtime route denominators",
+        "Fresh Inertia page partition",
+        "Fresh semantic backend/data/test denominators",
+        "Fresh feature and journey identity adjudication"
+      ],
+      "output_message_hash": null,
+      "final_assignment_credit": false,
+      "credit_note": "Preparation return was not captured as a canonical structured output payload and therefore does not count toward the final minimum-assignment gate."
+    },
+    {
+      "assignment_id": "PREP-003",
+      "task_path": "/root/remaining_gate_reconciliation",
+      "display_name": "Ramanujan the 2nd",
+      "scope": "Fresh-run reproducibility, root-only writer boundary, artifact lineage, clean-room benchmark separation, validation, and rollback method.",
+      "pass_lens": ["orchestration", "P3", "P8"],
+      "write_rule": "Read-only; no edits, staging, commits, browser, tests, or application execution.",
+      "return_status": "returned_and_reconciled",
+      "returned_evidence_count": 11,
+      "count_basis": "Eleven bounded assignments in the recommended fresh-run schedule.",
+      "principal_result": "Rebuild all 18 artifact families from current structured evidence; preserve the old bundle as provenance only and require distinct benchmark observer, neutralizer, and native-comparator owners.",
+      "unresolved_gaps": [
+        "Formal structured no-write assignments not yet dispatched",
+        "Distinct benchmark A/B/C evidence not yet collected",
+        "Fresh frozen-tree Pass 8 not yet run",
+        "Final manifest and dashboard not yet generated"
+      ],
+      "output_message_hash": null,
+      "final_assignment_credit": false,
+      "credit_note": "Preparation return was not captured as a canonical structured output payload and therefore does not count toward the final minimum-assignment gate."
+    }
+  ],
+  "counts": {
+    "preparation_assignments": 3,
+    "returned": 3,
+    "reported_subagent_writes": 0,
+    "assignments_eligible_for_final_minimum": 0
+  },
+  "reconciliation": {
+    "all_preparation_agents_returned": true,
+    "contradictions_resolved": [
+      "Use a direct committed-tree diff for old-vs-current source drift because the old source commit is not an ancestor.",
+      "Pin the application source to a0493442 and the audit-output parent to cf578b35; no non-audit application path differs between them.",
+      "Treat historical semantic denominators and numerators as provenance, never current credit."
+    ],
+    "final_all_agents_gate_satisfied": false,
+    "reason": "The formal source, benchmark, visual, process, and fresh Pass-8 assignment universe has not yet run."
+  }
+}
