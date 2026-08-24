@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-030",
+  "status": "CANONICAL_IDENTITY_INDEPENDENCE_AND_INTEGRATION_REGISTER_COMPLETE",
+  "generated_at": "2026-08-24T20:30:00+12:00",
+  "agents": [
+    {
+      "role": "canonical_identity_integrator",
+      "evidence_run": "RUN-028",
+      "result": "AUTHORITATIVE_362_EDGE_SET_AND_340_TARGET_REGISTRY"
+    },
+    {
+      "role": "canonical_identity_denominator_red_team",
+      "evidence_run": "RUN-029",
+      "result": "INDEPENDENT_DISAGREEMENT_RECONCILED_TO_EXACT_TASK_CSV_SOURCE_ROW"
+    },
+    {
+      "role": "canonical_identity_medical_profile_owner",
+      "evidence_run": "RUN-027",
+      "result": "INDEPENDENT_TIE_BREAK_REPRODUCED_362_EDGE_HASH"
+    },
+    {
+      "role": "root_deterministic_integrator",
+      "evidence_run": "RUN-030",
+      "result": "REPRODUCED_ALL_DECLARED_EDGE_TARGET_CLASS_MODULE_AND_CATALOG_HASHES"
+    }
+  ],
+  "agreement": {
+    "independent_reconstructions": 3,
+    "source_candidates": 186,
+    "layer_a_edges": 362,
+    "layer_a_edge_sha256": "131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0",
+    "canonical_targets": 340,
+    "classes": {
+      "H": 300,
+      "D": 40,
+      "M": 0
+    },
+    "global_target_class_module_sha256": "f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac",
+    "remaining_identity_conflicts": 0
+  },
+  "credit_boundary": {
+    "canonical_static_identity_frozen": true,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "test_execution_credit": 0,
+    "benchmark_credit": 0,
+    "ease_credit": 0,
+    "release_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}
