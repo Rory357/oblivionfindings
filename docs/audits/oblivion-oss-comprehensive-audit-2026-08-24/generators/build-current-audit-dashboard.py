@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import html
 import json
+from collections import Counter
 from pathlib import Path
 from string import Template
 
 
 AUDIT_DIR = Path(__file__).resolve().parents[1]
-GENERATED_AT = "2026-08-24T18:15:00+12:00"
 
 
 def read_json(relative: str) -> dict:
@@ -21,9 +21,6 @@ wave1 = read_json("evidence/source/current-feature-discovery-wave-01.json")
 wave2 = read_json("evidence/source/current-feature-discovery-wave-02.json")
 wave3 = read_json("evidence/source/current-feature-discovery-wave-03.json")
 semantic = read_json("evidence/source/current-static-semantic-census.json")
-agents = read_json("evidence/source/current-static-coverage-agent-register.json")
-visual_agents = read_json("evidence/source/current-visual-matrix-agent-register.json")
-metadata_agents = read_json("evidence/benchmark/current-benchmark-metadata-agent-register.json")
 benchmark = read_json("evidence/benchmark/current-benchmark-wave-01.json")
 pages = read_json("evidence/source/current-page-adjudication-wave-01.json")
 route_gap = read_json("evidence/source/current-route-navigation-gap-wave-01.json")
@@ -32,21 +29,87 @@ visual_matrix = read_json("evidence/source/current-visual-matrix-materialization
 backend = read_json("evidence/source/current-backend-data-test-census-wave-01.json")
 runtime = read_json("evidence/runtime/current-runtime-safety-assessment.json")
 deployment = read_json("evidence/browser/deployed-build-identity-assessment.json")
+canonical = read_json("evidence/source/current-canonical-feature-identity-wave-01.json")
+identity_agents = read_json("evidence/source/current-canonical-identity-agent-register.json")
 
 candidates = wave1["candidates"] + wave2["candidates"] + wave3["candidates"]
 candidate_ids = [row["candidate_id"] for row in candidates]
 assert len(candidates) == 186
 assert len(set(candidate_ids)) == 186
 
-class_counts = {key: sum(1 for row in candidates if row["feature_class"] == key) for key in ("H", "D", "M")}
-assert class_counts == {"H": 157, "D": 27, "M": 2}
-assert agents["cumulative_formal_assignments_eligible"] == 14
-assert metadata_agents["cumulative_formal_assignments_eligible"] == 15
-assert visual_agents["cumulative_formal_assignments_eligible"] == 16
+targets = canonical["targets"]
+target_ids = [row["feature_id"] for row in targets]
+class_counts = Counter(row["feature_class"] for row in targets)
+assert canonical["run_id"] == "RUN-030"
+assert identity_agents["run_id"] == "RUN-030"
+assert identity_agents["status"] == "CANONICAL_IDENTITY_INDEPENDENCE_AND_INTEGRATION_REGISTER_COMPLETE"
+assert canonical["generated_at"] == identity_agents["generated_at"]
+assert len(targets) == len(set(target_ids)) == 340
+assert class_counts == {"H": 300, "D": 40}
+assert canonical["counts"]["source_candidates"] == 186
+assert canonical["counts"]["mapped_sources"] == 185
+assert canonical["counts"]["excluded_sources"] == 1
+assert canonical["counts"]["layer_a_edges"] == 362
+assert canonical["counts"]["layer_a_targets"] == 338
+assert canonical["counts"]["layer_b_catalog_relations"] == 14
+assert canonical["counts"]["layer_b_catalog_targets"] == 9
+assert canonical["counts"]["layer_b_new_targets"] == 2
+assert canonical["counts"]["canonical_targets"] == 340
+assert canonical["counts"]["classes"] == {"H": 300, "D": 40, "M": 0}
+assert identity_agents["agreement"]["independent_reconstructions"] == 3
+assert identity_agents["agreement"]["remaining_identity_conflicts"] == 0
+assert identity_agents["agreement"]["canonical_targets"] == 340
+assert identity_agents["agreement"]["classes"] == {"H": 300, "D": 40, "M": 0}
+assert canonical["static_evidence_gaps"]["targets_missing_route_anchor"] == 120
+assert canonical["static_evidence_gaps"]["targets_missing_page_anchor"] == 226
+assert canonical["static_evidence_gaps"]["targets_missing_both_route_and_page_anchor"] == 116
+assert canonical["completion_gate"]["canonical_static_identity_frozen"] is True
+for credit in (
+    "runtime_credit", "browser_credit", "test_execution_credit", "benchmark_credit",
+    "ease_credit", "release_credit", "completion_credit",
+):
+    assert canonical["completion_gate"][credit] == 0
+assert canonical["completion_gate"]["audit_complete"] is False
+assert all(
+    target[credit] == 0
+    for target in targets
+    for credit in (
+        "runtime_credit", "browser_credit", "test_execution_credit",
+        "benchmark_credit", "ease_credit", "completion_credit",
+    )
+)
+assert runtime["pins"]["application_commit"] == canonical["source_pin"]["application_commit"]
+assert runtime["pins"]["application_tree"] == canonical["source_pin"]["application_tree"]
+assert runtime["sanitized_environment_observations"]["vendor_autoload_exists"] is False
+assert runtime["setup_boundary"]["setup_executed"] is False
+assert runtime["gate_result"]["framework_route_denominator_established"] is False
+assert runtime["gate_result"]["current_schema_snapshot_established"] is False
+assert runtime["gate_result"]["tests_executed"] == 0
+assert runtime["gate_result"]["runtime_credit"] == 0
+assert deployment["pins"]["application_commit"] == canonical["source_pin"]["application_commit"]
+assert deployment["pins"]["application_tree"] == canonical["source_pin"]["application_tree"]
+assert deployment["identity_assessment"]["deployed_commit_or_tree_proven"] is False
+assert deployment["gate_result"]["deployment_identity_established"] is False
+assert deployment["gate_result"]["current_source_application_pages_observed"] == 0
+assert deployment["gate_result"]["current_source_routes_observed"] == 0
+assert deployment["gate_result"]["current_source_workflows_executed"] == 0
+assert deployment["gate_result"]["browser_credit"] == 0
+benchmark_register = benchmark["project_register_current_audit"]
+assert benchmark_register["current_upstream_full_triage_unique_repository_completions"] == 0
+assert benchmark_register["current_upstream_full_triage_prompt_occurrence_completions"] == 0
+assert benchmark_register["current_project_triage_completion_credit"] == 0
+for credit in (
+    "upstream_full_triage_credit", "exact_behaviour_credit", "edition_boundary_credit",
+    "root_licence_confirmation_credit", "maintenance_quality_credit",
+    "selection_or_outcome_credit", "feature_mapping_credit", "benchmark_completion_credit",
+):
+    assert benchmark_register["metadata_credit_boundary"][credit] == 0
+assert benchmark["current_feature_gate"]["verified_benchmark_or_documented_no_credible_match"] == 0
 assert visual_matrix["matrix"]["rows"] == 2812
 assert visual_matrix["credit_boundary"]["browser"] == 0
 
-module_labels = sorted({row["module"] for row in candidates})
+module_labels = sorted({row["module"] for row in targets})
+assert len(module_labels) == 29
 findings = wave1["provisional_findings"] + wave2["provisional_findings"]
 assert len(findings) == 12
 
@@ -61,10 +124,10 @@ finding_rows = "".join(
 module_rows = "".join(
     "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
         html.escape(module),
-        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "H"),
-        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "D"),
-        sum(1 for row in candidates if row["module"] == module and row["feature_class"] == "M"),
-        sum(1 for row in candidates if row["module"] == module),
+        sum(1 for row in targets if row["module"] == module and row["feature_class"] == "H"),
+        sum(1 for row in targets if row["module"] == module and row["feature_class"] == "D"),
+        sum(1 for row in targets if row["module"] == module and row["feature_class"] == "M"),
+        sum(1 for row in targets if row["module"] == module),
     )
     for module in module_labels
 )
@@ -89,20 +152,20 @@ TEMPLATE = Template(r"""<!doctype html>
   <header><div class="eyebrow">Oblivion Findings · comprehensive audit restart</div><div class="hero"><div><h1>Fresh current-source audit</h1><p>Evidence is pinned to application commit <span class="mono">$application_short</span>. Historical percentages remain provenance only.</p></div><div class="badge">IN PROGRESS · NOT COMPREHENSIVE</div></div></header>
   <nav aria-label="Audit sections"><div><a href="#progress">Progress</a><a href="#pages">Pages</a><a href="#static-census">Static census</a><a href="#runtime">Runtime gates</a><a href="#benchmarks">Benchmarks</a><a href="#modules">Modules</a><a href="#findings">Provisional findings</a><a href="#gaps">Gaps</a></div></nav>
   <main>
-    <div class="notice" role="status"><strong>No completion claim:</strong> 186 grouped rows are a provisional discovery floor, not a frozen feature denominator. The 711-page committed-source denominator and 2,812-row source-inferred visual matrix do not establish runtime routes, final mapping, rendered browser coverage, executed tests, full benchmark triage, task/ease scores, journeys, or all-pass modules.</div>
+    <div class="notice" role="status"><strong>No completion claim:</strong> RUN-030 freezes 340 current-source static canonical targets (300 H · 40 D · 0 M) from 186 discovery sources and 362 Layer-A edges. This establishes static identity and source ownership only; it does not establish runtime routes, rendered browser coverage, executed tests, benchmark equivalence, task/ease scores, journeys, Pass completion, release, or audit completion.</div>
     <section id="progress" class="cards" aria-label="Current audit progress">
-      <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div><div class="card"><strong>$route_calls</strong><span>static route callsites</span><small>not runtime routes</small></div><div class="card"><strong>$page_root_count</strong><span>static Inertia page roots</span><small>$resolver_count paths partitioned; prompt gate open</small></div><div class="card"><strong>$candidate_count</strong><span>grouped candidates</span><small>$h_count H · $d_count D · $m_count M</small></div>
-      <div class="card"><strong>$assignment_count / 11</strong><span>formal assignments / planned target</span><small>planned target met; finalization open</small></div><div class="card"><strong class="partial">$finding_count</strong><span>provisional P1 claims</span><small>none final</small></div><div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>vendor absent; setup not run</small></div><div class="card"><strong class="zero">0</strong><span>current-source browser routes</span><small>deployment identity unproved</small></div>
+      <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div><div class="card"><strong>$route_calls</strong><span>static route callsites</span><small>not runtime routes</small></div><div class="card"><strong>$page_root_count</strong><span>static Inertia page roots</span><small>$resolver_count paths partitioned; prompt gate open</small></div><div class="card"><strong>$canonical_count</strong><span>canonical static targets</span><small>$h_count H · $d_count D · $m_count M</small></div>
+      <div class="card"><strong>$mapped_sources / $source_count</strong><span>discovery sources mapped</span><small>one bounded source excluded</small></div><div class="card"><strong class="partial">$finding_count</strong><span>provisional P1 claims</span><small>none final</small></div><div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>vendor absent; setup not run</small></div><div class="card"><strong class="zero">0</strong><span>current-source browser routes</span><small>deployment identity unproved</small></div>
     </section>
     <section id="pages" class="panel"><h2>Current static Inertia page partition</h2><p>RUN-010 partitioned every resolver TSX path for render/import identity. The 711-file denominator is committed-source evidence only; final prompt classification remains open.</p><div class="table-wrap"><table><thead><tr><th>Partition</th><th>Count</th><th>Current static identity</th></tr></thead><tbody><tr><td>Existing literal backend render roots</td><td>$page_root_count</td><td class="partial">static file-backed page roots</td></tr><tr><td>Unrendered but imported</td><td>$support_count</td><td class="partial">support/components, not page roots</td></tr><tr><td>Unrendered/unimported aliases or legacy</td><td>$legacy_count</td><td class="partial">10 Redirect/legacy + 10 Duplicate</td></tr><tr><td>Unrendered/unimported dead or demo</td><td>$dead_demo_count</td><td class="partial">3 Dead/unreachable + 2 Out of product scope</td></tr><tr><td>Missing backend render literals</td><td>$missing_target_count</td><td class="zero">retired/unrouted liabilities; zero page credit</td></tr><tr><td><strong>Resolver TSX partitioned</strong></td><td><strong>$resolver_count</strong></td><td class="partial">963/963 static render/import identity; prompt gate open</td></tr></tbody></table></div></section>
-    <div class="split"><section class="panel"><h2>Formal waves</h2><p>RUN-001 through RUN-016 returned and reported no file writes.</p><ul class="list"><li>RUN-001: initial semantic route/page/backend/data/test census</li><li>RUN-002–006: first 172 grouped source candidates</li><li>RUN-007–009: observer, neutralizer, and eight native comparison packets</li><li>RUN-010–011: page/support adjudication and independent reconciliation</li><li>RUN-012: 38-route-file and 162-navigation-file reconciliation plus 14 provisional additions</li><li>RUN-013: full production JS/TS hero, overlay, state, and trigger census</li><li>RUN-014: backend, data-history, async, policy, and static test census</li><li>RUN-015: official GitHub metadata prerequisite for 95/95 prompt repositories</li><li>RUN-016: exact 2,812-row static visual-matrix materialization</li></ul></section><section class="panel"><h2>Execution credit</h2><p>Static evidence is not runtime evidence.</p><ul class="list"><li><span class="zero">0</span> framework route executions</li><li><span class="zero">0</span> current application tests</li><li><span class="zero">0</span> rendered current-build visual instances</li><li><span class="zero">0</span> current-build application browser routes</li><li><span class="zero">0</span> benchmark mappings promoted</li><li><span class="zero">0</span> completed Pass 1–8 modules</li></ul></section></div>
-    <section id="static-census" class="panel"><h2>Expanded static coverage wave</h2><p>RUN-012 through RUN-016 establish source denominators, metadata prerequisites, and gaps only. The row-level visual materialization is complete; canonical feature identity, rendered coverage, schema truth, and execution gates remain open.</p><div class="table-wrap"><table><thead><tr><th>Static universe</th><th>Denominator</th><th>Current boundary</th></tr></thead><tbody><tr><td>Route source files / callsites</td><td>$route_file_count / $route_calls</td><td class="partial">all files classified; no framework expansion</td></tr><tr><td>Named navigation/tab source files</td><td>$nav_file_count</td><td class="partial">definitions, not runtime-visible links</td></tr><tr><td>Hero definitions / instances</td><td>$hero_definitions / $hero_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Overlay definitions / instances</td><td>$overlay_definitions / $overlay_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Declarative / direct / named triggers</td><td>$declarative_triggers / $direct_triggers / $named_triggers</td><td class="partial">row-level static locators; 0 interactions</td></tr><tr><td>Required visual matrix rows</td><td>$visual_matrix_rows</td><td class="partial">49 columns complete; every row browser-blocked</td></tr><tr><td>Models / policies / service entries</td><td>$models / $policies / $services</td><td class="partial">directory/declaration census, not ownership completion</td></tr><tr><td>Jobs / events / listeners</td><td>$jobs / $events / $listeners</td><td class="partial">static owners, no queue execution</td></tr><tr><td>Migrations / lexical PHP test cases</td><td>$migrations / $php_test_cases</td><td class="partial">history and locators; 0 database/test execution</td></tr></tbody></table></div></section>
+    <div class="split"><section class="panel"><h2>Evidence waves represented</h2><p>RUN-001 through RUN-030 are represented by audit artifacts; none grants application runtime, browser, or executed-test credit.</p><ul class="list"><li>RUN-001–016: census, discovery, page/static visual, and benchmark-metadata foundations</li><li>RUN-017–022: frontline/platform identity adjudication and blocked-owner reconciliation</li><li>RUN-023–025: cross-scope and remaining-owner arbitration</li><li>RUN-026: report-catalog identity adjudication</li><li>RUN-027: medical-profile owner tie-break</li><li>RUN-028–029: denominator integration and independent red team</li><li>RUN-030: deterministic materialization of 362 Layer-A edges and 340 canonical targets</li></ul></section><section class="panel"><h2>Execution credit</h2><p>Static evidence is not runtime evidence.</p><ul class="list"><li><span class="zero">0</span> framework route executions</li><li><span class="zero">0</span> current application tests</li><li><span class="zero">0</span> rendered current-build visual instances</li><li><span class="zero">0</span> current-build application browser routes</li><li><span class="zero">0</span> benchmark mappings promoted</li><li><span class="zero">0</span> completed Pass 1–8 modules</li></ul></section></div>
+    <section id="static-census" class="panel"><h2>Expanded static coverage wave</h2><p>RUN-030 freezes canonical static identity; rendered coverage, schema truth, runtime, benchmark, ease, release, and completion gates remain open.</p><div class="table-wrap"><table><thead><tr><th>Static universe</th><th>Denominator</th><th>Current boundary</th></tr></thead><tbody><tr><td>Discovery sources / Layer-A edges</td><td>$mapped_sources of $source_count / $layer_a_edges</td><td class="partial">one bounded source excluded; $layer_a_targets Layer-A targets</td></tr><tr><td>Canonical targets</td><td>$canonical_count / $h_count H · $d_count D · $m_count M</td><td class="partial">static identity frozen; no downstream credit</td></tr><tr><td>Missing route / page / both anchors</td><td>$route_gap_count / $page_gap_count / $both_gap_count</td><td class="partial">static anchor completion remains open</td></tr><tr><td>Route source files / callsites</td><td>$route_file_count / $route_calls</td><td class="partial">all files classified; no framework expansion</td></tr><tr><td>Named navigation/tab source files</td><td>$nav_file_count</td><td class="partial">definitions, not runtime-visible links</td></tr><tr><td>Hero definitions / instances</td><td>$hero_definitions / $hero_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Overlay definitions / instances</td><td>$overlay_definitions / $overlay_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Declarative / direct / named triggers</td><td>$declarative_triggers / $direct_triggers / $named_triggers</td><td class="partial">row-level static locators; 0 interactions</td></tr><tr><td>Required visual matrix rows</td><td>$visual_matrix_rows</td><td class="partial">49 columns complete; every row browser-blocked</td></tr><tr><td>Models / policies / service entries</td><td>$models / $policies / $services</td><td class="partial">directory/declaration census, not ownership completion</td></tr><tr><td>Jobs / events / listeners</td><td>$jobs / $events / $listeners</td><td class="partial">static owners, no queue execution</td></tr><tr><td>Migrations / lexical PHP test cases</td><td>$migrations / $php_test_cases</td><td class="partial">history and locators; 0 database/test execution</td></tr></tbody></table></div></section>
     <section id="runtime" class="panel"><h2>Runtime and deployed-build identity gates</h2><p>Both checks are evidence about whether execution is safe and attributable. Neither grants application execution credit.</p><div class="table-wrap"><table><thead><tr><th>Gate</th><th>Observed fact</th><th>Result</th></tr></thead><tbody><tr><td>Local PHP/runtime</td><td>PHP $php_version; test-oriented settings; <span class="mono">vendor/autoload.php</span> absent</td><td class="zero">Laravel not booted; 0 runtime tests</td></tr><tr><td>Repository setup</td><td>Combined setup includes dependencies, forced migration, frontend build, and device configuration</td><td class="zero">State-changing setup not run</td></tr><tr><td>Signed-in deployment</td><td>Inertia component <span class="mono">$deployed_component</span> and deployed assets recorded read-only</td><td class="zero">No authoritative commit/tree marker</td></tr><tr><td>Local build manifest</td><td>Present locally but not tracked at the application source pin</td><td class="zero">Cannot identify the deployed build</td></tr></tbody></table></div></section>
-    <section id="benchmarks" class="panel"><h2>Current benchmark wave</h2><p>The prompt denominator was reconciled literally: 98 URL occurrences represent 95 unique repositories because three repositories appear twice. Official GitHub metadata now covers all 95 prompt repositories and all 98 occurrence-weighted entries. That is a metadata prerequisite only; full project triage and every current mapping remain open.</p><div class="table-wrap"><table><thead><tr><th>Evidence slice</th><th>Count</th><th>Current credit</th></tr></thead><tbody><tr><td>Prompt-listed URL occurrences</td><td>$prompt_occurrences</td><td class="partial">$prompt_unique unique repositories; three repeated</td></tr><tr><td>Physical carry-forward register rows</td><td>$register_physical</td><td class="partial">95 exact prompt repos + $extra_rows historical extras</td></tr><tr><td>Official GitHub metadata prerequisite</td><td>$metadata_unique / $prompt_unique</td><td class="partial">$metadata_occurrences / $prompt_occurrences weighted entries; metadata only</td></tr><tr><td>Full project triage</td><td>$triage_unique / $prompt_unique</td><td class="zero">$triage_occurrences / $prompt_occurrences weighted entries</td></tr><tr><td>Exact behaviour / root licence / edition / selection</td><td>0 / 0 / 0 / 0</td><td class="zero">no substantive benchmark credit</td></tr><tr><td>Observer relations</td><td>$observer_records records / $observer_unique candidates</td><td class="partial">provisional only</td></tr><tr><td>Neutralizer adjudications</td><td>$neutralizer_count</td><td class="partial">challenge evidence only</td></tr><tr><td>Native comparator packets</td><td>$comparator_count</td><td class="partial">bounded static packets</td></tr><tr><td>Promoted feature mappings or final no-matches</td><td>$promoted_count</td><td class="zero">denominator not frozen</td></tr></tbody></table></div></section>
-    <section id="modules" class="panel"><h2>Current discovery labels</h2><p>$module_count module labels across two partial waves. Conceptual overlaps still need collision and ownership adjudication.</p><div class="table-wrap"><table><thead><tr><th>Module label</th><th>H</th><th>D</th><th>M</th><th>Total</th></tr></thead><tbody>$module_rows</tbody></table></div></section>
+    <section id="benchmarks" class="panel"><h2>Current benchmark wave</h2><p>The prompt denominator was reconciled literally: 98 URL occurrences represent 95 unique repositories because three repositories appear twice. Official GitHub metadata now covers all 95 prompt repositories and all 98 occurrence-weighted entries. That is a metadata prerequisite only; full project triage and every current mapping remain open.</p><div class="table-wrap"><table><thead><tr><th>Evidence slice</th><th>Count</th><th>Current credit</th></tr></thead><tbody><tr><td>Prompt-listed URL occurrences</td><td>$prompt_occurrences</td><td class="partial">$prompt_unique unique repositories; three repeated</td></tr><tr><td>Physical carry-forward register rows</td><td>$register_physical</td><td class="partial">95 exact prompt repos + $extra_rows historical extras</td></tr><tr><td>Official GitHub metadata prerequisite</td><td>$metadata_unique / $prompt_unique</td><td class="partial">$metadata_occurrences / $prompt_occurrences weighted entries; metadata only</td></tr><tr><td>Full project triage</td><td>$triage_unique / $prompt_unique</td><td class="zero">$triage_occurrences / $prompt_occurrences weighted entries</td></tr><tr><td>Exact behaviour / root licence / edition / selection</td><td>0 / 0 / 0 / 0</td><td class="zero">no substantive benchmark credit</td></tr><tr><td>Observer relations</td><td>$observer_records records / $observer_unique candidates</td><td class="partial">provisional only</td></tr><tr><td>Neutralizer adjudications</td><td>$neutralizer_count</td><td class="partial">challenge evidence only</td></tr><tr><td>Native comparator packets</td><td>$comparator_count</td><td class="partial">bounded static packets</td></tr><tr><td>Promoted feature mappings or final no-matches</td><td>$promoted_count</td><td class="zero">340-target denominator frozen; zero mappings or final no-matches credited</td></tr></tbody></table></div></section>
+    <section id="modules" class="panel"><h2>Canonical static feature modules</h2><p>$module_count module labels across $canonical_count canonical static targets. Module completion credit remains zero.</p><div class="table-wrap"><table><thead><tr><th>Module label</th><th>H</th><th>D</th><th>M</th><th>Total</th></tr></thead><tbody>$module_rows</tbody></table></div></section>
     <section id="findings" class="panel"><h2>Provisional current-source P1 claims</h2><p>None is a final finding, verified exploit, remediated issue, or closed gate.</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Static concern</th><th>Status</th></tr></thead><tbody>$finding_rows</tbody></table></div></section>
-    <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Framework route reachability and route/page-to-feature mapping</li><li>Final H/D/M identity and collision adjudication</li><li>Complete backend/data/test ownership</li><li>Full current project behaviour/licence/edition triage and one final mapping or documented no-match per frozen feature</li><li>Task scripts and ten ease dimensions per H feature</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Rendered hero, overlay, trigger, and material-state coverage from the completed static matrix</li><li>Safe current-build application browser/runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8, freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
-    <section class="panel"><h2>Evidence files</h2><ul class="list"><li><a href="00-executive-summary.md">Executive summary</a></li><li><a href="01-repository-module-map.md">Current repository and page map</a></li><li><a href="02-repository-module-map-wave-02.md">Wave 02 module map</a></li><li><a href="02-eight-pass-coverage-ledger.csv">Provisional eight-pass route-file ledger</a></li><li><a href="03-feature-to-benchmark-matrix.csv">Interim feature-to-benchmark matrix</a></li><li><a href="05-browser-visual-coverage-matrix.csv">2,812-row static visual matrix</a></li><li><a href="06-open-source-benchmark-register.csv">Current carry-forward benchmark register</a></li><li><a href="evidence/source/current-static-semantic-census.json">Initial semantic census JSON</a></li><li><a href="evidence/source/current-route-navigation-gap-wave-01.json">Route/navigation reconciliation</a></li><li><a href="evidence/source/current-visual-static-census-wave-01.json">Visual static census</a></li><li><a href="evidence/source/current-visual-matrix-materialization-wave-01.json">Visual matrix materialization evidence</a></li><li><a href="evidence/source/current-visual-matrix-agent-register.json">Visual matrix agent register</a></li><li><a href="evidence/source/current-backend-data-test-census-wave-01.json">Backend/data/test census</a></li><li><a href="evidence/source/current-static-coverage-agent-register.json">Static coverage agent register</a></li><li><a href="evidence/source/current-page-adjudication-wave-01.json">Page adjudication evidence</a></li><li><a href="evidence/source/current-page-agent-register.json">Page agent register</a></li><li><a href="evidence/source/current-feature-discovery-wave-01.json">Feature wave 01 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-02.json">Feature wave 02 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-03.json">Feature wave 03 gap additions</a></li><li><a href="evidence/benchmark/current-benchmark-wave-01.json">Benchmark wave evidence</a></li><li><a href="evidence/benchmark/current-benchmark-agent-register.json">Benchmark agent register</a></li><li><a href="evidence/benchmark/current-benchmark-metadata-agent-register.json">Benchmark metadata agent register</a></li><li><a href="evidence/benchmark/current-github-project-metadata-snapshot.json">Official GitHub metadata snapshot</a></li><li><a href="evidence/benchmark/current-prompt-project-denominator-reconciliation.json">Prompt project denominator reconciliation</a></li><li><a href="evidence/runtime/current-runtime-safety-assessment.json">Runtime safety assessment</a></li><li><a href="evidence/browser/deployed-build-identity-assessment.json">Deployed build identity assessment</a></li><li><a href="13-unresolved-questions-and-evidence-gaps.md">Unresolved evidence gaps</a></li></ul></section>
+    <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Framework route reachability and route/page-to-feature mapping</li><li>Static anchor completion: $route_gap_count targets lack route anchors, $page_gap_count lack page anchors, and $both_gap_count lack both</li><li>Complete backend/data/test ownership</li><li>Full current project behaviour/licence/edition triage and one final mapping or documented no-match per frozen feature</li><li>Task scripts and ten ease dimensions per H feature</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Rendered hero, overlay, trigger, and material-state coverage from the completed static matrix</li><li>Safe current-build application browser/runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8, final artifact freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
+    <section class="panel"><h2>Evidence files</h2><ul class="list"><li><a href="00-executive-summary.md">Executive summary</a></li><li><a href="01-repository-module-map.md">Current repository and page map</a></li><li><a href="02-repository-module-map-wave-02.md">Wave 02 module map</a></li><li><a href="02-eight-pass-coverage-ledger.csv">Provisional eight-pass route-file ledger</a></li><li><a href="03-feature-to-benchmark-matrix.csv">340-row canonical static feature matrix</a></li><li><a href="05-browser-visual-coverage-matrix.csv">2,812-row static visual matrix</a></li><li><a href="06-open-source-benchmark-register.csv">Current carry-forward benchmark register</a></li><li><a href="evidence/source/current-canonical-feature-identity-wave-01.json">RUN-030 canonical feature identity</a></li><li><a href="evidence/source/current-canonical-identity-agent-register.json">RUN-030 identity agent register</a></li><li><a href="evidence/source/current-static-semantic-census.json">Initial semantic census JSON</a></li><li><a href="evidence/source/current-route-navigation-gap-wave-01.json">Route/navigation reconciliation</a></li><li><a href="evidence/source/current-visual-static-census-wave-01.json">Visual static census</a></li><li><a href="evidence/source/current-visual-matrix-materialization-wave-01.json">Visual matrix materialization evidence</a></li><li><a href="evidence/source/current-visual-matrix-agent-register.json">Visual matrix agent register</a></li><li><a href="evidence/source/current-backend-data-test-census-wave-01.json">Backend/data/test census</a></li><li><a href="evidence/source/current-static-coverage-agent-register.json">Static coverage agent register</a></li><li><a href="evidence/source/current-page-adjudication-wave-01.json">Page adjudication evidence</a></li><li><a href="evidence/source/current-page-agent-register.json">Page agent register</a></li><li><a href="evidence/source/current-feature-discovery-wave-01.json">Feature wave 01 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-02.json">Feature wave 02 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-03.json">Feature wave 03 gap additions</a></li><li><a href="evidence/benchmark/current-benchmark-wave-01.json">Benchmark wave evidence</a></li><li><a href="evidence/benchmark/current-benchmark-agent-register.json">Benchmark agent register</a></li><li><a href="evidence/benchmark/current-benchmark-metadata-agent-register.json">Benchmark metadata agent register</a></li><li><a href="evidence/benchmark/current-github-project-metadata-snapshot.json">Official GitHub metadata snapshot</a></li><li><a href="evidence/benchmark/current-prompt-project-denominator-reconciliation.json">Prompt project denominator reconciliation</a></li><li><a href="evidence/runtime/current-runtime-safety-assessment.json">Runtime safety assessment</a></li><li><a href="evidence/browser/deployed-build-identity-assessment.json">Deployed build identity assessment</a></li><li><a href="13-unresolved-questions-and-evidence-gaps.md">Unresolved evidence gaps</a></li></ul></section>
     <p class="footer">Generated deterministically at $generated_at. Audit artifacts only; no application remediation is authorised.</p>
   </main>
 </body>
@@ -111,7 +174,7 @@ TEMPLATE = Template(r"""<!doctype html>
 
 
 dashboard = TEMPLATE.substitute(
-    application_short=wave1["source"]["application_commit"][:12],
+    application_short=canonical["source_pin"]["application_commit"][:12],
     route_calls=f"{semantic['routes']['static_route_declaration_callsites']:,}",
     resolver_count=f"{semantic['inertia_pages']['resolver_non_test_tsx']:,}",
     page_root_count=f"{pages['recommended_denominator']['value']:,}",
@@ -119,11 +182,17 @@ dashboard = TEMPLATE.substitute(
     legacy_count=pages["candidate_class_counts"]["alias/generated/legacy"],
     dead_demo_count=pages["candidate_class_counts"]["dead/unreachable candidate"] + pages["candidate_class_counts"]["test/demo/story"],
     missing_target_count=len(pages["missing_render_target_adjudication"]),
-    candidate_count=f"{len(candidates):,}",
+    canonical_count=f"{len(targets):,}",
+    source_count=canonical["counts"]["source_candidates"],
+    mapped_sources=canonical["counts"]["mapped_sources"],
+    layer_a_edges=canonical["counts"]["layer_a_edges"],
+    layer_a_targets=canonical["counts"]["layer_a_targets"],
     h_count=class_counts["H"],
     d_count=class_counts["D"],
-    m_count=class_counts["M"],
-    assignment_count=visual_agents["cumulative_formal_assignments_eligible"],
+    m_count=canonical["counts"]["classes"]["M"],
+    route_gap_count=canonical["static_evidence_gaps"]["targets_missing_route_anchor"],
+    page_gap_count=canonical["static_evidence_gaps"]["targets_missing_page_anchor"],
+    both_gap_count=canonical["static_evidence_gaps"]["targets_missing_both_route_and_page_anchor"],
     finding_count=len(findings),
     module_count=len(module_labels),
     module_rows=module_rows,
@@ -161,7 +230,7 @@ dashboard = TEMPLATE.substitute(
     listeners=f"{backend['module_arithmetic']['listeners']['total']:,}",
     migrations=f"{backend['migration_filename_primary_mapping']['total']:,}",
     php_test_cases=f"{backend['tests_static']['lexical_cases']:,}",
-    generated_at=GENERATED_AT,
+    generated_at=canonical["generated_at"],
 )
 
 (AUDIT_DIR / "audit-dashboard.html").write_text(dashboard.rstrip() + "\n", encoding="utf-8", newline="\n")

@@ -48,7 +48,7 @@ Three formal read-only assignments returned and reported no file writes. The orc
 
 - 3,217 static route declaration callsites across the 38 route files. This is a source locator, not a framework/provider runtime-route denominator.
 - 963 non-test TSX files in the current Inertia resolver: 711 matched backend render roots, 227 unrendered imported paths, and 25 unrendered/unimported paths. That first partition required the RUN-010 manual adjudication recorded below before a source denominator could be accepted.
-- 62 grouped capability candidates across Clients, Care & Clinical, eMAR, Incidents & Safeguarding, HR, Workforce, Frontline Workspaces, and Operations: 54 H, eight D, and zero M candidates. This is not the final canonical feature denominator.
+- 62 grouped capability candidates across Clients, Care & Clinical, eMAR, Incidents & Safeguarding, HR, Workforce, Frontline Workspaces, and Operations: 54 H, eight D, and zero M candidates. At that stage, this was not the final canonical feature denominator.
 - Three provisional eMAR P1 source claims—`MED-RBAC-01`, `MED-CD-SCOPE-01`, and `MED-CD-ATOMICITY-01`—require independent current-source review and the matching role/Site, runtime, failure, or concurrency gates before they can become final findings.
 
 Static backend, migration, test, and page-visual locators were also reconciled. Their directory, declaration, history, and callsite scopes remain deliberately separate and receive no execution or completion credit.
@@ -57,19 +57,19 @@ Static backend, migration, test, and page-visual locators were also reconciled. 
 
 RUN-004 through RUN-006 also returned read-only and reported no file writes. They add 110 grouped candidates across Finance, Governance, Health & Safety, Privacy, Safeguarding, Complaints & Feedback, Sites & Locations, Fleet & Assets, Security Devices, IT & Support, Integrations, Control Room, and Public & Settings Platform: 91 H, 18 D, and one bounded-negative M candidate.
 
-The two discovery waves now contain 172 unique grouped rows: 145 H, 26 D, and one M. This remains a partial discovery register, not a frozen feature denominator. The protected-disclosure M row records that no dedicated owner was found in the bounded static search; it is not proof that no external or undocumented process exists.
+At that stage, the two discovery waves contained 172 unique grouped rows: 145 H, 26 D, and one M. This was a partial discovery register, not a frozen feature denominator. The protected-disclosure M row recorded that no dedicated owner was found in the bounded static search; it was not proof that no external or undocumented process exists.
 
 Nine additional P1 source claims were retained provisionally, bringing the current provisional register to 12. The new claims cover governance meeting/resolution visibility, board-pack distribution, quorum/decision snapshots, H&S register Site scope, privacy report permission separation, safeguarding intake provenance, safeguarding alert identity and projection durability, and outbound webhook destination safety. None is a final finding, verified exploit, remediated issue, or closed gate.
 
 ## First current benchmark wave
 
-Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles, bringing the fresh run to nine reconciled formal assignments at that stage. RUN-010 through RUN-016 bring the current total to 16. The prompt's numerical minimum of eight and the planned current-run target of 11 are met, but assignment count is not completion: canonical identities, full triage/execution gates, fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
+Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles, bringing the fresh run to nine reconciled formal assignments at that stage. RUN-010 through RUN-016 brought the RUN-016 snapshot to 16. Later RUN-017 through RUN-030 canonical-identity evidence is recorded below. The prompt's numerical minimum of eight and the planned current-run target of 11 are met, but assignment count is not completion: full triage/execution gates, fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
 
 Literal reconciliation corrected the project denominator. The prompt contains 98 GitHub URL occurrences representing 95 unique repositories because `glpi-project/glpi`, `netbox-community/netbox`, and `opf/openproject` each appear in two categories. The 98-row physical carry-forward register contains those 95 exact repositories plus three historical extras: `Bahmni/openmrs-module-ipd`, `medplum/medplum-provider`, and supplemental observer project `frappe/frappe`. RUN-015 and the root collector obtained authenticated read-only official GitHub repository metadata for 95/95 unique prompt repositories and all 98 occurrence-weighted entries: 95 successful public records, four HTTP 200 receipts, one archived repository, zero disabled repositories, and zero canonical-identity changes. This is metadata-prerequisite coverage only. Full upstream triage, repository-root licence, edition boundary, maintenance quality, exact behaviour, selection, and mapping credit remain 0/95 and 0/98; the three historical extras were not refreshed. The superseded 97-plus-one composition receives no credit.
 
 RUN-007 returned 30 provisional observer relations across 29 of the 172 grouped candidates. RUN-008 challenged 15 samples—five semantic/UI collisions failed, five retained only a partial neutral requirement, and five survived a narrow static requirement—and identified nine collision/composite groups. RUN-009 completed eight high-risk comparison packets: zero copied-baseline classifications, two stronger-native-control observations, four Oblivion-specific gaps, and two domains with no credible comparison at the packet level.
 
-None of those slices selects a final current benchmark or establishes a feature-level `No credible match`. The candidate denominator is not frozen; official repository metadata is present but exact upstream behaviour, licence-root, edition, maintenance, and target-specific triage are absent; zero current mappings are promoted. No runtime, application-browser, test, compliance, remediation, or completion credit follows.
+None of those slices selects a final current benchmark or establishes a feature-level `No credible match`. RUN-030 later froze the separate static canonical-feature denominator, but exact upstream behaviour, licence-root, edition, maintenance, and target-specific triage are absent; zero current mappings or final no-matches are promoted. No runtime, application-browser, test, compliance, remediation, or completion credit follows.
 
 ## Static Inertia page adjudication
 
@@ -83,15 +83,23 @@ RUN-011 initially returned NO-GO on five bounded evidence defects, including the
 
 ## Expanded static coverage wave
 
-RUN-012 through RUN-014 returned read-only and reported no writes, bringing the reconciled formal-assignment count to 14. RUN-012 accounted for all 38 route PHP files, 3,217 static route callsites, 3,245 fluent name callsites, and 162 named navigation/tab source files. It found 14 owner-backed route/navigation families omitted from the first 172 grouped candidates: 12 H, one D, and one M. They cover admin/Today dashboards, notifications, Catering, Compliance, Portal, Respite, Roadmap, cross-module Reporting, and the internal quality checklist. The current discovery floor is therefore 186 rows—157 H, 27 D, and two M—but collisions may still split or collapse identities, so this is not a frozen canonical feature denominator.
+RUN-012 through RUN-014 returned read-only and reported no writes, bringing the reconciled formal-assignment count to 14 at that stage. RUN-012 accounted for all 38 route PHP files, 3,217 static route callsites, 3,245 fluent name callsites, and 162 named navigation/tab source files. It found 14 owner-backed route/navigation families omitted from the first 172 grouped candidates: 12 H, one D, and one M. They cover admin/Today dashboards, notifications, Catering, Compliance, Portal, Respite, Roadmap, cross-module Reporting, and the internal quality checklist. RUN-012 therefore established a 186-row discovery floor—157 H, 27 D, and two M—which RUN-017 through RUN-030 later split, merged, excluded, and reconciled into the frozen static canonical denominator described below.
 
 RUN-013 parsed all 1,761 production JS/TS files with TypeScript 5.9.3 and zero parse diagnostics. Its separate static universes contain 57 hero definitions and 659 hero instances, 473 overlay definitions and 1,211 overlay instances, 115 declarative primitive trigger tags, 689 direct inline opening-handler sites, and 138 local named-handler sites. RUN-016 materialized the required 49-column visual matrix as 2,812 unique source rows and visual IDs with SHA-256 `564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84`. Definitions, state transitions, excluded close/change bindings, inline hero candidates, and inline ARIA dialogs remain separate supporting ledgers to avoid overlap. The exact machine rerun also corrected linkage-only arithmetic drift in the earlier prose handoff; primary RUN-013 universe counts and hashes were unchanged. All 2,812 rows remain source-inferred and browser-blocked, with zero rendered visual, role/Site, viewport, screenshot, interaction, accessibility, route-execution, or final-feature credit.
 
 RUN-014 established source-only denominators of 561 controller-directory paths, 735 service entries, 782 model paths, 75 policy paths, 126 queued job paths, 14 event paths, 12 listeners, 29 observers, 978 migrations, and 1,381 PHP test files containing 9,895 lexical test cases. Exact anchors in the prior 172 candidates cover only 62 controller paths and 54 service entries and cover zero model, policy, async-owner, notification, or migration paths. Migration filenames and the committed schema dump are history locators rather than database truth, and lexical tests were not executed.
 
-RUN-015 completed the official GitHub metadata prerequisite described above, and RUN-016 completed the static visual-row materialization contract. Both agents reported no repository writes; only the root orchestrator wrote the collectors, generators, matrices, and normalized evidence. The cumulative formal-assignment count is 16, while the finalization gate remains false.
+RUN-015 completed the official GitHub metadata prerequisite described above, and RUN-016 completed the static visual-row materialization contract. Both agents reported no repository writes; only the root orchestrator wrote the collectors, generators, matrices, and normalized evidence. The cumulative formal-assignment count at the RUN-016 snapshot was 16. Later RUN-017 through RUN-030 evidence does not close the finalization gate.
 
 The new `02-eight-pass-coverage-ledger.csv` contains 38 provisional route-file ownership rows so Pass gaps are measurable. It is not the canonical module/submodule denominator: every row remains incomplete, and no module has all eight passes.
+
+## Canonical static feature identity freeze
+
+RUN-017 through RUN-029 performed partitioned, adversarial, owner, report-catalog, integrator, and denominator-red-team reconciliation. RUN-030 deterministically integrated the pinned evidence and froze **340 current-source static canonical targets: 300 H, 40 D, and zero M**. Of the 186 discovery sources, 185 map through 362 Layer-A edges to 338 targets. The bounded protected-disclosure source is excluded because no current canonical owner was established; that exclusion does not prove that no external or undocumented process exists. The report-catalog layer contributes 14 relations across nine targets, two of them new, producing the 340-target global denominator.
+
+Three independent reconstructions agree, with zero remaining identity conflicts. The normalized Layer-A edge SHA-256 is `131fe9434e94d6158f7349c0522f42a40cf878fb3f7c4a2b7b71d0cc5e4831c0`, and the global target class/module row SHA-256 is `f33d53cf3c9ed7520b683686520eaca9903e50713f438768a8a70819f1c787ac`. Static linkage gaps remain explicit: 120 targets lack a route anchor, 226 lack a page anchor, and 116 lack both.
+
+This freezes static identity only. Framework route execution, current-build browser coverage, executed tests, benchmark mappings or final no-matches, task/ease evidence, release evidence, Pass completion, and audit completion all retain zero credit.
 
 ## Current official New Zealand source baseline
 
@@ -124,6 +132,8 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `evidence/source/current-backend-data-test-census-wave-01.json`: backend, data-history, async, policy, migration, schema-dump, and static test denominators and review locators.
 - `evidence/source/current-feature-discovery-wave-03.json`: the 14 route/navigation gap additions and 186-row provisional discovery floor.
 - `evidence/source/current-static-coverage-agent-register.json`: normalized RUN-012 through RUN-014 returns and the cumulative 14-assignment state.
+- `evidence/source/current-canonical-feature-identity-wave-01.json`: the RUN-030 186-source, 362-edge, 340-target static canonical identity registry, exact hashes, linkage gaps, and zero-credit boundaries.
+- `evidence/source/current-canonical-identity-agent-register.json`: independent RUN-027 through RUN-029 agreement and deterministic RUN-030 integration, with zero remaining identity conflicts and no downstream credit.
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and RUN-015 metadata-only evidence with zero mapping/completion credit.
 - `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
@@ -139,7 +149,7 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
 - `02-eight-pass-coverage-ledger.csv`: 38 provisional route-file ownership rows with explicit P1–P8 gaps and zero completed row.
-- `03-feature-to-benchmark-matrix.csv`: interim 186-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
+- `03-feature-to-benchmark-matrix.csv`: 340-row canonical static identity matrix with P1 identity frozen only; route/page gaps and all benchmark, ease, executed-test, runtime, browser, release, P2–P8, and completion credit remain explicit and zero.
 - `05-browser-visual-coverage-matrix.csv`: 2,812 unique source-inferred hero, overlay, and trigger rows; every browser/runtime/final-feature field remains explicitly blocked or zero-credit.
 - `06-open-source-benchmark-register.csv`: 95 exact prompt-repository rows plus three historical extras, with prompt occurrence weights totalling 98, current official GitHub metadata fields for the 95 prompt repositories, and zero full-triage or mapping credit.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
@@ -151,16 +161,17 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `generators/generate-visual-matrix.cjs`: fail-fast TypeScript AST, import/render/route, candidate-link, and row materialization generator with exact count/hash assertions.
 - `generators/integrate-visual-matrix-wave-01.py`: deterministic validation and normalization for the RUN-016 matrix and agent evidence.
 - `generators/integrate-page-adjudication-wave-01.py`: deterministic normalization for the RUN-010 page/support and missing-render adjudication.
+- `generators/integrate-canonical-feature-identity-wave-01.py`: deterministic RUN-030 input-hash, edge, target, class, module, gap, register, and matrix integration.
 - `generators/build-current-audit-dashboard.py`: aggregate dashboard builder over the normalized current evidence.
 
 The collector was rerun twice with identical output hashes. It did not boot Laravel, access a database, run tests or a build, use a browser, or mutate an external system.
 
 ## Immediate work order
 
-1. Preserve the 711-file static page-root denominator and finish framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership; the semantic/runtime graph remains partial.
-2. Adjudicate collisions and ownership across the 186-row discovery floor before freezing H/D/M identities; use the historical 904 register only as a crosswalk.
+1. Preserve the frozen 340-target, 300 H / 40 D / zero M denominator and its exact hashes; use the historical 904 register only as a crosswalk.
+2. Resolve the static linkage gaps—120 targets without route anchors, 226 without page anchors, and 116 without either—then finish safe framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership. The semantic/runtime graph remains partial.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, and all eight pass ledgers; use the completed 2,812-row static visual matrix as the source universe for later safe current-build rendered role/Site/viewport/state coverage.
-4. Build on the completed 95/95 official GitHub metadata prerequisite by finishing repository-root licence, edition, maintenance, exact-behaviour, and target-specific upstream triage; then complete one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen. The metadata and first A/B/C evidence waves grant zero mapping credit.
+4. Build on the completed 95/95 official GitHub metadata prerequisite by finishing repository-root licence, edition, maintenance, exact-behaviour, and target-specific upstream triage; then complete one verified benchmark or documented `No credible match` for each of the 340 canonical targets. The metadata and first A/B/C evidence waves grant zero mapping credit.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.
 6. Freeze artifacts, dispatch fresh independent Pass 8 review, integrate only through the orchestrator, validate all literal completion gates, and update the dashboard from current structured evidence.
 
