@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-027",
+  "status": "COMPLETE_READ_ONLY_MEDICAL_PROFILE_OWNER_ARBITRATION_NOT_FINAL_DENOMINATOR",
+  "target_id": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+  "decision": "KEEP_CLIENTS_H_DROP_EMAR_EDGE",
+  "module": "Clients",
+  "feature_class": "H",
+  "canonical_user_job": "Complete and maintain the authorised client's health and medical profile, including GP details, allergies, disabilities, histories and notes, within the client profile workflow.",
+  "source_disposition": {
+    "CAP-MED-CLIENT-MEDICAL-PROFILE": "CANONICAL_OWNER",
+    "CAP-MED-API-CURRENT-SURFACES": "REMOVE_EDGE_TO_THIS_TARGET"
+  },
+  "separate_clients_owner_exists": true,
+  "basis": "The client completion/edit wizard is a live human surface that hydrates, validates and persists ClientMedicalProfile through ClientController. The dedicated /clients/{client}/medical URLs are compatibility redirects to eMAR, but they are not the only Clients surface.",
+  "canonical_production_anchors": [
+    "routes/operations.php:251-254",
+    "app/Http/Controllers/ClientController.php:2632-2732",
+    "app/Http/Controllers/ClientController.php:2737-2828",
+    "app/Http/Controllers/ClientController.php:2831-2941",
+    "app/Http/Requests/UpdateClientRequest.php:83-99",
+    "resources/js/components/client-edit-dialog.tsx:28-110",
+    "resources/js/components/clients/add-client-dialog.tsx:756-811",
+    "resources/js/components/clients/add-client-dialog.tsx:900-910",
+    "resources/js/components/clients/add-client-dialog.tsx:1701-1901",
+    "app/Models/Client.php:180-183",
+    "app/Models/ClientMedicalProfile.php:10-13",
+    "app/Models/ClientMedicalProfile.php:81-106",
+    "app/Policies/ClientPolicy.php:121-124"
+  ],
+  "canonical_test_anchors": [
+    "tests/Feature/Operations/ClientProfileFoundationTest.php:80-137",
+    "tests/Feature/Operations/ClientProfileFoundationTest.php:139-360",
+    "tests/Feature/ClientControllerTest.php:1510-1556",
+    "tests/Feature/ClientControllerTest.php:2122-2205",
+    "resources/js/test/client-profile-edit-dialog.test.tsx:32-78"
+  ],
+  "aliases_and_read_lenses": [
+    {
+      "surface": "GET /clients/{client}/medical and GET /operations/clients/{client}/medical",
+      "disposition": "COMPATIBILITY_NAVIGATION_ALIAS_TO_EMAR",
+      "anchors": [
+        "routes/clients.php:41-44",
+        "routes/operations.php:166-169",
+        "app/Http/Controllers/ClientMedicalController.php:89-94",
+        "app/Support/EmarUrl.php:17-22",
+        "tests/Feature/ClientMedicalControllerTest.php:53-58"
+      ]
+    },
+    {
+      "surface": "Operations client profile Medical tab",
+      "disposition": "READ_LENS_NOT_SEPARATE_OWNER",
+      "anchors": [
+        "app/Http/Controllers/ClientController.php:431-438",
+        "app/Http/Controllers/ClientController.php:799-804",
+        "resources/js/pages/operations/clients/show.tsx:3173-3375"
+      ]
+    },
+    {
+      "surface": "PUT client medical profile compatibility routes",
+      "disposition": "MUTATION_ALIAS_OF_CLIENTS_OWNER",
+      "anchors": [
+        "routes/clients.php:122-124",
+        "routes/operations.php:308-310",
+        "app/Http/Controllers/ClientMedicalController.php:96-132"
+      ]
+    }
+  ],
+  "emar_api_disposition": {
+    "decision": "NOT_AN_ALIAS_OF_CLIENT_MEDICAL_PROFILE_NO_NEW_FEATURE",
+    "mapping_rule": "Remove the RUN-020 API edge to CAP-MED-CLIENT-MEDICAL-PROFILE. Retain the allergy API anchors as component and transport evidence under the existing CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE edge.",
+    "reason": "The API endpoints operate on MedicationAllergy, a separate record store from ClientMedicalProfile. The GET is embedded only as an allergy safety lookup in the Add Medication flow; no source-visible UI caller or dedicated test was found for POST. Do not create another canonical feature from this inspection.",
+    "anchors": [
+      "routes/api_medications.php:107-114",
+      "app/Http/Controllers/Api/MedicationsApiController.php:1218-1275",
+      "app/Models/MedicationAllergy.php:11-39",
+      "resources/js/pages/emar/_dialogs.tsx:114-146"
+    ],
+    "dual_record_store_warning": "ClientMedicalProfile.allergies and MedicationAllergy are distinct stores; do not merge their ownership merely because both represent allergy information.",
+    "authority_and_test_gaps": [
+      "GET and POST use different route permissions and Client policy actions.",
+      "No source-visible frontend caller or dedicated route test was found for the POST allergy endpoint."
+    ]
+  },
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "credits": {
+    "runtime": 0,
+    "browser": 0,
+    "test_execution": 0,
+    "benchmark": 0,
+    "ease": 0,
+    "completion": 0
+  },
+  "evidence_limit": "Static pinned-source identity and owner arbitration only; no runtime, browser, test-execution, benchmark, ease, release, production-readiness, or audit-completion credit.",
+  "adjudication_wrote_files": false,
+  "materialization_wrote_files": false,
+  "audit_completion_test_met": false
+}
