@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-051",
+  "generated_at": "2026-08-25T01:37:42+12:00",
+  "role": "INDEPENDENT_POST_RECONCILIATION_FACET_ADJUDICATOR_AGENT_D",
+  "responsible_agent_identity": "/root/run051_independent_adjudicator",
+  "status": "NO_GO_PROMPT_LINEAGE_FAILURE_ZERO_EDGES_ZERO_CREDIT",
+  "governing_inputs": {
+    "prompt": {
+      "path": "C:/Users/steph/Downloads/oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "bytes": 88305,
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+    },
+    "frozen_matrix": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv",
+      "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+    },
+    "parent_run_046": {
+      "path": "evidence/benchmark/current-target-neutral-comparison-wave-01.json",
+      "sha256": "648fd95c9291a094a60bf1dfb007e1da9f58eb9b9889ffaad4fa5d542ecbf1f4"
+    },
+    "run_047_raw_clinical_incident": {
+      "path": "evidence/benchmark/raw-run-047-upstream-facet-refinement-clinical-incident-wave-02.json",
+      "sha256": "517be316ad4ac47bc029799736ce7f648d06ff39b7cbefd360685bf6240a99c8"
+    },
+    "run_047_raw_composites": {
+      "path": "evidence/benchmark/raw-run-047-upstream-facet-refinement-composites-wave-02.json",
+      "sha256": "978fad489512c4498140bdec02bda59a36b9e0cefcb073316c59a3be6efcac99"
+    },
+    "run_047_integrated": {
+      "path": "evidence/benchmark/current-upstream-facet-refinement-wave-02.json",
+      "sha256": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e"
+    },
+    "run_047_agent_register": {
+      "path": "evidence/benchmark/current-upstream-facet-refinement-agent-register.json",
+      "sha256": "bc8265ee896a04335b9c36a077f09bb7c0d7d8e5892200542601f682f05e076b"
+    },
+    "run_048": {
+      "path": "evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6"
+    },
+    "run_049": {
+      "path": "evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json",
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a"
+    },
+    "run_050_partition_1": {
+      "path": "evidence/benchmark/raw-run-050-clean-facet-comparison-clinical-incident-hr-wave-02.json",
+      "sha256": "49dc874e7b66fa40701e96e8fd08dc9bb20c6bf7b72850220068591f69e03586"
+    },
+    "run_050_partition_2": {
+      "path": "evidence/benchmark/raw-run-050-clean-facet-comparison-medication-finance-wave-02.json",
+      "sha256": "82e89513aa387301dccede26b833dc472cc30c8950bf410b0d285b8caece6b73"
+    },
+    "run_050_full_crosscheck": {
+      "path": "evidence/benchmark/raw-run-050-clean-facet-comparison-full-crosscheck-wave-02.json",
+      "sha256": "64a5777dfd17345969a22ad63d03348089dd699147e3448e750425f795258b4f"
+    },
+    "run_050_tiebreak": {
+      "path": "evidence/benchmark/raw-run-050-witness-authority-tiebreak-wave-02.json",
+      "sha256": "748e9dafa9177b8eb71425db7cf2701174a93edb28e0e283344a07be69b3d747"
+    },
+    "run_050_reconciled": {
+      "path": "evidence/benchmark/raw-run-050-clean-facet-comparison-reconciled-wave-02.json",
+      "sha256": "fa5248dd88b3a43334e9f181bba2f8459274c2c404d984189c39a54d74988159"
+    },
+    "application_git_object": {
+      "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+      "read_mode": "PINNED_GIT_OBJECT_ONLY"
+    }
+  },
+  "validation": {
+    "all_named_file_hashes_match": true,
+    "run_047_partition_union": {
+      "pairs": 24,
+      "unique_pairs": 24,
+      "overlap": 0,
+      "candidate_locators": 12,
+      "bounded_no_candidates_not_final_no_match": 12,
+      "integrated_record_content_matches_raw": true,
+      "canonical_record_sha256_mismatches": 0
+    },
+    "matrix": {
+      "rows": 340,
+      "unique_feature_ids": 340,
+      "selected_feature_rows": 6,
+      "hash_unchanged": true
+    },
+    "run_049_source_anchors": {
+      "occurrences": 155,
+      "unique_anchor_strings": 148,
+      "unique_git_object_paths": 84,
+      "malformed": 0,
+      "missing_paths": 0,
+      "out_of_bounds_ranges": 0,
+      "commit_type": "commit",
+      "resolved_tree_matches": true
+    },
+    "run_050_pair_and_arithmetic": {
+      "run_048_pairs": 24,
+      "run_049_pairs": 24,
+      "partition_1_pairs": 13,
+      "partition_2_pairs": 11,
+      "partition_overlap": 0,
+      "full_crosscheck_pairs": 24,
+      "reconciled_pairs": 24,
+      "dimension_ratings": 144,
+      "rating_disagreements_partition_vs_full": 29,
+      "facet_verdict_disagreements_partition_vs_full": 3,
+      "disagreement_resolutions_complete": true,
+      "post_reconciliation_tiebreak_changes": 2,
+      "tiebreak_pair": "CAP-MED-CD-REGISTER-BALANCE|witness_authority",
+      "reconciled_rating_counts": {
+        "MET": 20,
+        "STRONGER": 0,
+        "GAP": 60,
+        "CONTRADICTED": 64,
+        "NOT_APPLICABLE": 0
+      },
+      "reconciled_facet_verdict_counts": {
+        "GAP": 5,
+        "CONTRADICTED": 19
+      },
+      "reconciled_feature_verdict_counts": {
+        "CONTRADICTED": 6
+      },
+      "arithmetic_valid": true
+    },
+    "identity_blind_stage_boundary": {
+      "agent_a_current_product_withheld": true,
+      "agent_b_upstream_identity_withheld": true,
+      "agent_c_upstream_identity_withheld": true,
+      "agent_c_inputs_limited_to_run_048_and_run_049": true,
+      "prompt_required_agent_a_to_agent_b_sanitized_behaviour_derivation": false,
+      "determinative_failure": "RUN-048 attests that it saw only literal feature/facet identifiers and no RUN-047 sanitized observed behaviour. It is an independent normative specification, not Agent B's source-independent rewrite of Agent A's observed benchmark behaviour. RUN-050 therefore compares current source with an unlinked specification and cannot complete the prompt's observed behaviour -> neutral requirements -> current product chain."
+    },
+    "credit_flags_in_inputs_all_false": true
+  },
+  "rating_dimension_order": [
+    "authorization_scope",
+    "state_read_projection",
+    "integrity_audit_provenance",
+    "replay_concurrency",
+    "privacy_direct_object",
+    "collision_exclusions"
+  ],
+  "rating_review": {
+    "accounting": {
+      "total_reconciled_cells": 144,
+      "accepted_as_stated": 126,
+      "corrected": 12,
+      "invalid_due_to_neutral_target_drift": 6,
+      "accounted_cells": 144
+    },
+    "independent_valid_cell_counts_after_corrections": {
+      "cells": 138,
+      "MET": 19,
+      "STRONGER": 0,
+      "GAP": 66,
+      "CONTRADICTED": 53,
+      "NOT_APPLICABLE": 0
+    },
+    "independent_facet_verdict_counts": {
+      "GAP": 8,
+      "CONTRADICTED": 15,
+      "INVALID_NEUTRAL_TARGET": 1
+    },
+    "corrections": [
+      {
+        "pair": "CAP-CLIN-OBSERVATION-REGISTER-RECORD|create_register",
+        "dimensions": "ALL_SIX",
+        "from": ["CONTRADICTED", "CONTRADICTED", "GAP", "GAP", "CONTRADICTED", "CONTRADICTED"],
+        "to": "INVALID_NEUTRAL_TARGET_NO_RERATING",
+        "reason": "RUN-048 changes the frozen user job and RUN-047 initial-observation registration behaviour into creation of a template-versioned register definition."
+      },
+      {
+        "pair": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|view",
+        "dimension": "privacy_direct_object",
+        "from": "MET",
+        "to": "GAP",
+        "reason": "Site concealment is shown, but parity across every supported search, count, related-label, error, and download path is not proved."
+      },
+      {
+        "pair": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|update",
+        "dimension": "privacy_direct_object",
+        "from": "MET",
+        "to": "GAP",
+        "reason": "Direct-target concealment is shown, but rejected-value and error redaction is not established."
+      },
+      {
+        "pair": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|set_active",
+        "dimension": "privacy_direct_object",
+        "from": "MET",
+        "to": "GAP",
+        "reason": "Pre-validation target concealment is shown, but absence of unrelated HR or account details in responses is not established."
+      },
+      {
+        "pair": "CAP-MED-CD-REGISTER-BALANCE|destruction_projection",
+        "dimension": "integrity_audit_provenance",
+        "from": "GAP",
+        "to": "CONTRADICTED",
+        "reason": "RUN-049 affirmatively permits controlled destruction without a controlled-register disposal entry and omits void metadata, conflicting with required row-level register and movement-state provenance."
+      },
+      {
+        "pair": "CAP-FIN-ALLOCATION-MATCH-HISTORY|allocation_history_review",
+        "dimensions": ["authorization_scope", "collision_exclusions"],
+        "from": ["CONTRADICTED", "CONTRADICTED"],
+        "to": ["GAP", "GAP"],
+        "reason": "Broad coherent AR/AP permissions leave exact history authority and adjacent-action separation unproved; no unauthorized principal or capability substitution is established."
+      },
+      {
+        "pair": "CAP-FIN-ALLOCATION-MATCH-HISTORY|suggested_match_review",
+        "dimensions": ["authorization_scope", "collision_exclusions"],
+        "from": ["CONTRADICTED", "CONTRADICTED"],
+        "to": ["GAP", "GAP"],
+        "reason": "Shared banking permissions and rendered-but-route-denied controls do not establish that an adjacent permission executes the action; privacy remains contradicted because proposal Site is not re-proved."
+      },
+      {
+        "pair": "CAP-FIN-ALLOCATION-MATCH-HISTORY|confirm",
+        "dimensions": ["authorization_scope", "collision_exclusions"],
+        "from": ["CONTRADICTED", "CONTRADICTED"],
+        "to": ["GAP", "MET"],
+        "reason": "The route gate exists but exact least-privilege semantics are unproved; no adjacent permission is shown to substitute for confirm."
+      },
+      {
+        "pair": "CAP-FIN-ALLOCATION-MATCH-HISTORY|reject",
+        "dimensions": ["authorization_scope", "collision_exclusions"],
+        "from": ["CONTRADICTED", "CONTRADICTED"],
+        "to": ["GAP", "MET"],
+        "reason": "The route gate exists but exact least-privilege semantics are unproved; no adjacent permission is shown to substitute for reject."
+      }
+    ]
+  },
+  "facets": [
+    {"feature_id":"CAP-CLIN-OBSERVATION-REGISTER-RECORD","facet_key":"create_register","upstream":"CANDIDATE_OPENEMR","reconciled":["CONTRADICTED","CONTRADICTED","GAP","GAP","CONTRADICTED","CONTRADICTED"],"independent":"INVALID_NEUTRAL_TARGET","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-CLIN-OBSERVATION-REGISTER-RECORD","facet_key":"amendment","upstream":"CANDIDATE_OPENMRS","reconciled":["GAP","GAP","GAP","GAP","GAP","MET"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-CLIN-OBSERVATION-REGISTER-RECORD","facet_key":"care_context_template_hierarchy_filtering","upstream":"CANDIDATE_OPENEMR_BOUNDED","reconciled":["GAP","GAP","GAP","GAP","GAP","MET"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-CLIN-EVENT-REGISTER-RECORD","facet_key":"initial_event_record","upstream":"BOUNDED_REJECTION_NOT_FINAL_NO_MATCH","reconciled":["MET","GAP","GAP","GAP","CONTRADICTED","MET"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-INC-INCIDENT-REVIEW-CLOSURE","facet_key":"incident_review","upstream":"CANDIDATE_BEACONHS_BOUNDED_REVIEW_IA","reconciled":["CONTRADICTED","GAP","GAP","MET","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-INC-INCIDENT-REVIEW-CLOSURE","facet_key":"incident_closure","upstream":"CANDIDATE_BEACONHS","reconciled":["CONTRADICTED","GAP","GAP","GAP","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"create","upstream":"CANDIDATE_ERPNEXT","reconciled":["CONTRADICTED","CONTRADICTED","GAP","GAP","GAP","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"view","upstream":"CANDIDATE_ERPNEXT","reconciled":["MET","GAP","GAP","GAP","MET","MET"],"independent":["MET","GAP","GAP","GAP","GAP","MET"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"update","upstream":"CANDIDATE_ERPNEXT","reconciled":["CONTRADICTED","CONTRADICTED","GAP","CONTRADICTED","MET","CONTRADICTED"],"independent":["CONTRADICTED","CONTRADICTED","GAP","CONTRADICTED","GAP","CONTRADICTED"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"set_active","upstream":"CANDIDATE_ERPNEXT","reconciled":["CONTRADICTED","CONTRADICTED","GAP","CONTRADICTED","MET","CONTRADICTED"],"independent":["CONTRADICTED","CONTRADICTED","GAP","CONTRADICTED","GAP","CONTRADICTED"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"rehire","upstream":"BOUNDED_REJECTION_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","CONTRADICTED","GAP","GAP","GAP","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"invite","upstream":"BOUNDED_REJECTION_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","GAP","GAP","CONTRADICTED","GAP","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE","facet_key":"longitudinal_history","upstream":"CANDIDATE_HORILLA_BOUNDED","reconciled":["GAP","GAP","GAP","GAP","GAP","MET"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"view","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","GAP","GAP","GAP","GAP","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"register_movement","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"balance_check","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"discrepancy_resolution","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"destruction_projection","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","CONTRADICTED","GAP","GAP","CONTRADICTED","MET"],"independent":["CONTRADICTED","CONTRADICTED","CONTRADICTED","GAP","CONTRADICTED","MET"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-MED-CD-REGISTER-BALANCE","facet_key":"witness_authority","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["GAP","CONTRADICTED","GAP","CONTRADICTED","CONTRADICTED","CONTRADICTED"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-FIN-ALLOCATION-MATCH-HISTORY","facet_key":"allocation_history_review","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","GAP","GAP","GAP","GAP","CONTRADICTED"],"independent":["GAP","GAP","GAP","GAP","GAP","GAP"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-FIN-ALLOCATION-MATCH-HISTORY","facet_key":"suggested_match_review","upstream":"CANDIDATE_BIGCAPITAL","reconciled":["CONTRADICTED","GAP","GAP","GAP","CONTRADICTED","CONTRADICTED"],"independent":["GAP","GAP","GAP","GAP","CONTRADICTED","GAP"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-FIN-ALLOCATION-MATCH-HISTORY","facet_key":"confirm","upstream":"CANDIDATE_BIGCAPITAL","reconciled":["CONTRADICTED","MET","GAP","MET","MET","CONTRADICTED"],"independent":["GAP","MET","GAP","MET","MET","MET"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-FIN-ALLOCATION-MATCH-HISTORY","facet_key":"reject","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["CONTRADICTED","MET","GAP","MET","MET","CONTRADICTED"],"independent":["GAP","MET","GAP","MET","MET","MET"],"formal_disposition":"NO_GO"},
+    {"feature_id":"CAP-FIN-ALLOCATION-MATCH-HISTORY","facet_key":"settlement_replay_and_provenance","upstream":"BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH","reconciled":["GAP","GAP","GAP","GAP","MET","MET"],"independent":"ACCEPT_VECTOR","formal_disposition":"NO_GO"}
+  ],
+  "feature_verdicts": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "The create-register neutral target drifts from the frozen record-observation job and RUN-047 behavior; no prompt-valid Agent A to Agent B derivation exists.",
+      "next_action": "Bind the create facet to initial observation recording, pass identity-stripped RUN-047 create/filter/amendment observations to a fresh Agent B, regenerate neutral requirements, rerun Agent C, and independently adjudicate OpenEMR/OpenMRS candidates."
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "OpenMRS Encounter is correctly rejected as a compound container and the four-project bounded search is not a final no-match.",
+      "next_action": "Use the atomic event contract for a broader official-source search beyond the bounded seed queries; select an exact candidate or produce documented final no-match evidence, then run the complete A-to-B-to-C chain."
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "BeaconHS supplies bounded review information architecture and an exact closure action, but RUN-048 is not derived from those sanitized observations and the review/closure limitations remain material.",
+      "next_action": "Give a fresh Agent B identity-stripped BeaconHS review and closure packets, preserve the no-enforced-review and reversible-closure limitations, rerun Agent C, and independently select or reject each facet."
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "Five candidate facets remain unneutralized from Agent A; create-register-style target drift also appears in set-active account synchronization, and rehire/invite searches are bounded only.",
+      "next_action": "Source-link identity-stripped ERPNext create/view/update/set-active and Horilla history behavior into fresh Agent B packets, correct the set-active inversion, broaden official rehire/invite searches, then rerun comparison and adjudication."
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "RUN-047 found zero exact candidates across six facets and explicitly limits its search against any final no-match claim.",
+      "next_action": "Run facet-specific official-source deep searches for view, movement, count, discrepancy, destruction, and witness behavior; for each facet either perform identity-stripped A-to-B neutralization and clean comparison or record sufficiently broad final no-match search and exclusion evidence."
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "run_050_comparison_verdict": "CONTRADICTED",
+      "independent_formal_verdict": "NO_GO",
+      "formal_edges": 0,
+      "reason": "BigCapital is only a later-comparison candidate for suggestion review and confirm; history, reject, and replay/provenance have one-repository bounded searches, and RUN-050 never compares or selects upstream behavior.",
+      "next_action": "Perform an explicit identity-stripped Agent A to Agent B stage for BigCapital suggestion/confirm and deep official-source searches across ERPNext, Dolibarr, LedgerSMB, or other credible projects for history/reject/replay; then rerun Agent C and independent adjudication."
+    }
+  ],
+  "formal_edge_count": 0,
+  "final_no_match_count": 0,
+  "credit_boundary": {
+    "formal_mapping_credit": false,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "canonical_matrix_disposition": {
+    "status": "UNCHANGED_GUARDED_OVERLAY_ONLY",
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "formal_edges_promoted": 0,
+    "final_no_matches_promoted": 0,
+    "reason": "The prompt-valid clean specification lineage fails before mapping selection, one neutral facet target is invalid, and all bounded no-candidate results remain non-final."
+  },
+  "external_mutations_attestation": "ONLY_THIS_AUTHORIZED_RUN_051_ARTIFACT_CREATED; NO_APPLICATION_SOURCE_READ_FROM_WORKING_TREE; NO_WEB_OR_UPSTREAM_REFRESH; NO_RUNTIME_TEST_BROWSER_DATABASE; NOT_STAGED_COMMITTED_OR_PUSHED"
+}

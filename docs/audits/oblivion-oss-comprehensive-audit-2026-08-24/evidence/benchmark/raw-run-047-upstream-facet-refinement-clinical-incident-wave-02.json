@@ -1,0 +1,435 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-047-P1",
+  "generated_at": "2026-08-25T00:00:37+12:00",
+  "role": "UPSTREAM_BEHAVIOUR_OBSERVER_AGENT_A_REFINEMENT",
+  "responsible_agent_identity": "/root/run047_upstream_clinical_incident",
+  "status": "SIX_FACET_UPSTREAM_REFINEMENT_COMPLETE_ZERO_CREDIT",
+  "run_role": "UPSTREAM_BEHAVIOUR_OBSERVER_AGENT_A_REFINEMENT",
+  "input_boundary": {
+    "frozen_feature_ids": [
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+    ],
+    "local_inputs_read": [
+      "C:/Users/steph/Downloads/oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "C:/Users/steph/Herd/oblivionfindings/docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv exact frozen rows only",
+      "C:/Users/steph/Herd/oblivionfindings/docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-039-target-upstream-behaviour-wave-01.json"
+    ],
+    "upstream_boundary": "Official repositories and official documentation from the prompt-listed benchmark universe only.",
+    "inspected_date": "2026-08-24",
+    "application_source_inspected": false,
+    "current_product_evidence_inspected": false,
+    "prohibited_runs_inspected": false,
+    "runtime_tests_browser_run": false,
+    "files_edited": false,
+    "files_staged": false,
+    "commits_created": false,
+    "pushes_performed": false,
+    "external_mutations": false
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openemr/openemr",
+      "official_ref": {
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L242-L281",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L283-L351",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L471-L578",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L597-L616"
+      ],
+      "observed_behaviors": [
+        "Saving requires observation-form permission and a valid CSRF token.",
+        "With no observation ID, the controller starts from a new observation template; it binds form, active patient, encounter, user, provider group, and authorization context before validation.",
+        "The controller validates the observation and saves the main record and sub-observations inside an explicit transaction with rollback on failure.",
+        "Persistence generates a UUID, creates and links an encounter form when form_id is absent, defaults an unqualified code to LOINC, inserts a new form_observation row when no record ID exists, and reloads the persisted record.",
+        "Sub-observations inherit the saved parent ID, patient, encounter, and form ID."
+      ],
+      "gaps": [
+        "The same service updates an existing observation row in place, so this locator is not eligible as an amendment/version-history comparator.",
+        "A durable success audit event is not established; the inspected service contains a TODO for save-event dispatch.",
+        "Row locking, idempotency, replay behavior, approved-Site scope, and retry recovery are not established.",
+        "The source identifies portions of the observation implementation as AI-generated; no runtime or maturity inference is made."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "GPL-3.0",
+        "licence_anchor": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE#L1-L6",
+        "edition_boundary": "Public repository and pinned ref only; hosted services and uncited modules are excluded. No further edition split was established."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Initial clinical-observation registration only.",
+        "reason": "The pinned paths expose a concrete initial-record branch, required context, validation, transaction, persistence, and success behavior without relying on a grouped source relation."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openmrs/openmrs-core",
+      "official_ref": {
+        "canonical_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L39-L66",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L95-L99",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L1185-L1207",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java#L103-L129",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java#L134-L198"
+      ],
+      "observed_behaviors": [
+        "OpenMRS defines an observation as a single unit of clinical information and explicitly warns against altering the official encounter record in place.",
+        "Saving an existing observation requires a change message and edit-observation privilege.",
+        "A dirty existing observation is copied without its original ID, saved as a new row, linked through previousVersion, and the original observation is voided with the change message for historical retention.",
+        "When the original status is FINAL, the replacement status becomes AMENDED.",
+        "The observation model exposes PRELIMINARY, FINAL, and AMENDED states and describes the previous-version relationship explicitly."
+      ],
+      "gaps": [
+        "No user-facing amendment confirmation, reviewer approval, signature, or reason-quality validation was established.",
+        "Concurrency locking and idempotent amendment replay are not established.",
+        "Approved-Site scope and minimum-necessary disclosure are not established.",
+        "For complex observations, the inspected service may purge the previous complex payload; complete binary-history preservation requires separate verification.",
+        "The model is audited, but the exact durable audit reader and end-user provenance display were not inspected."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "MPL-2.0 with the repository Healthcare Disclaimer",
+        "licence_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L1-L2",
+        "healthcare_disclaimer_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L366-L400",
+        "edition_boundary": "OpenMRS Core repository modules only; separately installable modules are excluded.",
+        "edition_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/README.md#L215-L253"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Clinical-observation amendment and version lineage.",
+        "reason": "The pinned service implements a concrete replacement-row, previous-version, void-old, reason-required, and AMENDED-state behavior."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openemr/openemr",
+      "official_ref": {
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L75-L108",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L180-L203",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L179-L196",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L228-L241",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L278-L324"
+      ],
+      "observed_behaviors": [
+        "The new/edit action derives patient and encounter from the active session, resolves the requested form or observation, and uses a default empty observation template when no record resolves.",
+        "Single-record lookup is constrained by observation ID and patient ID and can populate child observations.",
+        "The list action filters by active patient, active encounter, form ID, and absence of a parent-observation ID so only top-level records seed the result.",
+        "Encounter retrieval filters by patient and encounter, orders top-level observations newest first, and attaches each record's sub-observations.",
+        "Hierarchy population identifies top-level results and attaches child records using parent_observation_id."
+      ],
+      "gaps": [
+        "The inspected hierarchy population establishes parent and immediate-child behavior; arbitrary multi-level hierarchy is not established.",
+        "form_id and a default empty observation template do not establish a configurable care-plan or clinical-template hierarchy.",
+        "Approved-Site filtering is not established.",
+        "Single-record lookup is patient-scoped but does not itself include encounter scope.",
+        "Authorization beyond the controller's observation-form permission and privacy behavior outside the active patient context remain unknown."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "GPL-3.0",
+        "licence_anchor": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE#L1-L6",
+        "edition_boundary": "Public repository and pinned ref only; hosted services and uncited modules are excluded. No further edition split was established."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Patient, encounter, form, top-level, and immediate-child selection behavior only.",
+        "reason": "The official pinned paths expose the exact filter inputs and hierarchy assembly rather than merely naming observations or forms."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "candidate_status": "NO_CANDIDATE_BOUNDED_REJECTION",
+      "candidate_project": null,
+      "official_ref": {
+        "rejected_locator_project": "openmrs/openmrs-core",
+        "canonical_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Encounter.java#L47-L115",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L101-L224",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L246-L274"
+      ],
+      "observed_behaviors": [
+        "The rejected OpenMRS locator defines an Encounter as a visit or interaction container with zero-to-many observations and orders.",
+        "The model also contains diagnoses, conditions, allergies, providers, a form, location, encounter type, and an optional visit.",
+        "Saving can assign and persist a visit, persist the encounter, and then save order groups, orders, observations, conditions, allergies, and diagnoses.",
+        "New and existing encounters require different add/edit privileges."
+      ],
+      "gaps": [
+        "The locator is a compound encounter container, not an exact atomic initial clinical-event record.",
+        "The frozen evidence supplies only the user job Record a clinical event; target event fields, categories, state, provenance, and completion contract cannot be established without prohibited current-product evidence.",
+        "No official pinned source inspected in this bounded refinement established a standalone initial-event record equivalent.",
+        "The bounded search is not an exhaustive final no-match search across the complete benchmark universe."
+      ],
+      "bounded_search": {
+        "projects_and_queries": [
+          {
+            "project": "openmrs/openmrs-core",
+            "query": "Pinned Encounter model and save behavior",
+            "result": "Rejected as a compound visit or interaction container."
+          },
+          {
+            "project": "openemr/openemr",
+            "query": "Official-repository search for clinical event",
+            "result": "No exact standalone initial-event locator returned."
+          },
+          {
+            "project": "ohcnetwork/care",
+            "query": "Official-repository search for Clinical Event record",
+            "result": "No exact standalone initial-event locator returned."
+          },
+          {
+            "project": "medplum/medplum",
+            "query": "Official-repository search for clinical event",
+            "result": "No exact standalone initial-event locator returned."
+          }
+        ]
+      },
+      "licence_edition_boundary": {
+        "root_licence": "MPL-2.0 with the repository Healthcare Disclaimer",
+        "licence_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L1-L2",
+        "healthcare_disclaimer_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L366-L400",
+        "edition_boundary": "OpenMRS Core repository modules only; separately installable modules are excluded."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": false,
+        "scope": "Initial clinical-event recording.",
+        "reason": "Using the compound Encounter service would conflate a care interaction container with the frozen atomic event-record job. A target contract and exact upstream event object are required first."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "braedonsaunders/beaconhs",
+      "official_ref": {
+        "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+        "branch": "main",
+        "commit_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/_header-actions.tsx#L45-L67",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L1741-L1759",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L2878-L3271"
+      ],
+      "observed_behaviors": [
+        "Incident detail exposes reported, under_investigation, pending_review, closed, and reopened statuses in desktop and mobile selectors, and selection auto-submits.",
+        "A visible review-progress checklist covers incident details, people and injuries, reconstructed timeline, contributing factors, root cause or 5-Whys, preventative steps, and closure.",
+        "The investigation surface exposes timeline events, contributing factors, root cause or 5-Whys, owned and due preventative steps, and linked corrective actions with status."
+      ],
+      "gaps": [
+        "The checklist and pending_review state do not gate closure in the inspected closure action.",
+        "No formal review-completion action, reviewer identity, review outcome, approval, signature, or corrective-action effectiveness decision is required.",
+        "The status selector has no explicit confirmation or error surface in the inspected header component.",
+        "This is source evidence from a repository described as pre-launch; no runtime, maturity, or production credit is available."
+      ],
+      "bounded_search": [
+        {
+          "project": "intuitem/ciso-assistant-community",
+          "ref": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+          "disposition": "AUXILIARY_ONLY",
+          "reason": "Direct security or operational incident lifecycle and status history, but no distinct review state or review authority was established.",
+          "anchor": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/product-docs/concepts/incidents.md#L28-L54"
+        },
+        {
+          "project": "MeyerThorsten/QAtrial",
+          "ref": "b10fab722caf9561bcf4fdb03cc9733156992635",
+          "disposition": "COLLISION_LIMITED_PROXY",
+          "reason": "Investigation, root-cause, and CAPA behavior applies to a deviation object, not an incident.",
+          "anchor": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L224-L345"
+        },
+        {
+          "project": "SmartQHSE/hse-calculators",
+          "ref": "324829cf05f2b99363a4d4d0d59e008c4a300032",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Calculator library, not an incident-review workflow."
+        },
+        {
+          "project": "opf/openproject",
+          "ref": "7a59d6b855a5df431f9ab80742b64763016f95e8",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Generic work-package workflow only."
+        }
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "AGPL-3.0",
+        "licence_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/LICENSE#L1-L12",
+        "edition_boundary": "Public self-hosted repository only. The README describes the project as pre-launch; no maturity or production boundary is inferred.",
+        "edition_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/README.md#L296-L310"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Incident investigation and review information architecture only.",
+        "reason": "BeaconHS provides a direct H&S incident object with an exact pending-review status, investigation artifacts, and visible review checklist. It does not establish an enforced review gate."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "braedonsaunders/beaconhs",
+      "official_ref": {
+        "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+        "branch": "main",
+        "commit_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/lib/permissions-meta.ts#L45-L51",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L140-L243",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L1841-L1865",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L3306-L3315"
+      ],
+      "observed_behaviors": [
+        "Closure requires the distinct incidents.close capability and an owner/site-aware record-visibility guard.",
+        "The incident row is locked before the closure mutation.",
+        "Closing sets closedAt, clears inProgress, locks the incident, and records a transactional domain event for downstream notification, integration, and flow consumers.",
+        "The action subsequently records activity audit information and refreshes incident detail and list views.",
+        "Closed incidents display the closure date, appear locked, and expose status and audit history in Activity."
+      ],
+      "gaps": [
+        "Review checklist completion, pending flow gates, and corrective-action state do not gate closure; the inspected action permits a direct status change to closed.",
+        "No closure confirmation, rationale, approval, signature, reviewer identity, or effectiveness decision is required.",
+        "The schema has closedByTenantUserId, but the inspected closure mutation does not populate it.",
+        "Activity audit recording occurs after the closure transaction, so atomic closure-plus-audit recovery is not established.",
+        "Selecting a non-closed status clears closedAt and unlocks the incident; a user with update permission can also unlock a closed incident separately, so closure immutability is not established."
+      ],
+      "bounded_search": [
+        {
+          "project": "intuitem/ciso-assistant-community",
+          "ref": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+          "disposition": "AUXILIARY_ONLY",
+          "reason": "Direct incident closure status and actor/timestamp timeline, but no close-specific authority or mandatory evidence gate.",
+          "anchor": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/backend/core/views.py#L16010-L16035"
+        },
+        {
+          "project": "MeyerThorsten/QAtrial",
+          "ref": "b10fab722caf9561bcf4fdb03cc9733156992635",
+          "disposition": "COLLISION_LIMITED_PROXY",
+          "reason": "Closure is state-gated and records actor/time, but the object is a deviation and its linked CAPA may remain open.",
+          "anchor": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L154-L205"
+        },
+        {
+          "project": "SmartQHSE/hse-calculators",
+          "ref": "324829cf05f2b99363a4d4d0d59e008c4a300032",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Calculator library, not an incident-closure workflow."
+        },
+        {
+          "project": "opf/openproject",
+          "ref": "7a59d6b855a5df431f9ab80742b64763016f95e8",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Generic configurable work-package status only."
+        }
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "AGPL-3.0",
+        "licence_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/LICENSE#L1-L12",
+        "edition_boundary": "Public self-hosted repository only. The README describes the project as pre-launch; no maturity or production boundary is inferred.",
+        "edition_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/README.md#L296-L310"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Direct H&S incident closure authority, locking, mutation, downstream event, feedback, and known recovery gaps.",
+        "reason": "The pinned action is an exact incident-closure implementation rather than a generic lifecycle reference, while its missing prerequisites and reversibility remain explicit."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "frozen_feature_ids": 3,
+    "facets": 6,
+    "candidate_facets": 5,
+    "bounded_no_candidate_facets": 1,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_credit": 0,
+    "final_no_match_credit": 0,
+    "completion_credit": 0
+  },
+  "credit_boundary": {
+    "disposition": "UPSTREAM_LOCATOR_REFINEMENT_ONLY",
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "completion_credit": false,
+    "final_mapping_claim": false,
+    "final_no_match_claim": false
+  },
+  "mutation_attestation": {
+    "application_files_modified": false,
+    "application_runtime_executed": false,
+    "tests_executed": false,
+    "browser_executed": false,
+    "external_systems_mutated": false,
+    "audit_artifact_created": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-047-upstream-facet-refinement-clinical-incident-wave-02.json"
+  }
+}

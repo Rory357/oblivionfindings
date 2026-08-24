@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-050-T",
+  "generated_at": "2026-08-25T01:20:00+12:00",
+  "role": "CLEAN_COMPARISON_WITNESS_AUTHORITY_TIEBREAK",
+  "responsible_agent_identity": "/root/run050_witness_tiebreak",
+  "inputs": [
+    {
+      "run_id": "RUN-048",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "sha256": "FA9B793AD851D90A1871B0CE7DE76906026144FCE3E54FF8F502352F72584BD6"
+    },
+    {
+      "run_id": "RUN-049",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json",
+      "sha256": "2ED6B9BAE1270A4C00B3B427DAA077C145CFB370AA26CC4D12E4A3E68ACC765A"
+    }
+  ],
+  "pair": {
+    "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+    "facet_key": "witness_authority",
+    "pair_key": "CAP-MED-CD-REGISTER-BALANCE|witness_authority"
+  },
+  "decision_rule": {
+    "contradicted": "Use CONTRADICTED only when RUN-049 states behavior that conflicts with a required RUN-048 outcome.",
+    "gap": "Use GAP when a required outcome is absent or unproved and RUN-049 states no conflicting behavior."
+  },
+  "selected_view": "B",
+  "ratings": {
+    "authorization_scope": {
+      "rating": "GAP",
+      "run_048_requirement": {
+        "field": "authorization_scope",
+        "lines": "1035-1038",
+        "citation": "The witness must have exact controlled-drug witness authority for the Site, register, and action category; the initiator separately needs exact action authority, and witness authority cannot initiate or alter the underlying action."
+      },
+      "run_049_evidence": [
+        {
+          "field": "authority",
+          "line": 544,
+          "citation": "The selected witness is separately checked for medications.controlled.witness."
+        },
+        {
+          "field": "site_direct_object",
+          "line": 545,
+          "citation": "No witness Site overlap, Client assignment, current competency, or canonical relationship to the controlled record is established."
+        },
+        {
+          "field": "collisions_gaps",
+          "line": 549,
+          "citation": "Witness identity does not prove Site, assignment, competency, independence, or continuing eligibility."
+        }
+      ],
+      "reason": "RUN-049 proves a separate witness permission but describes the stronger canonical scope and eligibility outcomes as not established or not proved. It does not state that a wrong-Site, unassigned, unqualified, or non-independent witness is accepted, or that witness authority initiates or alters the action. Under the decision rule, the required outcome is absent or unproved rather than contradicted."
+    },
+    "integrity_audit_provenance": {
+      "rating": "GAP",
+      "run_048_requirements": [
+        {
+          "field": "state_read_projection",
+          "lines": "1041-1043",
+          "citation": "Attestation must record witness, time, assurance method, action identity and revision, bind reliably to the exact action content, and become invalid after payload change."
+        },
+        {
+          "field": "integrity_audit_provenance",
+          "lines": "1045-1047",
+          "citation": "Attestation must be non-transferable and tamper-evidently bound to exact action content and state, with attributable provenance."
+        }
+      ],
+      "run_049_evidence": [
+        {
+          "field": "state_read_effects",
+          "line": 546,
+          "citation": "Witness identity is stored with movement and balance evidence, but eligibility is not a separately governed command or snapshot."
+        },
+        {
+          "field": "transaction_locking_replay",
+          "line": 547,
+          "citation": "Witness authority has no durable eligibility snapshot or request key."
+        },
+        {
+          "field": "collisions_gaps",
+          "line": 549,
+          "citation": "Witness identity does not prove independence or continuing eligibility."
+        }
+      ],
+      "reason": "RUN-049 establishes stored witness identity but does not establish exact-payload binding, tamper evidence, non-transferability, invalidation, or full provenance. It does not state that an attestation is transferable, reused, retained after payload change, or accepted against conflicting state. Under the decision rule, the required outcome is absent or unproved rather than contradicted."
+    }
+  },
+  "count_effect": {
+    "rated_dimensions": 2,
+    "GAP": 2,
+    "CONTRADICTED": 0,
+    "difference_from_view_A": "Move two ratings from CONTRADICTED to GAP; credit remains zero."
+  },
+  "credits": {
+    "requirements_credit": false,
+    "downstream_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false
+  },
+  "credit": false,
+  "completion_credit": false,
+  "boundary_attestation": {
+    "input_artifact_content_access": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json"
+    ],
+    "other_file_content_accessed": false,
+    "source_accessed": false,
+    "git_or_upstream_accessed": false,
+    "web_accessed": false,
+    "runtime_tests_or_browser_accessed": false,
+    "authorized_output_path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-witness-authority-tiebreak-wave-02.json",
+    "other_files_written": false,
+    "staged_committed_or_pushed": false
+  },
+  "audit_complete": false
+}

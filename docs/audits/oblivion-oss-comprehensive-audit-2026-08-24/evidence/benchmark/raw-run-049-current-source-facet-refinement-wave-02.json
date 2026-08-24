@@ -1,0 +1,739 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-049",
+  "generated_at": "2026-08-25T00:36:00+12:00",
+  "role": "PINNED_CURRENT_SOURCE_FACET_REFINEMENT_AGENT_C_PRECOMPARISON",
+  "responsible_agent_identity": "/root/run049_current_source_refinement",
+  "status": "TWENTY_FOUR_PINNED_CURRENT_SOURCE_FACETS_REDTEAM_REFINED_CREDIT_ZERO",
+  "input_boundary": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "frozen_matrix": {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv",
+      "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+    },
+    "audit_artifacts": [
+      {
+        "run_id": "RUN-040",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-040-current-product-source-packets-wave-01.json",
+        "sha256": "4d9ea76a79e023e69c996ae8685f19651a0e309a1ffb217a889d7058f6505602"
+      },
+      {
+        "run_id": "RUN-041",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-041-current-source-red-team-wave-01.json",
+        "sha256": "aef801877a0392df9a84ee77b8a4c573170de68f6841162aea61b655c057ed7c"
+      },
+      {
+        "run_id": "RUN-044",
+        "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-044-current-source-facet-reconciliation-wave-01.json",
+        "sha256": "b63de4b47c8703de72550c6c94db9bbe86e5c4aca5bdd891bf42e9f3f1114457"
+      }
+    ],
+    "application_read_mode": "PINNED_GIT_OBJECT_ONLY",
+    "excluded": [
+      "RUN-047",
+      "upstream projects",
+      "web and network",
+      "blind neutral output",
+      "working-tree application source",
+      "application runtime",
+      "test execution",
+      "browser execution",
+      "repository mutation except this explicitly authorized RUN-049 artifact"
+    ],
+    "mutation_attestation": "ONLY_AUTHORIZED_RUN_049_ARTIFACT_MATERIALIZED"
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "CREATE_COMMAND_AND_READ_REGISTER",
+      "anchors": [
+        "routes/health-clinical.php:30-35",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100,336-349,620-635",
+        "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:34-69",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120,224-273,527-547,601-693",
+        "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-119,121-194",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:304-387",
+        "app/Domain/Clinical/Models/ClinicalObservation.php:18-105",
+        "app/Policies/ClientPolicy.php:20-42",
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:88-97,324-420"
+      ],
+      "authority": "Register read requires clinical.observations.viewAny. Module creation requires clinical.observations.record, separately authorized Client view, and clinical.observations.recordClinical additionally for vitals or pain.",
+      "site_direct_object": "Register rows, filters, and options use approved-Site scope. Foreign Client, Site filter, or protocol schedule produces explicit 403, not concealed 404. Stored non-null Site provenance must agree with canonical Client Site. All-Sites permission broadens Site scope only.",
+      "state_read_effects": "The register filters by Client, type, recorder, Site, and date. Typed creation stores recorder, time, Site, data, NEWS2, flags, notes, and optional schedule provenance; it emits timeline evidence and may complete a pending schedule and emit deterioration signals.",
+      "audit_provenance": "ClinicalObservation uses AuditableChanges and stores recorder, Site, time, flag, and schedule provenance. Timeline creation is inside the transaction. No fail-closed audit or durable observation outbox is established.",
+      "transaction_locking_replay": "A three-attempt transaction owns observation, timeline, optional schedule completion, signals, and dispatch. Protocol then schedule locks serialize the supplied schedule path. Ordinary creation has no request key, general row lock, or same-result replay.",
+      "collisions_gaps": [
+        "Amendment is a separate absent facet.",
+        "Questionnaire, approval, and escalation workflows are excluded.",
+        "Direct-object denial is 403.",
+        "General replay and exactly-once dispatch are not established.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "MISSING_CAPABILITY_EVIDENCE",
+      "anchors": [
+        "routes/health-clinical.php:28-50",
+        "app/Domain/Clinical/Models/ClinicalObservation.php:29-59,88-100,137-140",
+        "app/Domain/Clinical/Policies/ClinicalObservationPolicy.php:28-45",
+        "database/migrations/2026_04_13_100000_create_clinical_observations_table.php:31-36",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:46-120"
+      ],
+      "authority": "A clinical.observations.correct policy capability exists, but no routed observation amendment, correction submission, approval, rejection, or review command exists at the pin.",
+      "site_direct_object": "No amendment direct-object or Site behavior exists because no production action resolves an original observation or correction.",
+      "state_read_effects": "The model and schema expose correction_of_id, correction_status, correction_reason, approver, and approval-time fields and relationships. The canonical service only creates an initial observation and does not populate an amendment lifecycle.",
+      "audit_provenance": "AuditableChanges exists on the model, but model hooks cannot establish amendment provenance without a production writer.",
+      "transaction_locking_replay": "No amendment transaction, original-row lock, version precondition, request key, or replay contract exists.",
+      "collisions_gaps": [
+        "Medication-administration correction and Behaviour ABC correction behavior belong to different owners.",
+        "Schema, relationships, permission seeding, and a policy method do not constitute an implemented amendment action."
+      ],
+      "absence_evidence": {
+        "search_scope": [
+          "app",
+          "routes",
+          "resources/js/pages/health-clinical"
+        ],
+        "production_writer_or_route_matches": 0,
+        "remaining_observation_match": "ClinicalObservationPolicy capability only"
+      },
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "MISSING_CAPABILITY_EVIDENCE",
+      "anchors": [
+        "routes/health-clinical.php:28-35",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:63-100",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:327-364",
+        "app/Domain/Clinical/Enums/ObservationType.php:5-37",
+        "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:34-69",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:224-273",
+        "resources/js/pages/health-clinical/components/record-observation-dialog.tsx:50-133,171-236",
+        "resources/js/pages/health-clinical/observations.tsx:249-278"
+      ],
+      "authority": "Only the existing observation register and record capabilities apply. No care-context, form-template, or hierarchy-selection action capability exists in the bounded source.",
+      "site_direct_object": "Existing Client, Site, staff, and record scopes are approved-Site scoped, but there is no care-context or template direct object to authorize or conceal.",
+      "state_read_effects": "The register exposes Client, observation-type, recorder, Site, and date filters. Creation uses seven fixed ObservationType enum values and a static wizard. No care-context-dependent template catalogue, parent-child hierarchy, or hierarchy filter is present.",
+      "audit_provenance": "No template-selection or care-context decision exists to audit. Observation audit evidence belongs only to the resulting create command.",
+      "transaction_locking_replay": "The register is read-only and the requested behavior is absent; no template transaction, lock, or replay contract exists.",
+      "collisions_gaps": [
+        "A protocol_schedule_id binds an optional due protocol schedule and is not a form-template hierarchy.",
+        "The wizard step labelled Context contains time, notes, and flags and is not a governed care-context object."
+      ],
+      "absence_evidence": {
+        "search_scope": [
+          "app/Domain/Clinical",
+          "app/Http/Controllers/Clinical",
+          "resources/js/pages/health-clinical",
+          "routes/health-clinical.php",
+          "tests/Feature/Domain/Clinical"
+        ],
+        "terms": [
+          "care_context",
+          "care context",
+          "encounter",
+          "form_template",
+          "template hierarchy",
+          "parent_template",
+          "child_template"
+        ],
+        "matches": 0
+      },
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "CREATE_COMMAND_AND_READ_REGISTER",
+      "anchors": [
+        "routes/health-clinical.php:36-41",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:106-161,357-370,620-635",
+        "app/Http/Controllers/Clinical/Concerns/RecordsClinicalRecords.php:81-122",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:31-140,238-302",
+        "app/Domain/Clinical/Services/ClinicalSiteAccessService.php:16-119,121-168",
+        "app/Policies/ClientPolicy.php:20-42",
+        "app/Domain/Clinical/Models/ClinicalEvent.php:20-63,97-109",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:776-857",
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:99-107,324-420"
+      ],
+      "authority": "Register read requires clinical.events.viewAny. Initial creation requires clinical.events.record and separately authorized Client view. Review, follow-up, and escalation use different capabilities and are excluded.",
+      "site_direct_object": "Client and register filters are approved-Site scoped. Client/Shift Site conflict is rejected and the canonical Site is snapshotted. Foreign Client or Site access produces explicit 403, not concealed 404.",
+      "state_read_effects": "Creates an open event with reporter, type, severity, occurrence/report times, description, immediate action, outcome, witnesses, follow-up evidence, and Site. Timeline and required H&S linkage are created in the core transaction; attachments are persisted afterward. Signals and ClinicalEventRecorded dispatch occur after the transaction.",
+      "audit_provenance": "ClinicalEvent uses AuditableChanges and stores reporter, Site, time, linkage, and review-related fields. Initial timeline evidence is transactional, but attachments and post-transaction signals are separate boundaries.",
+      "transaction_locking_replay": "The core event, timeline, and required H&S linkage use a three-attempt transaction. No create row lock, request key, or same-result replay exists. Attachment/core atomicity and exactly-once post-transaction dispatch are not established.",
+      "collisions_gaps": [
+        "Review, follow-up, escalation, linked-incident closure, and later investigation are excluded.",
+        "Direct-object denial is 403.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "routes/incidents.php:88-100",
+        "app/Policies/ClientIncidentPolicy.php:11-70",
+        "app/Http/Controllers/IncidentController.php:1560-1618",
+        "app/Models/ClientIncident.php:16-20,24-73,97-104",
+        "app/Services/Incidents/IncidentJourneyService.php:124-170",
+        "app/Models/Concerns/AuditableChanges.php:8-52",
+        "tests/Feature/IncidentControllerTest.php:2257-2390"
+      ],
+      "authority": "The route and policy require incidents.approve and submitted state. Review notes are optional.",
+      "site_direct_object": "Neither ClientIncidentPolicy::review nor the review controller performs an approved-Site assertion before or after locking. A submitted direct-bound incident is therefore authorized by action capability and state without a Site boundary. Concealment is not established.",
+      "state_read_effects": "Transitions submitted to reviewed, recording reviewer, time, and optional notes. It ensures the canonical incident journey, which may create or repair linked H&S and alert records, then sends a notification after the transaction.",
+      "audit_provenance": "Reviewer/time/notes and ClientIncident AuditableChanges exist. No dedicated durable review outbox exists; the notification is outside the transaction.",
+      "transaction_locking_replay": "A three-attempt transaction locks the incident and re-authorizes the locked state. Competing review transitions serialize, but repeat review is rejected by state rather than returning the original result. No request key exists.",
+      "collisions_gaps": [
+        "Investigation, root cause, corrective actions, H&S governance, and closure remain separate owners.",
+        "The missing Site assertion is a direct source gap.",
+        "Review notification durability and exactly-once delivery are not established.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "routes/incidents.php:93-104",
+        "app/Policies/ClientIncidentPolicy.php:62-75",
+        "app/Http/Controllers/IncidentController.php:1341-1351,1621-1725",
+        "app/Services/UserSiteAccessService.php:185-244,246-279",
+        "app/Services/Incidents/IncidentJourneyService.php:124-170,637-718",
+        "app/Services/Incidents/IncidentAlertLifecycleSignalService.php:27-60,155-167,172-249",
+        "app/Models/ClientIncident.php:16-20,24-73,97-104",
+        "app/Models/Concerns/AuditableChanges.php:8-52",
+        "database/migrations/2026_08_14_000063_create_incident_lifecycle_signal_outbox.php:12-94",
+        "tests/Feature/Incidents/IncidentJourneyServiceTest.php:219-288",
+        "tests/Feature/Incidents/IncidentAlertLifecycleSignalTest.php:166-245"
+      ],
+      "authority": "The route and policy require incidents.approve and reviewed state. closed_outcome is required; closed_notes is optional. healthSafety.viewAllSites or reports.viewAny may broaden Site scope but do not replace incidents.approve.",
+      "site_direct_object": "Site access is asserted before and under the incident lock. Foreign-Site denial is explicit 403, not concealed 404. A malformed or conflicting canonical journey is converted to 404.",
+      "state_read_effects": "Closure requires review actor/time evidence, no incomplete follow-ups, completed required high/critical investigation, and closed linked H&S governance. It transitions reviewed to closed with closer, time, outcome, notes, and a lifecycle signal outbox.",
+      "audit_provenance": "ClientIncident stores closure actor/time/outcome/notes and uses AuditableChanges. The same transaction records an append-only lifecycle signal containing actor, Client, Site, H&S tuple, sequence, fingerprint, and idempotency key plus a recoverable outbox. Database triggers make lifecycle signals immutable.",
+      "transaction_locking_replay": "A three-attempt transaction locks the parent incident, canonicalizes and locks journey parents, evaluates the gate, writes closure, locks the latest lifecycle signal, and writes the outbox. Repeat close is state-rejected rather than same-result replay. Outbox dispatch is recoverable; the separate CRUD notification has no exactly-once contract.",
+      "collisions_gaps": [
+        "Investigation, follow-ups, corrective actions, H&S governance, and Control Room processing are external prerequisites, not incident-closure ownership.",
+        "Foreign-Site denial is 403.",
+        "No caller request key or same-result close replay exists.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "CREATE_OR_LINK_COMMAND",
+      "anchors": [
+        "app/Domain/Hr/Services/EmployeeIntakeService.php:41-294,504-630",
+        "app/Domain/Hr/Services/EmployeeRoleAssignmentService.php:18-90",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:854-1026",
+        "app/Http/Requests/Hr/StoreEmployeeRequest.php:14-123",
+        "resources/js/components/hr/add-employee-dialog.tsx:90-169",
+        "resources/js/pages/hr/employees/index.tsx:94-144,350-412,485-493",
+        "routes/hr.php:264-275",
+        "tests/Feature/Hr/EmployeeIntakeAfterCommitTest.php:100-142",
+        "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:260-915",
+        "tests/Feature/Hr/StaffCreationWorkflowTest.php:68-149,204-235,269-480"
+      ],
+      "authority": "hr.employees.viewAny plus hr.employees.manage; Clinical Lead and administrator-grade assignments have additional gates.",
+      "site_direct_object": "Every requested primary and secondary Site must be active, unarchived, accessible, revalidated, and locked.",
+      "state_read_effects": "User, profile, roles, Sites, and fail-closed intake audit are atomic. link_existing may update or link an existing identity. Onboarding, compliance seed, invite, automation, and webhook are best effort after commit.",
+      "transaction_locking_replay": "Normalized-email and employee-number mutexes exist. No request key; duplicate replay validates as duplicate, while repeated explicit link may re-audit and re-emit.",
+      "collisions_gaps": [
+        "This is create-or-link, not pure create."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "READ_PROJECTION",
+      "anchors": [
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:61-495,571-615,1275-1707",
+        "app/Services/UserSiteAccessService.php:42,1330-1349,1421-1439",
+        "resources/js/pages/hr/employees/index.tsx:94-144,350-474",
+        "resources/js/pages/hr/employees/show.tsx:654-760,870-954",
+        "routes/hr.php:264-266",
+        "tests/Feature/Hr/EmployeeProfileSitePrivacyTest.php:100-251",
+        "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:130-187,1006-1029"
+      ],
+      "authority": "hr.employees.viewAny; the policy self-view allowance is not reachable through these routes.",
+      "site_direct_object": "At least one historical or current assigned Site must overlap. Wholly foreign or provenance-free profiles are concealed 404. viewAllSites broadens Site scope only.",
+      "state_read_effects": "Restricted, financial, document, leave, compliance, and related projections retain separate disclosure gates.",
+      "transaction_locking_replay": "Not applicable to the read action.",
+      "collisions_gaps": [
+        "Workers use the separate self-profile route.",
+        "Policy self allowances are bypassed by route and controller gates."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "UPDATE_COMMAND",
+      "anchors": [
+        "app/Domain/Hr/Services/PeopleMutationLockService.php:9-58",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1744-1948",
+        "app/Http/Requests/Hr/UpdateEmployeeProfileRequest.php:12-145",
+        "resources/js/pages/hr/employees/edit.tsx:58-124,505-545,751-762",
+        "routes/hr.php:276-277"
+      ],
+      "authority": "hr.employees.viewAny plus hr.employees.manage; financial fields additionally require hr.employees.viewFinancial.",
+      "site_direct_object": "Edit permits any assigned-Site overlap, while mutation requires every assigned Site. A mixed visible and foreign profile can render edit but conceal PUT as 404.",
+      "state_read_effects": "Profile, destination Sites, and manager are locked; role, Site, and employment changes may create an IT mover workflow.",
+      "transaction_locking_replay": "No request key, entity version, or stale-write precondition; locks serialize but opposing writes remain last-writer-wins.",
+      "collisions_gaps": [
+        "The FormRequest lacks the HR global Site-bypass list used by the locked controller check.",
+        "PUT accepts is_active without the dedicated set-active login restoration."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "app/Observers/HrEmployeeProfileObserver.php:28-57",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1032-1077",
+        "resources/js/components/hr/people-pane.tsx:294-300,370-410",
+        "routes/hr.php:280",
+        "tests/Unit/Hr/EmployeePeopleMutationLockingContractTest.php:31-65",
+        "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:189-258",
+        "tests/Feature/Hr/PeoplePaneActionsTest.php:58-88"
+      ],
+      "authority": "hr.employees.viewAny plus hr.employees.manage and access to every assigned Site; inaccessible targets are concealed before payload validation.",
+      "site_direct_object": "All assigned Sites are checked through the mutation seam.",
+      "state_read_effects": "Activation restores missing User approval. Deactivation does not revoke login, set end date, or write a status journal. The observer flags held assets and sends deduplicated alerts synchronously inside the transaction.",
+      "transaction_locking_replay": "Target and actor graph are locked. Same-value repeats converge, but there is no request key or version; opposing commands are last-writer-wins.",
+      "collisions_gaps": [
+        "The generic update path can also change is_active without these effects."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "app/Domain/Hr/Services/EmployeeIntakeService.php:296-501",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1084-1169",
+        "resources/js/components/hr/rehire-wizard.tsx:135-218,390-470",
+        "resources/js/pages/hr/employees/index.tsx:408-425,521-528",
+        "resources/js/pages/hr/employees/show.tsx:910-954,3316-3322",
+        "routes/hr.php:281",
+        "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:887-915,1129-1149",
+        "tests/Feature/Hr/RehireFlowTest.php:67-166"
+      ],
+      "authority": "hr.employees.viewAny plus hr.employees.manage and exact role-assignment gates.",
+      "site_direct_object": "Every old assigned Site must be accessible before rehire; the new primary Site must also be accessible.",
+      "state_read_effects": "The locked transaction cancels open offboarding, appends prior-stint history, restores soft delete, activates, clears termination fields, restores login, and synchronizes roles. Login audit, onboarding, invite, and webhook are best effort after commit.",
+      "transaction_locking_replay": "A repeat fails once active; it is not same-result replay and has no request key.",
+      "collisions_gaps": [
+        "No executed outer-commit or concurrent-rehire proof is awarded."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "AFTER_COMMIT_DELIVERY_COMMAND",
+      "anchors": [
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:807-848",
+        "app/Domain/Hr/Notifications/EmployeeInviteNotification.php:11",
+        "resources/js/components/hr/needs-triage-dialog.tsx:143-160",
+        "routes/hr.php:282",
+        "tests/Feature/Hr/EmployeeInviteLifecycleTest.php:28-103",
+        "tests/Feature/Hr/NeedsTriageTest.php:88-108",
+        "tests/Feature/Hr/PeopleDirectObjectCanonicalAccessTest.php:189-223"
+      ],
+      "authority": "hr.employees.viewAny plus hr.employees.manage, a non-archived profile, and access to every assigned Site.",
+      "site_direct_object": "All assigned Sites are rechecked under the profile lock.",
+      "state_read_effects": "The guard is User.approved_at null; profile inactivity is not required. After commit, a token is created and the branded invite is queued.",
+      "transaction_locking_replay": "The transaction records no replay marker. Because send does not change approved_at, repeated requests can replace tokens and send multiple notifications.",
+      "collisions_gaps": [
+        "RUN-040's inactive-profile statement is false at this pin.",
+        "Create and rehire use a different reset-link delivery implementation."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "MISSING_CAPABILITY_EVIDENCE",
+      "anchors": [
+        "app/Domain/Hr/Models/HrEmployeeProfile.php:127-129,172-174",
+        "app/Domain/Hr/Models/HrEmployeeProfileVersion.php:10-46",
+        "app/Domain/Hr/Models/HrEmployeeStatusChange.php:10-43",
+        "database/migrations/2026_02_12_100002_create_hr_employee_profiles_tables.php:62-73",
+        "database/migrations/2026_03_22_500001_create_hr_employee_status_changes_table.php:10-27"
+      ],
+      "authority": "No production write command or exact action capability was found for either history model.",
+      "site_direct_object": "Not established because no production writer or direct-object workflow was found.",
+      "state_read_effects": "Profile-version and status-change schemas and relationships exist, but no production writer was found. Rehire employment_history JSON and generic audit logs are distinct evidence.",
+      "transaction_locking_replay": "Not established; model and table presence is not a transaction or replay contract.",
+      "collisions_gaps": [
+        "Do not credit rehire JSON employment history or generic audit logs as the missing version and status ledgers."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "READ_PROJECTION",
+      "anchors": [
+        "app/Http/Controllers/Emar/EmarController.php:593-618,1483-1715",
+        "resources/js/pages/emar/ControlledDrugs.tsx:592-620,1436-1475",
+        "routes/emar.php:57-81",
+        "tests/Feature/Emar/ControlledDrugsTest.php:88-156"
+      ],
+      "authority": "medications.view.",
+      "site_direct_object": "Uses medication-viewable Client IDs, assignments, and broad medication or Client permissions rather than UserSiteAccessService. Supplied site_id is a Client query filter without explicit Site-authority validation.",
+      "state_read_effects": "Projects controlled medications, balances, entries, open or under-review discrepancies, destructions, and loss reports.",
+      "transaction_locking_replay": "Not applicable to the read action.",
+      "collisions_gaps": [
+        "No bounded foreign-Site negative is established."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STOCK_AND_REGISTER_COMMAND",
+      "anchors": [
+        "app/Http/Controllers/Concerns/HandlesMedicationSync.php:7-99",
+        "app/Http/Controllers/Emar/EmarController.php:764-787,4986-5129",
+        "app/Models/ClientControlledDrugEntry.php:9-67",
+        "app/Models/ClientMedicationStock.php:11-118",
+        "resources/js/pages/emar/_cd-dialogs.tsx:89-169",
+        "routes/emar.php:154-218"
+      ],
+      "authority": "medications.orders.manage at the route; witness permission is checked separately.",
+      "site_direct_object": "The Client is resolved, but medication lookup is nullable; actor Site/direct-object access and Client-medication ownership are not checked.",
+      "state_read_effects": "Validates caller-supplied before/after arithmetic and creates a register entry whose client_medication_id may be null when medication lookup does not resolve. Stock mutation and schedule update occur only when medication resolves.",
+      "transaction_locking_replay": "Writes are not transaction-bound and take no stock or register lock. The optional seven-day cache key is not actor- or payload-bound, is checked before access, and is written after effects without an atomic mutex.",
+      "collisions_gaps": [
+        "ClientControlledDrugEntryPolicy defines medications.controlled.view and record, but this path does not invoke it.",
+        "Nullable medication resolution permits a register entry without medication identity, stock mutation, or schedule update.",
+        "The cache is not durable idempotency."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "BALANCE_AND_DISCREPANCY_COMMAND",
+      "anchors": [
+        "app/Services/MedicationIncidentIntegrationService.php:211-286",
+        "app/Http/Controllers/Emar/EmarController.php:5132-5288",
+        "app/Models/ClientControlledDrugDiscrepancy.php:10-78",
+        "resources/js/pages/emar/_cd-dialogs.tsx:495-572",
+        "routes/emar.php:213",
+        "tests/Feature/Emar/ControlledDrugsTest.php:190-294"
+      ],
+      "authority": "medications.orders.manage plus witness permission; actor Site checks are absent.",
+      "site_direct_object": "The actor-Site seam is missing as for register movement, and medication lookup is nullable rather than ownership-bound.",
+      "state_read_effects": "The balance-check entry may carry a null client_medication_id, and stock mutation occurs only when medication resolves. On a mismatch with unmatched medication, discrepancy integration dereferences the missing medication, so discrepancy, incident, and alert effects are not unconditional and may fail.",
+      "transaction_locking_replay": "Core writes are transactional but stock is not locked. Alert clearing occurs after commit. The optional cache has the same non-durable limitations as movement.",
+      "collisions_gaps": [
+        "A concurrent stock writer can race the unlocked balance transaction.",
+        "An unmatched medication plus discrepancy can fail during missing-medication dereference instead of completing discrepancy, incident, and alert creation."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "app/Services/MedicationIncidentIntegrationService.php:762-783",
+        "app/Http/Controllers/Emar/EmarController.php:5291-5314",
+        "resources/js/pages/emar/_cd-dialogs.tsx:749-766",
+        "routes/emar.php:214"
+      ],
+      "authority": "medications.orders.manage.",
+      "site_direct_object": "Direct route binding has no actor Site or current-Client access check.",
+      "state_read_effects": "Overwrites status and resolution evidence without an open-state precondition; alert and signal resolution is a separate call.",
+      "transaction_locking_replay": "No row lock, transaction, request key, or same-result replay.",
+      "collisions_gaps": [
+        "A failure after discrepancy save can leave closed discrepancy evidence with live alerts."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "EXTERNAL_PROJECTION_DEPENDENCY",
+      "anchors": [
+        "app/Http/Controllers/Emar/EmarController.php:1563-1572,1673-1688,4023-4121,5405-5421",
+        "app/Models/MedicationDestruction.php:10-129",
+        "resources/js/pages/emar/ControlledDrugs.tsx:1436-1475",
+        "resources/js/pages/emar/_cd-dialogs.tsx:1342-1414",
+        "routes/emar.php:217-218",
+        "tests/Feature/Emar/MedicationIntegrityAuditTest.php:97"
+      ],
+      "authority": "Projection requires medications.view; the external destruction write requires medications.orders.manage.",
+      "site_direct_object": "Independent Client, medication, and Site identifiers are existence-validated but not ownership-consistency or Site-authority checked.",
+      "state_read_effects": "Creation is transactional and locks stock only when linked stock exists. The controlled page projects destruction evidence but omits void metadata.",
+      "transaction_locking_replay": "No request key. Void does not reverse stock or register movement.",
+      "collisions_gaps": [
+        "Controlled destruction can be saved without a controlled-register disposal entry when linkage or stock is absent.",
+        "Voided evidence can appear without its void state.",
+        "The destruction command belongs to CAP-MED-DESTRUCTION."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "CROSS_CUTTING_ACTION_AUTHORITY",
+      "anchors": [
+        "app/Http/Controllers/Emar/EmarController.php:4986-5129,5132-5288",
+        "app/Policies/ClientControlledDrugEntryPolicy.php:8-34",
+        "routes/emar.php:154-218",
+        "tests/Feature/Emar/ControlledDrugsTest.php:88-294"
+      ],
+      "authority": "Movement and balance routes require medications.orders.manage; the selected witness is separately checked for medications.controlled.witness. The controlled-entry policy record action is not invoked.",
+      "site_direct_object": "No witness Site overlap, Client assignment, current competency, or canonical relationship to the controlled record is established.",
+      "state_read_effects": "Witness identity is stored with movement and balance evidence, but eligibility is not a separately governed command or snapshot.",
+      "transaction_locking_replay": "Witness authority inherits each caller's transaction and replay weakness and has no durable eligibility snapshot or request key.",
+      "collisions_gaps": [
+        "Witness identity does not prove Site, assignment, competency, independence, or continuing eligibility."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "READ_PROJECTION",
+      "anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentAllocationController.php:11-70",
+        "app/Domain/Finance/Models/FinPaymentAllocation.php:13-111",
+        "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:21-100",
+        "resources/js/pages/finance/payment-allocations/Index.tsx:64-226",
+        "routes/finance.php:339-341",
+        "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:256-358,596-671"
+      ],
+      "authority": "finance.ar.view or finance.ap.view; the controller partitions receivable and payable rows by the exact permission held.",
+      "site_direct_object": "Stored settlement Site scope filters rows. finance.payments.viewAllSites broadens read scope and admits legacy review-required rows. No direct allocation mutation route exists.",
+      "state_read_effects": "Read-only traceable-allocation versus legacy-review projection; the model blocks update and delete.",
+      "transaction_locking_replay": "Not applicable to the read action.",
+      "collisions_gaps": [
+        "Settlement and manual-AR producer commands are not review ownership."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "READ_PROJECTION_AND_PROPOSAL_COMMAND",
+      "anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:21-122",
+        "app/Domain/Finance/Models/FinPaymentMatch.php:14-115",
+        "app/Domain/Finance/Services/PaymentMatchingService.php:32-106,206-295,619-662",
+        "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:124-135",
+        "resources/js/pages/finance/payment-matching/Index.tsx:138-236,520-552",
+        "routes/finance.php:464-472"
+      ],
+      "authority": "List requires finance.bank.view; suggestion and match-all require finance.bank.manage.",
+      "site_direct_object": "List is organisation and stored-Site scoped; review does not re-prove that a stored proposal Site still equals its current target Site, while confirm and reject do.",
+      "state_read_effects": "Suggested, confirmed, auto-confirmed, or rejected. Rejection evidence is immutable. Deterministic proposal keys suppress another non-rejected proposal and append a version after rejection.",
+      "transaction_locking_replay": "Suggestion locks the bank transaction. Proposal versioning is not request idempotency.",
+      "collisions_gaps": [
+        "The view-only page renders auto-match and confirm/reject actions without a capability gate, although routes deny those commands to a finance.bank.view-only actor."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:127-137",
+        "app/Domain/Finance/Services/PaymentMatchingService.php:300-303,352-606",
+        "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150",
+        "routes/finance.php:473-475",
+        "tests/Feature/Finance/PaymentMatchingJournalPostingTest.php:51-197,391-437"
+      ],
+      "authority": "finance.bank.manage at the route envelope; the service does not independently re-check the action.",
+      "site_direct_object": "Organisation, stored proposal Site, current target Site, and actor target access are checked. manage-all-Sites broadens actor access only. Inaccessible targets are concealed 404 unless that actor scope applies; stored/current target-Site mismatch is always concealed 404 and is never bypassed.",
+      "state_read_effects": "Transitions suggested to confirmed. AP and AR paths enforce sign, due, journal, allocation, and target-state rules; fully allocated invoices project paid state.",
+      "transaction_locking_replay": "One transaction locks journal sequence, match, bank transaction, then bill or invoice. Already-confirmed replays only when canonical journal and allocation evidence remains; no request key exists.",
+      "collisions_gaps": [
+        "Evidence-conditioned state replay is not general payload-bound idempotency."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentMatchController.php:142-156",
+        "app/Domain/Finance/Models/FinPaymentMatch.php:45-64",
+        "app/Domain/Finance/Services/PaymentMatchingService.php:308-350",
+        "routes/finance.php:476-478",
+        "tests/Feature/Finance/PaymentMatchingJournalPostingTest.php:253-389"
+      ],
+      "authority": "finance.bank.manage at the route envelope.",
+      "site_direct_object": "The same organisation, current-target, and concealed-404 boundary as confirm applies. manage-all-Sites broadens actor access only; stored/current target-Site mismatch is always concealed 404 and is never bypassed.",
+      "state_read_effects": "Transitions unsettled suggested to immutable rejected with actor, time, and reason. Confirmed or rejected rows cannot be rejected again.",
+      "transaction_locking_replay": "Proposal lock, validation, rejection evidence, and fail-closed audit share one transaction. Repeat reject fails; a later suggestion is a new version.",
+      "collisions_gaps": [],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "source_status": "RUN_044_VALIDATED_CARRY_FORWARD",
+      "ownership_class": "PRODUCER_INTEGRITY_DEPENDENCY",
+      "anchors": [
+        "app/Domain/Finance/Models/FinPaymentAllocation.php:13-111",
+        "app/Domain/Finance/Services/AccountsReceivableService.php:296-439",
+        "app/Domain/Finance/Services/PaymentSettlementRecorder.php:19-150",
+        "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:21-205",
+        "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:360-671"
+      ],
+      "authority": "Producer commands retain their own exact AR, AP, or bank-management action; all-Sites permissions broaden scope but do not replace that action.",
+      "site_direct_object": "Canonical target and settlement Site are rechecked before append-only allocation evidence is accepted; inaccessible targets are concealed by the owning producer seam.",
+      "state_read_effects": "Settlement provenance binds allocation, target, source, journal, Site, actor, and bank-transaction evidence. These producer effects feed history but are not owned by its read route.",
+      "transaction_locking_replay": "Recorder uniqueness and producer locks prevent duplicate canonical settlement sources. Replay strength varies by producer and is not one target-wide idempotency contract.",
+      "collisions_gaps": [
+        "Producer integrity is a dependency of allocation history and must not be credited as the history-review action."
+      ],
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "source_anchor_validation": {
+    "application_commit_object_exists": true,
+    "resolved_tree_matches_declared_tree": true,
+    "artifact_application_pins_match": true,
+    "run_044_input_hashes_match_run_040_and_run_041": true,
+    "frozen_matrix": {
+      "row_count": 340,
+      "unique_feature_id_count": 340,
+      "selected_row_count": 6
+    },
+    "run_044_carry_forward": {
+      "facet_count": 18,
+      "anchor_occurrences": 106,
+      "unique_anchor_strings": 103,
+      "unique_files": 57,
+      "missing_files": 0,
+      "malformed_ranges": 0,
+      "out_of_bounds_ranges": 0
+    },
+    "run_049_independent": {
+      "facet_count": 6,
+      "anchor_counts_by_facet": {
+        "create_register": 9,
+        "amendment": 5,
+        "care_context_template_hierarchy_filtering": 8,
+        "initial_event_record": 9,
+        "incident_review": 7,
+        "incident_closure": 11
+      },
+      "anchor_occurrences": 49,
+      "unique_anchor_strings": 45,
+      "unique_files": 28,
+      "missing_files": 0,
+      "malformed_ranges": 0,
+      "out_of_bounds_ranges": 0
+    },
+    "all_anchors_exist_and_ranges_are_in_bounds": true,
+    "tests_executed": false
+  },
+  "counts": {
+    "frozen_feature_rows": 340,
+    "selected_feature_rows": 6,
+    "facet_count": 24,
+    "run_044_validated_carry_forward_facets": 18,
+    "run_049_independently_verified_facets": 6,
+    "explicit_missing_capability_facets": 3,
+    "source_anchor_occurrences": 155,
+    "facet_counts_by_feature_id": {
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD": 3,
+      "CAP-CLIN-EVENT-REGISTER-RECORD": 1,
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE": 2,
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE": 7,
+      "CAP-MED-CD-REGISTER-BALANCE": 6,
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY": 5
+    },
+    "credited_facets": 0
+  },
+  "credit_boundary": {
+    "evidence_class": "STATIC_SOURCE_ONLY",
+    "formal_mapping_credit": false,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "browser_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false
+  },
+  "audit_complete": false,
+  "external_mutations_attestation": "NONE_READ_ONLY_PINNED_GIT_OBJECT_SOURCE_REVIEW"
+}

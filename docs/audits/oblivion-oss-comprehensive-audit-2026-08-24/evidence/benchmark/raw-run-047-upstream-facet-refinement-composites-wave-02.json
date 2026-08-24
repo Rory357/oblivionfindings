@@ -1,0 +1,772 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-047-P2",
+  "generated_at": "2026-08-25T00:00:22+12:00",
+  "role": "UPSTREAM_BEHAVIOUR_OBSERVER_AGENT_A_FACET_REFINEMENT",
+  "responsible_agent_identity": "/root/run047_upstream_composites",
+  "status": "EIGHTEEN_FACET_UPSTREAM_REFINEMENT_COMPLETE_ZERO_CREDIT",
+  "run_role": "RUN-047_AGENT_A_OFFICIAL_UPSTREAM_FACET_REFINEMENT_READ_ONLY",
+  "input_boundary": {
+    "allowed_internal_inputs": [
+      "C:/Users/steph/Downloads/oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/03-feature-to-benchmark-matrix.csv rows for the three assigned feature IDs",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-039-target-upstream-behaviour-wave-01.json"
+    ],
+    "prohibited_internal_inputs_attestation": "No Oblivion application source and no RUN-040, RUN-041, RUN-043, RUN-044, RUN-045, RUN-046, or current-product evidence was inspected.",
+    "external_source_policy": "Official upstream repositories and official project documentation only; repository evidence was pinned to immutable commit SHAs.",
+    "external_mutations_attestation": "NONE_READ_ONLY",
+    "bounded_search_scopes": {
+      "HR_REHIRE_INVITE": {
+        "projects": [
+          "frappe/erpnext@83e33b343cfac160f3811461d1737e67be82efd9",
+          "horilla/horilla-hr@d3443753e46f65a0b6793db4291b19ab141cf74b",
+          "orangehrm/orangehrm@56e23b3b09e7af29317a0943523b825843fff527"
+        ],
+        "terms": [
+          "rehire",
+          "reactivate",
+          "termination",
+          "invite",
+          "create user",
+          "history"
+        ],
+        "limit": "Targeted repository tree, employee lifecycle loci, and official documentation review; not a universe-wide absence proof."
+      },
+      "MED_BOUNDED_01": {
+        "projects": [
+          "openemr/openemr@a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+          "Bahmni/openmrs-module-ipd@9dbf2d26677228d94d21d33d1cdddbdaa92325ef",
+          "Bahmni/openmrs-module-ipd-frontend@cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+          "ohcnetwork/care@9a397f07ca5405dbaecd6143327fc228678dc2dc",
+          "earthians/marley@e24bc491047212b86488cf203a3457236387ca1e"
+        ],
+        "terms": [
+          "controlled",
+          "narcotic",
+          "register",
+          "movement",
+          "stock",
+          "inventory",
+          "balance",
+          "discrepancy",
+          "destruction",
+          "witness"
+        ],
+        "limit": "OpenEMR target loci were inspected in detail; the other official repositories received bounded tree/path triage. This is not a repository-wide absence proof or final no-match."
+      },
+      "FIN_BOUNDED_01": {
+        "projects": [
+          "bigcapitalhq/bigcapital@b9a431c1685a427b71b9bb757a97450b85ecb35f"
+        ],
+        "terms": [
+          "matched",
+          "perfect matches",
+          "possible matches",
+          "match",
+          "unmatch",
+          "recognized",
+          "history",
+          "replay",
+          "idempotency"
+        ],
+        "limit": "Detailed inspection of the official BankingMatching module and its schema; no final benchmark selection."
+      }
+    }
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; hosted Frappe Cloud and uninspected Frappe Framework behavior excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L116-L195",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876",
+        "https://docs.frappe.io/hr/employee#2-how-to-create-an-employee"
+      ],
+      "observed_behaviors": [
+        "The Employee document assigns its identifier through a naming series, validates lifecycle state, dates, email, reporting relationships, and preferred contact data before persistence.",
+        "HR User and HR Manager metadata grant create, read, and write authority.",
+        "After insert, optional automatic linked-user creation is invoked when a usable employee email exists."
+      ],
+      "gaps": [
+        "Framework-level persistence, transaction, and record-level permission execution are outside the pinned ERPNext repository slice.",
+        "Approved-Site scope, sensitive-field privacy, concurrency, and idempotency are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A_CREATE_BEHAVIOR_CANDIDATE; framework assumptions and privacy controls must remain unknown.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; Frappe Framework enforcement and hosted editions excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee_list.js#L1-L24",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L735-L789",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876",
+        "https://docs.frappe.io/hr/employee"
+      ],
+      "observed_behaviors": [
+        "The Employee list defaults to Active records and renders status indicators for Active, Inactive, Left, and Suspended.",
+        "The Employee document exposes Overview, Profile, and Connections areas.",
+        "Employee, HR User, and HR Manager roles have read metadata; create and write remain limited to the HR roles in this locus."
+      ],
+      "gaps": [
+        "The pinned source does not establish field-level privacy or the complete row-level user-permission evaluation performed by Frappe Framework.",
+        "Approved-Site scope and direct-object concealment are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A_PROFILE_VIEW_CANDIDATE; authorization claims must stop at the evidenced role metadata.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; external framework internals excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L120-L179",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L197-L253",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L852-L876"
+      ],
+      "observed_behaviors": [
+        "HR User and HR Manager metadata grant write authority.",
+        "Updates revalidate lifecycle, dates, email, reporting relationships, linked-user uniqueness, and preferred contact details.",
+        "A linked user's Employee role, selected personal fields, image, and optional Employee and Company user permissions are synchronized."
+      ],
+      "gaps": [
+        "Optimistic concurrency, stale-write handling, idempotency, and a complete durable audit event are not established.",
+        "Sensitive-field and approved-Site authorization are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_AN_UPDATE_BEHAVIOR_CANDIDATE.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L274-L312",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee_list.js#L1-L9"
+      ],
+      "observed_behaviors": [
+        "Employee status is constrained to Active, Inactive, Suspended, or Left.",
+        "Moving to Left requires a relieving date and is blocked while active employees still report to the departing employee.",
+        "A non-Active status disables the linked user, while return to Active re-enables it."
+      ],
+      "gaps": [
+        "The source does not establish a separate approval, effective-dated transition record, or durable lifecycle audit event.",
+        "Reactivation must not be treated as evidenced rehire.",
+        "Concurrent status changes and retry semantics are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_FOR ACTIVE_OR_INACTIVE_STATE SYNCHRONIZATION ONLY.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "Public ERPNext repository only."
+        },
+        {
+          "repository": "https://github.com/orangehrm/orangehrm",
+          "commit_sha": "56e23b3b09e7af29317a0943523b825843fff527",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OrangeHRM Starter public repository only; current help-center Workforce Management behavior is not assumed edition-equivalent."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L300-L312",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/Api/EmployeeTerminationAPI.php#L342-L375",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/entity/Employee.php#L301-L316",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/entity/Employee.php#L492-L497",
+        "https://help.orangehrm.com/hc/en-us/articles/51888457817113-How-to-Re-Activate-a-Terminated-Employee"
+      ],
+      "observed_behaviors": [
+        "ERPNext re-enables a linked user when an Employee record returns to Active.",
+        "OrangeHRM Starter clears the current termination pointer through deletion while its Employee entity also models a collection of termination records.",
+        "OrangeHRM's official help article describes Reactivate Employment and optionally updating the joined date, but the page does not establish equivalence to the pinned Starter repository."
+      ],
+      "gaps": [
+        "No inspected edition-matched locus establishes a distinct rehire transaction, new service period, rehire effective date, rehire reason, authority, or downstream contract and entitlement consequences.",
+        "Simple reactivation is insufficient evidence for rehire semantics."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT_REHIRE_CANDIDATE; later comparison requires edition-matched source proving service-period and provenance behavior.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; Frappe Framework mail and token behavior excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L159-L195",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L435-L482",
+        "https://docs.frappe.io/hr/employee#32-create-user"
+      ],
+      "observed_behaviors": [
+        "An authorized Employee write path can create an enabled User from an employee email, assign the Employee role, link it to the Employee, and optionally add Employee and Company user permissions.",
+        "The official documentation labels this behavior Create User for new or existing employees."
+      ],
+      "gaps": [
+        "The pinned target-specific source does not establish invitation issuance, one-time token, delivery state, expiry, acceptance, resend, cancellation, or recovery.",
+        "Any welcome-email or password-setup behavior implemented by external Frappe Framework was not inspected and cannot be inferred."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT_INVITATION_CANDIDATE; eligible only as adjacent linked-user-creation evidence.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "horilla/horilla-hr",
+      "official_ref": [
+        {
+          "repository": "https://github.com/horilla/horilla-hr",
+          "commit_sha": "d3443753e46f65a0b6793db4291b19ab141cf74b",
+          "licence": "LGPL-2.1",
+          "edition_boundary": "Public Horilla 2.0 repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/models.py#L921-L990",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/models.py#L528-L545",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/views.py#L3338-L3366",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/templates/tabs/history.html#L1-L6"
+      ],
+      "observed_behaviors": [
+        "Employee work information carries a HorillaAuditLog and exposes tracked diffs.",
+        "A profile History tab and employee-list history sidebar render the same activity-history feed.",
+        "The feed presents an explicit empty state when no changes exist."
+      ],
+      "gaps": [
+        "The evidenced feed is driven by EmployeeWorkInformation tracking; complete personal-profile, activation, invitation, termination, and rehire coverage is not established.",
+        "Tamper resistance, retention, export, and approved-Site filtering are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A USER-VISIBLE WORK-INFORMATION HISTORY CANDIDATE; not evidence of a complete canonical lifecycle ledger.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only; bounded target and adjacent inventory loci."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L35",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L88-L100",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "OpenEMR provides an ACL-protected drug-inventory view with facility or warehouse restriction, lot, expiry, and on-hand quantity.",
+        "A separate prescription locus records a controlled-substance reporting flag."
+      ],
+      "gaps": [
+        "No inspected query or model joins the controlled-substance flag to the inventory view as a controlled-drug register.",
+        "Register entries, running-balance chronology, resident or prescription provenance, and controlled-drug-specific visibility are not established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG REGISTER VIEW CANDIDATE; generic inventory remains adjacent evidence only under MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L163-L176",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/dispense_drug.php#L79-L88",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "Generic inventory exposes purchases, transfers, adjustments, consumption, destruction, returns, edits, and dispensing.",
+        "Dispensing records a drug sale only when inventory is available.",
+        "Controlled-substance reporting remains a separate prescription flag."
+      ],
+      "gaps": [
+        "No append-only controlled-drug movement entry binds movement type, before and after balance, actor, recipient, reason, witness, and controlled-drug identity.",
+        "Atomicity, locking, correction semantics, and Site-specific register ownership are not established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG MOVEMENT CANDIDATE; bounded generic inventory evidence only.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L39-L49",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L88-L100"
+      ],
+      "observed_behaviors": [
+        "The generic inventory query exposes and can sort by each lot's on-hand quantity.",
+        "Destroyed lots are excluded from the active inventory query."
+      ],
+      "gaps": [
+        "A displayed on-hand value is not an evidenced balance-check workflow.",
+        "No physical count, expected-versus-observed comparison, checker identity, witness, effective time, lock, pass or fail state, or signed reconciliation is established.",
+        "The inventory is not evidenced as controlled-drug-specific."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT BALANCE-CHECK CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L163-L176"
+      ],
+      "observed_behaviors": [
+        "The generic inventory grants a distinct adjustments permission and exposes adjustment, consumption, return, or edit actions for lots."
+      ],
+      "gaps": [
+        "No inspected locus detects or opens a discrepancy case, freezes unsafe activity, requires recount, preserves the original balance, records investigation and resolution, or routes escalation.",
+        "No controlled-drug-specific authority or witness rule is established.",
+        "A generic stock adjustment must not be treated as discrepancy resolution."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT DISCREPANCY-RESOLUTION CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L81-L95",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L142-L174",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/reports/destroyed_drugs_report.php#L172-L214",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "An administrator can mark an inventory lot with destruction date, method, free-text witness, and notes after CSRF validation.",
+        "A date-ranged report projects destroyed lots with on-hand quantity, method, witness, and notes."
+      ],
+      "gaps": [
+        "The destruction path and report are generic drug-inventory behaviors and are not joined to the separate controlled-substance prescription flag.",
+        "The source marks a lot destroyed; it does not establish a controlled-drug movement ledger, partial-destruction accounting, pre and post balance, or immutable correction.",
+        "Witness identity and authority are not validated."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG DESTRUCTION PROJECTION; eligible only as adjacent generic destruction-report behavior.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L29-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L81-L95",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L171-L174",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/reports/destroyed_drugs_report.php#L196-L214"
+      ],
+      "observed_behaviors": [
+        "Destroy-lot access requires the admin/drugs permission.",
+        "The destruction form accepts witness as free text and the destroyed-drugs report displays that value."
+      ],
+      "gaps": [
+        "Free text is not authenticated witness identity or authority.",
+        "No distinct witness permission, medication competency, independence rule, second-person confirmation, signature, refusal, or unavailable-witness path is established.",
+        "The acting administrator and alleged witness are not evidenced as separate accountable actors."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN EXACT WITNESS-AUTHORITY CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/models/MatchedBankTransaction.ts#L1-L20",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/database/tenant/migrations/20240619133733_create_matched_bank_transactions_table.ts#L1-L13",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L21-L44"
+      ],
+      "observed_behaviors": [
+        "Current match rows retain source transaction ID, reference type, reference ID, amount, and timestamps.",
+        "Unmatching deletes the current matched-bank-transaction rows inside a unit of work."
+      ],
+      "gaps": [
+        "Hard deletion on unmatch prevents these rows from establishing durable allocation-history review.",
+        "Actor, reason, previous state, settlement identity, review decision, and immutable provenance are not stored in the inspected schema.",
+        "Bank matching must not be assumed equivalent to payment-allocation history."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN EXACT ALLOCATION-HISTORY CANDIDATE; BigCapital remains only a bounded potential finance candidate.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "bigcapitalhq/bigcapital",
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L33-L55",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L34-L83",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L85-L113"
+      ],
+      "observed_behaviors": [
+        "The matched-transactions endpoint returns perfect and possible candidates for selected uncategorized bank transactions.",
+        "Candidate types include sale invoices, bills, expenses, manual journals, and cashflow records.",
+        "Candidates are sorted by closeness; same amount and same calendar day are classified as perfect matches, with remaining candidates classified as possible matches."
+      ],
+      "gaps": [
+        "The inspected controller does not establish user-facing role authorization or privacy scope.",
+        "Suggestion explanation is limited to evidenced amount and date classification; confidence, rule provenance, and reviewer audit are not established.",
+        "This is bank-transaction matching, not yet evidence of payment-allocation equivalence."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER CLEAN COMPARISON AS A SUGGESTED-MATCH REVIEW CANDIDATE ONLY; BigCapital is not selected as a winner.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "bigcapitalhq/bigcapital",
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L57-L64",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L46-L120",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L127-L172"
+      ],
+      "observed_behaviors": [
+        "Confirmation accepts one or more uncategorized transaction IDs and reference entries.",
+        "Source rows are loaded in deterministic ID order and locked FOR UPDATE inside a unit of work.",
+        "The command rejects missing, excluded, or already-matched sources, invalid reference types or IDs, and totals differing by more than 0.01.",
+        "Validated match records are created and matching and matched events are emitted inside the transaction callback."
+      ],
+      "gaps": [
+        "Stable request-key idempotency and same-request replay are not established.",
+        "User authorization, actor attribution, durable decision audit, and payment-settlement equivalence are not established.",
+        "Rollback details beyond the unit-of-work boundary are not evidenced in this inspected slice."
+      ],
+      "eligibility": "ELIGIBLE_FOR LATER CLEAN COMPARISON AS A MATCH-CONFIRMATION CANDIDATE ONLY; BigCapital remains unselected.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L66-L74",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L21-L44",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L74-L112"
+      ],
+      "observed_behaviors": [
+        "The service can unmatch an already-confirmed source by deleting its current match rows and emitting unmatching and unmatched events.",
+        "Suggested perfect and possible candidates are returned, but no explicit rejection command appears in the inspected matching module."
+      ],
+      "gaps": [
+        "Unmatch-after-confirmation is not the same as rejecting a proposed match.",
+        "No rejected state, candidate identity, reason, reviewer, timestamped rejection record, suppression rule, or reconsideration path is established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT SUGGESTION-REJECTION CANDIDATE UNDER FIN_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L53-L72",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L127-L172",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/models/MatchedBankTransaction.ts#L1-L20",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L26-L44"
+      ],
+      "observed_behaviors": [
+        "Source rows are locked during match confirmation and an already-matched source is rejected.",
+        "Current match rows carry reference identity and timestamps.",
+        "Match and unmatch events are emitted around creation or deletion."
+      ],
+      "gaps": [
+        "Rejecting a repeat against an already-matched row is not stable-key replay.",
+        "No idempotency key, original-result replay, payload conflict response, settlement or journal identity, actor, decision reason, or immutable provenance chain is established.",
+        "Unmatch deletes current rows, so the inspected persistence does not preserve replay history."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS AN EXACT SETTLEMENT-REPLAY-AND-PROVENANCE CANDIDATE; BigCapital provides adjacent locking and duplicate-rejection evidence only.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "facets_total": 18,
+    "exact_candidate_for_later_clean_comparison_only": 7,
+    "bounded_no_candidate_not_final_no_match": 11,
+    "by_feature": {
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE": {
+        "facets": 7,
+        "exact_candidates": 5,
+        "bounded_no_candidates": 2
+      },
+      "CAP-MED-CD-REGISTER-BALANCE": {
+        "facets": 6,
+        "exact_candidates": 0,
+        "bounded_no_candidates": 6
+      },
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY": {
+        "facets": 5,
+        "exact_candidates": 2,
+        "bounded_no_candidates": 3
+      }
+    },
+    "final_mapping_credit": 0,
+    "final_no_match_credit": 0,
+    "benchmark_credit": 0,
+    "completion_credit": 0
+  },
+  "credit_boundary": {
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "completion_credit": false,
+    "final_mapping_selected": false,
+    "bigcapital_selected_as_winner": false,
+    "source_reuse_authorized": false,
+    "statement": "These are official-upstream behavior and bounded no-candidate packets only. They do not compare against Oblivion, select a final mapping, establish a final no-match, award benchmark credit, or authorize copying."
+  },
+  "no_mutation_attestation": {
+    "oblivion_application_source_inspected": false,
+    "current_product_evidence_inspected": false,
+    "prohibited_runs_inspected": false,
+    "app_runtime_executed": false,
+    "tests_executed": false,
+    "browser_executed": false,
+    "external_systems_mutated": false,
+    "files_edited_other_than_this_authorized_raw_artifact": false,
+    "files_staged": false,
+    "commits_created": false,
+    "pushes_performed": false
+  }
+}

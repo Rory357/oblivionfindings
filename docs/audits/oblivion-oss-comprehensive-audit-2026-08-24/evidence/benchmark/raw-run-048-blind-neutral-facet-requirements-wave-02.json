@@ -1,0 +1,1385 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-048",
+  "generated_at": "2026-08-25T00:46:00+12:00",
+  "role": "BLIND_NEUTRAL_REQUIREMENTS_WRITER_AGENT_B",
+  "responsible_agent_identity": "/root/run048_blind_neutral_requirements",
+  "status": "TWENTY_FOUR_BLIND_NEUTRAL_FACET_REQUIREMENTS_REDTEAM_REFINED_CREDIT_ZERO",
+  "input_boundary": {
+    "mode": "STRICT_BLIND_SOURCE_INDEPENDENT",
+    "filesystem_input_access": false,
+    "repository_source_access": false,
+    "audit_evidence_access": false,
+    "upstream_evidence_access": false,
+    "benchmark_code_access": false,
+    "web_access": false,
+    "attestation": "Requirements were authored without inspecting filesystem inputs, repository source, audit evidence, upstream evidence, benchmark code, or web material. The literal feature identifiers supplied by the coordinating agent were used only as denominator identity."
+  },
+  "architecture": {
+    "organization_model": "One operating organization across multiple Sites.",
+    "authorization_rule": "Broad or global Site access may widen the set of in-scope records, but never supplies or replaces the exact action, review, approval, or witness authority required by a facet.",
+    "scope_rule": "Authorization uses roles and permissions, approved Sites, canonical record ownership, direct-object concealment, and privacy boundaries.",
+    "mechanism_neutrality_rule": "Requirements are expressed solely as observable safety and integrity outcomes. No particular technical mechanism is required. Optional result-reuse, result-segmentation, download, and asynchronous-delivery facilities are assessed only when present.",
+    "assessment_note": "These are normative, source-independent requirements. No implementation or evidentiary claim is made."
+  },
+  "all_credits": false,
+  "counts": {
+    "features": 6,
+    "facets": 24
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "actor_need": "An authorized clinical worker needs to create the canonical observation register required for a person's defined care context.",
+      "preconditions": [
+        "The person, owning Site, and care context exist and are active for the intended effective period.",
+        "An active and eligible observation template or register definition, including its immutable version, is selected.",
+        "Required units, schedule, effective dates, clinical metadata, and uniqueness or overlap rules are valid."
+      ],
+      "authorization_scope": [
+        "The actor has the exact observation-register-create authority and access to the canonical person, Site, and care context.",
+        "Scope is derived from canonical relationships rather than trusted request-supplied Site or care-context identifiers.",
+        "Broad Site access, template access, general clinical edit, or observation-entry authority does not authorize register creation."
+      ],
+      "state_read_projection": [
+        "Creation atomically produces exactly one canonical register with owner, Site, care context, lifecycle state, template revision, and effective period.",
+        "Read-after-write reflects persisted canonical values and does not silently create a clinical event, amend another register, or grant access."
+      ],
+      "integrity_audit_provenance": [
+        "Schema, units, ranges, temporal rules, and uniqueness constraints are enforced.",
+        "Audit provenance records actor, time, Site, person, care context, initial values, request origin, and template revision that remains identifiable after later template changes."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical creation has explicit safe semantics: it returns the original outcome or is rejected without duplicating state or side effects.",
+        "A materially changed submission cannot be mistaken for a replay of the original operation, regardless of how replay equivalence is established.",
+        "Concurrent equivalent requests cannot create duplicate or overlapping registers."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized or foreign-Site person, context, template, or register identifiers are concealed with a not-found-equivalent outcome.",
+        "Denial occurs before existence, clinical metadata, or duplicate-status details are disclosed."
+      ],
+      "collision_exclusions": [
+        "Template listing or use, general person update, observation entry recording, clinical-event creation, and broad Site access are not this facet.",
+        "A created row without canonical ownership, exact authority, and durable provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized in-scope creation with persisted projection and provenance.",
+        "Broad-Site-without-action and exact-action-but-out-of-scope denials, including a direct-object attempt.",
+        "Identical logical replay, materially changed repeat, concurrent duplicate attempt, and comparisons against every named adjacent capability."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if creation is canonical, exactly authorized, validated, auditable, privacy-preserving, idempotent, and duplicate-safe across all comparisons.",
+        "fail": "Fail if an adjacent permission creates, request-supplied scope expands access, protected existence leaks, duplicates can arise, provenance is incomplete, or a required comparison is absent."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "actor_need": "An authorized clinical worker needs to correct or supplement an existing observation register without erasing the clinical record originally relied upon.",
+      "preconditions": [
+        "The canonical register exists, is in scope, is amendable, and is protected against acting on stale state by a version, state comparison, or equivalent control.",
+        "The actor supplies an amendment reason and all changed fields satisfy schema and temporal rules.",
+        "Clinically locked or separately governed fields remain protected."
+      ],
+      "authorization_scope": [
+        "The actor has exact observation-register-amend authority and access to the canonical person, Site, and care context.",
+        "Additional field or observation-type authority is enforced where applicable.",
+        "Broad Site access, create, template-edit, or ordinary entry-recording authority does not replace amendment authority."
+      ],
+      "state_read_projection": [
+        "The current projection incorporates accepted amendments and clearly labels amended values.",
+        "Original values and all prior revisions remain recoverable and chronologically ordered.",
+        "Amendment does not replace register identity, alter unrelated observations, or create an initial clinical event."
+      ],
+      "integrity_audit_provenance": [
+        "Amendment is append-only or equivalently revision-preserving.",
+        "Provenance binds actor, timestamp, reason, prior and new revisions, changed fields, and source request without falsifying original authorship or occurrence time."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical amendment returns the original outcome or is rejected without adding a duplicate revision.",
+        "A materially changed submission cannot be treated as the original replay, and stale-state protection may use revisions or any outcome-equivalent mechanism.",
+        "Concurrent or stale amendments cannot overwrite one another silently."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized register IDs are concealed before original values, revision count, or amendment eligibility is exposed.",
+        "Audit projections redact clinical content the viewer lacks authority to see."
+      ],
+      "collision_exclusions": [
+        "General profile update, register creation, observation entry creation, template editing, and clinical-event amendment do not prove register amendment.",
+        "Mutable storage without revision preservation is not a governed amendment."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized amendment showing original, amended, and current projections.",
+        "Missing-action and out-of-scope direct-ID denials.",
+        "Stale-state conflict, concurrent competing amendments, identical logical replay, materially changed repeat rejection, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if amendment is explicitly authorized, revision-preserving, reasoned, attributable, stale-write safe, replay safe, and concealed outside scope.",
+        "fail": "Fail if history is overwritten, chronology or authorship is falsified, an adjacent capability suffices, stale updates win, direct objects leak, or comparison coverage is incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "actor_need": "A clinical worker needs to see only observation templates valid for the selected person's canonical care context under the configured applicability model.",
+      "preconditions": [
+        "The person and care context resolve to canonical Site and service relationships.",
+        "Template applicability may be flat or hierarchical; the configured assignments, effective periods, versions, and active status are defined.",
+        "The actor has care-context access and any required template-list or template-use authority."
+      ],
+      "authorization_scope": [
+        "Every candidate is filtered through exact template authority and the canonical person's Site and care-context scope.",
+        "Broad Site access widens scope only and does not grant template use or register creation.",
+        "Client-supplied hierarchy, Site, or context values cannot expand results."
+      ],
+      "state_read_projection": [
+        "Only active, effective, applicable templates are returned.",
+        "A flat applicability model is valid. Where multiple applicability levels exist, precedence, inheritance, overrides, and duplicate suppression are deterministic.",
+        "Each option identifies its applicability basis and immutable revision.",
+        "Unrelated Site, service, care-context, retired, or superseded templates are absent."
+      ],
+      "integrity_audit_provenance": [
+        "Eligibility is explainable from canonical applicability assignments, effective time, authorization context, and template revision.",
+        "Where hierarchy exists, the applied level and precedence decision are explainable. A created register preserves the selected revision and applicability origin; sensitive access is auditable where required."
+      ],
+      "replay_concurrency": [
+        "One response uses one consistent applicability and template-version snapshot.",
+        "If results are precomputed or reused, each reused result remains isolated by authorization, canonical context, effective time, and relevant applicability state.",
+        "Concurrent applicability changes produce a complete prior or next snapshot, never a mixed result."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized person, context, and template IDs are concealed and cannot be enumerated.",
+        "Excluded template labels, counts, metadata, and ordering are not leaked."
+      ],
+      "collision_exclusions": [
+        "Global template-catalog access, person view, template administration, register creation, and broad Site access do not prove correct care-context applicability filtering.",
+        "A flat list is valid only when the configured applicability model is flat; it is insufficient where multiple levels require precedence."
+      ],
+      "minimum_comparison_evidence": [
+        "Representative configured applicability cases. A flat model must demonstrate correct inclusion and exclusion; a multi-level model must additionally demonstrate precedence, inheritance, and overrides.",
+        "Active, retired, effective, superseded, inherited, overridden, missing-action, foreign-Site, and direct-template comparisons.",
+        "A concurrent applicability-change comparison, reused-result isolation when result reuse exists, and collision-capability denials."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if configured applicability, conditional precedence, revision identity, scope, privacy, and snapshot consistency are deterministic across relevant model and authorization comparisons.",
+        "fail": "Fail if an ineligible template appears, an eligible template is unpredictably omitted, applicable multi-level precedence or reused-result isolation fails, broad access substitutes for exact authority, or evidence is incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "actor_need": "An authorized clinical worker needs to create the first canonical record of a clinical event when it is reported or observed.",
+      "preconditions": [
+        "The canonical person, Site, and care context are valid for the event time.",
+        "Required event type, occurrence time, report time, narrative, and structured clinical fields are present.",
+        "The event is not already represented by the same logical submission or external identity, and exceptional chronology follows explicit policy."
+      ],
+      "authorization_scope": [
+        "The actor has exact initial-clinical-event-record authority and access to the canonical person and Site.",
+        "Restricted event types require additional explicit authority.",
+        "Broad Site access, clinical-note access, observation-register access, or event amendment does not authorize initial event creation."
+      ],
+      "state_read_projection": [
+        "Exactly one canonical event is created with initial lifecycle state, person, Site, care context, event type, occurrence time, reporter, and source.",
+        "Occurred-at, recorded-at, and later amendment times remain distinct.",
+        "Creation does not silently review, close, or amend the event."
+      ],
+      "integrity_audit_provenance": [
+        "Clinical structure and chronology are validated and the initial content is preserved as the first revision.",
+        "Provenance records actor, reporter relationship, source channel, event and record times, submission provenance, and external reference."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical event returns the original outcome or is rejected without duplicating the event or downstream effects.",
+        "A materially changed submission cannot be treated as the original replay, regardless of how the system distinguishes logical operations.",
+        "Concurrent duplicates yield one event and one downstream-effect set."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized person, context, or event identifiers are concealed before clinical details or duplicate status are disclosed.",
+        "Sensitive event types receive field-level response and audit redaction."
+      ],
+      "collision_exclusions": [
+        "Observation-register creation, general note creation, incident review, event view, and event amendment do not prove initial-event authority.",
+        "A notification or external reference without a canonical initial record is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized creation with initial-state and provenance projection.",
+        "Missing-action, foreign-Site, direct-person, and restricted-type denials.",
+        "Identical logical retry, materially changed repeat, concurrent duplicate, chronology, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if one canonical initial record is exactly authorized, chronologically faithful, provenance-complete, idempotent, concurrency-safe, and concealed outside scope.",
+        "fail": "Fail if adjacent permissions suffice, duplicate effects occur, original content disappears, timestamps are conflated, direct objects leak, or comparisons are missing."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "actor_need": "An authorized reviewer needs to assess a submitted incident, record a reasoned determination, and advance review state without implicitly closing it.",
+      "preconditions": [
+        "The canonical incident exists, is reviewable, is not terminal, and stale-state protection is available through revision checking or an equivalent control.",
+        "Required facts, classification inputs, review checklist, and evidence are available.",
+        "Any reviewer independence or conflict-of-interest rule is satisfied."
+      ],
+      "authorization_scope": [
+        "The actor has exact incident-review authority and access to the canonical Site and protected category.",
+        "Restricted categories require any additional authority defined for them.",
+        "Broad Site access, incident view, edit, investigate, assign, or close authority does not substitute for review."
+      ],
+      "state_read_projection": [
+        "The review decision, rationale, reviewer, reviewed time, evidence, and resulting review status are visible.",
+        "Submitted incident content remains preserved.",
+        "Review does not silently close the incident or complete unrelated corrective actions."
+      ],
+      "integrity_audit_provenance": [
+        "Review criteria, evidence references, classification changes, and before-and-after state are attributable.",
+        "Prior reviews remain visible, and provenance distinguishes submitter, reviewer, and any later closer."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical review returns the original outcome or is rejected without duplicating the review transition.",
+        "A materially changed or stale review cannot be mistaken for the original operation; any outcome-equivalent duplicate and stale-state safeguards are acceptable.",
+        "Competing reviews and review-versus-close races serialize or return an explicit stale-state conflict."
+      ],
+      "privacy_direct_object": [
+        "Out-of-scope incident IDs are concealed before category, participant, review, or status details are exposed.",
+        "Output is field-minimized for the actor's category and role."
+      ],
+      "collision_exclusions": [
+        "Incident list, view, edit, investigate, assign, acknowledge, or close is not incident review.",
+        "A status change without a durable review artifact is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized review with rationale and durable transition.",
+        "Broad-Site-without-review, exact-review-but-out-of-scope, restricted-category, and direct-ID denials.",
+        "Identical logical replay, stale-state attempt, competing review, review-versus-close race, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if review is independently authorized, reasoned, revision-safe, auditable, non-closing, private, and race-safe.",
+        "fail": "Fail if another capability reviews, submitted facts are overwritten, review silently closes, provenance is missing, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "actor_need": "An authorized closer needs to close an incident only after all policy-defined review and remediation prerequisites are satisfied.",
+      "preconditions": [
+        "The canonical incident is open in a closable state and protected against stale closure by a revision, state recheck, or equivalent control.",
+        "Mandatory review, investigation, notifications, corrective actions, and evidence are complete or validly waived.",
+        "Closure reason, outcome, effective time, and blocker disposition are supplied."
+      ],
+      "authorization_scope": [
+        "The actor has exact incident-close authority and access to the canonical Site and category.",
+        "Required reviewer-closer separation and waiver authority are independently enforced.",
+        "Broad Site access, incident review, general edit, or workflow administration does not replace close authority."
+      ],
+      "state_read_projection": [
+        "The incident becomes explicitly closed with closer, time, reason, outcome, and prerequisite disposition.",
+        "Closed state prevents ordinary mutation while preserving a separately authorized reopen path if policy permits.",
+        "Original incident, review, investigation, and corrective-action history remain distinct."
+      ],
+      "integrity_audit_provenance": [
+        "Closure atomically binds terminal state to the exact prerequisite versions evaluated.",
+        "Provenance records actor, prior state, closure inputs, satisfied or waived blockers, and separation-of-duties evidence without deleting chronology."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical closure returns the original outcome or is rejected without duplicating the terminal transition.",
+        "A materially changed or stale closure cannot be treated as the original replay; equivalent duplicate and stale-state safeguards are acceptable.",
+        "Concurrent close, reopen, review, or corrective-action updates cannot create contradictory states."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized incident IDs are concealed before closure eligibility, blockers, or terminal state are returned.",
+        "Closure receipts expose only fields the actor may view."
+      ],
+      "collision_exclusions": [
+        "Review, corrective-action resolution, investigate, assign, edit, and workflow-manage authority are not close authority.",
+        "A closed-looking display without enforced terminal state and durable provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized closure with all prerequisites and complete audit projection.",
+        "Missing-action, foreign-Site, restricted-category, unmet-blocker, and separation-of-duties denials.",
+        "Identical logical replay, materially changed repeat, stale-state attempt, close-versus-update race, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if closure is exactly authorized, prerequisite-bound, terminal, attributable, idempotent, race-safe, and concealed outside scope.",
+        "fail": "Fail if blockers are bypassed, another capability closes, history is lost, races are ambiguous, protected existence leaks, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "actor_need": "An authorized HR actor needs to establish one canonical staff profile without accidentally activating access, inviting the person, or duplicating an existing identity.",
+      "preconditions": [
+        "Required identity, contact, employment, initial Site-assignment, lifecycle, and effective-date data are valid.",
+        "Duplicate checks use stable identity attributes under an approved matching policy.",
+        "Sensitive fields have a defined lawful purpose."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-profile-create authority for every requested Site assignment and any required field-specific authority.",
+        "Broad Site access, profile update, set-active, rehire, invite, or account administration does not replace create authority."
+      ],
+      "state_read_projection": [
+        "Exactly one canonical profile is created with explicit identity, lifecycle state, employment state, account state, and Site relationships.",
+        "Activation, credentials, and invitations occur only when explicitly requested and separately authorized.",
+        "A former-profile match is surfaced for rehire rather than silently duplicated."
+      ],
+      "integrity_audit_provenance": [
+        "Identity uniqueness, effective dates, required fields, and allowed values are validated.",
+        "Provenance records creator, source, initial lifecycle state, Site assignments, and protected-field changes without logging secrets."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical creation returns the original outcome or is rejected without creating another profile or repeating side effects.",
+        "A materially changed submission cannot be treated as the original replay, regardless of how replay equivalence is established.",
+        "Concurrent duplicate creation is prevented."
+      ],
+      "privacy_direct_object": [
+        "Duplicate and validation responses do not expose protected details of profiles the actor cannot view.",
+        "Out-of-scope Site, manager, and related staff IDs are concealed."
+      ],
+      "collision_exclusions": [
+        "Update, set-active, rehire, invite, authentication-account creation, and broad Site administration are distinct.",
+        "An account without a canonical HR profile is not equivalent."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized creation with canonical projection and provenance.",
+        "Broad-Site-without-create, foreign-Site, protected-field, former-profile-match, and direct-object denials.",
+        "Identical logical replay, materially changed repeat, concurrent duplicate, and proof that create cannot implicitly activate or invite."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if profile creation is exactly authorized, deduplicated, field-governed, lifecycle-explicit, auditable, idempotent, and separate from activation and invitation.",
+        "fail": "Fail if adjacent permissions create, duplicates arise, unauthorized fields or Sites are accepted, access activates implicitly, identity leaks, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "actor_need": "An authorized HR or operational actor needs to view only the staff-profile fields necessary for the actor's role and purpose.",
+      "preconditions": [
+        "The canonical profile exists and current and historical Site relationships are known.",
+        "Field classifications, actor purpose, and projection class are defined."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-profile-view authority and applicable Site scope.",
+        "Additional field authorities govern identity, health, payroll, banking, disciplinary, and safeguarding data.",
+        "Broad Site access alone does not grant profile or sensitive-field view."
+      ],
+      "state_read_projection": [
+        "The projection separates current identity, employment, Site assignment, lifecycle, and account status.",
+        "Only authorized fields are returned; credentials, secrets, and unrelated sensitive records are absent."
+      ],
+      "integrity_audit_provenance": [
+        "Material values retain effective dates and source provenance.",
+        "Sensitive access records actor, subject, purpose, time, and projection class; redaction does not make remaining data misleading."
+      ],
+      "replay_concurrency": [
+        "Each response uses a consistent authorization and data snapshot; if results are segmented or downloadable, every segment or download preserves it.",
+        "If projections are precomputed or reused, each reused projection remains isolated by actor, field entitlements, Site scope, and relevant profile state.",
+        "Concurrent updates cannot yield a mixed sensitive projection."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized profile IDs are concealed rather than distinguished as existing.",
+        "Every supported access path, including search, counts, related-object labels, errors, and downloads when present, enforces identical restrictions."
+      ],
+      "collision_exclusions": [
+        "Staff-directory access, account administration, Site-membership view, longitudinal-history view, and broad Site access do not prove full profile view.",
+        "Visibility of one directory field does not authorize the profile."
+      ],
+      "minimum_comparison_evidence": [
+        "Two in-scope actors with different field entitlements viewing the same profile.",
+        "Missing-view, foreign-Site, direct-ID, search, and detail comparisons, plus download and reused-result isolation comparisons when those facilities exist.",
+        "Directory, account-admin, and history-view collision denials."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if every path enforces exact view authority, Site scope, field minimization, direct-object concealment, coherent projection, and required provenance.",
+        "fail": "Fail if an alternate or reused projection leaks fields or existence, broad access substitutes for view authority, or applicable comparisons are missing."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "actor_need": "An authorized HR actor needs to change permitted staff-profile fields while preserving prior values and preventing lifecycle or access actions from being smuggled into an ordinary update.",
+      "preconditions": [
+        "The canonical profile exists, is in scope, and is protected against stale update by a revision, state comparison, or equivalent control.",
+        "Changed fields, effective dates, and required reasons are explicit and valid.",
+        "Immutable and separately governed fields remain excluded unless independently authorized."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-profile-update authority plus necessary field-level and Site authorities.",
+        "Scope is checked against canonical current and affected Site relationships.",
+        "Broad Site access, view, set-active, rehire, or invite authority does not replace update."
+      ],
+      "state_read_projection": [
+        "Only allowed requested fields change and previous values remain available through revision or history records.",
+        "Ordinary update cannot change active state, create employment episodes, issue invitations, or alter unrelated credentials."
+      ],
+      "integrity_audit_provenance": [
+        "Allowed-field, format, effective-date, and cross-field invariants are validated.",
+        "Provenance records actor, reason, effective time, prior and new revisions, and redacted field-level before-and-after values."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical update returns the original outcome or is rejected without duplicating revision or side effects.",
+        "A materially changed or stale update cannot be treated as the original replay; equivalent duplicate and stale-state safeguards are acceptable.",
+        "Concurrent or stale updates cannot silently overwrite one another."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized profile and related IDs are concealed before values or validation differences are returned.",
+        "Errors do not echo sensitive rejected values."
+      ],
+      "collision_exclusions": [
+        "View, create, set-active, rehire, invite, account-update, and broad Site administration are distinct.",
+        "Generic mass assignment or unrestricted save is not governed profile update."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized ordinary-field and governed-field updates with history.",
+        "Protected-field, missing-action, out-of-scope direct-ID, and lifecycle-smuggling denials.",
+        "Identical logical retry, materially changed repeat, stale-state attempt, concurrent update, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if field and Site authority, revision safety, history, audit attribution, replay safety, privacy, and lifecycle separation all hold.",
+        "fail": "Fail if update performs another lifecycle action, overwrites history, accepts stale writes, leaks direct objects, permits unauthorized fields, or lacks comparisons."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "actor_need": "An authorized HR actor needs to deliberately set a staff profile's active state without conflating employment, account, rehire, or invitation state.",
+      "preconditions": [
+        "The canonical profile exists and is protected against stale transition by a revision, state recheck, or equivalent control.",
+        "Requested active value, effective time, and reason are explicit.",
+        "Eligibility and blocking employment, compliance, or termination conditions are evaluated."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-profile-set-active authority for the canonical Site scope; overrides require separate authority.",
+        "Broad Site access, profile update, rehire, invite, or account administration does not replace set-active authority."
+      ],
+      "state_read_projection": [
+        "The projection records requested active state, effective time, reason, and actor.",
+        "Profile activity remains distinct from employment episode and authentication-account status.",
+        "The action does not silently rehire, invite, create credentials, or erase termination history."
+      ],
+      "integrity_audit_provenance": [
+        "Eligibility and transition rules use canonical current state.",
+        "Every transition preserves prior state and records actor, reason, effective time, submission provenance, and override basis; no-op requests remain distinguishable."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical state transition returns the original outcome or is rejected without duplicating history or side effects.",
+        "A materially changed or stale transition cannot be treated as the original replay; equivalent duplicate and stale-state safeguards are acceptable.",
+        "Concurrent activation, deactivation, rehire, or termination has one deterministic winner."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized profile IDs are concealed before active state or eligibility failures are exposed.",
+        "Responses reveal no unrelated HR or account details."
+      ],
+      "collision_exclusions": [
+        "General profile update, user enablement, rehire, invite, termination, and broad Site administration are distinct.",
+        "A writable active field without a governed transition is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized true, false, and no-op cases with provenance.",
+        "Missing-action, out-of-scope direct-ID, blocked-eligibility, and override comparisons.",
+        "Identical logical replay, materially changed repeat, stale-state attempt, competing lifecycle race, and adjacent-capability denials."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if active transition is exactly authorized, eligibility checked, historically preserved, idempotent, race-safe, concealed, and isolated from adjacent actions.",
+        "fail": "Fail if the field is mass assignable, another capability changes it, rehire or invite happens implicitly, stale transitions win, state leaks, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "actor_need": "An authorized HR actor needs to re-engage a former staff member under the existing canonical identity while preserving prior employment episodes.",
+      "preconditions": [
+        "A canonical former profile exists with no conflicting current employment episode.",
+        "New start date, role, Site assignments, terms, and required checks are valid.",
+        "The former identity match and any cooling-off, compliance, or approval conditions are confirmed."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-profile-rehire authority and scope for every new Site assignment.",
+        "Protected terms and overrides require separate authority.",
+        "Broad Site access, create, update, set-active, or invite authority does not replace rehire."
+      ],
+      "state_read_projection": [
+        "One new employment episode links to the existing profile while prior episodes, termination reasons, and Site relationships remain intact.",
+        "New lifecycle state is explicit; activation and invitation occur only through separately authorized explicit actions."
+      ],
+      "integrity_audit_provenance": [
+        "Identity match, prior episode, new terms, dates, checks, approver, and source are preserved.",
+        "Episodes cannot overlap unless policy permits and records the exception; provenance distinguishes identity continuity from new employment facts."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical rehire returns the original outcome or is rejected without adding another employment episode or repeating side effects.",
+        "A materially changed submission cannot be treated as the original replay; request identities or any outcome-equivalent safeguard are acceptable.",
+        "Concurrent rehire or create cannot produce duplicate profiles or overlapping episodes."
+      ],
+      "privacy_direct_object": [
+        "Former-profile lookup does not expose identity or termination information to unauthorized actors.",
+        "Out-of-scope profile and Site IDs are concealed."
+      ],
+      "collision_exclusions": [
+        "Create, update, set-active, invite, and account restoration are not rehire.",
+        "An active flag without a new attributable employment episode is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized rehire preserving a prior episode and creating one new episode.",
+        "Missing-action, foreign-Site, protected-term, current-episode, duplicate-identity, and direct-ID denials.",
+        "Identical logical retry, materially changed repeat, concurrent rehire, create-versus-rehire, and no-implicit-activate-or-invite comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if rehire preserves canonical identity and history, creates one valid episode, enforces exact authority and scope, and is replay- and concurrency-safe.",
+        "fail": "Fail if duplicates or overlapping episodes arise, history is overwritten, adjacent capabilities rehire, activation or invite is implicit, identity leaks, or comparisons are missing."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "actor_need": "An authorized actor needs to issue a controlled onboarding invitation to an eligible staff profile without exposing or duplicating credential-bearing material.",
+      "preconditions": [
+        "The canonical profile exists, is in scope, and is eligible.",
+        "Validated delivery address, purpose, invitation lifetime, and authorized bootstrap roles are present.",
+        "Existing account, accepted, pending, expired, and revoked invitation states are checked."
+      ],
+      "authorization_scope": [
+        "The actor has exact staff-invite authority and profile Site scope; initial roles require separate role-grant authority.",
+        "Broad Site access, profile create, update, set-active, or account view does not replace invite."
+      ],
+      "state_read_projection": [
+        "Exactly one pending invitation records purpose, issue time, expiry, delivery state, and non-secret identifier.",
+        "Tokens are irreversibly or equivalently protected and disclosed only through the intended channel.",
+        "Invitation does not silently activate employment or grant unapproved roles."
+      ],
+      "integrity_audit_provenance": [
+        "Provenance records inviter, profile, destination classification, issue and expiry, bootstrap roles, delivery, revocation, and acceptance without logging the token.",
+        "Invitation state and delivery outcome remain consistent across commit, rollback, failure, and retry so no message exposes a rolled-back or untracked valid invitation; any equivalent delivery mechanism is acceptable, and resend or replacement relationships remain traceable."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical invitation returns the original outcome or is rejected without duplicate sends or duplicate live invitations.",
+        "A materially changed destination, role set, or expiry cannot be treated as the original replay; any outcome-equivalent safeguard is acceptable.",
+        "Concurrent invite, accept, revoke, and resend produce one coherent lifecycle."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized profile IDs and delivery addresses are concealed.",
+        "Responses resist account, invitation, and email enumeration."
+      ],
+      "collision_exclusions": [
+        "Create, set-active, rehire, password reset, account creation, resend, and role assignment are distinct actions.",
+        "An email without a durable invitation lifecycle is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized invitation with protected token, provenance, and delivery correlation.",
+        "Missing-action, foreign-Site, ineligible-profile, unauthorized-role, and enumeration denials.",
+        "Identical logical retry, materially changed repeat, concurrent duplicate, invite-versus-accept/revoke/resend, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if invitation is exactly authorized, eligible, secret-safe, attributable, non-duplicating, race-safe, non-enumerating, and separate from activation and role grant.",
+        "fail": "Fail if tokens leak, sends duplicate, another capability invites, unapproved roles are granted, existence is disclosed, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "actor_need": "An authorized HR reviewer needs a trustworthy chronology of the staff-profile events the reviewer is authorized to see, without implying visibility of concealed history.",
+      "preconditions": [
+        "The canonical staff identity and historical records exist with stable effective and recorded times.",
+        "The actor's purpose, Site scope, and field-level history entitlements are known."
+      ],
+      "authorization_scope": [
+        "The actor has exact HR-longitudinal-history-view authority.",
+        "Each historical event is filtered by permitted Sites, periods, and sensitive field classes.",
+        "Broad Site access, current-profile view, or audit administration does not replace history authority."
+      ],
+      "state_read_projection": [
+        "Within the viewer's authorized slice, employment episodes, Site assignments, lifecycle transitions, material revisions, and corrections remain distinct, complete, and ordered.",
+        "Effective time, recorded time, actor, source, and supersession are distinguishable.",
+        "Redaction preserves chronology without leaking values or creating a false narrative, and the projection discloses that events or fields were omitted whenever that disclosure itself is authorized and necessary to avoid a false claim of global completeness."
+      ],
+      "integrity_audit_provenance": [
+        "History is append-only or tamper-evident and every item links to its originating action and prior revision.",
+        "Corrections do not erase original facts, authorship, or reason."
+      ],
+      "replay_concurrency": [
+        "The authorized slice uses a stable as-of point and deterministic order; if results are segmented or downloadable, every segment or download preserves that state.",
+        "Authorization is evaluated for the complete authorized projection. If results are precomputed or reused, each reused projection remains isolated by the relevant authorization and scope.",
+        "Concurrent additions cannot cause duplicates, gaps, or reordering within one projected snapshot."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized profile and historical-event IDs are concealed.",
+        "Historical Site membership cannot reveal events outside permitted Sites or periods; every supported search or download path applies the same rules."
+      ],
+      "collision_exclusions": [
+        "Current-profile view, directory, activity feed, generic audit log, payroll history, and broad Site access do not prove longitudinal-history authority.",
+        "A current-state snapshot is not longitudinal history."
+      ],
+      "minimum_comparison_evidence": [
+        "A profile with multiple episodes, Site changes, amendments, active transitions, and corrections, including events inside and outside the viewer's authorized slice.",
+        "Current-only, partial-history, sensitive-history, and no-history actors.",
+        "Authorized-slice completeness, disclosed-omission, direct-ID, search, and concurrent-addition comparisons, plus segmented-result, download, and reused-result comparisons only where those facilities exist."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if chronology is complete and reconcilable within the viewer's authorized slice, omissions are disclosed without leakage where needed, and the slice is revision-preserving, attributable, ordered, filtered, and snapshot-stable.",
+        "fail": "Fail if the projection claims global completeness while hiding events, current view substitutes for history, authorized facts disappear, protected history leaks, conditional pages gap or duplicate, or comparisons are missing."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "actor_need": "An authorized medicines worker needs to inspect a controlled-drug register and accountable balance without gaining movement or witness powers.",
+      "preconditions": [
+        "The canonical register, Site, item, reporting period, opening balance, movements, corrections, destruction records, and balance checks exist.",
+        "The requested as-of point and actor purpose are defined."
+      ],
+      "authorization_scope": [
+        "The actor has exact controlled-drug-register-view authority for the canonical Site and register.",
+        "Medicine, location, and patient-linked restrictions are independently enforced.",
+        "Broad Site access, inventory view, medication administration, movement, or witness authority does not replace register view."
+      ],
+      "state_read_projection": [
+        "Opening balance, ordered movements, corrections, reversals, running balance, checks, discrepancies, and current or closing balance are shown.",
+        "Voided and superseded entries remain distinct from effective entries, and viewing confers no mutation or witness ability."
+      ],
+      "integrity_audit_provenance": [
+        "Every balance is derivable from attributable ledger entries and precision rules.",
+        "Entry provenance includes type, amount, unit, actor, effective and recorded times, source, and witness where required; sensitive access is auditable."
+      ],
+      "replay_concurrency": [
+        "Detail uses one consistent as-of snapshot and deterministic movement order; if results are segmented or downloadable, every segment or download preserves that snapshot.",
+        "Concurrent movement appears wholly before or after the snapshot, preserving balance continuity."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized register, movement, patient, medicine, and location IDs are concealed.",
+        "Patient-linked information is minimized consistently across every supported list, detail, search, and download path."
+      ],
+      "collision_exclusions": [
+        "Generic inventory view, medication-administration records, pharmacy reports, movement authority, witness authority, and broad Site access are not register view.",
+        "A stock total without attributable ledger history is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "A register with normal, corrected, reversed, witnessed, and discrepancy-related entries.",
+        "Missing-action, foreign-Site, restricted-item, and direct-movement-ID denials.",
+        "List and detail balance continuity, concurrent snapshot, adjacent-permission comparisons, and download continuity when downloads exist."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if projection is exactly authorized, arithmetically reproducible, provenance-complete, snapshot-consistent, privacy-minimized, and non-mutating.",
+        "fail": "Fail if another permission views, balances lack traceable entries, concurrency mixes totals, patient or direct-object data leaks, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "actor_need": "An authorized medicines worker needs to record a controlled-drug receipt, issue, administration-linked movement, transfer, return, adjustment, or destruction movement.",
+      "preconditions": [
+        "Canonical Site, register, medicine, strength, unit, batch or container, movement type, source, destination, quantity, time, reason, and supporting reference are valid.",
+        "Available balance and movement-specific rules are satisfied.",
+        "A qualified independent witness is bound where required."
+      ],
+      "authorization_scope": [
+        "The initiator has exact authority for the requested movement category and Site.",
+        "A required witness has separate exact witness authority and is not the initiator.",
+        "Broad Site access, register view, medication administration, stock adjustment, or witness authority alone does not authorize movement."
+      ],
+      "state_read_projection": [
+        "Exactly one immutable movement is appended and balance changes atomically.",
+        "Transfers update both registers atomically; witness-required movements cannot appear final without a valid witness.",
+        "Corrections use linked reversing or correcting entries rather than destructive edits."
+      ],
+      "integrity_audit_provenance": [
+        "Quantity sign, unit, precision, stock sufficiency, chronology, and transfer conservation are validated.",
+        "Provenance reliably binds initiator, witness, exact action content, Site, register, item, batch, category, amount, source, and times without prescribing a technical binding mechanism."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical movement returns the original outcome or is rejected without duplicating balance, journal, notification, or transfer effects.",
+        "A materially changed submission cannot be treated as the original replay, regardless of how replay equivalence is established.",
+        "Concurrent operations cannot overdraw, double-post, or remain indefinitely blocked."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized register, medicine, patient, source, destination, and witness IDs are concealed before balance or eligibility is disclosed.",
+        "Replay lookup cannot expose another Site's movement through a guessed operation reference."
+      ],
+      "collision_exclusions": [
+        "Medication administration, generic inventory adjustment, register view, discrepancy resolution, destruction projection, and witness authority alone are not movement authority.",
+        "A balance mutation without immutable movement provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized examples for every claimed category, including witnessed action and transfer where claimed.",
+        "Missing-action, foreign-Site, insufficient-stock, invalid-unit, self-witness, and missing-witness denials.",
+        "Identical logical retry, materially changed repeat, competing withdrawals, transfer concurrency, atomic rollback, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if each claimed category is exactly authorized, atomically ledgered, balance-safe, witness-correct, attributable, idempotent, concurrency-safe, and private.",
+        "fail": "Fail if broad access or an adjacent capability posts, witness rules are bypassed, balances diverge, effects duplicate, direct objects leak, or category comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "actor_need": "An authorized medicines worker needs to record a physical count and compare it with accountable ledger balance without silently adjusting that balance.",
+      "preconditions": [
+        "The canonical register and item are active and in scope.",
+        "Physical quantity, unit, count time, counter identity, and a reproducible accountable-ledger state are supplied or established.",
+        "Required independent witness or dual count and precision rules are satisfied."
+      ],
+      "authorization_scope": [
+        "The actor has exact controlled-drug-balance-check authority; a required witness has separate exact witness authority.",
+        "Broad Site access, register view, movement, discrepancy resolution, or generic stocktake does not replace balance-check authority."
+      ],
+      "state_read_projection": [
+        "The check records expected ledger balance at a fixed point, physical balance, variance, unit, participants, and status.",
+        "A nonzero variance creates or links a discrepancy.",
+        "The check itself neither adjusts ledger balance nor resolves the discrepancy."
+      ],
+      "integrity_audit_provenance": [
+        "The accountable ledger state and included movements are fixed and reproducible through a revision, as-of point, or equivalent representation.",
+        "Provenance binds counter, witness, count and record times, values, variance, Site, register, and item; corrections preserve the original count."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical check returns the original outcome or is rejected without duplicating the count record.",
+        "A materially changed count cannot be treated as the original replay, and the accountable count point remains unambiguous through any outcome-equivalent safeguard.",
+        "Concurrent movement is wholly included before or excluded after the fixed count point."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized register and check IDs are concealed before expected balance or discrepancy is shown.",
+        "Patient-linked details are not exposed merely to count balance."
+      ],
+      "collision_exclusions": [
+        "Register view, movement, discrepancy resolution, generic stocktake, and broad Site access are not this facet.",
+        "A calculated balance without a durable physical-count record is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized zero-variance and nonzero-variance checks with reproducible expected balances.",
+        "Missing-action, foreign-Site, missing-witness, invalid-unit, and direct-ID denials.",
+        "No-adjustment proof, identical logical replay, materially changed count, movement-versus-count race, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if count is exactly authorized, revision-bound, witnessed when required, non-adjusting, attributable, idempotent, and race-safe.",
+        "fail": "Fail if check changes balance, another permission records it, variance disappears, count point is ambiguous, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "actor_need": "An authorized medicines investigator needs to resolve a controlled-drug discrepancy with documented evidence and any necessary linked correction while preserving the original variance.",
+      "preconditions": [
+        "A canonical open discrepancy exists and stale-state protection is available through revisions, state rechecks, or an equivalent control.",
+        "Required investigation, evidence, explanation, outcome, and corrective actions are complete.",
+        "Any proposed correction, approval, separation of duties, and witness participation are explicit and valid."
+      ],
+      "authorization_scope": [
+        "The actor has exact discrepancy-resolution authority for the canonical Site and register.",
+        "Corrective movement and witness actions require their own exact authorities.",
+        "Broad Site access, balance check, register view, investigation, or generic stock adjustment does not replace resolution."
+      ],
+      "state_read_projection": [
+        "The discrepancy becomes resolved with outcome, rationale, evidence, resolver, and time.",
+        "Original physical count, expected balance, and variance remain visible.",
+        "Any correcting movement is separately identifiable, linked, and atomic; no-correction resolution records why balance did not change."
+      ],
+      "integrity_audit_provenance": [
+        "Resolution binds discrepancy revision, evidence, policy basis, actor, approver or witness, and correction movement.",
+        "Chronology remains append-only and correction cannot make the original check appear variance-free."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical resolution returns the original outcome or is rejected without duplicating resolution or correction effects.",
+        "A materially changed outcome or correction and a stale operation cannot be treated as the original replay; any outcome-equivalent safeguards are acceptable.",
+        "Competing resolution, evidence, and movement operations serialize or produce stale-state conflict."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized discrepancy, register, movement, patient, and evidence IDs are concealed.",
+        "Only minimum authorized patient and investigation information is exposed."
+      ],
+      "collision_exclusions": [
+        "Balance check, discrepancy view, investigation, movement, witness authority, and broad Site access do not prove resolution.",
+        "Closing a task or changing status without rationale and linked ledger effects is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized no-correction and separately authorized correction resolutions.",
+        "Missing-resolution, missing-movement, missing-witness, foreign-Site, unmet-prerequisite, and direct-ID denials.",
+        "Original-variance preservation, identical logical retry, materially changed repeat, stale-state attempt, competing resolution, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if resolution is independently authorized, evidence-bound, history-preserving, correctly linked to separate adjustment and witness authority, idempotent, race-safe, and private.",
+        "fail": "Fail if status closes without rationale, variance is erased, correction or witness authority is inferred, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "actor_need": "An authorized medicines worker needs a trustworthy read projection of controlled drugs proposed, awaiting approval or witness, completed, reversed, or excluded from destruction.",
+      "preconditions": [
+        "Canonical Site, register, item, batch, eligibility criteria, as-of period, destruction requests, approvals, witnesses, movements, reversals, and remaining quantities exist.",
+        "Eligibility and lifecycle status definitions are explicit."
+      ],
+      "authorization_scope": [
+        "The actor has exact destruction-projection authority and required register-view scope for the canonical Site.",
+        "Patient and restricted-item details require separate view authority.",
+        "Broad Site access, expired-stock view, movement, approval, or witness authority does not replace projection authority."
+      ],
+      "state_read_projection": [
+        "Eligible, proposed, approved, awaiting-witness, destroyed, rejected, cancelled, and reversed quantities are distinct.",
+        "Projected destruction is never shown as completed movement.",
+        "Totals avoid double-counting partial destruction, reversal, or superseded requests, and completed destruction links to movement and witness evidence."
+      ],
+      "integrity_audit_provenance": [
+        "Every row identifies source item, batch, register, eligibility rule, request revision, movement state, and as-of point.",
+        "Rule version and cutoff are reproducible; lifecycle changes remain attributable and append-only."
+      ],
+      "replay_concurrency": [
+        "Projection uses one as-of snapshot and deterministic ordering.",
+        "If projections are precomputed or reused, each reused projection remains isolated by actor scope, Site, register, rule version, and cutoff.",
+        "Concurrent approval, witness, cancellation, or movement yields a complete old or new state without double counting."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized register, destruction request, batch, patient, and movement IDs are concealed.",
+        "Counts and filters cannot reveal protected stock or patient activity."
+      ],
+      "collision_exclusions": [
+        "Expired-stock list, generic register view, destruction request, execution movement, approval, and witness authority do not independently prove this projection.",
+        "Projection access does not authorize destruction or witnessing."
+      ],
+      "minimum_comparison_evidence": [
+        "Partial, proposed, approved, completed, cancelled, rejected, and reversed states with arithmetic reconciliation.",
+        "Missing-action, foreign-Site, restricted-item, direct-ID, and concurrent-transition comparisons, plus reused-result isolation when result reuse exists.",
+        "Proof that projection access cannot execute, approve, or witness."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if status and quantities are exactly authorized, reproducible, non-mutating, lifecycle-distinct, reconciled, snapshot-consistent, and private.",
+        "fail": "Fail if proposals appear completed, quantities double-count, another permission exposes or acts, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "actor_need": "A separately authorized person needs to provide an independent, contemporaneous attestation for a controlled-drug action whose exact payload was verified.",
+      "preconditions": [
+        "A canonical witness-required action exists, is pending, and is not cancelled, finalized, or superseded.",
+        "Action payload, quantity, item, Site, register, initiator, and revision are fixed.",
+        "The witness is a different authenticated individual satisfying qualification, presence, timing, and independence rules and explicitly confirms the attestation."
+      ],
+      "authorization_scope": [
+        "The witness has exact controlled-drug witness authority for the Site, register, and action category; the initiator separately has exact action authority.",
+        "Broad Site access, register view, movement authority, job title, or generic workflow approval does not replace witness authority.",
+        "Witness authority cannot initiate or alter the underlying action."
+      ],
+      "state_read_projection": [
+        "Attestation records witness, time, assurance method, action identity and revision, and a reliable binding to the exact action content without prescribing a technical binding mechanism.",
+        "The action finalizes only when all required attestations are valid.",
+        "Self-witness, stale or reused attestation, and unattested completion are impossible; payload change invalidates prior attestation."
+      ],
+      "integrity_audit_provenance": [
+        "Attestation is non-transferable and tamper-evidently bound to the exact action content and state.",
+        "Provenance distinguishes initiator, witness, authenticator, time, location or presence evidence where required, finalization, revocation, and invalidation."
+      ],
+      "replay_concurrency": [
+        "An attestation cannot be reused for another action or witness, regardless of how logical-operation equivalence is established.",
+        "Repeated submission by the same witness for unchanged action content returns the original outcome or is rejected without duplicate attestation; changed witness, action, or content cannot be treated as that replay.",
+        "Concurrent payload change, cancellation, duplicate witness, or finalization cannot accept stale attestation."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized action, register, medicine, patient, and witness IDs are concealed before eligibility or pending state is exposed.",
+        "The witness sees only information necessary to verify the action."
+      ],
+      "collision_exclusions": [
+        "Broad Site access, register view, movement, discrepancy resolution, destruction approval, generic approval, and job title do not prove witness authority.",
+        "A second username without payload binding and independence checks is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Two distinct actors completing a witness-required action with verifiable payload binding.",
+        "Self-witness, missing-authority, wrong-Site, wrong-category, stale-revision, expired, cancelled, changed-payload, and reuse denials.",
+        "Identical logical replay, witness-versus-mutation race, and proof initiator and witness authority cannot substitute."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if witnessing is independent, exactly authorized, contemporaneous, payload-bound, non-reusable, privacy-minimized, attributable, and race-safe.",
+        "fail": "Fail if broad access or another capability witnesses, self-witness succeeds, changed payload retains approval, attestations are reusable, direct objects leak, or comparisons are missing."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "actor_need": "An authorized finance reviewer needs to reconstruct, within the viewer's authorized slice, how receipts were allocated, reallocated, reversed, or settled against invoices over time.",
+      "preconditions": [
+        "Canonical receipts, invoices, allocations, reversals, settlements, journals, currency rules, and accounting periods exist for the requested scope.",
+        "The actor has a defined review purpose."
+      ],
+      "authorization_scope": [
+        "The actor has exact allocation-history-review authority for every canonical Site, account, receipt, and invoice represented.",
+        "Protected payer and banking details require separate authority.",
+        "Broad Site access, invoice or payment view, suggestion review, or confirm does not replace history review."
+      ],
+      "state_read_projection": [
+        "Within the authorized slice, original allocation, amendment, reallocation, reversal, write-off linkage, and settlement effects remain chronologically distinct and complete.",
+        "Amounts reconcile at defined precision within that slice using authorized opening, closing, carried, or redacted-boundary values as needed.",
+        "Current authorized state is traceable without hiding authorized superseded records, and manual, imported, and suggestion-derived origins remain distinct.",
+        "The projection discloses that events or values were omitted when necessary to avoid a false claim of global completeness and when that disclosure itself is authorized."
+      ],
+      "integrity_audit_provenance": [
+        "Each item links actor or system principal, source, receipt, invoice, allocation, settlement, journal, reversal, effective time, record time, and reason.",
+        "Accounting references are immutable or revision-preserving and authorized-slice totals can be independently recomputed without requiring disclosure of concealed entries."
+      ],
+      "replay_concurrency": [
+        "The authorized projection uses a stable as-of snapshot and deterministic accounting order; if results are segmented or downloadable, every segment or download preserves it.",
+        "Concurrent allocation or reversal appears wholly before or after the snapshot.",
+        "If projections are precomputed or reused, each reused projection remains isolated by actor, Site and account scope, currency, period, and cutoff."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized receipt, invoice, allocation, payer, bank, and journal IDs are concealed.",
+        "Every supported search, total, count, related-navigation, and download path enforces identical scope and field restrictions."
+      ],
+      "collision_exclusions": [
+        "Current invoice view, payment view, generic ledger view, suggestion review, confirm, reject, and broad Site access do not prove allocation-history review.",
+        "A paid or unpaid flag is not allocation history."
+      ],
+      "minimum_comparison_evidence": [
+        "Original, partial, reversed, and reallocated chain with resulting settlement and arithmetic reconciliation within the viewer's authorized slice.",
+        "A comparison containing concealed events or values, with safe omission disclosure and authorized boundary values sufficient to avoid a misleading reconciliation.",
+        "Missing-action, foreign-Site, protected-field, and direct-allocation-ID denials.",
+        "Concurrent-allocation snapshot behavior and adjacent-permission comparisons, plus segmented-result, download, and reused-result isolation when those facilities exist."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if chronology is exactly authorized, complete and arithmetically reproducible within the authorized slice, omission-aware, provenance-linked, snapshot-stable, and concealed across all paths.",
+        "fail": "Fail if the projection claims global completeness while concealing entries, authorized history disappears, authorized-slice totals do not reconcile, adjacent permissions expose it, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "actor_need": "An authorized finance reviewer needs to inspect non-posting candidate matches between receipts and invoices, including rationale and currency of each suggestion.",
+      "preconditions": [
+        "The canonical receipt has available amount and each candidate invoice has eligible outstanding amount.",
+        "Currency, account or Site relationship, payer, dates, references, and matching inputs exist.",
+        "Suggestion set has version, generation time, rule or model version, and data cutoff."
+      ],
+      "authorization_scope": [
+        "The actor has exact suggested-match-review authority and view scope for both receipt and every candidate invoice.",
+        "Candidates outside the intersection of permitted scopes are excluded.",
+        "Broad Site access, payment or invoice view, confirm, reject, or history review does not replace suggestion review."
+      ],
+      "state_read_projection": [
+        "Suggestions are clearly non-posted candidates and include proposed amount, currency, rank or confidence, material rationale, input snapshot, staleness, and version.",
+        "Review does not allocate, settle, reject, or mutate balances.",
+        "Ineligible, fully allocated, stale, and out-of-scope candidates are absent or non-actionable without leaking data."
+      ],
+      "integrity_audit_provenance": [
+        "Provenance identifies generation source, rule or model version, input cutoff, receipt and invoice revisions, and material signals.",
+        "Manual overrides are distinct from generated suggestions; sensitive review access is auditable."
+      ],
+      "replay_concurrency": [
+        "One response uses one receipt, invoice, and suggestion-version snapshot.",
+        "If suggestions are precomputed or reused, each reused suggestion remains isolated by actor scope, relevant object state, and rule version.",
+        "Concurrent allocation, invoice change, confirmation, or rejection invalidates or marks the suggestion stale."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized receipt, invoice, payer, bank, and suggestion IDs are concealed.",
+        "Ranks, counts, rationale, and errors cannot reveal out-of-scope candidates."
+      ],
+      "collision_exclusions": [
+        "Receipt view, invoice view, reconciliation report, allocation history, confirm, reject, and broad Site access do not prove suggestion review.",
+        "An unexplained candidate list without versioned provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Multiple candidates with differing rationale, rank, eligibility, and staleness.",
+        "Missing-action, foreign-Site, cross-account, protected-field, and direct-suggestion-ID denials.",
+        "No-mutation proof, concurrent invalidation, adjacent-capability comparisons, and reused-result isolation when result reuse exists."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if suggestions are exactly authorized, explainable, versioned, non-posting, scope-intersected, staleness-aware, snapshot-consistent, and non-enumerating.",
+        "fail": "Fail if review mutates finance state, protected candidates appear, provenance is absent, stale suggestions remain actionable, adjacent permissions suffice, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "actor_need": "An authorized finance actor needs to confirm an explicit receipt-to-invoice match and atomically post allocation and settlement effects.",
+      "preconditions": [
+        "Canonical receipt and invoice exist, are mutually eligible, and are protected against stale confirmation by state rechecks, revisions, or an equivalent control.",
+        "Amount is positive, currency-compatible, within available and outstanding balances, and valid for the accounting period.",
+        "Any suggestion is current and bound to the same receipt, invoice, amount, and version; posting inputs are complete."
+      ],
+      "authorization_scope": [
+        "The actor has exact allocation-match-confirm authority and access to both canonical object scopes.",
+        "Overrides, cross-account matches, period exceptions, and write-offs require separate authority.",
+        "Broad Site access, suggestion review, reject, invoice update, payment view, or history review does not replace confirm."
+      ],
+      "state_read_projection": [
+        "Exactly one allocation posts and receipt-available and invoice-outstanding balances change atomically.",
+        "Settlement changes only when defined balance rules are met.",
+        "Journal, allocation, source suggestion or manual basis, and downstream event have traceable identifiers; no partial projection survives failure."
+      ],
+      "integrity_audit_provenance": [
+        "Currency precision and over-allocation rules are enforced.",
+        "Provenance binds actor, relevant receipt and invoice state, amount, currency, source basis, logical operation, allocation, settlement, journal, and times without prescribing a binding mechanism.",
+        "Reversal is a separate attributable action."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical confirmation returns the original outcome or is rejected without duplicating allocation, journal, settlement, or downstream effects.",
+        "A materially changed or stale confirmation cannot be treated as the original replay, regardless of how replay and stale-state equivalence are established.",
+        "Concurrent operations cannot over-allocate, double-settle, or remain indefinitely blocked. Failure leaves no orphan or contradictory allocation, journal, or settlement state and, if notification or asynchronous delivery exists, no orphan or contradictory delivery effect."
+      ],
+      "privacy_direct_object": [
+        "Canonical receipt and invoice authorization occurs before replay result, balances, suggestion state, or duplicate detail is returned.",
+        "Unauthorized receipt, invoice, allocation, payer, account, and journal IDs are concealed."
+      ],
+      "collision_exclusions": [
+        "Suggestion review, reject, payment view, invoice edit, generic journal post, history review, and broad Site access do not prove confirm.",
+        "Marking an invoice paid without canonical allocation and provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized full and partial confirmations with reconciled receipt, invoice, allocation, settlement, and journal state.",
+        "Missing-action, foreign-Site, cross-scope, stale-suggestion, currency, period, and over-allocation denials.",
+        "Identical logical retry, materially changed repeat, competing confirmations, confirm-versus-reject, atomic failure rollback, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if confirmation is exactly authorized across both objects, amount-valid, attributable, atomic, idempotent, concurrency-safe, rollback-safe, and concealed.",
+        "fail": "Fail if another permission confirms, balances or journals diverge, posting duplicates, stale suggestion posts, replay leaks, partial effects survive, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "actor_need": "An authorized finance reviewer needs to reject a specific suggested match with a reason while leaving financial balances and journals unchanged.",
+      "preconditions": [
+        "The canonical suggestion exists, is current, and is protected against stale rejection by a state check, version, or equivalent control.",
+        "Linked receipt and invoice remain accessible and the suggestion is not confirmed, superseded, or cancelled.",
+        "A valid rejection reason and required classification are supplied."
+      ],
+      "authorization_scope": [
+        "The actor has exact suggested-match-reject authority and access to both canonical object scopes.",
+        "Broad Site access, suggestion review, confirm, history review, or payment and invoice update does not replace reject."
+      ],
+      "state_read_projection": [
+        "The exact suggestion version becomes rejected with actor, time, reason, and disposition.",
+        "Receipt and invoice balances, allocations, settlement, and journals remain unchanged.",
+        "A regenerated suggestion is a new version and cannot revive the rejected version silently."
+      ],
+      "integrity_audit_provenance": [
+        "Provenance binds actor, suggestion version, relevant receipt and invoice state, reason, source, logical operation, and time.",
+        "Prior rationale and inputs remain available to authorized history viewers and the rejection is revision-preserving."
+      ],
+      "replay_concurrency": [
+        "Repeated submission of the same logical rejection returns the original outcome or is rejected without duplicating the transition.",
+        "A materially changed reason or target and a stale rejection cannot be treated as the original replay; any outcome-equivalent duplicate and stale-state safeguards are acceptable.",
+        "Concurrent confirm, reject, regeneration, or invalidation has one winner and cannot both post and reject the same version."
+      ],
+      "privacy_direct_object": [
+        "Unauthorized suggestion, receipt, invoice, payer, and account IDs are concealed before state is disclosed.",
+        "Responses reveal no rationale beyond the actor's review entitlement."
+      ],
+      "collision_exclusions": [
+        "Suggestion review, confirm, invoice edit, payment update, allocation reversal, generic workflow reject, and broad Site access do not prove match rejection.",
+        "Hiding a candidate without durable rejection provenance is insufficient."
+      ],
+      "minimum_comparison_evidence": [
+        "Authorized rejection with durable reason and unchanged financial projections.",
+        "Missing-action, foreign-Site, stale-version, already-confirmed, and direct-ID denials.",
+        "Identical logical replay, materially changed reason, confirm-versus-reject race, regeneration, arithmetic no-mutation proof, and adjacent-capability comparisons."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if rejection is independently authorized, version-specific, reasoned, non-posting, attributable, idempotent, race-safe, and concealed.",
+        "fail": "Fail if review or another permission rejects, finance state changes, confirmed and rejected coexist, history disappears, direct objects leak, or comparisons are incomplete."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "actor_need": "An authorized finance actor or narrowly delegated retry worker needs to recover safely from timeout or uncertain completion and obtain the original settlement result without duplicate financial effects.",
+      "preconditions": [
+        "The original operation has a durable identity and reliable binding to its normalized content, canonical receipt and invoice, action, originating authorization context, and scope without prescribing a technical representation.",
+        "A human caller's current authority and scope can be validated before replay disclosure, or a recovery worker acts under an explicitly recorded delegation to the authorized original-operation context.",
+        "Processing, allocation, settlement, journal, and reversal states are durable; if delivery exists, its state is durable enough for safe recovery.",
+        "Retry policy distinguishes never-started, in-progress, committed, rolled-back, reversed, and irrecoverably failed outcomes."
+      ],
+      "authorization_scope": [
+        "A human retry requires the same exact settlement or confirm authority and current access to every canonical object.",
+        "A recovery worker has only narrowly delegated authority to complete or report the recorded original operation and is evaluated as acting under that operation's explicitly authorized context, not as an unrelated changed principal.",
+        "Broad Site access never replaces exact action authority, and possession of an operation identifier grants no lookup or disclosure authority."
+      ],
+      "state_read_projection": [
+        "Repeated recovery of the same logical operation returns the original allocation, settlement, journal identifiers, balances, and outcome rather than creating new ones.",
+        "In-progress state is explicit; rolled-back state has no effects; reversed state remains distinct from never committed.",
+        "The projection links request, receipt, invoice, allocation, settlement, journal, reversal, principal, and suggestion or manual basis."
+      ],
+      "integrity_audit_provenance": [
+        "Durable recovery and duplicate-suppression state is established early enough that no financial or downstream effect can escape the operation's safe replay semantics; the particular mechanism is not prescribed.",
+        "The operation is unambiguously bound to action, normalized content, canonical objects, and the authorized original-operation context, including any explicit recovery delegation.",
+        "Provenance records submission, authorization context, attempts, processing outcome, canonical identifiers, response, errors, and reversals and, when delivery exists, its state and outcome.",
+        "No isolated technical artifact proves this facet unless the complete observable replay, concurrency, privacy, and provenance outcomes are demonstrated."
+      ],
+      "replay_concurrency": [
+        "Concurrent recovery attempts for the same logical operation converge on one result.",
+        "Materially changed receipt, invoice, amount, currency, action, or content, and any unrelated or unauthorized principal context, cannot be treated as the original replay. An explicitly delegated recovery worker acting under the recorded original-operation context is not a principal change.",
+        "Financial objects and recovery state are coordinated so concurrency cannot over-allocate, double-settle, or remain indefinitely blocked.",
+        "Recovery cannot duplicate journal, allocation, or settlement effects and, if notification or asynchronous-delivery effects exist, cannot duplicate them. Abandoned in-progress recovery follows explicit safe ownership, reconciliation, or outcome-equivalent semantics."
+      ],
+      "privacy_direct_object": [
+        "Canonical authorization and Site scope, or the worker's explicit original-operation recovery delegation, are established before replay hit or conflict details are returned.",
+        "Unauthorized callers cannot infer operation existence from timing, status, identifiers, or content-comparison differences.",
+        "Operation references and provenance expose no payer, bank, invoice, or journal data beyond field authority."
+      ],
+      "collision_exclusions": [
+        "A single storage, request-processing, user-interface, or delivery safeguard alone does not prove settlement replay safety.",
+        "History review, suggestion review, confirm, and journal provenance each prove only part unless the full replay chain is demonstrated."
+      ],
+      "minimum_comparison_evidence": [
+        "First execution and repeated recovery of the same logical operation returning identical canonical identifiers and balances.",
+        "Positive recovery by an explicitly delegated worker under the original authorized operation context.",
+        "Changed amount, invoice, receipt, currency, action, and unrelated or unauthorized principal context, each rejected before side effects.",
+        "Concurrent identical requests yielding one effect chain.",
+        "Failures before durable operation control, after control is established, during posting, and after commit before response and, if asynchronous delivery exists, during delivery, regardless of the chosen mechanism.",
+        "Authorized human recovery, delegated-worker recovery, missing-action denial, foreign-Site denial, guessed-identifier concealment, and full provenance reconstruction."
+      ],
+      "pass_fail_completeness_test": {
+        "pass": "Pass only if authorized human or explicitly delegated recovery converges on the original attributable result, materially changed and unauthorized reuse is rejected without disclosure, concurrency yields one effect chain, and every failure point has deterministic safe recovery.",
+        "fail": "Fail if durable replay control is established too late to prevent duplicate effects, possession of an identifier reveals state, changed content reuses an outcome, an authorized delegated worker is contradicted as a changed principal, effects duplicate, recovery blindly reposts, provenance is incomplete, or comparisons are absent."
+      },
+      "credits": {
+        "requirements_credit": false,
+        "downstream_credit": false,
+        "runtime_credit": false,
+        "browser_credit": false,
+        "test_credit": false,
+        "ease_credit": false,
+        "release_credit": false,
+        "completion_credit": false
+      }
+    }
+  ],
+  "credit_boundary": {
+    "all_credits": false,
+    "downstream_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false,
+    "attestation": "Blind-neutral requirements establish no implementation, equivalence, test, runtime, browser, ease-of-exploitation, release, completion, or audit-complete credit."
+  },
+  "external_mutations_attestation": "NONE_BLIND_TEXT_ONLY"
+}

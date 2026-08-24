@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-25T01:52:10.5131889+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=facet-refinement-wave-02#benchmarks",
+  "dashboard_sha256": "2641dbd356b8760df8322107578df9d066e0dbecb490c9efae7447d5e8841405",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_facet_refinement_content_observed": {
+    "wave_features": 6,
+    "wave_facets": 24,
+    "candidate_locators": 12,
+    "bounded_no_candidates_not_final_no_match": 12,
+    "source_anchor_occurrences_validated": 155,
+    "source_anchor_files_validated": 84,
+    "comparison_dimension_ratings": 144,
+    "independent_no_go_verdicts": 6,
+    "formal_edges": 0,
+    "promoted_feature_mappings_or_final_no_matches": 0,
+    "canonical_mapping_credit_fraction": "0/340",
+    "stage_lineage_status": "NO_GO_AGENT_A_TO_B_SANITIZED_BEHAVIOUR_PACKET_MISSING"
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_client_width": 1425,
+      "document_horizontal_overflow": false,
+      "benchmark_panel_observed": true,
+      "lineage_no_go_content_observed": true,
+      "console_warnings_or_errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_client_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 771,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "benchmark_panel_observed": true,
+      "lineage_no_go_content_observed": true,
+      "console_warnings_or_errors": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus filesystem existence validation against the same local audit-only root",
+    "rendered_hrefs": 64,
+    "local_files_checked": 56,
+    "missing": 0,
+    "failures": []
+  },
+  "generator_determinism": {
+    "run_047_integration_successful_runs": 2,
+    "run_047_outputs_identical_sha256": true,
+    "run_052_integration_successful_runs": 2,
+    "run_052_outputs_identical_sha256": true,
+    "dashboard_successful_runs": 2,
+    "dashboard_identical_sha256": true
+  },
+  "canonical_matrix_guard": {
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "unchanged": true
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current upstream project, current-build application browser, feature benchmark, route, workflow, runtime, test, build, release, or audit-completion credit."
+}

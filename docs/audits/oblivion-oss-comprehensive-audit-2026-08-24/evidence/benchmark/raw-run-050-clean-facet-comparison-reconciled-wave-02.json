@@ -1,0 +1,1025 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-050",
+  "generated_at": "2026-08-25T01:21:00+12:00",
+  "role": "CLEAN_CURRENT_NEUTRAL_FACET_COMPARISON_RECONCILER",
+  "responsible_agent_identity": "/root/run050_comparison_reconciler",
+  "status": "COMPLETE_STATIC_SIX_ARTIFACT_RECONCILIATION_CREDIT_ZERO",
+  "inputs": [
+    {
+      "run_id": "RUN-048",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-049",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json",
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-050-P1",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-clean-facet-comparison-clinical-incident-hr-wave-02.json",
+      "sha256": "49dc874e7b66fa40701e96e8fd08dc9bb20c6bf7b72850220068591f69e03586",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-050-P2",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-clean-facet-comparison-medication-finance-wave-02.json",
+      "sha256": "82e89513aa387301dccede26b833dc472cc30c8950bf410b0d285b8caece6b73",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-050-X",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-clean-facet-comparison-full-crosscheck-wave-02.json",
+      "sha256": "64a5777dfd17345969a22ad63d03348089dd699147e3448e750425f795258b4f",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-050-T",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-witness-authority-tiebreak-wave-02.json",
+      "sha256": "748e9dafa9177b8eb71425db7cf2701174a93edb28e0e283344a07be69b3d747",
+      "hash_match": true
+    }
+  ],
+  "validation": {
+    "input_file_count": 6,
+    "all_input_hashes_match": true,
+    "tiebreak_embedded_base_hashes_match": true,
+    "pair_integrity": {
+      "run_048_pairs": 24,
+      "run_049_pairs": 24,
+      "p1_pairs": 13,
+      "p2_pairs": 11,
+      "partition_overlap": 0,
+      "partition_union_pairs": 24,
+      "full_pairs": 24,
+      "exact_matched_pairs": 24,
+      "missing_pairs": 0,
+      "extra_pairs": 0
+    },
+    "disagreement_integrity": {
+      "rating_disagreements": 29,
+      "facet_verdict_disagreements": 3,
+      "post_reconciliation_tiebreak_changes": 2
+    },
+    "count_integrity": {
+      "features": 6,
+      "facets": 24,
+      "dimensions_per_facet": 6,
+      "dimension_ratings": 144,
+      "all_arithmetic_valid": true
+    },
+    "all_credits_false": true,
+    "all_valid": true
+  },
+  "method": {
+    "allowed_ratings": [
+      "MET",
+      "STRONGER",
+      "GAP",
+      "CONTRADICTED",
+      "NOT_APPLICABLE"
+    ],
+    "resolution_rule": "CONTRADICTED if RUN-049 states current behavior that conflicts with a required RUN-048 outcome; GAP if the outcome is absent or unproved but not conflicting; MET or STRONGER only with stated evidence.",
+    "facet_verdict_rule": "CONTRADICTED if any rating is CONTRADICTED; otherwise GAP if any rating is GAP; otherwise MET when every applicable rating is MET or STRONGER; all NOT_APPLICABLE yields NOT_APPLICABLE.",
+    "feature_verdict_rule": "CONTRADICTED if any facet is CONTRADICTED; otherwise GAP if any facet is GAP; otherwise MET.",
+    "conditional_facilities_rule": "Cache, pagination, export, result reuse, and asynchronous delivery are assessed only when RUN-049 states they are present; absence alone is not a gap.",
+    "mechanism_equivalence": "Outcome-equivalent mechanisms are accepted."
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "ratings": {
+        "authorization_scope": "MET",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "MET",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "ratings": {
+        "authorization_scope": "MET",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "CONTRADICTED",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "CONTRADICTED",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "CONTRADICTED",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "MET",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "MET",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "MET",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "MET",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "MET"
+      },
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "rollups": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_count": 3,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 2,
+        "CONTRADICTED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 2,
+        "STRONGER": 0,
+        "GAP": 12,
+        "CONTRADICTED": 4,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_count": 1,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 0,
+        "CONTRADICTED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 2,
+        "STRONGER": 0,
+        "GAP": 3,
+        "CONTRADICTED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_count": 2,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 0,
+        "CONTRADICTED": 2,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 1,
+        "STRONGER": 0,
+        "GAP": 5,
+        "CONTRADICTED": 6,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_count": 7,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 2,
+        "CONTRADICTED": 5,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 6,
+        "STRONGER": 0,
+        "GAP": 19,
+        "CONTRADICTED": 17,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_count": 6,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 0,
+        "CONTRADICTED": 6,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 1,
+        "STRONGER": 0,
+        "GAP": 8,
+        "CONTRADICTED": 27,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_count": 5,
+      "facet_verdict_counts": {
+        "MET": 0,
+        "STRONGER": 0,
+        "GAP": 1,
+        "CONTRADICTED": 4,
+        "NOT_APPLICABLE": 0
+      },
+      "rating_counts": {
+        "MET": 8,
+        "STRONGER": 0,
+        "GAP": 13,
+        "CONTRADICTED": 9,
+        "NOT_APPLICABLE": 0
+      },
+      "feature_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "counts": {
+    "features": 6,
+    "facets": 24,
+    "dimension_ratings": 144,
+    "dimension_rating_counts": {
+      "MET": 20,
+      "STRONGER": 0,
+      "GAP": 60,
+      "CONTRADICTED": 64,
+      "NOT_APPLICABLE": 0
+    },
+    "facet_verdict_counts": {
+      "MET": 0,
+      "STRONGER": 0,
+      "GAP": 5,
+      "CONTRADICTED": 19,
+      "NOT_APPLICABLE": 0
+    },
+    "feature_verdict_counts": {
+      "MET": 0,
+      "STRONGER": 0,
+      "GAP": 0,
+      "CONTRADICTED": 6,
+      "NOT_APPLICABLE": 0
+    },
+    "credited_facets": 0
+  },
+  "disagreement_resolution_audit": {
+    "phase": "PRE_TIEBREAK_RECONCILIATION",
+    "rating_disagreements": 29,
+    "facet_verdict_disagreements": 3,
+    "entries": [
+      {
+        "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+        "facet_key": "initial_event_record",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "state_read_projection",
+            "partition": "MET",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "RUN-049 does not state the complete RUN-048 care-context, source, and temporal projection; the unproved remainder is GAP."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "facet_key": "incident_review",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "replay_concurrency",
+            "partition": "MET",
+            "full": "GAP",
+            "resolved": "MET",
+            "basis": "RUN-048 accepts rejection and serialization; RUN-049 states locked reauthorization, repeat rejection, serialized reviews, and the same parent lock for closure."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "CONTRADICTED",
+            "full": "MET",
+            "resolved": "CONTRADICTED",
+            "basis": "RUN-049 uses incidents.approve for both review and closure, conflicting with RUN-048 action separation."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "facet_key": "incident_closure",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "replay_concurrency",
+            "partition": "MET",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "Repeat rejection and parent or journey locks are stated, but coordination with every reopen or corrective-action writer required by RUN-048 is unproved."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "create",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Shared hr.employees.manage and create-or-link conflict with RUN-048 exact create ownership."
+          },
+          {
+            "dimension": "integrity_audit_provenance",
+            "partition": "MET",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "Mutexes, Site validation, and fail-closed audit are stated, but complete effective-date, source, initial-state, Site-assignment, and protected-field provenance is not."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "view",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "state_read_projection",
+            "partition": "MET",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "Field gates are stated, but the complete identity, employment, Site, lifecycle, account-state, and secret-exclusion projection is not."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "update",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Shared hr.employees.manage and the stated FormRequest or controller Site-scope mismatch conflict with RUN-048 exact update scope."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "set_active",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "replay_concurrency",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "CONTRADICTED",
+            "basis": "RUN-049 explicitly states opposing commands are last-writer-wins without a version, conflicting with stale-transition safeguards and a single concurrent winner."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "rehire",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Shared hr.employees.manage conflicts with RUN-048 exact rehire ownership and adjacent-action exclusions."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+        "facet_key": "invite",
+        "partition_id": "RUN-050-P1",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Shared hr.employees.manage conflicts with RUN-048 exact invite ownership."
+          },
+          {
+            "dimension": "state_read_projection",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "GAP",
+            "basis": "Token creation and after-commit delivery are stated, but the durable pending-invitation projection is absent or unproved, not affirmatively contradicted."
+          },
+          {
+            "dimension": "integrity_audit_provenance",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "GAP",
+            "basis": "After-commit delivery is positive, but inviter, delivery, revocation, acceptance, and replacement provenance remains unproved."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "view",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "replay_concurrency",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "RUN-048 requires read-snapshot consistency; RUN-049 supplies no snapshot evidence but states no actual mixed-snapshot behavior."
+          },
+          {
+            "dimension": "privacy_direct_object",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "GAP",
+            "basis": "Missing Site-filter validation and a foreign-Site negative leave concealment unproved; unauthorized disclosure is not stated."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+        "facet_key": "witness_authority",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Initial reconciliation: broad initiator authority and absent witness Site, assignment, competency, and canonical relationship were treated as conflicting with RUN-048 exact scope."
+          },
+          {
+            "dimension": "integrity_audit_provenance",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "Initial reconciliation: stored witness identity without separately governed exact-content binding was treated as conflicting with RUN-048 provenance."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "RUN-048 rejects a second username without payload binding and independence checks; RUN-049 states those controls are absent."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "allocation_history_review",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "CONTRADICTED",
+            "basis": "Generic finance.ar.view or finance.ap.view conflicts with exact history-review authority."
+          },
+          {
+            "dimension": "replay_concurrency",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "GAP",
+            "basis": "Stable read-snapshot behavior is unproved, but no conflicting mixed snapshot is stated."
+          },
+          {
+            "dimension": "privacy_direct_object",
+            "partition": "GAP",
+            "full": "MET",
+            "resolved": "GAP",
+            "basis": "Stored-Site filtering is stated, but complete concealment across every required ID and supported path is not."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "CONTRADICTED",
+            "full": "MET",
+            "resolved": "CONTRADICTED",
+            "basis": "Generic AR or AP view permissions substitute for history review, directly colliding with RUN-048 exclusions."
+          }
+        ],
+        "facet_verdict_resolution": {
+          "partition": "CONTRADICTED",
+          "full": "GAP",
+          "resolved": "CONTRADICTED",
+          "basis": "Derived because canonical authorization_scope and collision_exclusions are CONTRADICTED."
+        }
+      },
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "suggested_match_review",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "privacy_direct_object",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "CONTRADICTED",
+            "basis": "Review does not re-prove stored proposal Site against current target Site, conflicting with concealment of out-of-scope candidates."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "GAP",
+            "full": "CONTRADICTED",
+            "resolved": "CONTRADICTED",
+            "basis": "finance.bank.view substitutes for exact review and the view-only page exposes adjacent command controls."
+          }
+        ]
+      },
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "confirm",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "CONTRADICTED",
+            "basis": "Broad finance.bank.manage and no independent service action check conflict with exact confirm authority."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "CONTRADICTED",
+            "full": "MET",
+            "resolved": "CONTRADICTED",
+            "basis": "The same finance.bank.manage envelope owns confirm and adjacent matching actions."
+          }
+        ],
+        "facet_verdict_resolution": {
+          "partition": "CONTRADICTED",
+          "full": "GAP",
+          "resolved": "CONTRADICTED",
+          "basis": "Derived because canonical authorization_scope and collision_exclusions are CONTRADICTED."
+        }
+      },
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "reject",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "CONTRADICTED",
+            "full": "GAP",
+            "resolved": "CONTRADICTED",
+            "basis": "Shared finance.bank.manage conflicts with exact reject authority."
+          },
+          {
+            "dimension": "collision_exclusions",
+            "partition": "CONTRADICTED",
+            "full": "MET",
+            "resolved": "CONTRADICTED",
+            "basis": "The same finance.bank.manage envelope also owns confirm and other matching actions."
+          }
+        ],
+        "facet_verdict_resolution": {
+          "partition": "CONTRADICTED",
+          "full": "GAP",
+          "resolved": "CONTRADICTED",
+          "basis": "Derived because canonical authorization_scope and collision_exclusions are CONTRADICTED."
+        }
+      },
+      {
+        "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+        "facet_key": "settlement_replay_and_provenance",
+        "partition_id": "RUN-050-P2",
+        "rating_resolutions": [
+          {
+            "dimension": "authorization_scope",
+            "partition": "GAP",
+            "full": "MET",
+            "resolved": "GAP",
+            "basis": "Exact producer actions and Site rechecks are stated, but delegated recovery, recorded original authorization context, and operation-ID non-authority outcomes are unproved."
+          }
+        ]
+      }
+    ]
+  },
+  "post_reconciliation_tiebreak_audit": {
+    "source_run_id": "RUN-050-T",
+    "source_sha256": "748e9dafa9177b8eb71425db7cf2701174a93edb28e0e283344a07be69b3d747",
+    "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+    "facet_key": "witness_authority",
+    "selected_view": "B",
+    "changes": [
+      {
+        "dimension": "authorization_scope",
+        "pre_tiebreak": "CONTRADICTED",
+        "final": "GAP",
+        "basis": "RUN-049 proves a separate witness permission but describes canonical Site, assignment, competency, independence, and relationship outcomes only as not established; it does not state that an ineligible witness is accepted."
+      },
+      {
+        "dimension": "integrity_audit_provenance",
+        "pre_tiebreak": "CONTRADICTED",
+        "final": "GAP",
+        "basis": "RUN-049 proves stored witness identity but describes exact-content binding, tamper evidence, non-transferability, invalidation, eligibility snapshot, and full provenance only as absent or unproved; it does not state conflicting attestation behavior."
+      }
+    ],
+    "unchanged": {
+      "collision_exclusions": "CONTRADICTED",
+      "facet_verdict": "CONTRADICTED"
+    },
+    "count_effect": {
+      "GAP": 2,
+      "CONTRADICTED": -2,
+      "facet_verdict_change": 0,
+      "credit_change": 0
+    }
+  },
+  "credits": {
+    "all_credits": false,
+    "requirements_credit": false,
+    "mapping_credit": false,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "all_credits": false,
+    "formal_mapping_credit": false,
+    "downstream_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false
+  },
+  "audit_complete": false,
+  "boundary": {
+    "evidence_class": "STATIC_SIX_NAMED_INPUT_FILES_ONLY",
+    "input_files_inspected": 6,
+    "other_files_inspected": 0,
+    "git_used": false,
+    "source_or_upstream_inspected": false,
+    "web_or_network_used": false,
+    "runtime_or_tests_used": false,
+    "browser_used": false,
+    "output_files_written": 1,
+    "output_path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-050-clean-facet-comparison-reconciled-wave-02.json",
+    "other_files_written": 0,
+    "staged": false,
+    "committed": false,
+    "pushed": false
+  },
+  "external_mutations_attestation": "ONLY_AUTHORIZED_RECONCILED_OUTPUT_MATERIALIZED"
+}

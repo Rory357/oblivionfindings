@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-050-P2",
+  "generated_at": "2026-08-25T00:55:30+12:00",
+  "role": "CLEAN_CURRENT_NEUTRAL_FACET_COMPARATOR_AGENT_C_PARTITION_2",
+  "responsible_agent_identity": "/root/run050_med_fin_partition",
+  "status": "ELEVEN_CLEAN_COMPARISONS_COMPLETE_CREDIT_ZERO",
+  "input_boundary": {
+    "RUN-048": {
+      "file": "raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6"
+    },
+    "RUN-049": {
+      "file": "raw-run-049-current-source-facet-refinement-wave-02.json",
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a"
+    },
+    "only_these_inputs": true
+  },
+  "method": {
+    "lens_order": [
+      "authorization_scope",
+      "state_read_projection",
+      "integrity_audit_provenance",
+      "replay_concurrency",
+      "privacy_direct_object",
+      "collision_exclusions"
+    ],
+    "allowed_ratings": [
+      "MET",
+      "STRONGER",
+      "GAP",
+      "CONTRADICTED",
+      "NOT_APPLICABLE"
+    ],
+    "rules": [
+      "Compare each RUN-049 current-source facet only with its matching RUN-048 blind-neutral facet.",
+      "Count equivalent observable outcomes without prescribing a technical mechanism.",
+      "Apply segmented or downloadable, precomputed or reused, and asynchronous-delivery clauses only when the corresponding facility is present.",
+      "Do not infer runtime, browser, test, release, benchmark, mapping, final-no-match, or completion credit from this clean static comparison."
+    ]
+  },
+  "features": [
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facets": [
+        {
+          "facet_key": "view",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "GAP",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "GAP",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "Read-only projection exposes balances, entries, discrepancies, destructions, and loss reports.",
+          "gaps": "Generic medications.view replaces exact register authority; Site filter lacks explicit validation; full ledger derivation, stable snapshot, provenance, minimization, and foreign-Site denial are unproved.",
+          "native_preserve": "Existing controlled-drug read page, Client-view filtering, and non-mutating projection.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "register_movement",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "CONTRADICTED",
+            "integrity_audit_provenance": "CONTRADICTED",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "Creates register evidence, updates stock and schedules when medication resolves, and separately checks witness permission.",
+          "gaps": "Broad orders.manage substitutes for exact action authority; Site and ownership checks are absent; nullable medication permits unbound entries; writes lack transactions, locks, and durable actor/payload-bound replay.",
+          "native_preserve": "Movement categories, register-entry model, witness permission check, and schedule synchronization.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "balance_check",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "CONTRADICTED",
+            "integrity_audit_provenance": "CONTRADICTED",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "Core writes are transactional, witness permission is checked, and discrepancy/incident/alert integration exists.",
+          "gaps": "No exact balance-check or actor-Site authority; nullable medication can break provenance and mismatch handling; the check can mutate stock; stock is unlocked and replay cache is non-durable.",
+          "native_preserve": "Core transaction, witness evidence, and discrepancy/incident/alert integrations.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "discrepancy_resolution",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "CONTRADICTED",
+            "integrity_audit_provenance": "CONTRADICTED",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "Records resolution evidence and invokes alert/signal resolution.",
+          "gaps": "Broad permission and direct binding lack Site checks; status/evidence are overwritten without open-state or revision protection; alert resolution is non-atomic; no lock, transaction, replay identity, or linked correction contract exists.",
+          "native_preserve": "Resolution route/dialog and alert/signal integration.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "destruction_projection",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "CONTRADICTED",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "GAP",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "MET"
+          },
+          "strengths": "The page projects destruction evidence; creation is transactional and conditionally locks linked stock; the external command is correctly attributed to CAP-MED-DESTRUCTION.",
+          "gaps": "No exact projection authority or ownership-consistent Site boundary; void metadata is omitted, void does not reverse stock/register movement, and destruction may lack a disposal entry; as-of, rule-version, reconciliation, and snapshot guarantees are absent.",
+          "native_preserve": "Current projection/model, transactional creation, conditional stock lock, and separate CAP-MED-DESTRUCTION ownership.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "witness_authority",
+          "ratings": {
+            "authorization_scope": "GAP",
+            "state_read_projection": "CONTRADICTED",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "GAP"
+          },
+          "strengths": "medications.controlled.witness is checked separately and witness identity is stored.",
+          "gaps": "No separately governed contemporaneous attestation, Site overlap, assignment, competency, independence, exact payload/revision binding, eligibility snapshot, durable replay, race protection, or direct-object concealment is established.",
+          "native_preserve": "Separate witness permission check and stored witness identity.",
+          "facet_verdict": "CONTRADICTED"
+        }
+      ],
+      "rollup": {
+        "facet_count": 6,
+        "lens_assessment_count": 36,
+        "lens_counts": {
+          "MET": 1,
+          "STRONGER": 0,
+          "GAP": 8,
+          "CONTRADICTED": 27,
+          "NOT_APPLICABLE": 0
+        },
+        "facet_verdict_counts": {
+          "GAP": 0,
+          "CONTRADICTED": 6
+        },
+        "verdict": "CONTRADICTED",
+        "summary": "Useful native projections, evidence models, and integrations exist, but every facet conflicts with at least one essential authority, ownership, atomicity, replay, or privacy requirement."
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facets": [
+        {
+          "facet_key": "allocation_history_review",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "GAP",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "CONTRADICTED",
+            "privacy_direct_object": "GAP",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "AR/AP rows are permission-partitioned and Site-filtered; all-Sites broadens scope only; allocations are immutable and traceable rows are distinguished from legacy-review rows.",
+          "gaps": "Generic AR/AP view replaces exact history authority; complete omission-aware chronology and arithmetic are unproved; no stable as-of snapshot or complete supported-path concealment evidence exists.",
+          "native_preserve": "Read-only controller, immutable allocation model, AR/AP partitioning, Site-scope service, and legacy-review distinction.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "suggested_match_review",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "GAP",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "GAP",
+            "privacy_direct_object": "CONTRADICTED",
+            "collision_exclusions": "GAP"
+          },
+          "strengths": "List scope, deterministic proposal keys, rejection-version progression, bank-transaction locking, and command-time current-target rechecks exist.",
+          "gaps": "Generic bank.view replaces exact review authority; list review does not re-prove current target Site; rationale, input cutoff, rule version, staleness, and reused-proposal isolation are incomplete; view-only UI exposes command controls.",
+          "native_preserve": "Proposal/version model, stored-Site filtering, generation lock, immutable rejection, and route-level bank.manage command enforcement.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "confirm",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "MET",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "MET",
+            "privacy_direct_object": "MET",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "One locked transaction posts validated AP/AR allocation, journal, settlement, and target state; evidence-conditioned replay is an acceptable equivalent outcome; inaccessible or Site-mismatched targets receive concealed 404s.",
+          "gaps": "Generic finance.bank.manage replaces exact confirm authority and also owns adjacent actions; provenance lacks a complete logical-operation binding despite strong canonical journal/allocation evidence.",
+          "native_preserve": "Existing lock order, atomic posting, sign/due checks, evidence-conditioned replay, canonical Site rechecks, and concealed mismatch behavior.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "reject",
+          "ratings": {
+            "authorization_scope": "CONTRADICTED",
+            "state_read_projection": "MET",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "MET",
+            "privacy_direct_object": "MET",
+            "collision_exclusions": "CONTRADICTED"
+          },
+          "strengths": "Locked transactional rejection is immutable, records actor/time/reason, rejects repeats without duplication, gives later suggestions new versions, and applies concealed current-target Site checks.",
+          "gaps": "Generic finance.bank.manage replaces exact reject authority and also authorizes confirm; full suggestion-version, object-state, source, and logical-operation provenance is not established.",
+          "native_preserve": "Proposal lock, fail-closed audit transaction, immutable rejection evidence, version regeneration, and concealed Site boundary.",
+          "facet_verdict": "CONTRADICTED"
+        },
+        {
+          "facet_key": "settlement_replay_and_provenance",
+          "ratings": {
+            "authorization_scope": "GAP",
+            "state_read_projection": "GAP",
+            "integrity_audit_provenance": "GAP",
+            "replay_concurrency": "GAP",
+            "privacy_direct_object": "MET",
+            "collision_exclusions": "MET"
+          },
+          "strengths": "Producer-specific exact actions and Site concealment remain intact; append-only settlement evidence, recorder uniqueness, and producer locks prevent duplicate canonical sources.",
+          "gaps": "There is no uniform durable operation/content binding, original authorization context, recovery-state projection, delegated-worker contract, deterministic uncertain-outcome recovery, or target-wide replay semantics.",
+          "native_preserve": "Producer ownership, canonical target/Site checks, settlement recorder uniqueness, locks, and allocation/journal provenance.",
+          "facet_verdict": "GAP"
+        }
+      ],
+      "rollup": {
+        "facet_count": 5,
+        "lens_assessment_count": 30,
+        "lens_counts": {
+          "MET": 8,
+          "STRONGER": 0,
+          "GAP": 13,
+          "CONTRADICTED": 9,
+          "NOT_APPLICABLE": 0
+        },
+        "facet_verdict_counts": {
+          "GAP": 1,
+          "CONTRADICTED": 4
+        },
+        "verdict": "CONTRADICTED",
+        "summary": "Confirm and reject retain strong native atomicity, replay, and concealment outcomes, but generic action permissions contradict exact facet ownership and review/recovery contracts remain incomplete."
+      }
+    }
+  ],
+  "counts": {
+    "feature_count": 2,
+    "facet_count": 11,
+    "lens_assessment_count": 66,
+    "lens_counts": {
+      "MET": 9,
+      "STRONGER": 0,
+      "GAP": 21,
+      "CONTRADICTED": 36,
+      "NOT_APPLICABLE": 0
+    },
+    "facet_verdict_counts": {
+      "GAP": 1,
+      "CONTRADICTED": 10
+    },
+    "credited_facets": 0
+  },
+  "credit_boundary": {
+    "formal_mapping_credit": false,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "external_mutations_attestation": "NONE_TWO_INPUT_FILES_ONLY"
+}

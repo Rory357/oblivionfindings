@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-050-X",
+  "generated_at": "2026-08-25T00:56:00+12:00",
+  "role": "CLEAN_CURRENT_NEUTRAL_FACET_COMPARATOR_FULL_CROSSCHECK",
+  "responsible_agent_identity": "/root/run050_clean_facet_comparison_v3",
+  "comparison_status": "COMPLETE_STATIC_TWO_ARTIFACT_COMPARISON_CREDIT_ZERO",
+  "inputs": [
+    {
+      "run_id": "RUN-048",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json",
+      "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6",
+      "hash_match": true
+    },
+    {
+      "run_id": "RUN-049",
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json",
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a",
+      "hash_match": true
+    }
+  ],
+  "pair_integrity": {
+    "run_048_pairs": 24,
+    "run_049_pairs": 24,
+    "exact_matched_pairs": 24,
+    "missing_from_run_049": 0,
+    "extra_in_run_049": 0
+  },
+  "method": {
+    "allowed_ratings": ["MET", "STRONGER", "GAP", "CONTRADICTED", "NOT_APPLICABLE"],
+    "facet_verdict_rule": "CONTRADICTED if any rating is CONTRADICTED; otherwise GAP if any rating is GAP; otherwise MET if every applicable rating is MET or STRONGER; all-NOT_APPLICABLE yields NOT_APPLICABLE",
+    "feature_verdict_rule": "CONTRADICTED if any facet is CONTRADICTED; otherwise GAP if any facet is GAP; otherwise MET",
+    "conditional_facilities_rule": "Cache, pagination, export, result reuse and asynchronous delivery are assessed only when RUN-049 states they are present; absence alone is not a gap.",
+    "mechanism_equivalence": "Outcome-equivalent mechanisms are accepted."
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "ratings": {"authorization_scope": "MET", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "MET"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "MET"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "ratings": {"authorization_scope": "MET", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "MET", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "MET", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "MET", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "CONTRADICTED", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "GAP", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "CONTRADICTED", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "CONTRADICTED", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "CONTRADICTED", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "MET"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "CONTRADICTED", "integrity_audit_provenance": "CONTRADICTED", "replay_concurrency": "CONTRADICTED", "privacy_direct_object": "CONTRADICTED", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "MET", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "ratings": {"authorization_scope": "CONTRADICTED", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "GAP", "collision_exclusions": "CONTRADICTED"},
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "MET", "integrity_audit_provenance": "GAP", "replay_concurrency": "MET", "privacy_direct_object": "MET", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "ratings": {"authorization_scope": "GAP", "state_read_projection": "MET", "integrity_audit_provenance": "GAP", "replay_concurrency": "MET", "privacy_direct_object": "MET", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "ratings": {"authorization_scope": "MET", "state_read_projection": "GAP", "integrity_audit_provenance": "GAP", "replay_concurrency": "GAP", "privacy_direct_object": "MET", "collision_exclusions": "MET"},
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "rollups": [
+    {"feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD", "facet_count": 3, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 2, "CONTRADICTED": 1, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 2, "STRONGER": 0, "GAP": 12, "CONTRADICTED": 4, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"},
+    {"feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD", "facet_count": 1, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 0, "CONTRADICTED": 1, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 2, "STRONGER": 0, "GAP": 3, "CONTRADICTED": 1, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"},
+    {"feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE", "facet_count": 2, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 0, "CONTRADICTED": 2, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 1, "STRONGER": 0, "GAP": 6, "CONTRADICTED": 5, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"},
+    {"feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE", "facet_count": 7, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 2, "CONTRADICTED": 5, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 6, "STRONGER": 0, "GAP": 18, "CONTRADICTED": 18, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"},
+    {"feature_id": "CAP-MED-CD-REGISTER-BALANCE", "facet_count": 6, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 0, "CONTRADICTED": 6, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 1, "STRONGER": 0, "GAP": 5, "CONTRADICTED": 30, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"},
+    {"feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY", "facet_count": 5, "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 4, "CONTRADICTED": 1, "NOT_APPLICABLE": 0}, "rating_counts": {"MET": 13, "STRONGER": 0, "GAP": 15, "CONTRADICTED": 2, "NOT_APPLICABLE": 0}, "feature_verdict": "CONTRADICTED"}
+  ],
+  "counts": {
+    "features": 6,
+    "facets": 24,
+    "dimension_ratings": 144,
+    "dimension_rating_counts": {"MET": 25, "STRONGER": 0, "GAP": 59, "CONTRADICTED": 60, "NOT_APPLICABLE": 0},
+    "facet_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 8, "CONTRADICTED": 16, "NOT_APPLICABLE": 0},
+    "feature_verdict_counts": {"MET": 0, "STRONGER": 0, "GAP": 0, "CONTRADICTED": 6, "NOT_APPLICABLE": 0}
+  },
+  "credits": {
+    "all_credits": false,
+    "mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "all_credits": false,
+    "formal_mapping_credit": false,
+    "downstream_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false
+  },
+  "boundary": {
+    "evidence_class": "STATIC_TWO_INPUT_FILES_ONLY",
+    "input_files_inspected": 2,
+    "other_evidence_files_inspected": 0,
+    "git_used": false,
+    "source_or_upstream_inspected": false,
+    "network_used": false,
+    "runtime_or_tests_used": false,
+    "browser_used": false,
+    "output_files_written": 1,
+    "staged": false,
+    "committed": false,
+    "pushed": false
+  },
+  "external_mutations_attestation": "NONE_TWO_INPUT_FILES_ONLY"
+}

@@ -1,0 +1,1166 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-047",
+  "generated_at": "2026-08-25T00:07:00+12:00",
+  "role": "ROOT_UPSTREAM_FACET_REFINEMENT_INTEGRATOR",
+  "responsible_agent_identity": "/root",
+  "status": "TWENTY_FOUR_OFFICIAL_UPSTREAM_FACET_PACKETS_INTEGRATED_NEUTRAL_AND_COMPARISON_PENDING_CREDIT_ZERO",
+  "governing_pins": {
+    "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "prompt_bytes": 88305,
+    "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "parent_run_046_sha256": "648fd95c9291a094a60bf1dfb007e1da9f58eb9b9889ffaad4fa5d542ecbf1f4"
+  },
+  "inputs": {
+    "raw_partitions": [
+      {
+        "partition_id": "RUN-047-P1",
+        "path": "raw-run-047-upstream-facet-refinement-clinical-incident-wave-02.json",
+        "sha256": "517be316ad4ac47bc029799736ce7f648d06ff39b7cbefd360685bf6240a99c8",
+        "responsible_agent_identity": "/root/run047_upstream_clinical_incident",
+        "facets": 6
+      },
+      {
+        "partition_id": "RUN-047-P2",
+        "path": "raw-run-047-upstream-facet-refinement-composites-wave-02.json",
+        "sha256": "978fad489512c4498140bdec02bda59a36b9e0cefcb073316c59a3be6efcac99",
+        "responsible_agent_identity": "/root/run047_upstream_composites",
+        "facets": 18
+      }
+    ]
+  },
+  "stage_boundary": {
+    "official_upstream_observation": "COMPLETE_FOR_24_BOUNDED_FACETS",
+    "blind_neutral_requirements": "PENDING_SEPARATE_AGENT_B_STAGE",
+    "current_product_facet_packets": "PENDING_SEPARATE_CURRENT_SOURCE_STAGE",
+    "clean_current_neutral_comparison": "PENDING",
+    "independent_adjudication": "PENDING",
+    "formal_edges": 0
+  },
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "candidate_status": "NO_CANDIDATE_BOUNDED_REJECTION",
+      "candidate_project": null,
+      "official_ref": {
+        "rejected_locator_project": "openmrs/openmrs-core",
+        "canonical_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Encounter.java#L47-L115",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L101-L224",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java#L246-L274"
+      ],
+      "observed_behaviors": [
+        "The rejected OpenMRS locator defines an Encounter as a visit or interaction container with zero-to-many observations and orders.",
+        "The model also contains diagnoses, conditions, allergies, providers, a form, location, encounter type, and an optional visit.",
+        "Saving can assign and persist a visit, persist the encounter, and then save order groups, orders, observations, conditions, allergies, and diagnoses.",
+        "New and existing encounters require different add/edit privileges."
+      ],
+      "gaps": [
+        "The locator is a compound encounter container, not an exact atomic initial clinical-event record.",
+        "The frozen evidence supplies only the user job Record a clinical event; target event fields, categories, state, provenance, and completion contract cannot be established without prohibited current-product evidence.",
+        "No official pinned source inspected in this bounded refinement established a standalone initial-event record equivalent.",
+        "The bounded search is not an exhaustive final no-match search across the complete benchmark universe."
+      ],
+      "bounded_search": {
+        "projects_and_queries": [
+          {
+            "project": "openmrs/openmrs-core",
+            "query": "Pinned Encounter model and save behavior",
+            "result": "Rejected as a compound visit or interaction container."
+          },
+          {
+            "project": "openemr/openemr",
+            "query": "Official-repository search for clinical event",
+            "result": "No exact standalone initial-event locator returned."
+          },
+          {
+            "project": "ohcnetwork/care",
+            "query": "Official-repository search for Clinical Event record",
+            "result": "No exact standalone initial-event locator returned."
+          },
+          {
+            "project": "medplum/medplum",
+            "query": "Official-repository search for clinical event",
+            "result": "No exact standalone initial-event locator returned."
+          }
+        ]
+      },
+      "licence_edition_boundary": {
+        "root_licence": "MPL-2.0 with the repository Healthcare Disclaimer",
+        "licence_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L1-L2",
+        "healthcare_disclaimer_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L366-L400",
+        "edition_boundary": "OpenMRS Core repository modules only; separately installable modules are excluded."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": false,
+        "scope": "Initial clinical-event recording.",
+        "reason": "Using the compound Encounter service would conflate a care interaction container with the frozen atomic event-record job. A target contract and exact upstream event object are required first."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "75d1a09f854f7953d9878d587baa8d95e8511e06fed958d63892d8742d73b7bc"
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openmrs/openmrs-core",
+      "official_ref": {
+        "canonical_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L39-L66",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L95-L99",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Obs.java#L1185-L1207",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java#L103-L129",
+        "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java#L134-L198"
+      ],
+      "observed_behaviors": [
+        "OpenMRS defines an observation as a single unit of clinical information and explicitly warns against altering the official encounter record in place.",
+        "Saving an existing observation requires a change message and edit-observation privilege.",
+        "A dirty existing observation is copied without its original ID, saved as a new row, linked through previousVersion, and the original observation is voided with the change message for historical retention.",
+        "When the original status is FINAL, the replacement status becomes AMENDED.",
+        "The observation model exposes PRELIMINARY, FINAL, and AMENDED states and describes the previous-version relationship explicitly."
+      ],
+      "gaps": [
+        "No user-facing amendment confirmation, reviewer approval, signature, or reason-quality validation was established.",
+        "Concurrency locking and idempotent amendment replay are not established.",
+        "Approved-Site scope and minimum-necessary disclosure are not established.",
+        "For complex observations, the inspected service may purge the previous complex payload; complete binary-history preservation requires separate verification.",
+        "The model is audited, but the exact durable audit reader and end-user provenance display were not inspected."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "MPL-2.0 with the repository Healthcare Disclaimer",
+        "licence_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L1-L2",
+        "healthcare_disclaimer_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/LICENSE#L366-L400",
+        "edition_boundary": "OpenMRS Core repository modules only; separately installable modules are excluded.",
+        "edition_anchor": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/README.md#L215-L253"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Clinical-observation amendment and version lineage.",
+        "reason": "The pinned service implements a concrete replacement-row, previous-version, void-old, reason-required, and AMENDED-state behavior."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "5f2020880415dd86d5bb773d53fcfdbbd6689e8cc98862f4c114f9e949a6c3f5"
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openemr/openemr",
+      "official_ref": {
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L75-L108",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L180-L203",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L179-L196",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L228-L241",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L278-L324"
+      ],
+      "observed_behaviors": [
+        "The new/edit action derives patient and encounter from the active session, resolves the requested form or observation, and uses a default empty observation template when no record resolves.",
+        "Single-record lookup is constrained by observation ID and patient ID and can populate child observations.",
+        "The list action filters by active patient, active encounter, form ID, and absence of a parent-observation ID so only top-level records seed the result.",
+        "Encounter retrieval filters by patient and encounter, orders top-level observations newest first, and attaches each record's sub-observations.",
+        "Hierarchy population identifies top-level results and attaches child records using parent_observation_id."
+      ],
+      "gaps": [
+        "The inspected hierarchy population establishes parent and immediate-child behavior; arbitrary multi-level hierarchy is not established.",
+        "form_id and a default empty observation template do not establish a configurable care-plan or clinical-template hierarchy.",
+        "Approved-Site filtering is not established.",
+        "Single-record lookup is patient-scoped but does not itself include encounter scope.",
+        "Authorization beyond the controller's observation-form permission and privacy behavior outside the active patient context remain unknown."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "GPL-3.0",
+        "licence_anchor": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE#L1-L6",
+        "edition_boundary": "Public repository and pinned ref only; hosted services and uncited modules are excluded. No further edition split was established."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Patient, encounter, form, top-level, and immediate-child selection behavior only.",
+        "reason": "The official pinned paths expose the exact filter inputs and hierarchy assembly rather than merely naming observations or forms."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "16dcba6303fdd94a998666c3f763d0737b335a22d28b2d09500c8f8c28ee51db"
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "openemr/openemr",
+      "official_ref": {
+        "canonical_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L242-L281",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Controllers/Interface/Forms/Observation/ObservationController.php#L283-L351",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L471-L578",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/src/Services/ObservationService.php#L597-L616"
+      ],
+      "observed_behaviors": [
+        "Saving requires observation-form permission and a valid CSRF token.",
+        "With no observation ID, the controller starts from a new observation template; it binds form, active patient, encounter, user, provider group, and authorization context before validation.",
+        "The controller validates the observation and saves the main record and sub-observations inside an explicit transaction with rollback on failure.",
+        "Persistence generates a UUID, creates and links an encounter form when form_id is absent, defaults an unqualified code to LOINC, inserts a new form_observation row when no record ID exists, and reloads the persisted record.",
+        "Sub-observations inherit the saved parent ID, patient, encounter, and form ID."
+      ],
+      "gaps": [
+        "The same service updates an existing observation row in place, so this locator is not eligible as an amendment/version-history comparator.",
+        "A durable success audit event is not established; the inspected service contains a TODO for save-event dispatch.",
+        "Row locking, idempotency, replay behavior, approved-Site scope, and retry recovery are not established.",
+        "The source identifies portions of the observation implementation as AI-generated; no runtime or maturity inference is made."
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "GPL-3.0",
+        "licence_anchor": "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/LICENSE#L1-L6",
+        "edition_boundary": "Public repository and pinned ref only; hosted services and uncited modules are excluded. No further edition split was established."
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Initial clinical-observation registration only.",
+        "reason": "The pinned paths expose a concrete initial-record branch, required context, validation, transaction, persistence, and success behavior without relying on a grouped source relation."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "bf2727fb802699a51ea469b6b9196f4c2d40ca12298b16185216d7960bbeb6ef"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "allocation_history_review",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/models/MatchedBankTransaction.ts#L1-L20",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/database/tenant/migrations/20240619133733_create_matched_bank_transactions_table.ts#L1-L13",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L21-L44"
+      ],
+      "observed_behaviors": [
+        "Current match rows retain source transaction ID, reference type, reference ID, amount, and timestamps.",
+        "Unmatching deletes the current matched-bank-transaction rows inside a unit of work."
+      ],
+      "gaps": [
+        "Hard deletion on unmatch prevents these rows from establishing durable allocation-history review.",
+        "Actor, reason, previous state, settlement identity, review decision, and immutable provenance are not stored in the inspected schema.",
+        "Bank matching must not be assumed equivalent to payment-allocation history."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN EXACT ALLOCATION-HISTORY CANDIDATE; BigCapital remains only a bounded potential finance candidate.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "bf9af9a8f0dad2ef761380c654211306ef92c2e7196d42c2783bd5662d3127c2"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "confirm",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "bigcapitalhq/bigcapital",
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L57-L64",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L46-L120",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L127-L172"
+      ],
+      "observed_behaviors": [
+        "Confirmation accepts one or more uncategorized transaction IDs and reference entries.",
+        "Source rows are loaded in deterministic ID order and locked FOR UPDATE inside a unit of work.",
+        "The command rejects missing, excluded, or already-matched sources, invalid reference types or IDs, and totals differing by more than 0.01.",
+        "Validated match records are created and matching and matched events are emitted inside the transaction callback."
+      ],
+      "gaps": [
+        "Stable request-key idempotency and same-request replay are not established.",
+        "User authorization, actor attribution, durable decision audit, and payment-settlement equivalence are not established.",
+        "Rollback details beyond the unit-of-work boundary are not evidenced in this inspected slice."
+      ],
+      "eligibility": "ELIGIBLE_FOR LATER CLEAN COMPARISON AS A MATCH-CONFIRMATION CANDIDATE ONLY; BigCapital remains unselected.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "91855c10407e5b5dccd45a8875fca866ac43255d6948a54fdc75d865b18adff0"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "reject",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L66-L74",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L21-L44",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L74-L112"
+      ],
+      "observed_behaviors": [
+        "The service can unmatch an already-confirmed source by deleting its current match rows and emitting unmatching and unmatched events.",
+        "Suggested perfect and possible candidates are returned, but no explicit rejection command appears in the inspected matching module."
+      ],
+      "gaps": [
+        "Unmatch-after-confirmation is not the same as rejecting a proposed match.",
+        "No rejected state, candidate identity, reason, reviewer, timestamped rejection record, suppression rule, or reconsideration path is established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT SUGGESTION-REJECTION CANDIDATE UNDER FIN_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "8f35c3b78c387c7da20e8da186d05e6153ece686dac3e5c58ba1fb73903a5b61"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "settlement_replay_and_provenance",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L53-L72",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/MatchTransactions.ts#L127-L172",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/models/MatchedBankTransaction.ts#L1-L20",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/commands/UnmatchMatchedTransaction.service.ts#L26-L44"
+      ],
+      "observed_behaviors": [
+        "Source rows are locked during match confirmation and an already-matched source is rejected.",
+        "Current match rows carry reference identity and timestamps.",
+        "Match and unmatch events are emitted around creation or deletion."
+      ],
+      "gaps": [
+        "Rejecting a repeat against an already-matched row is not stable-key replay.",
+        "No idempotency key, original-result replay, payload conflict response, settlement or journal identity, actor, decision reason, or immutable provenance chain is established.",
+        "Unmatch deletes current rows, so the inspected persistence does not preserve replay history."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS AN EXACT SETTLEMENT-REPLAY-AND-PROVENANCE CANDIDATE; BigCapital provides adjacent locking and duplicate-rejection evidence only.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "61aaa9a4f8ba97f715a970459464776a45ff209d0c3033fe8af587e78ba5f853"
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "facet_key": "suggested_match_review",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "bigcapitalhq/bigcapital",
+      "official_ref": [
+        {
+          "repository": "https://github.com/bigcapitalhq/bigcapital",
+          "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+          "licence": "AGPL-3.0",
+          "edition_boundary": "Public BigCapital repository only; cloud operation excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/BankingMatching.controller.ts#L33-L55",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L34-L83",
+        "https://github.com/bigcapitalhq/bigcapital/blob/b9a431c1685a427b71b9bb757a97450b85ecb35f/packages/server/src/modules/BankingMatching/queries/GetMatchedTransactions.service.ts#L85-L113"
+      ],
+      "observed_behaviors": [
+        "The matched-transactions endpoint returns perfect and possible candidates for selected uncategorized bank transactions.",
+        "Candidate types include sale invoices, bills, expenses, manual journals, and cashflow records.",
+        "Candidates are sorted by closeness; same amount and same calendar day are classified as perfect matches, with remaining candidates classified as possible matches."
+      ],
+      "gaps": [
+        "The inspected controller does not establish user-facing role authorization or privacy scope.",
+        "Suggestion explanation is limited to evidenced amount and date classification; confidence, rule provenance, and reviewer audit are not established.",
+        "This is bank-transaction matching, not yet evidence of payment-allocation equivalence."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER CLEAN COMPARISON AS A SUGGESTED-MATCH REVIEW CANDIDATE ONLY; BigCapital is not selected as a winner.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "a3048481a12ee56ad35eb02561811e8333525308fe008ff4d9188d5d7ef72446"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; hosted Frappe Cloud and uninspected Frappe Framework behavior excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L116-L195",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876",
+        "https://docs.frappe.io/hr/employee#2-how-to-create-an-employee"
+      ],
+      "observed_behaviors": [
+        "The Employee document assigns its identifier through a naming series, validates lifecycle state, dates, email, reporting relationships, and preferred contact data before persistence.",
+        "HR User and HR Manager metadata grant create, read, and write authority.",
+        "After insert, optional automatic linked-user creation is invoked when a usable employee email exists."
+      ],
+      "gaps": [
+        "Framework-level persistence, transaction, and record-level permission execution are outside the pinned ERPNext repository slice.",
+        "Approved-Site scope, sensitive-field privacy, concurrency, and idempotency are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A_CREATE_BEHAVIOR_CANDIDATE; framework assumptions and privacy controls must remain unknown.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "62de9bf8acc2aae9e052cfb4eb794ad3d675421cbaa536ffeb25bc25c9ca21b1"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; Frappe Framework mail and token behavior excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L159-L195",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L435-L482",
+        "https://docs.frappe.io/hr/employee#32-create-user"
+      ],
+      "observed_behaviors": [
+        "An authorized Employee write path can create an enabled User from an employee email, assign the Employee role, link it to the Employee, and optionally add Employee and Company user permissions.",
+        "The official documentation labels this behavior Create User for new or existing employees."
+      ],
+      "gaps": [
+        "The pinned target-specific source does not establish invitation issuance, one-time token, delivery state, expiry, acceptance, resend, cancellation, or recovery.",
+        "Any welcome-email or password-setup behavior implemented by external Frappe Framework was not inspected and cannot be inferred."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT_INVITATION_CANDIDATE; eligible only as adjacent linked-user-creation evidence.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "7a51dac6fa48853aa9eb9446a129ed075345a6b9979a71a7ee4c255cdb8af1e6"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "horilla/horilla-hr",
+      "official_ref": [
+        {
+          "repository": "https://github.com/horilla/horilla-hr",
+          "commit_sha": "d3443753e46f65a0b6793db4291b19ab141cf74b",
+          "licence": "LGPL-2.1",
+          "edition_boundary": "Public Horilla 2.0 repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/models.py#L921-L990",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/models.py#L528-L545",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/views.py#L3338-L3366",
+        "https://github.com/horilla/horilla-hr/blob/d3443753e46f65a0b6793db4291b19ab141cf74b/employee/templates/tabs/history.html#L1-L6"
+      ],
+      "observed_behaviors": [
+        "Employee work information carries a HorillaAuditLog and exposes tracked diffs.",
+        "A profile History tab and employee-list history sidebar render the same activity-history feed.",
+        "The feed presents an explicit empty state when no changes exist."
+      ],
+      "gaps": [
+        "The evidenced feed is driven by EmployeeWorkInformation tracking; complete personal-profile, activation, invitation, termination, and rehire coverage is not established.",
+        "Tamper resistance, retention, export, and approved-Site filtering are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A USER-VISIBLE WORK-INFORMATION HISTORY CANDIDATE; not evidence of a complete canonical lifecycle ledger.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "903b4da71fc4ef92cdac233d592745466358b685e4002c6fb1e25cf112163ccb"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "Public ERPNext repository only."
+        },
+        {
+          "repository": "https://github.com/orangehrm/orangehrm",
+          "commit_sha": "56e23b3b09e7af29317a0943523b825843fff527",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OrangeHRM Starter public repository only; current help-center Workforce Management behavior is not assumed edition-equivalent."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L300-L312",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/Api/EmployeeTerminationAPI.php#L342-L375",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/entity/Employee.php#L301-L316",
+        "https://github.com/orangehrm/orangehrm/blob/56e23b3b09e7af29317a0943523b825843fff527/src/plugins/orangehrmPimPlugin/entity/Employee.php#L492-L497",
+        "https://help.orangehrm.com/hc/en-us/articles/51888457817113-How-to-Re-Activate-a-Terminated-Employee"
+      ],
+      "observed_behaviors": [
+        "ERPNext re-enables a linked user when an Employee record returns to Active.",
+        "OrangeHRM Starter clears the current termination pointer through deletion while its Employee entity also models a collection of termination records.",
+        "OrangeHRM's official help article describes Reactivate Employment and optionally updating the joined date, but the page does not establish equivalence to the pinned Starter repository."
+      ],
+      "gaps": [
+        "No inspected edition-matched locus establishes a distinct rehire transaction, new service period, rehire effective date, rehire reason, authority, or downstream contract and entitlement consequences.",
+        "Simple reactivation is insufficient evidence for rehire semantics."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT_REHIRE_CANDIDATE; later comparison requires edition-matched source proving service-period and provenance behavior.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "4f58eeb3711e859bc65ca4a8d00058359e13f6f53b998e6576108af64fa7b75d"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L274-L312",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee_list.js#L1-L9"
+      ],
+      "observed_behaviors": [
+        "Employee status is constrained to Active, Inactive, Suspended, or Left.",
+        "Moving to Left requires a relieving date and is blocked while active employees still report to the departing employee.",
+        "A non-Active status disables the linked user, while return to Active re-enables it."
+      ],
+      "gaps": [
+        "The source does not establish a separate approval, effective-dated transition record, or durable lifecycle audit event.",
+        "Reactivation must not be treated as evidenced rehire.",
+        "Concurrent status changes and retry semantics are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_FOR ACTIVE_OR_INACTIVE_STATE SYNCHRONIZATION ONLY.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "39fce4745b1462f0ecdd412cf082deed30005b667ce2ddbfc84b20d20ed36ca7"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; external framework internals excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L120-L179",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.py#L197-L253",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L852-L876"
+      ],
+      "observed_behaviors": [
+        "HR User and HR Manager metadata grant write authority.",
+        "Updates revalidate lifecycle, dates, email, reporting relationships, linked-user uniqueness, and preferred contact details.",
+        "A linked user's Employee role, selected personal fields, image, and optional Employee and Company user permissions are synchronized."
+      ],
+      "gaps": [
+        "Optimistic concurrency, stale-write handling, idempotency, and a complete durable audit event are not established.",
+        "Sensitive-field and approved-Site authorization are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_AN_UPDATE_BEHAVIOR_CANDIDATE.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "d82950e966d27dac395ea760ca89c6ef1ebfce8f141ab3b17b9b3e2e588ad029"
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "candidate_status": "EXACT_CANDIDATE_FOR_LATER_CLEAN_COMPARISON_ONLY",
+      "candidate_project": "frappe/erpnext",
+      "official_ref": [
+        {
+          "repository": "https://github.com/frappe/erpnext",
+          "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+          "licence": "GPL-3.0",
+          "edition_boundary": "ERPNext public repository only; Frappe Framework enforcement and hosted editions excluded."
+        }
+      ],
+      "anchors": [
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee_list.js#L1-L24",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L735-L789",
+        "https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/setup/doctype/employee/employee.json#L843-L876",
+        "https://docs.frappe.io/hr/employee"
+      ],
+      "observed_behaviors": [
+        "The Employee list defaults to Active records and renders status indicators for Active, Inactive, Left, and Suspended.",
+        "The Employee document exposes Overview, Profile, and Connections areas.",
+        "Employee, HR User, and HR Manager roles have read metadata; create and write remain limited to the HR roles in this locus."
+      ],
+      "gaps": [
+        "The pinned source does not establish field-level privacy or the complete row-level user-permission evaluation performed by Frappe Framework.",
+        "Approved-Site scope and direct-object concealment are not established."
+      ],
+      "eligibility": "ELIGIBLE_FOR_LATER_CLEAN_COMPARISON_AS_A_PROFILE_VIEW_CANDIDATE; authorization claims must stop at the evidenced role metadata.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "234491e9931bab588a0e2db204445c80e0e24252c35c7a65b0a3629d955b10ef"
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "braedonsaunders/beaconhs",
+      "official_ref": {
+        "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+        "branch": "main",
+        "commit_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/lib/permissions-meta.ts#L45-L51",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L140-L243",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L1841-L1865",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L3306-L3315"
+      ],
+      "observed_behaviors": [
+        "Closure requires the distinct incidents.close capability and an owner/site-aware record-visibility guard.",
+        "The incident row is locked before the closure mutation.",
+        "Closing sets closedAt, clears inProgress, locks the incident, and records a transactional domain event for downstream notification, integration, and flow consumers.",
+        "The action subsequently records activity audit information and refreshes incident detail and list views.",
+        "Closed incidents display the closure date, appear locked, and expose status and audit history in Activity."
+      ],
+      "gaps": [
+        "Review checklist completion, pending flow gates, and corrective-action state do not gate closure; the inspected action permits a direct status change to closed.",
+        "No closure confirmation, rationale, approval, signature, reviewer identity, or effectiveness decision is required.",
+        "The schema has closedByTenantUserId, but the inspected closure mutation does not populate it.",
+        "Activity audit recording occurs after the closure transaction, so atomic closure-plus-audit recovery is not established.",
+        "Selecting a non-closed status clears closedAt and unlocks the incident; a user with update permission can also unlock a closed incident separately, so closure immutability is not established."
+      ],
+      "bounded_search": [
+        {
+          "project": "intuitem/ciso-assistant-community",
+          "ref": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+          "disposition": "AUXILIARY_ONLY",
+          "reason": "Direct incident closure status and actor/timestamp timeline, but no close-specific authority or mandatory evidence gate.",
+          "anchor": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/backend/core/views.py#L16010-L16035"
+        },
+        {
+          "project": "MeyerThorsten/QAtrial",
+          "ref": "b10fab722caf9561bcf4fdb03cc9733156992635",
+          "disposition": "COLLISION_LIMITED_PROXY",
+          "reason": "Closure is state-gated and records actor/time, but the object is a deviation and its linked CAPA may remain open.",
+          "anchor": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L154-L205"
+        },
+        {
+          "project": "SmartQHSE/hse-calculators",
+          "ref": "324829cf05f2b99363a4d4d0d59e008c4a300032",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Calculator library, not an incident-closure workflow."
+        },
+        {
+          "project": "opf/openproject",
+          "ref": "7a59d6b855a5df431f9ab80742b64763016f95e8",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Generic configurable work-package status only."
+        }
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "AGPL-3.0",
+        "licence_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/LICENSE#L1-L12",
+        "edition_boundary": "Public self-hosted repository only. The README describes the project as pre-launch; no maturity or production boundary is inferred.",
+        "edition_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/README.md#L296-L310"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Direct H&S incident closure authority, locking, mutation, downstream event, feedback, and known recovery gaps.",
+        "reason": "The pinned action is an exact incident-closure implementation rather than a generic lifecycle reference, while its missing prerequisites and reversibility remain explicit."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "f5d03e773346076f5c540bbafb81fdaf475eae86e9c54e9415f2c06cf4a5df09"
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "candidate_status": "CANDIDATE",
+      "candidate_project": "braedonsaunders/beaconhs",
+      "official_ref": {
+        "canonical_url": "https://github.com/braedonsaunders/beaconhs",
+        "branch": "main",
+        "commit_sha": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+        "ref_type": "immutable_commit",
+        "inspected_date": "2026-08-24"
+      },
+      "anchors": [
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/_header-actions.tsx#L45-L67",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L1741-L1759",
+        "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/apps/web/src/app/%28app%29/incidents/%5Bid%5D/page.tsx#L2878-L3271"
+      ],
+      "observed_behaviors": [
+        "Incident detail exposes reported, under_investigation, pending_review, closed, and reopened statuses in desktop and mobile selectors, and selection auto-submits.",
+        "A visible review-progress checklist covers incident details, people and injuries, reconstructed timeline, contributing factors, root cause or 5-Whys, preventative steps, and closure.",
+        "The investigation surface exposes timeline events, contributing factors, root cause or 5-Whys, owned and due preventative steps, and linked corrective actions with status."
+      ],
+      "gaps": [
+        "The checklist and pending_review state do not gate closure in the inspected closure action.",
+        "No formal review-completion action, reviewer identity, review outcome, approval, signature, or corrective-action effectiveness decision is required.",
+        "The status selector has no explicit confirmation or error surface in the inspected header component.",
+        "This is source evidence from a repository described as pre-launch; no runtime, maturity, or production credit is available."
+      ],
+      "bounded_search": [
+        {
+          "project": "intuitem/ciso-assistant-community",
+          "ref": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+          "disposition": "AUXILIARY_ONLY",
+          "reason": "Direct security or operational incident lifecycle and status history, but no distinct review state or review authority was established.",
+          "anchor": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/product-docs/concepts/incidents.md#L28-L54"
+        },
+        {
+          "project": "MeyerThorsten/QAtrial",
+          "ref": "b10fab722caf9561bcf4fdb03cc9733156992635",
+          "disposition": "COLLISION_LIMITED_PROXY",
+          "reason": "Investigation, root-cause, and CAPA behavior applies to a deviation object, not an incident.",
+          "anchor": "https://github.com/MeyerThorsten/QAtrial/blob/b10fab722caf9561bcf4fdb03cc9733156992635/server/routes/deviations.ts#L224-L345"
+        },
+        {
+          "project": "SmartQHSE/hse-calculators",
+          "ref": "324829cf05f2b99363a4d4d0d59e008c4a300032",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Calculator library, not an incident-review workflow."
+        },
+        {
+          "project": "opf/openproject",
+          "ref": "7a59d6b855a5df431f9ab80742b64763016f95e8",
+          "disposition": "NO_EXACT_LOCATOR",
+          "reason": "Generic work-package workflow only."
+        }
+      ],
+      "licence_edition_boundary": {
+        "root_licence": "AGPL-3.0",
+        "licence_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/LICENSE#L1-L12",
+        "edition_boundary": "Public self-hosted repository only. The README describes the project as pre-launch; no maturity or production boundary is inferred.",
+        "edition_anchor": "https://github.com/braedonsaunders/beaconhs/blob/7e1f3ec12708e2d612755c41ef36599c9de24a5c/README.md#L296-L310"
+      },
+      "eligibility": {
+        "eligible_for_later_clean_comparison": true,
+        "scope": "Incident investigation and review information architecture only.",
+        "reason": "BeaconHS provides a direct H&S incident object with an exact pending-review status, investigation artifacts, and visible review checklist. It does not establish an enforced review gate."
+      },
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P1",
+      "facet_record_sha256": "933d9ec0cee1608f3532cc530eeec28d3a8cc091dcb0f7656cf884b8fe67896b"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "balance_check",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L39-L49",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L88-L100"
+      ],
+      "observed_behaviors": [
+        "The generic inventory query exposes and can sort by each lot's on-hand quantity.",
+        "Destroyed lots are excluded from the active inventory query."
+      ],
+      "gaps": [
+        "A displayed on-hand value is not an evidenced balance-check workflow.",
+        "No physical count, expected-versus-observed comparison, checker identity, witness, effective time, lock, pass or fail state, or signed reconciliation is established.",
+        "The inventory is not evidenced as controlled-drug-specific."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT BALANCE-CHECK CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "38ba2c387cf0d574fb6db3d2e160685c58ae71bde1bec4cfc560f776b06bab2e"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "destruction_projection",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L81-L95",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L142-L174",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/reports/destroyed_drugs_report.php#L172-L214",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "An administrator can mark an inventory lot with destruction date, method, free-text witness, and notes after CSRF validation.",
+        "A date-ranged report projects destroyed lots with on-hand quantity, method, witness, and notes."
+      ],
+      "gaps": [
+        "The destruction path and report are generic drug-inventory behaviors and are not joined to the separate controlled-substance prescription flag.",
+        "The source marks a lot destroyed; it does not establish a controlled-drug movement ledger, partial-destruction accounting, pre and post balance, or immutable correction.",
+        "Witness identity and authority are not validated."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG DESTRUCTION PROJECTION; eligible only as adjacent generic destruction-report behavior.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "57b5a2d91a43210a8003d0fd9279d5010a302013fe4e8ac71693a0765b17bb37"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "discrepancy_resolution",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L163-L176"
+      ],
+      "observed_behaviors": [
+        "The generic inventory grants a distinct adjustments permission and exposes adjustment, consumption, return, or edit actions for lots."
+      ],
+      "gaps": [
+        "No inspected locus detects or opens a discrepancy case, freezes unsafe activity, requires recount, preserves the original balance, records investigation and resolution, or routes escalation.",
+        "No controlled-drug-specific authority or witness rule is established.",
+        "A generic stock adjustment must not be treated as discrepancy resolution."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT DISCREPANCY-RESOLUTION CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "da558702730c65bc0039a2ad2f0bdcf02dff3a54cc3bbe4c05a9f9e0003575cb"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "register_movement",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L163-L176",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/dispense_drug.php#L79-L88",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "Generic inventory exposes purchases, transfers, adjustments, consumption, destruction, returns, edits, and dispensing.",
+        "Dispensing records a drug sale only when inventory is available.",
+        "Controlled-substance reporting remains a separate prescription flag."
+      ],
+      "gaps": [
+        "No append-only controlled-drug movement entry binds movement type, before and after balance, actor, recipient, reason, witness, and controlled-drug identity.",
+        "Atomicity, locking, correction semantics, and Site-specific register ownership are not established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG MOVEMENT CANDIDATE; bounded generic inventory evidence only.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "c2c042919b5f74d777f9bb746a078d12ccc65eec457286d68b2b890b9ac51112"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "view",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only; bounded target and adjacent inventory loci."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L19-L35",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/drug_inventory.php#L88-L100",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/controllers/C_Prescription.class.php#L351-L357"
+      ],
+      "observed_behaviors": [
+        "OpenEMR provides an ACL-protected drug-inventory view with facility or warehouse restriction, lot, expiry, and on-hand quantity.",
+        "A separate prescription locus records a controlled-substance reporting flag."
+      ],
+      "gaps": [
+        "No inspected query or model joins the controlled-substance flag to the inventory view as a controlled-drug register.",
+        "Register entries, running-balance chronology, resident or prescription provenance, and controlled-drug-specific visibility are not established."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN_EXACT CONTROLLED-DRUG REGISTER VIEW CANDIDATE; generic inventory remains adjacent evidence only under MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "ddafb64d757705436f81a3ad37eee0ebc216124e31b7d249e38b966a11323769"
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "facet_key": "witness_authority",
+      "candidate_status": "BOUNDED_NO_CANDIDATE_NOT_FINAL_NO_MATCH",
+      "candidate_project": null,
+      "official_ref": [
+        {
+          "repository": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "licence": "GPL-3.0",
+          "edition_boundary": "OpenEMR public repository only."
+        }
+      ],
+      "anchors": [
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L29-L30",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L81-L95",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/drugs/destroy_lot.php#L171-L174",
+        "https://github.com/openemr/openemr/blob/a6321a3e2978e62472dbb6c721b680ca2d65b592/interface/reports/destroyed_drugs_report.php#L196-L214"
+      ],
+      "observed_behaviors": [
+        "Destroy-lot access requires the admin/drugs permission.",
+        "The destruction form accepts witness as free text and the destroyed-drugs report displays that value."
+      ],
+      "gaps": [
+        "Free text is not authenticated witness identity or authority.",
+        "No distinct witness permission, medication competency, independence rule, second-person confirmation, signature, refusal, or unavailable-witness path is established.",
+        "The acting administrator and alleged witness are not evidenced as separate accountable actors."
+      ],
+      "eligibility": "NOT_ELIGIBLE_AS_AN EXACT WITNESS-AUTHORITY CANDIDATE UNDER MED_BOUNDED_01.",
+      "neutral_requirement_credit": false,
+      "current_product_comparison_credit": false,
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "final_no_match_credit": false,
+      "completion_credit": false,
+      "source_partition": "RUN-047-P2",
+      "facet_record_sha256": "791d8d41d678281e8beac55786fae464f46d6604143ce7e30566caa359edf052"
+    }
+  ],
+  "counts": {
+    "feature_ids": 6,
+    "facets": 24,
+    "candidate_locators_for_later_clean_comparison": 12,
+    "bounded_no_candidate_not_final_no_match": 12,
+    "by_feature": {
+      "CAP-CLIN-EVENT-REGISTER-RECORD": {
+        "facets": 1,
+        "candidate_locators": 0,
+        "bounded_no_candidate_not_final_no_match": 1
+      },
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD": {
+        "facets": 3,
+        "candidate_locators": 3,
+        "bounded_no_candidate_not_final_no_match": 0
+      },
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY": {
+        "facets": 5,
+        "candidate_locators": 2,
+        "bounded_no_candidate_not_final_no_match": 3
+      },
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE": {
+        "facets": 7,
+        "candidate_locators": 5,
+        "bounded_no_candidate_not_final_no_match": 2
+      },
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE": {
+        "facets": 2,
+        "candidate_locators": 2,
+        "bounded_no_candidate_not_final_no_match": 0
+      },
+      "CAP-MED-CD-REGISTER-BALANCE": {
+        "facets": 6,
+        "candidate_locators": 0,
+        "bounded_no_candidate_not_final_no_match": 6
+      }
+    },
+    "neutral_requirements": 0,
+    "current_product_comparisons": 0,
+    "independent_adjudications": 0,
+    "formal_edges": 0,
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "credit_boundary": {
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "canonical_matrix_disposition": {
+    "status": "UNCHANGED_GUARDED_UPSTREAM_OVERLAY_ONLY",
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW_AND_LOCAL_AUDIT_INTEGRATION"
+}

@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-050-P1",
+  "generated_at": "2026-08-25T00:55:30+12:00",
+  "role": "CLEAN_CURRENT_NEUTRAL_FACET_COMPARATOR_AGENT_C_PARTITION_1",
+  "responsible_agent_identity": "/root/run050_clin_hr_partition",
+  "status": "THIRTEEN_CLEAN_COMPARISONS_COMPLETE_CREDIT_ZERO",
+  "inputs": {
+    "run_048": {
+      "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6",
+      "verified": true
+    },
+    "run_049": {
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a",
+      "verified": true
+    }
+  },
+  "facet_count": 13,
+  "lens_order": [
+    "authorization_scope",
+    "state_read_projection",
+    "integrity_audit_provenance",
+    "replay_concurrency",
+    "privacy_direct_object",
+    "collision_exclusions"
+  ],
+  "comparison_rule": "Equivalent outcomes count; conditional hierarchy, reuse, pagination, download, restricted-category, and reopen obligations apply only when present.",
+  "facets": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "create_register",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "Exact record/type permissions, approved-Site scope, canonical Site agreement, transactional timeline evidence."
+      ],
+      "gaps": [
+        "Current command records an observation entry, not the required template-versioned canonical register.",
+        "No general replay/duplicate contract or complete durable provenance; foreign direct objects return 403."
+      ],
+      "native_preserve": [
+        "Existing clinical permission split, Site checks, schedule locks, AuditableChanges and timeline transaction."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "amendment",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "strengths": [
+        "Correction fields, relationships, policy capability, and adjacent-owner exclusions are identified."
+      ],
+      "gaps": [
+        "No routed production amendment writer, revision lifecycle, direct-object behavior, transaction, stale-state control, or replay contract."
+      ],
+      "native_preserve": [
+        "Dormant correction schema/relationships and exact correction capability boundary."
+      ],
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facet_key": "care_context_template_hierarchy_filtering",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "strengths": [
+        "Existing Client/Site record scope is retained; protocol schedule and wizard Context are correctly rejected as false equivalents."
+      ],
+      "gaps": [
+        "No governed care-context/template authority, applicability catalogue, immutable revision, flat applicability filtering, audit decision, privacy behavior, or snapshot contract.",
+        "Hierarchy-only precedence is conditional and unscored, but the unconditional flat applicability outcome is also absent."
+      ],
+      "native_preserve": [
+        "Fixed observation types and existing approved-Site record filters."
+      ],
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facet_key": "initial_event_record",
+      "ratings": {
+        "authorization_scope": "MET",
+        "state_read_projection": "MET",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "MET"
+      },
+      "strengths": [
+        "Exact record authority plus Client view; canonical Site conflict rejection; open event preserves occurrence/report times; event, timeline and required H&S linkage share the core transaction."
+      ],
+      "gaps": [
+        "No duplicate/replay identity or exactly-once downstream contract; attachments and signals cross transaction boundaries; first-revision/source provenance is incomplete; foreign objects return 403."
+      ],
+      "native_preserve": [
+        "Separate review/follow-up/escalation owners, core transaction, AuditableChanges and canonical Site snapshot."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "MET",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "Locked incident is re-authorized; competing reviews serialize; repeat review is state-rejected; reviewer/time/notes and audit changes persist."
+      ],
+      "gaps": [
+        "No Site assertion permits an in-state direct-bound foreign-Site review; concealment is absent.",
+        "Review and closure share incidents.approve; rationale/evidence are optional or absent and notification durability is unestablished."
+      ],
+      "native_preserve": [
+        "Incident row lock, locked-state reauthorization, canonical journey repair and reviewer attribution."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "MET",
+        "privacy_direct_object": "CONTRADICTED",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "Site access is checked before and under lock; review/follow-up/investigation/H&S blockers are enforced; append-only immutable lifecycle signal and recoverable outbox are transactional."
+      ],
+      "gaps": [
+        "Review and close share incidents.approve; reviewer-closer separation and waiver authority are not established.",
+        "Closure reason, exact prerequisite-version evidence and ordinary post-close mutation constraints are incomplete; foreign-Site denial is 403."
+      ],
+      "native_preserve": [
+        "Canonical parent lock order, strict closure gate, closure attribution, immutable lifecycle signal and outbox."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "create",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "MET",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "All requested Sites are validated, revalidated and locked; normalized identity mutexes prevent concurrent duplicates; core User/profile/roles/Sites/fail-closed audit is atomic."
+      ],
+      "gaps": [
+        "Shared manage authority is not an independent create authority; create-or-link can mutate an existing identity.",
+        "Invite/onboarding effects are coupled after commit; repeated link may re-audit/re-emit; duplicate and related-object concealment is incomplete."
+      ],
+      "native_preserve": [
+        "Atomic intake core, fail-closed audit, Site locks, identity mutexes and elevated-role gates."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "view",
+      "ratings": {
+        "authorization_scope": "MET",
+        "state_read_projection": "MET",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "MET"
+      },
+      "strengths": [
+        "viewAny remains required; field-specific gates are retained; viewAllSites only broadens scope; wholly foreign and provenance-free profiles are concealed 404."
+      ],
+      "gaps": [
+        "Sensitive-access purpose/projection audit and effective provenance are not established; consistent as-of projection behavior is not evidenced."
+      ],
+      "native_preserve": [
+        "Historical/current Site-overlap rule, direct-object 404, field disclosure gates and separate worker self-profile route."
+      ],
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "update",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "Profile, destination Sites and manager are locked; financial fields retain an extra gate; inaccessible mutation targets are concealed 404."
+      ],
+      "gaps": [
+        "Shared manage authority and FormRequest/global-scope mismatch weaken exact authority.",
+        "PUT can change is_active outside the governed transition; no revision, reason or preserved field history; opposing writes are last-writer-wins."
+      ],
+      "native_preserve": [
+        "Mutation seam, all-assigned-Site check, related-object locks, financial gate and mover workflow."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "set_active",
+      "ratings": {
+        "authorization_scope": "CONTRADICTED",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "MET",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "All assigned Sites and actor graph are locked; inaccessible targets are concealed before validation; held-asset alerts are deduplicated."
+      ],
+      "gaps": [
+        "No independent set-active authority and generic update can bypass the transition.",
+        "Activation silently restores account approval; deactivation lacks account alignment/status journal; reason/effective-time history is absent; opposing commands are last-writer-wins."
+      ],
+      "native_preserve": [
+        "Canonical mutation lock, all-Site access check, pre-validation concealment and held-asset alert behavior."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "rehire",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "CONTRADICTED",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "Locked transaction preserves prior-stint JSON, cancels offboarding, restores the existing identity and enforces role-assignment gates."
+      ],
+      "gaps": [
+        "Shared manage authority is not exact rehire authority; complete new-Site and lookup concealment is not established.",
+        "Rehire implicitly activates, restores login, synchronizes roles and triggers invite-related effects; no canonical episode/overlap or concurrent rehire-create contract is established."
+      ],
+      "native_preserve": [
+        "Existing identity continuity, prior-stint preservation, offboarding cancellation, transaction and role gates."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "invite",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "CONTRADICTED",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "CONTRADICTED"
+      },
+      "strengths": [
+        "All assigned Sites are rechecked under profile lock and token creation/notification occur after commit."
+      ],
+      "gaps": [
+        "No independent invite authority or durable invitation lifecycle/provenance is established.",
+        "Repeated requests replace tokens and send multiple notifications; enumeration resistance is unproven; create/rehire use a separate reset-link implementation."
+      ],
+      "native_preserve": [
+        "Profile lock, all-Site recheck, after-commit delivery and branded notification."
+      ],
+      "facet_verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facet_key": "longitudinal_history",
+      "ratings": {
+        "authorization_scope": "GAP",
+        "state_read_projection": "GAP",
+        "integrity_audit_provenance": "GAP",
+        "replay_concurrency": "GAP",
+        "privacy_direct_object": "GAP",
+        "collision_exclusions": "MET"
+      },
+      "strengths": [
+        "Version/status schemas are identified and rehire JSON plus generic audit logs are correctly excluded as substitutes."
+      ],
+      "gaps": [
+        "No production writer, exact history-view authority, governed projection, append-only originating-action chain, stable snapshot, or history direct-object/privacy workflow."
+      ],
+      "native_preserve": [
+        "Existing dormant history models/tables and strict non-collision with rehire JSON and generic audits."
+      ],
+      "facet_verdict": "GAP",
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "feature_rollups": [
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "facets": 3,
+      "lens_counts": {
+        "MET": 2,
+        "STRONGER": 0,
+        "GAP": 12,
+        "CONTRADICTED": 4,
+        "NOT_APPLICABLE": 0
+      },
+      "facet_verdict_counts": {
+        "GAP": 2,
+        "CONTRADICTED": 1
+      },
+      "verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "facets": 1,
+      "lens_counts": {
+        "MET": 3,
+        "STRONGER": 0,
+        "GAP": 2,
+        "CONTRADICTED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "facet_verdict_counts": {
+        "CONTRADICTED": 1
+      },
+      "verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facets": 2,
+      "lens_counts": {
+        "MET": 2,
+        "STRONGER": 0,
+        "GAP": 4,
+        "CONTRADICTED": 6,
+        "NOT_APPLICABLE": 0
+      },
+      "facet_verdict_counts": {
+        "CONTRADICTED": 2
+      },
+      "verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "facets": 7,
+      "lens_counts": {
+        "MET": 8,
+        "STRONGER": 0,
+        "GAP": 21,
+        "CONTRADICTED": 13,
+        "NOT_APPLICABLE": 0
+      },
+      "facet_verdict_counts": {
+        "GAP": 2,
+        "CONTRADICTED": 5
+      },
+      "verdict": "CONTRADICTED",
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "overall": {
+    "facets": 13,
+    "lens_assessments": 78,
+    "lens_counts": {
+      "MET": 15,
+      "STRONGER": 0,
+      "GAP": 39,
+      "CONTRADICTED": 24,
+      "NOT_APPLICABLE": 0
+    },
+    "facet_verdict_counts": {
+      "GAP": 4,
+      "CONTRADICTED": 9
+    },
+    "credits": {
+      "requirements_credit": false,
+      "downstream_credit": false,
+      "runtime_credit": false,
+      "browser_credit": false,
+      "test_credit": false,
+      "ease_credit": false,
+      "release_credit": false,
+      "completion_credit": false
+    }
+  },
+  "credit_boundary": {
+    "mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false
+  },
+  "audit_complete": false,
+  "external_mutations_attestation": "NONE_TWO_INPUT_FILES_ONLY"
+}
