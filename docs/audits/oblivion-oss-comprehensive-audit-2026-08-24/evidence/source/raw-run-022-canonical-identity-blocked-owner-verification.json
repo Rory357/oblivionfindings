@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.0",
+  "run_id": "RUN-022",
+  "status": "COMPLETE_READ_ONLY",
+  "source_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "inputs": [
+    "evidence/source/raw-run-017-canonical-identity-frontline.json",
+    "evidence/source/raw-run-018-canonical-identity-platform.json",
+    "evidence/source/raw-run-019-canonical-identity-adversary.json"
+  ],
+  "scope_candidate_ids": [
+    "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+    "CAP-DAY-ALL-TASKS-WORKBENCH",
+    "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+    "CAP-INC-REPORT-AUDIT-EXPORTS",
+    "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST"
+  ],
+  "decisions": [
+    {
+      "candidate_id": "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "decision": "MERGE_INTO_EXACT_EXISTING_TARGET",
+      "targets": [
+        {
+          "feature_id": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+          "feature_class": "H"
+        }
+      ],
+      "operation_surface": "List, upload, edit, delete, and individually download an authorised client's documents. AuditLogger records list/download side effects; it does not expose an audit-evidence export.",
+      "anchors": {
+        "route": [
+          "routes/clients.php:28-39",
+          "routes/operations.php:147-153"
+        ],
+        "page": [
+          "resources/js/pages/operations/clients/documents.tsx:335-1333"
+        ],
+        "controller_service": [
+          "app/Http/Controllers/ClientDocumentController.php:23-78",
+          "app/Http/Controllers/ClientDocumentController.php:84-278"
+        ],
+        "policy_authority": [
+          "app/Policies/ClientPolicy.php:20-42",
+          "app/Services/Clients/ClientProfileSectionAccess.php:34-52",
+          "app/Services/Clients/ClientProfileSectionAccess.php:88-93"
+        ],
+        "test": [
+          "tests/Feature/ClientControllerTest.php:647-704",
+          "tests/Feature/Security/ClientProfileClinicalDirectRouteTest.php:105-149",
+          "tests/Feature/Portal/PortalDirectRouteAuthorizationTest.php:153-205"
+        ]
+      },
+      "confidence": "HIGH",
+      "missing_evidence": [
+        "No dedicated client-document bulk/export route, page, controller action, or service.",
+        "No audit-log or audit-evidence export is returned by ClientDocumentController.",
+        "No current test execution credit."
+      ]
+    },
+    {
+      "candidate_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "decision": "RETAIN_FINAL_H",
+      "targets": [
+        {
+          "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+          "feature_class": "H"
+        }
+      ],
+      "operation_surface": "Human cross-module workbench for permission-filtered task aggregation, filtering, search, detail, defaults, assignment, following, and child-task creation. AllTasksController owns the workbench orchestration; providers preserve each canonical module's record authority. Task reports and CSV remain a separate D sibling surface.",
+      "anchors": {
+        "navigation": [
+          "resources/js/components/app-sidebar.tsx:415-430"
+        ],
+        "route": [
+          "routes/tasks.php:6-30"
+        ],
+        "page": [
+          "resources/js/pages/tasks/index.tsx:284-755",
+          "resources/js/pages/tasks/task-detail-dialog.tsx:352-425"
+        ],
+        "controller_service": [
+          "app/Http/Controllers/AllTasksController.php:28-125",
+          "app/Http/Controllers/AllTasksController.php:126-216",
+          "app/Http/Controllers/AllTasksController.php:218-383",
+          "app/Services/Tasks/TaskAggregator.php:42-78",
+          "app/Services/Tasks/TaskAggregator.php:104-160",
+          "app/Services/Tasks/TaskAggregator.php:430-475"
+        ],
+        "policy_authority": [
+          "app/Services/Tasks/Contracts/TaskProvider.php",
+          "app/Services/Tasks/Contracts/AssignableTaskProvider.php",
+          "app/Services/Tasks/Contracts/SplittableTaskProvider.php"
+        ],
+        "test": [
+          "tests/Feature/Tasks/TaskProviderAuthorizationArchitectureTest.php:127-170",
+          "tests/Feature/Tasks/TaskProviderRowScopeTest.php:698-860",
+          "tests/Feature/Tasks/AllTasksDashboardTest.php:92-448",
+          "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:75-436",
+          "tests/Feature/Tasks/TaskWatchersTest.php:79-488"
+        ]
+      },
+      "confidence": "HIGH",
+      "missing_evidence": [
+        "No current runtime, test-execution, or browser credit."
+      ]
+    },
+    {
+      "candidate_id": "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+      "decision": "EXCLUDE_AS_NO_CURRENT_PRODUCT_CAPABILITY",
+      "targets": [],
+      "operation_surface": "None established. Confidential HR grievance, disciplinary, investigation, welfare, and complaint casework is adjacent functionality, not a protected-disclosure or anti-retaliation owner.",
+      "anchors": {
+        "route": [
+          "routes/hr.php:536-567"
+        ],
+        "page": [
+          "resources/js/pages/hr/cases/index.tsx:118-159",
+          "resources/js/pages/hr/cases/index.tsx:238-276"
+        ],
+        "controller_service": [
+          "app/Http/Controllers/Hr/HrCaseController.php:34-68",
+          "app/Http/Controllers/Hr/HrCaseController.php:359-435"
+        ],
+        "policy_authority": [
+          "app/Http/Controllers/Hr/HrCaseController.php:723-842"
+        ],
+        "test": [
+          "tests/Feature/Hr/HrCasesPageContractTest.php:66-129"
+        ],
+        "negative_search": [
+          "No whistle, protected-disclosure, anti-retaliation, speak-up, anonymous-report, or ethics-hotline owner found under app, routes, resources/js, tests, or database at the pinned commit."
+        ]
+      },
+      "confidence": "HIGH",
+      "missing_evidence": [
+        "No dedicated route, page, controller, service, model, policy, permission, or test.",
+        "HR case types do not establish protected-disclosure or anti-retaliation semantics.",
+        "No current runtime, test-execution, or browser credit."
+      ]
+    },
+    {
+      "candidate_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+      "decision": "SPLIT_TO_EXACT_PRODUCT_TARGET_AND_EXCLUDE_UNSUPPORTED_COMPONENT",
+      "targets": [
+        {
+          "feature_id": "CAP-INC-INCIDENT-REPORT-CSV-EXPORT",
+          "feature_class": "D"
+        }
+      ],
+      "excluded_components": [
+        "Safeguarding audit/report export",
+        "Generic audit-evidence export"
+      ],
+      "operation_surface": "A dedicated incident-report filter page and CSV download exist. The CSV contains incident record fields, not governance audit-log evidence. Safeguarding owns external-report mutation and individual sensitive attachment download, but has no report/audit-export route or owner.",
+      "anchors": {
+        "route": [
+          "routes/incidents.php:133-139",
+          "routes/safeguarding.php:75-106"
+        ],
+        "page": [
+          "resources/js/pages/reports/incidents.tsx:29-163"
+        ],
+        "controller_service": [
+          "app/Http/Controllers/IncidentReportController.php:12-101",
+          "app/Http/Controllers/SafeguardingExternalReportController.php:14-87",
+          "app/Http/Controllers/SafeguardingAttachmentController.php:14-75"
+        ],
+        "policy_authority": [
+          "app/Http/Controllers/IncidentReportController.php:14",
+          "app/Http/Controllers/IncidentReportController.php:32",
+          "routes/safeguarding.php:75-96"
+        ],
+        "test": [
+          "tests/Browser/Incidents/IncidentWorkflowInteractionTest.php:48-56",
+          "tests/Browser/Reports/ReportsTest.php:16-23",
+          "tests/Feature/Safeguarding/SafeguardingSubRecordTest.php:104-121"
+        ]
+      },
+      "confidence": "HIGH",
+      "missing_evidence": [
+        "No safeguarding report/audit-export route, page, controller action, or service.",
+        "No incident CSV export-specific feature test.",
+        "IncidentReportController's current queries show no source-visible approved-Site or assigned-record scope; this is a quality/privacy gap, not an identity gap.",
+        "No current runtime, test-execution, or browser credit."
+      ]
+    },
+    {
+      "candidate_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "decision": "RETAIN_FINAL_H",
+      "targets": [
+        {
+          "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+          "feature_class": "H"
+        }
+      ],
+      "operation_surface": "Human read-only display of a static unhappy-path QA reference checklist. It is not a persisted checklist-run, completion, attestation, or scheduling lifecycle.",
+      "anchors": {
+        "route": [
+          "routes/web.php:126-130"
+        ],
+        "page": [
+          "resources/js/pages/quality/checklist.tsx:6-153"
+        ],
+        "controller_service": [
+          "app/Http/Controllers/QualityChecklistController.php:7-15"
+        ],
+        "policy_authority": [
+          "app/Http/Controllers/QualityChecklistController.php:11-12",
+          "database/seeders/RbacSeeder.php:588-641",
+          "database/seeders/RbacSeeder.php:779-807",
+          "database/seeders/RbacSeeder.php:922-925"
+        ],
+        "test": [
+          "tests/Browser/Misc/MiscPagesTest.php:76-83"
+        ]
+      },
+      "confidence": "HIGH",
+      "missing_evidence": [
+        "No navigation entry.",
+        "No persisted check state, completion evidence, mutation owner, or Site-scoped record.",
+        "No dedicated feature authorization test.",
+        "No current runtime, test-execution, or browser credit."
+      ]
+    }
+  ],
+  "credit": {
+    "runtime": 0,
+    "tests_executed": 0,
+    "browser": 0,
+    "build": 0,
+    "database": 0,
+    "network": 0,
+    "benchmark": 0,
+    "final_feature_denominator": 0,
+    "completion": 0
+  },
+  "completion_test": {
+    "expected_candidate_count": 5,
+    "decision_count": 5,
+    "unique_candidate_id_count": 5,
+    "exact_scope_reconciled": true,
+    "zero_credit_contract_preserved": true,
+    "met": true
+  },
+  "completion_test_met": true,
+  "evidence_limit": "Pinned static route, page, backend, policy/authority, and test-presence evidence only. No runtime, test execution, browser, build, database, network, benchmark, final-denominator, or audit-completion credit.",
+  "adjudication_wrote_files": false,
+  "materialization": {
+    "authorized_write": true,
+    "path": "evidence/source/raw-run-022-canonical-identity-blocked-owner-verification.json",
+    "other_files_written": 0
+  }
+}

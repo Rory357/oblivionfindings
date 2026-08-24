@@ -1,0 +1,700 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-020",
+  "status": "COMPLETE_READ_ONLY_SOURCE_RECONCILIATION",
+  "generated_at": "2026-08-24T19:10:00+12:00",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "current_product_paths_match_pin": true,
+    "product_path_diff_count": 0
+  },
+  "inputs": {
+    "run_017": "evidence/source/raw-run-017-canonical-identity-frontline.json",
+    "run_017_file_sha256": "f503ce331a80457e04caf5859c69feec8ccb9ac3f345ff81bf5b3d2fc3d5e4e",
+    "run_019": "evidence/source/raw-run-019-canonical-identity-adversary.json",
+    "run_019_file_sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"
+  },
+  "scope": {
+    "basis": "Exact 95-candidate RUN-017 module scope, mechanically intersected with RUN-019.",
+    "run_017_candidate_count": 95,
+    "run_017_unique_candidate_count": 95,
+    "run_019_candidate_count": 186,
+    "run_019_unique_candidate_count": 186,
+    "intersection_count": 95,
+    "run_017_missing_from_run_019": [],
+    "run_017_ordered_candidate_ids_sha256": "af4cad5aa34302a75d264a90ef34edc057120a5f9684dc78169177c5b7dcafee",
+    "run_017_sorted_candidate_ids_sha256": "10a6c4fe2915f9788bd7e7aa4aa65e2020d792e1b9f816b81d69acfa6d12a21e",
+    "run_017_normalized_decisions_sha256": "eab6233065ba54b56f49e65ebfb1be14518ec2bc99febcfceae7d12087a165a9",
+    "run_019_scope_sorted_sha256": "7b5ea92ea06025118deb15479382cff5606849215de099d5f3efca7daa38c0a1",
+    "run_019_decision_partition_sorted_sha256": "ad28de401a006a1b4c5770be83957a6f18efd2531ab5c852dd040b0bab773981",
+    "run_019_blocked_sorted_sha256": "f43c2bb404094a0e940a847c5fe42d491d18150515fbbacaa5a224d26b4eb8b8",
+    "run_019_ambiguous_split_merge_gap_sorted_sha256": "abecfa1de53364fa2a4c444c66ff266a937edbaecdc0b318c6257dbc2e5bdeb4",
+    "run_019_challenged_set_sorted_sha256": "ab7901fda41092ab17837f86ada1e45a3a664235e20f2bf843dd2ed34a1ea894",
+    "disagreement_candidate_count": 45,
+    "disagreement_candidate_ids_sorted_sha256": "0cb63de45977415739d300e79f3ee68c26a7b96b897d4f5b9cc8b3034ff61bda",
+    "disagreement_candidate_ids": [
+      "CAP-CLI-CLIENT-SUPPORT-ASSESSMENT-RISK",
+      "CAP-CLI-CLIENT-ASSIGNMENT-NOTES",
+      "OPS-CLIENT-CONSENT",
+      "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "CAP-CLIN-BEHAVIOUR-AND-MONITORING",
+      "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+      "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+      "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+      "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+      "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+      "CAP-MED-API-CURRENT-SURFACES",
+      "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+      "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+      "CAP-INC-EVIDENCE-DOWNLOADS",
+      "CAP-INC-REPORT-AUDIT-EXPORTS",
+      "CAP-DAY-MY-DAY-WORKSPACE",
+      "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "CAP-HS-WORKER-PARTICIPATION",
+      "CAP-HS-WORKPLACE-INJURY-RTW",
+      "CAP-SAFE-INVESTIGATION-RISK",
+      "CAP-SAFE-EVIDENCE-ACTION-PLAN",
+      "CAP-COMPLAINT-SITE-FEEDBACK",
+      "CAP-COMPLAINT-RESPITE-STAY",
+      "CAP-COMPLAINT-HR-CASEWORK",
+      "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+      "CAP-FLEET-MAINTENANCE-COMPLIANCE",
+      "CAP-FLEET-KEY-HANDOVER",
+      "CAP-FLEET-TRACKING-GEOFENCE-REALTIME",
+      "CAP-FLEET-INCIDENT-OUTING-MILEAGE",
+      "CAP-FLEET-REPORTING-EXPORT",
+      "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+      "CAP-CR-COMMUNICATION-COLLABORATION",
+      "CAP-CR-EVIDENCE-REPORT-SLA",
+      "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS",
+      "CAP-SITE-MEAL-PLANNER-RECIPE-INVENTORY",
+      "CAP-PORT-CLIENT-FAMILY-WORKSPACE",
+      "CAP-RESP-REFERRAL-REQUEST-BOOKING",
+      "CAP-RESP-STAY-CARE-DISCHARGE",
+      "CAP-RESP-PROCEDURE-TASK-HANDOVER",
+      "CAP-RESP-EVIDENCE-PACK-EXPORT"
+    ]
+  },
+  "mechanical_comparison": {
+    "primary_operation_agreements": 78,
+    "primary_operation_disagreements": 17,
+    "same_primary_operation_but_reclassification_disagreements": 7,
+    "common_split_sources": 26,
+    "common_split_exact_target_sets": 5,
+    "common_split_differing_target_sets": 21,
+    "distinct_candidates_with_any_operation_target_name_class_or_module_disagreement": 45,
+    "candidates_with_no_identified_disagreement": 50,
+    "operation_pair_counts": {
+      "SURVIVES__SURVIVES": 44,
+      "SPLIT__SPLIT": 26,
+      "RECLASSIFY__SURVIVES": 7,
+      "SPLIT__SURVIVES": 4,
+      "SURVIVES__SPLIT": 4,
+      "SURVIVES__MERGE": 3,
+      "SURVIVES__NO_CANONICAL_OWNER": 3,
+      "MERGE__MERGE": 1,
+      "RECLASSIFY__SPLIT": 1,
+      "SPLIT__EVIDENCE_GAP": 1,
+      "SPLIT__MERGE": 1
+    }
+  },
+  "adjudication_rule": "Inspect canonical controllers, services, models, route consumers, and page owners at the pinned source. Route grouping alone is never decisive. A delivery endpoint merges into its user-job owner; a cohesive page or report family survives when it is itself a stable user job. Disclosure/download/export separates where authority or privacy differs.",
+  "authorization_boundary": "Single tenant, multiple Sites: exact action capability plus approved-Site scope plus canonical record ownership plus concealed foreign direct IDs plus applicable privacy or sensitivity rules. Global Site visibility broadens scope only and never replaces action authority.",
+  "recommendations": [
+    {
+      "source_id": "CAP-CLI-CLIENT-SUPPORT-ASSESSMENT-RISK",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CLI-CLIENT-SUPPORT-PLAN", "CAP-CLI-CLIENT-ASSESSMENT", "CAP-CLI-CLIENT-RISK-REGISTER"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CLI-CLIENT-SUPPORT-ASSESSMENT", "CAP-CLI-CLIENT-RISK-REGISTER"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CLI-CLIENT-SUPPORT-PLAN", "class": "H", "module": "Clients", "job": "Maintain the client's support plan", "anchors": ["routes/clients.php:156-157", "app/Http/Controllers/ClientSupportPlanController.php:10"]},
+        {"id": "CAP-CLI-CLIENT-ASSESSMENT", "class": "H", "module": "Clients", "job": "Create, update, and remove client assessments", "anchors": ["routes/clients.php:160-165", "app/Http/Controllers/ClientAssessmentController.php:10"]},
+        {"id": "CAP-CLI-CLIENT-RISK-REGISTER", "class": "H", "module": "Clients", "job": "View and maintain the client's risk register", "anchors": ["routes/clients.php:242-259", "app/Http/Controllers/ClientRiskController.php:10"]}
+      ],
+      "basis": "Support plan, assessment records, and risk records have separate controllers, action permissions, and canonical records."
+    },
+    {
+      "source_id": "CAP-CLI-CLIENT-ASSIGNMENT-NOTES",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CLI-CLIENT-ASSIGNMENT", "CAP-CLI-CLIENT-NOTES"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CLI-CLIENT-ASSIGNMENT", "CAP-CLI-CLIENT-SCOPED-NOTES"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CLI-CLIENT-ASSIGNMENT", "class": "H", "module": "Clients", "job": "Maintain authorised staff assignments for a client", "anchors": ["routes/clients.php:172-177", "app/Http/Controllers/ClientAssignmentController.php:10"]},
+        {"id": "CAP-CLI-CLIENT-NOTES", "class": "H", "module": "Clients", "job": "Create and pin privacy-scoped client timeline notes", "anchors": ["routes/clients.php:180-186", "app/Http/Controllers/ClientNoteController.php:11"]}
+      ],
+      "basis": "Privacy scope is enforced behavior, not part of the stable feature name."
+    },
+    {
+      "source_id": "OPS-CLIENT-CONSENT",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-CLI-CLIENT-CONSENT-LIFECYCLE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["OPS-CLIENT-CONSENT"]},
+      "disagreement_kinds": ["NAMING", "MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-CLI-CLIENT-CONSENT-LIFECYCLE", "class": "H", "module": "Clients", "job": "Request, decide, validate, withdraw, and evidence client consent", "anchors": ["app/Services/ConsentRequestService.php:30-1158", "app/Services/ConsentDecisionEvidenceService.php:18-220"]}
+      ],
+      "basis": "Consent authority and decision evidence bind to the canonical client and consent request, so Clients owns the identity."
+    },
+    {
+      "source_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-OPS-CARE-PLAN-LIFECYCLE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-OPS-CARE-PLAN-LIFECYCLE"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-OPS-CARE-PLAN-LIFECYCLE", "class": "H", "module": "Operations", "job": "Create, review, attest, export, and close a care plan", "anchors": ["routes/operations.php:638-686", "app/Services/Operations/CarePlanService.php:9", "app/Services/Operations/CarePlanAttestationService.php:19-392"]}
+      ],
+      "basis": "Operations owns the mutation and attestation lifecycle; Clients and Care & Clinical expose bounded read lenses."
+    },
+    {
+      "source_id": "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT"]},
+      "run_019": {"decision": "NO_CANONICAL_OWNER", "targets": []},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "MODULE_OWNERSHIP"],
+      "decision": "NO_CANONICAL_OWNER",
+      "final_targets": [],
+      "basis": "The current owner provides document list, CRUD, and individual download with audit logging, but no client-document audit-export operation.",
+      "anchors": ["routes/clients.php:34-37", "routes/clients.php:113-119", "app/Http/Controllers/ClientDocumentController.php:17-278"]
+    },
+    {
+      "source_id": "CAP-CLIN-BEHAVIOUR-AND-MONITORING",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CLIN-BEHAVIOUR-REGISTER", "CAP-CLIN-HEALTH-MONITORING"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CLIN-BEHAVIOUR-REGISTER", "CAP-CLIN-MONITORING-RECORD"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CLIN-BEHAVIOUR-REGISTER", "class": "H", "module": "Care & Clinical", "job": "Record and review ABC behaviour evidence", "anchors": ["routes/health-clinical.php:51-53", "routes/health-clinical.php:108-113", "app/Http/Controllers/Clinical/BehaviourAbcController.php:22"]},
+        {"id": "CAP-CLIN-HEALTH-MONITORING-LENS", "class": "H", "module": "Care & Clinical", "job": "Review the authorised health-monitoring rollup", "anchors": ["routes/health-clinical.php:57-59", "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:246", "app/Domain/Clinical/Services/ClinicalDashboardService.php:584"]}
+      ],
+      "basis": "Behaviour is a record lifecycle; health monitoring is a permission-filtered read lens, not a monitoring record owner."
+    },
+    {
+      "source_id": "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CLIN-ASSESSMENT-RECORD", "CAP-CLIN-PROTOCOL-LIFECYCLE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CLIN-ASSESSMENT-RECORD", "class": "H", "module": "Care & Clinical", "job": "Record and review a client clinical assessment", "anchors": ["routes/health-clinical.php:63-68", "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:377-471"]},
+        {"id": "CAP-CLIN-PROTOCOL-LIFECYCLE", "class": "H", "module": "Care & Clinical", "job": "Create, update, activate, and run clinical protocols", "anchors": ["routes/health-clinical.php:69-86", "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php:20-247", "app/Domain/Clinical/Services/ClinicalProtocolService.php:41"]}
+      ],
+      "basis": "Assessment records and reusable protocol definitions have different controllers, permissions, canonical records, and terminal actions."
+    },
+    {
+      "source_id": "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CLIN-TRENDS-LENS", "CAP-CLIN-CLIENT-SUMMARY-LENS", "CAP-OPS-CARE-PLAN-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CLIN-TRENDS-LENS", "CAP-CLIN-CARE-SUMMARY-LENS"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CLIN-TRENDS-LENS", "class": "H", "module": "Care & Clinical", "job": "Review permission-filtered client clinical trends", "anchors": ["routes/health-clinical.php:60-62", "routes/health-clinical.php:92-94", "app/Http/Controllers/Clinical/HealthClinicalClientTrendsController.php:12"]},
+        {"id": "CAP-CLIN-CLIENT-SUMMARY-LENS", "class": "H", "module": "Care & Clinical", "job": "Review the authorised client clinical summary", "anchors": ["routes/health-clinical.php:95-97", "app/Http/Controllers/HealthClinical/HealthClinicalController.php:25"]},
+        {"id": "CAP-OPS-CARE-PLAN-LIFECYCLE", "class": "H", "module": "Operations", "job": "Open the canonical care-plan lifecycle from its clinical read lens", "anchors": ["routes/health-clinical.php:54-56", "routes/operations.php:638-686", "app/Services/Operations/CarePlanService.php:9"]}
+      ],
+      "basis": "Trends and summary are distinct clinical projections; care-plan reads resolve to the existing Operations owner rather than a new clinical feature."
+    },
+    {
+      "source_id": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-CLIN-RECORD-WIZARD-CONTEXT-API"]},
+      "run_019": {"decision": "MERGE", "targets": ["CAP-CLIN-OBSERVATION-REGISTER-RECORD", "CAP-CLIN-EVENT-REGISTER-RECORD", "CAP-CLIN-BEHAVIOUR-REGISTER", "CAP-CLIN-MONITORING-RECORD", "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "MERGE",
+      "final_targets": [
+        {"id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD", "class": "H", "module": "Care & Clinical", "job": "Record a clinical observation with authorised client context", "anchors": ["routes/health-clinical.php:30-35", "resources/js/pages/health-clinical/components/record-observation-dialog.tsx:27-336"]},
+        {"id": "CAP-CLIN-EVENT-REGISTER-RECORD", "class": "H", "module": "Care & Clinical", "job": "Record a clinical event with authorised client context", "anchors": ["routes/health-clinical.php:36-41", "resources/js/pages/health-clinical/components/record-event-dialog.tsx:27-248"]},
+        {"id": "CAP-CLIN-BEHAVIOUR-REGISTER", "class": "H", "module": "Care & Clinical", "job": "Record an ABC behaviour entry with authorised client context", "anchors": ["routes/health-clinical.php:108-113", "resources/js/pages/health-clinical/components/record-abc-dialog.tsx:27-266"]},
+        {"id": "CAP-CLIN-ASSESSMENT-RECORD", "class": "H", "module": "Care & Clinical", "job": "Record a clinical assessment with authorised client context", "anchors": ["routes/health-clinical.php:63-68", "resources/js/pages/health-clinical/components/record-assessment-dialog.tsx:40-398"]}
+      ],
+      "basis": "The search and clinical-card endpoints are internal support calls consumed by four record dialogs, not an independent user job or record owner.",
+      "support_anchors": ["routes/health-clinical.php:87-91", "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:514-581", "resources/js/pages/health-clinical/components/record-wizard-shared.tsx:62-225"]
+    },
+    {
+      "source_id": "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-MED-MEDICATION-REVIEW", "CAP-MED-STAFF-COMPETENCY", "CAP-MED-ROUND-LIFECYCLE", "CAP-MED-SELF-ADMINISTRATION"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-MED-REVIEW-LIFECYCLE", "CAP-MED-COMPETENCY", "CAP-MED-ROUND-GOVERNANCE", "CAP-MED-SELF-ADMINISTRATION"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-MED-MEDICATION-REVIEW", "class": "H", "module": "eMAR", "job": "Create, progress, complete, and remove medication reviews", "anchors": ["routes/emar.php:109-111", "routes/emar.php:167-171"]},
+        {"id": "CAP-MED-STAFF-COMPETENCY", "class": "H", "module": "eMAR", "job": "Assess and maintain staff medication competency", "anchors": ["routes/emar.php:104-106", "routes/emar.php:186-188"]},
+        {"id": "CAP-MED-ROUND-LIFECYCLE", "class": "H", "module": "eMAR", "job": "Generate, assign, conduct, and complete a medication round", "anchors": ["routes/emar.php:118-130", "routes/emar.php:191-197", "app/Http/Controllers/Emar/GuidedRoundController.php:22"]},
+        {"id": "CAP-MED-SELF-ADMINISTRATION", "class": "H", "module": "eMAR", "job": "Assess and maintain client self-administration authority", "anchors": ["routes/emar.php:134-136", "routes/emar.php:200-202"]}
+      ],
+      "basis": "The RUN-017 names follow the current route and domain terms while retaining the four source-established owners."
+    },
+    {
+      "source_id": "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-MED-DESTRUCTION-LIFECYCLE", "CAP-MED-STOCK-MOVEMENT", "CAP-MED-PHARMACY-ACTIONS"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-MED-DESTRUCTION", "CAP-MED-STOCK-MOVEMENT", "CAP-MED-PHARMACY-ACTIONS"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-MED-DESTRUCTION-LIFECYCLE", "class": "H", "module": "eMAR", "job": "Record and, under authority, void a medication destruction", "anchors": ["routes/emar.php:139-141", "routes/emar.php:217-218", "app/Http/Controllers/Emar/EmarController.php:4023"]},
+        {"id": "CAP-MED-STOCK-MOVEMENT", "class": "H", "module": "eMAR", "job": "Receive, adjust, and inspect medication stock movements", "anchors": ["routes/emar.php:94-96", "routes/emar.php:224-226"]},
+        {"id": "CAP-MED-PHARMACY-ACTIONS", "class": "H", "module": "eMAR", "job": "Create, update, and advance pharmacy orders", "anchors": ["routes/emar.php:221-223", "app/Http/Controllers/Emar/EmarController.php:22"]}
+      ],
+      "basis": "Destruction has a terminal/void lifecycle; stock movements and pharmacy-order actions have independent records and action boundaries."
+    },
+    {
+      "source_id": "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-MED-SHIFT-HANDOVER", "CAP-MED-BREAK-GLASS-ACCESS", "CAP-MED-ADMINISTRATION-CORRECTION", "CAP-MED-MEDICATION-ERROR-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-MED-HANDOVER", "CAP-MED-BREAKGLASS", "CAP-MED-ADMIN-CORRECTION", "CAP-MED-ADMIN-ERROR"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-MED-SHIFT-HANDOVER", "class": "H", "module": "eMAR", "job": "Create, submit, acknowledge, lock, and govern a medication shift handover", "anchors": ["routes/emar.php:144-150", "routes/emar.php:249-270"]},
+        {"id": "CAP-MED-BREAK-GLASS-ACCESS", "class": "H", "module": "eMAR", "job": "Open, revoke, extend, and review emergency medication access", "anchors": ["routes/clients.php:204-209", "routes/emar.php:295-315", "app/Http/Controllers/BreakGlassController.php:24"]},
+        {"id": "CAP-MED-ADMINISTRATION-CORRECTION", "class": "H", "module": "eMAR", "job": "Request, approve, or reject a medication-administration correction", "anchors": ["routes/clients.php:198-201", "routes/emar.php:320-325", "app/Http/Controllers/MedicationAdministrationCorrectionController.php:12"]},
+        {"id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE", "class": "H", "module": "eMAR", "job": "Record, investigate, review, and close a medication error", "anchors": ["routes/emar.php:365-386", "app/Http/Controllers/Emar/MedicationErrorController.php:26"]}
+      ],
+      "basis": "The source-native names expose four separate authority, evidence, and terminal-transition owners."
+    },
+    {
+      "source_id": "CAP-MED-API-CURRENT-SURFACES",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-MED-API-CURRENT-SURFACES"]},
+      "run_019": {"decision": "MERGE", "targets": ["CAP-MED-WORKER-DOSE-PRN-LIFECYCLE", "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE", "CAP-MED-MEDICATION-ORDER-VERIFICATION", "CAP-MED-REVIEW-LIFECYCLE", "CAP-MED-COMPETENCY", "CAP-MED-ROUND-GOVERNANCE", "CAP-MED-SELF-ADMINISTRATION", "CAP-MED-CD-REGISTER-BALANCE", "CAP-MED-DESTRUCTION", "CAP-MED-STOCK-MOVEMENT", "CAP-MED-PHARMACY-ACTIONS", "CAP-MED-HANDOVER", "CAP-MED-BREAKGLASS", "CAP-MED-ADMIN-CORRECTION", "CAP-MED-ADMIN-ERROR"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING", "CLASS"],
+      "decision": "MERGE",
+      "final_targets": [
+        {"id": "CAP-MED-CLIENT-MEDICAL-PROFILE", "class": "H", "module": "eMAR", "job": "View and maintain authorised client allergy data", "anchors": ["routes/api_medications.php:107-114", "app/Http/Controllers/Api/MedicationsApiController.php:1218-1279"]},
+        {"id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE", "class": "H", "module": "eMAR", "job": "Review MAR and PRN context and record a medication administration", "anchors": ["routes/api_medications.php:18-37", "routes/api_medications.php:67-74", "app/Http/Controllers/Api/MedicationsApiController.php:302-999"]},
+        {"id": "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE", "class": "H", "module": "eMAR", "job": "Load medication workspace widgets, alerts, and medication version context", "anchors": ["routes/api_medications.php:13-16", "routes/api_medications.php:76-91", "routes/api_medications.php:116-119"]},
+        {"id": "CAP-MED-MEDICATION-ORDER-VERIFICATION", "class": "H", "module": "eMAR", "job": "Verify scan, safety, and drug-interaction conditions", "anchors": ["routes/api_medications.php:23-33", "routes/api_medications.php:67-70", "routes/api_medications.php:134-141"]},
+        {"id": "CAP-MED-STOCK-MOVEMENT", "class": "H", "module": "eMAR", "job": "Schedule and complete authorised medication stock counts", "anchors": ["routes/api_medications.php:121-132", "app/Http/Controllers/Api/MedicationsApiController.php:1315-1497"]},
+        {"id": "CAP-MED-SHIFT-HANDOVER", "class": "H", "module": "eMAR", "job": "Read the medication summary for an authorised shift handover", "anchors": ["routes/api_medications.php:102-105", "app/Http/Controllers/Api/MedicationsApiController.php:1197-1217"]},
+        {"id": "CAP-MED-ADMINISTRATION-CORRECTION", "class": "H", "module": "eMAR", "job": "Correct an authorised medication administration", "anchors": ["routes/api_medications.php:63-65", "app/Http/Controllers/Api/MedicationsApiController.php:913-1003"]},
+        {"id": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS", "class": "D", "module": "eMAR", "job": "View and export authorised medication reports", "anchors": ["routes/api_medications.php:93-100", "app/Http/Controllers/Api/MedicationsApiController.php:1132-1196"]}
+      ],
+      "basis": "The authenticated API is a delivery bundle for existing user jobs. Source inspection narrows the merge to endpoints actually present instead of treating every medication capability as an API target."
+    },
+    {
+      "source_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-INC-INCIDENT-AUTHOR-TEMPLATE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-INC-INCIDENT-AUTHOR-TEMPLATE"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE", "class": "H", "module": "Incidents", "job": "Author an incident from an authorised incident template", "anchors": ["routes/incidents.php:18-48", "app/Http/Controllers/IncidentController.php:36", "app/Http/Controllers/IncidentTemplateController.php:8"]}
+      ],
+      "basis": "Incident authoring and templates belong to the incident owner; safeguarding sensitivity must not be inferred from the route group."
+    },
+    {
+      "source_id": "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE", "CAP-INC-INCIDENT-FOLLOWUP-ACTIONS"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE", "class": "H", "module": "Incidents", "job": "Add, update, and remove governed incident evidence", "anchors": ["routes/incidents.php:59-86", "app/Http/Controllers/IncidentController.php:1457", "app/Http/Controllers/IncidentController.php:1861-1915"]},
+        {"id": "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE", "class": "H", "module": "Incidents", "job": "Create, update, and complete incident follow-up actions", "anchors": ["routes/incidents.php:106-118", "app/Http/Controllers/IncidentFollowupController.php:13"]}
+      ],
+      "basis": "Evidence attachment custody and follow-up work have different records, permissions, controllers, and terminal actions."
+    },
+    {
+      "source_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-INC-INCIDENT-REVIEW-CLOSURE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-INC-INCIDENT-REVIEW-CLOSURE"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-INC-INCIDENT-REVIEW-CLOSURE", "class": "H", "module": "Incidents", "job": "Review and close an incident under incident journey rules", "anchors": ["routes/incidents.php:88-104", "app/Services/Incidents/IncidentJourneyService.php:21"]}
+      ],
+      "basis": "The incident journey owns review and closure; safeguarding terminal projection remains separate."
+    },
+    {
+      "source_id": "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-SAFE-INVESTIGATION", "CAP-SAFE-RISK-ASSESSMENT", "CAP-SAFE-TERMINAL-PROJECTION"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-SAFE-INVESTIGATION-RISK", "CAP-SAFE-TERMINAL-PROJECTION"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-SAFE-INVESTIGATION", "class": "H", "module": "Safeguarding", "job": "Open and maintain a sensitivity-scoped safeguarding investigation", "anchors": ["routes/safeguarding.php:66-73", "app/Http/Controllers/SafeguardingInvestigationController.php:10-105"]},
+        {"id": "CAP-SAFE-RISK-ASSESSMENT", "class": "H", "module": "Safeguarding", "job": "Record and update the concern's safeguarding risk assessment", "anchors": ["routes/safeguarding.php:84-86", "app/Http/Controllers/SafeguardingRiskAssessmentController.php:11-58"]},
+        {"id": "CAP-SAFE-TERMINAL-PROJECTION", "class": "H", "module": "Safeguarding", "job": "Complete the governed safeguarding terminal transition and projections", "anchors": ["app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:45-225", "routes/safeguarding.php:75-82"]}
+      ],
+      "basis": "RUN-019's investigation-risk target is itself composite; the final graph expands it to the two current record owners plus terminal projection."
+    },
+    {
+      "source_id": "CAP-INC-EVIDENCE-DOWNLOADS",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD", "CAP-SAFE-EVIDENCE-DOWNLOAD"]},
+      "run_019": {"decision": "MERGE", "targets": ["CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE", "CAP-SAFE-EVIDENCE-LIFECYCLE"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "CLASS", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD", "class": "D", "module": "Incidents", "job": "Download authorised incident evidence", "anchors": ["routes/incidents.php:59-65", "app/Http/Controllers/IncidentController.php:1915"]},
+        {"id": "CAP-SAFE-EVIDENCE-DOWNLOAD", "class": "D", "module": "Safeguarding", "job": "Download need-to-know safeguarding evidence", "anchors": ["routes/safeguarding.php:88-96", "app/Http/Controllers/SafeguardingAttachmentController.php:51-69"]}
+      ],
+      "basis": "Download is a disclosure operation distinct from attachment mutation, and incident versus safeguarding evidence has different privacy and sensitivity boundaries."
+    },
+    {
+      "source_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-INC-INCIDENT-REPORT-AUDIT-EXPORT", "CAP-SAFE-REPORT-AUDIT-EXPORT"]},
+      "run_019": {"decision": "EVIDENCE_GAP", "targets": []},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT_WITH_EVIDENCE_GAP",
+      "final_targets": [
+        {"id": "CAP-INC-INCIDENT-REPORT-AUDIT-EXPORT", "class": "D", "module": "Incidents", "job": "Generate and export an authorised incident report and audit trail", "anchors": ["routes/incidents.php:132-138", "app/Http/Controllers/IncidentReportController.php:10-99"]}
+      ],
+      "basis": "The incident export has an exact owner; no dedicated safeguarding report/audit-export route or controller is present at the pin.",
+      "unresolved_target_ids": ["CAP-SAFE-REPORT-AUDIT-EXPORT"]
+    },
+    {
+      "source_id": "CAP-DAY-MY-DAY-WORKSPACE",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-DAY-MY-DAY-WORKSPACE"]},
+      "run_019": {"decision": "MERGE", "targets": ["CAP-MED-WORKER-TODAY-WORKLIST", "CAP-DAY-MY-ROSTER", "CAP-DAY-MY-CALENDAR"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-DAY-MY-DAY-WORKSPACE", "class": "H", "module": "Frontline Workspaces", "job": "Work a personal Site-scoped day view of shifts, tasks, medication, and due actions", "anchors": ["routes/web.php:151", "app/Http/Controllers/MyTasksController.php:45-145", "resources/js/pages/my-day/index.tsx:1"]}
+      ],
+      "basis": "The dedicated route, invokable controller, and page own a cohesive personal workday job; the underlying module records retain their own mutation authority."
+    },
+    {
+      "source_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-DAY-ALL-TASKS-WORKBENCH"]},
+      "run_019": {"decision": "NO_CANONICAL_OWNER", "targets": []},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "MODULE_OWNERSHIP"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-DAY-ALL-TASKS-WORKBENCH", "class": "H", "module": "Frontline Workspaces", "job": "Find, inspect, assign, watch, split, and report authorised tasks across canonical providers", "anchors": ["routes/tasks.php:16-29", "app/Http/Controllers/AllTasksController.php:35-614", "app/Services/Tasks/TaskAggregator.php:22-692"]}
+      ],
+      "basis": "A dedicated controller and aggregator own the cross-provider workbench while provider-specific authorisation remains decisive for each task and action."
+    },
+    {
+      "source_id": "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-HS-GOVERNANCE-REPORTS-EXPORT"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-HS-BOARD-REPORT", "CAP-HS-WORKSAFE-EXPORT", "CAP-HS-INVESTIGATION-REPORT", "CAP-HS-CORRECTIVE-ACTION-REPORT", "CAP-HS-RISK-REPORT"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-HS-GOVERNANCE-REPORTS-EXPORT", "class": "D", "module": "Health & Safety", "job": "View and export the authorised H&S governance report family", "anchors": ["routes/health-safety.php:120-127", "app/Http/Controllers/HealthSafety/HsGovernanceReportController.php:23-104"]}
+      ],
+      "basis": "Five metric endpoints share one controller, permission, compliance service, and reporting job; report variants are not separate canonical owners."
+    },
+    {
+      "source_id": "CAP-HS-WORKER-PARTICIPATION",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-HS-WORKER-PARTICIPATION"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-HS-WORKER-REPRESENTATIVES", "CAP-HS-COMMITTEE-MEETINGS", "CAP-HS-CONSULTATION-EVIDENCE"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-HS-WORKER-PARTICIPATION", "class": "H", "module": "Health & Safety", "job": "Govern representatives, committees, meetings, consultation, and participation evidence", "anchors": ["routes/health-safety.php:234-352", "app/Http/Controllers/HealthSafety/WorkerParticipationController.php:43-749"]}
+      ],
+      "basis": "The records are coordinated by one participation controller/page family and permission boundary as one worker-participation workflow."
+    },
+    {
+      "source_id": "CAP-HS-WORKPLACE-INJURY-RTW",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-HS-WORKPLACE-INJURY-RTW"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-HS-WORKPLACE-INJURY-REGISTER", "CAP-HS-RETURN-TO-WORK-PLAN"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-HS-WORKPLACE-INJURY-RTW", "class": "H", "module": "Health & Safety", "job": "Record a workplace injury and govern its return-to-work plan, capacity, duties, evidence, and completion", "anchors": ["routes/health-safety.php:354-399", "app/Http/Controllers/HealthSafety/ReturnToWorkController.php:37-893"]}
+      ],
+      "basis": "WorkplaceInjury is the canonical aggregate and owns subordinate return-to-work plans, assessments, duties, attachments, and status transitions."
+    },
+    {
+      "source_id": "CAP-SAFE-INVESTIGATION-RISK",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-SAFE-INVESTIGATION", "CAP-SAFE-RISK-ASSESSMENT"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-SAFE-INVESTIGATION-RISK"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-SAFE-INVESTIGATION", "class": "H", "module": "Safeguarding", "job": "Open and maintain a sensitivity-scoped safeguarding investigation", "anchors": ["routes/safeguarding.php:66-73", "app/Http/Controllers/SafeguardingInvestigationController.php:10-105"]},
+        {"id": "CAP-SAFE-RISK-ASSESSMENT", "class": "H", "module": "Safeguarding", "job": "Record and update the concern's safeguarding risk assessment", "anchors": ["routes/safeguarding.php:84-86", "app/Http/Controllers/SafeguardingRiskAssessmentController.php:11-58"]}
+      ],
+      "basis": "Investigation and risk assessment have distinct controllers, records, actions, and sensitivity-governed direct objects."
+    },
+    {
+      "source_id": "CAP-SAFE-EVIDENCE-ACTION-PLAN",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-SAFE-EVIDENCE-ATTACHMENTS", "CAP-SAFE-ACTION-PLAN-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-SAFE-EVIDENCE-LIFECYCLE", "CAP-SAFE-PROTECTIVE-ACTION-PLAN"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-SAFE-EVIDENCE-ATTACHMENTS", "class": "H", "module": "Safeguarding", "job": "Upload and manage need-to-know safeguarding evidence attachments", "anchors": ["routes/safeguarding.php:88-96", "app/Http/Controllers/SafeguardingAttachmentController.php:17-85"]},
+        {"id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE", "class": "H", "module": "Safeguarding", "job": "Create, update, progress, and complete a safeguarding action plan", "anchors": ["routes/safeguarding.php:98-106", "app/Http/Controllers/SafeguardingActionPlanController.php:10-88"]}
+      ],
+      "basis": "The source calls the canonical record an action plan; evidence mutation remains separate, with download retained as its own D-class identity."
+    },
+    {
+      "source_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-COMPLAINT-SITE-FEEDBACK"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-COMPLAINT-SITE-FEEDBACK"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-COMPLAINT-SITE-FEEDBACK", "class": "H", "module": "Sites & Locations", "job": "Record and respond to an approved-Site complaint or feedback record", "anchors": ["app/Http/Controllers/Sites/SiteComplianceController.php:415-548"]}
+      ],
+      "basis": "Site compliance owns the canonical complaint record, approved-Site scope, and action chain; no synthetic complaints module owns it."
+    },
+    {
+      "source_id": "CAP-COMPLAINT-RESPITE-STAY",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-COMPLAINT-RESPITE-STAY"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-COMPLAINT-RESPITE-STAY"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-COMPLAINT-RESPITE-STAY", "class": "H", "module": "Respite", "job": "Record a respite-stay complaint and HDC escalation state", "anchors": ["routes/respite.php:89", "app/Http/Controllers/Respite/RespiteStayController.php:544-574"]}
+      ],
+      "basis": "The canonical respite stay and its evidence chain own this complaint workflow."
+    },
+    {
+      "source_id": "CAP-COMPLAINT-HR-CASEWORK",
+      "run_017": {"decision": "RECLASSIFY", "targets": ["CAP-COMPLAINT-HR-CASEWORK"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-COMPLAINT-HR-CASEWORK"]},
+      "disagreement_kinds": ["MODULE_OWNERSHIP"],
+      "decision": "RECLASSIFY",
+      "final_targets": [
+        {"id": "CAP-COMPLAINT-HR-CASEWORK", "class": "H", "module": "HR", "job": "Manage confidential grievance and complaint casework", "anchors": ["app/Http/Controllers/Hr/HrCaseController.php:25-597", "app/Domain/Hr/Services/HrCaseAccessService.php:17"]}
+      ],
+      "basis": "Confidential HR case authority and canonical employment records determine ownership."
+    },
+    {
+      "source_id": "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-WHISTLE-PROTECTED-DISCLOSURE"]},
+      "run_019": {"decision": "NO_CANONICAL_OWNER", "targets": []},
+      "disagreement_kinds": ["OPERATION", "MODULE_OWNERSHIP"],
+      "decision": "NO_CANONICAL_OWNER",
+      "final_targets": [],
+      "basis": "No dedicated protected-disclosure route, controller, service, model, or page is present; confidential HR casework is adjacent but not the claimed owner.",
+      "anchors": ["app/Http/Controllers/Hr/HrCaseController.php:25-42"]
+    },
+    {
+      "source_id": "CAP-FLEET-MAINTENANCE-COMPLIANCE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-FLEET-DAILY-CHECK-INSPECTION", "CAP-FLEET-MAINTENANCE-SCHEDULE", "CAP-FLEET-WORK-ORDER-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-FLEET-CHECK-INSPECTION", "CAP-FLEET-MAINTENANCE-WORK-ORDER"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-FLEET-DAILY-VEHICLE-CHECK", "class": "H", "module": "Fleet & Assets", "job": "Record a daily vehicle check against its authorised template", "anchors": ["routes/fleet-assets.php:45-46", "app/Http/Controllers/FleetAssets/DailyCheckController.php:15-189"]},
+        {"id": "CAP-FLEET-VEHICLE-INSPECTION", "class": "H", "module": "Fleet & Assets", "job": "Create and complete a governed vehicle inspection", "anchors": ["routes/fleet-assets.php:172-175", "routes/fleet-assets.php:192", "app/Http/Controllers/FleetAssets/InspectionController.php:14-277"]},
+        {"id": "CAP-FLEET-MAINTENANCE-SCHEDULE", "class": "H", "module": "Fleet & Assets", "job": "Create and maintain vehicle service schedules", "anchors": ["routes/fleet-assets.php:170", "routes/fleet-assets.php:188-190", "app/Http/Controllers/FleetAssets/ServiceScheduleController.php:14-225"]},
+        {"id": "CAP-FLEET-WORK-ORDER-LIFECYCLE", "class": "H", "module": "Fleet & Assets", "job": "Create, progress, and close a fleet work order", "anchors": ["routes/fleet-assets.php:163-165", "routes/fleet-assets.php:180-183", "app/Http/Controllers/FleetAssets/WorkOrderController.php:13-281"]}
+      ],
+      "basis": "Both ledgers under-split current source: daily checks, inspections, service schedules, and work orders have distinct controllers, records, pages, and terminal actions."
+    },
+    {
+      "source_id": "CAP-FLEET-KEY-HANDOVER",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-FLEET-KEY-CUSTODY", "CAP-FLEET-HANDOVER-LIFECYCLE"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-FLEET-KEY-HANDOVER"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-FLEET-KEY-CUSTODY", "class": "H", "module": "Fleet & Assets", "job": "Issue, return, and reconcile vehicle-key custody", "anchors": ["routes/fleet-assets.php:195-205", "app/Http/Controllers/FleetAssets/KeyController.php:18-586"]},
+        {"id": "CAP-FLEET-HANDOVER-LIFECYCLE", "class": "H", "module": "Fleet & Assets", "job": "Create, accept, or dispute a fleet handover", "anchors": ["routes/fleet-assets.php:254-272", "app/Http/Controllers/FleetAssets/HandoverController.php:19-536"]}
+      ],
+      "basis": "Key custody and vehicle handover use different canonical records, controllers, evidence, and acceptance/dispute transitions."
+    },
+    {
+      "source_id": "CAP-FLEET-TRACKING-GEOFENCE-REALTIME",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-FLEET-RESIDENT-TRACKING", "CAP-FLEET-GEOFENCE-MANAGEMENT", "CAP-FLEET-PANIC-REALTIME-RESPONSE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-FLEET-RESIDENT-TRACKING", "CAP-FLEET-GEOFENCE", "CAP-FLEET-PANIC-STATE"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-FLEET-RESIDENT-TRACKING", "class": "H", "module": "Fleet & Assets", "job": "View consented, authorised resident transport tracking", "anchors": ["routes/fleet-assets.php:207-224", "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:34-754"]},
+        {"id": "CAP-FLEET-GEOFENCE-LIFECYCLE", "class": "H", "module": "Fleet & Assets", "job": "Create, update, and remove authorised fleet geofences", "anchors": ["routes/fleet-assets.php:145-157", "app/Http/Controllers/FleetAssets/GeofenceController.php:18-212"]},
+        {"id": "CAP-FLEET-PANIC-RESPONSE", "class": "H", "module": "Fleet & Assets", "job": "Raise and respond to a transport panic event", "anchors": ["routes/fleet-assets.php:224", "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:775-829"]}
+      ],
+      "basis": "The final names describe source actions rather than implementation state; tracking remains consent and approved-Site scoped, and panic is a response lifecycle."
+    },
+    {
+      "source_id": "CAP-FLEET-INCIDENT-OUTING-MILEAGE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-FLEET-INCIDENT-RECORD", "CAP-FLEET-OUTING-LIFECYCLE", "CAP-FLEET-MILEAGE-RECORD"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-FLEET-INCIDENT", "CAP-FLEET-OUTING-RETURN", "CAP-FLEET-MILEAGE"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-FLEET-INCIDENT-RECORD", "class": "H", "module": "Fleet & Assets", "job": "Record and govern a fleet incident", "anchors": ["routes/fleet-assets.php:274-302", "app/Http/Controllers/FleetAssets/IncidentController.php:33"]},
+        {"id": "CAP-FLEET-OUTING-LIFECYCLE", "class": "H", "module": "Fleet & Assets", "job": "Create, progress, and record return for a fleet outing", "anchors": ["routes/fleet-assets.php:303-315", "app/Http/Controllers/FleetAssets/OutingController.php:21"]},
+        {"id": "CAP-FLEET-MILEAGE-RECORD", "class": "H", "module": "Fleet & Assets", "job": "Record authorised vehicle mileage", "anchors": ["routes/fleet-assets.php:320-330", "app/Http/Controllers/FleetAssets/MileageController.php:14"]}
+      ],
+      "basis": "RUN-017's names preserve lifecycle/record semantics and match the three distinct source owners."
+    },
+    {
+      "source_id": "CAP-FLEET-REPORTING-EXPORT",
+      "run_017": {"decision": "SURVIVES", "targets": ["CAP-FLEET-REPORTING-EXPORT"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-FLEET-TRIP-REPORT", "CAP-FLEET-MAINTENANCE-REPORT", "CAP-FLEET-COST-REPORT", "CAP-FLEET-ACCESS-REPORT"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "NAMING"],
+      "decision": "SURVIVES",
+      "final_targets": [
+        {"id": "CAP-FLEET-REPORTING-EXPORT", "class": "D", "module": "Fleet & Assets", "job": "View and export authorised fleet report variants", "anchors": ["routes/fleet-assets.php:333-342", "app/Http/Controllers/FleetAssets/ReportController.php:22-756"]}
+      ],
+      "basis": "One report controller and permission family selects trip, fuel, maintenance, or compliance output; RUN-019's cost/access target names are not the source report variants."
+    },
+    {
+      "source_id": "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CR-ALERT-TASK-QUEUE", "CAP-CR-ESCALATION-LIFECYCLE", "CAP-CR-HS-TRANSFER"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CR-ALERT-FOLLOWUP-TASK", "CAP-CR-ALERT-ESCALATION", "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CR-ALERT-TASK-LIFECYCLE", "class": "H", "module": "Control Room", "job": "Create, assign, progress, and complete an alert follow-up task", "anchors": ["routes/control-room.php:143-163", "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:18-418"]},
+        {"id": "CAP-CR-ESCALATION-QUEUE-LIFECYCLE", "class": "H", "module": "Control Room", "job": "Queue, acknowledge, resolve, and govern alert escalations", "anchors": ["routes/control-room.php:177-181", "routes/control-room.php:241-258", "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php:22"]},
+        {"id": "CAP-HS-CORRECTIVE-ACTION-EVIDENCE", "class": "H", "module": "Health & Safety", "job": "Transfer alert work into the canonical H&S corrective-action owner", "anchors": ["routes/control-room.php:155-157", "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:259-281", "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:41"]}
+      ],
+      "basis": "My-queue is a read lens. H&S transfer creates the existing corrective-action identity, not a new Control Room or incident-handover capability."
+    },
+    {
+      "source_id": "CAP-CR-COMMUNICATION-COLLABORATION",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CR-BROADCAST", "CAP-CR-MESSAGING-DISCUSSION", "CAP-CR-ALERT-WATCH", "CAP-CR-TIME-RECORDING"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CR-MESSAGING-DISCUSSION", "CAP-CR-WATCH-SUBSCRIPTIONS", "CAP-CR-TIME-RECORDING"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CR-BROADCAST", "class": "H", "module": "Control Room", "job": "Create and manage authorised Control Room broadcasts", "anchors": ["routes/control-room.php:279-286", "app/Http/Controllers/ControlRoom/ControlRoomBroadcastController.php:16"]},
+        {"id": "CAP-CR-MESSAGING-DISCUSSION", "class": "H", "module": "Control Room", "job": "Exchange authorised alert messages and discussion", "anchors": ["app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:17", "routes/control-room.php:263-277"]},
+        {"id": "CAP-CR-ALERT-WATCH", "class": "H", "module": "Control Room", "job": "Subscribe or unsubscribe authorised alert watchers", "anchors": ["routes/control-room.php:433-444", "app/Http/Controllers/ControlRoom/ControlRoomWatcherController.php:15"]},
+        {"id": "CAP-CR-TIME-RECORDING", "class": "H", "module": "Control Room", "job": "Record time against an authorised Control Room alert", "anchors": ["app/Http/Controllers/ControlRoom/ControlRoomTimeEntryController.php:17", "routes/control-room.php:289-300"]}
+      ],
+      "basis": "Broadcast was omitted by RUN-019 and has its own current controller; watch and time records retain the source action names."
+    },
+    {
+      "source_id": "CAP-CR-EVIDENCE-REPORT-SLA",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CR-EVIDENCE-PACK", "CAP-CR-SLA-REPORTING-EXPORT"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CR-EVIDENCE-PACK", "CAP-CR-SLA-REPORT"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING", "CLASS"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CR-EVIDENCE-PACK-LIFECYCLE", "class": "H", "module": "Control Room", "job": "Assemble and govern a Control Room evidence pack", "anchors": ["routes/control-room.php:304-324", "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php:16-381"]},
+        {"id": "CAP-CR-REPORTING-EXPORT", "class": "D", "module": "Control Room", "job": "View and export Site-scoped Control Room reports including SLA metrics", "anchors": ["routes/control-room.php:62-75", "app/Http/Controllers/ControlRoom/ControlRoomReportController.php:14-235"]}
+      ],
+      "basis": "Evidence-pack mutation is H-class; the report controller exposes more than SLA and owns a disclosure/export family."
+    },
+    {
+      "source_id": "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CR-DEVICE-MAP", "CAP-CR-PLAYBOOK-LIFECYCLE", "CAP-CR-SIGNAL-QUEUE-CONFIGURATION", "CAP-CR-RECOVERY-SETTINGS"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-CR-LIVE-DEVICE-MAP", "CAP-CR-PLAYBOOKS", "CAP-CR-SIGNAL-QUEUE-SETTINGS", "CAP-CR-RECOVERY"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CR-LIVE-DEVICE-MAP", "class": "H", "module": "Control Room", "job": "View the authorised live device map and its device projection", "anchors": ["routes/control-room.php:214", "routes/control-room.php:379-386", "app/Http/Controllers/ControlRoom/ControlRoomMapController.php:21-111", "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:16-288"]},
+        {"id": "CAP-CR-PLAYBOOK-LIFECYCLE", "class": "H", "module": "Control Room", "job": "Create, activate, start, advance, and skip alert playbooks", "anchors": ["routes/control-room.php:388-410", "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php:18-552"]},
+        {"id": "CAP-CR-SIGNAL-QUEUE-CONFIGURATION", "class": "H", "module": "Control Room", "job": "Configure signal rules and triage queues", "anchors": ["routes/control-room.php:329-343", "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php:20"]},
+        {"id": "CAP-CR-RECOVERY-CONFIGURATION", "class": "H", "module": "Control Room", "job": "Configure maintenance, outbox recovery, and Control Room options", "anchors": ["routes/control-room.php:344-360", "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php:20"]}
+      ],
+      "basis": "The final names follow the source jobs; device list is a read projection within the live map, while the two settings domains have different recovery consequences."
+    },
+    {
+      "source_id": "CAP-SITE-MEAL-PLANNER-RECIPE-INVENTORY",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-CATER-MEAL-PLAN-LIFECYCLE", "CAP-CATER-RECIPE-LIBRARY", "CAP-CATER-PRODUCT-INVENTORY", "CAP-CATER-DIETARY-TAG-LIBRARY", "CAP-CATER-SITE-SHOPPING-LIST"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-SITE-MEAL-PLANNING", "CAP-SITE-RECIPE-LIBRARY", "CAP-SITE-DIETARY-RESTRICTIONS", "CAP-SITE-CATERING-INVENTORY-SHOPPING"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING", "MODULE_OWNERSHIP"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-CATER-MEAL-PLAN-LIFECYCLE", "class": "H", "module": "Catering", "job": "Plan, copy, serve, and govern meals for an approved Site", "anchors": ["routes/sites.php:295-361", "app/Http/Controllers/Sites/SiteMealPlanController.php:27-703"]},
+        {"id": "CAP-CATER-RECIPE-LIBRARY", "class": "H", "module": "Catering", "job": "Maintain the authorised recipe library", "anchors": ["routes/catering.php:29-47", "app/Http/Controllers/Catering/RecipeController.php:11-178"]},
+        {"id": "CAP-CATER-PRODUCT-CATALOG", "class": "H", "module": "Catering", "job": "Maintain the catering product catalog", "anchors": ["routes/catering.php:49-60", "app/Http/Controllers/Catering/ProductController.php:10-99"]},
+        {"id": "CAP-CATER-DIETARY-TAG-LIBRARY", "class": "H", "module": "Catering", "job": "Maintain dietary and allergen tags", "anchors": ["routes/catering.php:62-73", "app/Http/Controllers/Catering/DietaryTagController.php:10-80"]},
+        {"id": "CAP-CATER-SITE-INVENTORY-LIFECYCLE", "class": "H", "module": "Catering", "job": "Maintain, adjust, and stocktake approved-Site meal inventory", "anchors": ["routes/sites.php:363-383", "app/Http/Controllers/Sites/SiteMealInventoryController.php:13-168"]},
+        {"id": "CAP-CATER-SITE-SHOPPING-LIST", "class": "H", "module": "Catering", "job": "Generate, maintain, receive, and close approved-Site shopping lists", "anchors": ["routes/sites.php:385-410", "app/Http/Controllers/Sites/SiteMealShoppingListController.php:19-262"]}
+      ],
+      "basis": "Both ledgers under-split source: global recipe/product/tag libraries and Site-scoped plan/inventory/shopping records have six independent owners. Product is a catalog, not Site inventory."
+    },
+    {
+      "source_id": "CAP-PORT-CLIENT-FAMILY-WORKSPACE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-PORT-CLIENT-WORKSPACE", "CAP-PORT-FAMILY-WORKSPACE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-PORT-FAMILY-DASHBOARD-TIMELINE", "CAP-PORT-FAMILY-CALENDAR", "CAP-PORT-FAMILY-DOCUMENTS-MEDIA", "CAP-PORT-FAMILY-HEALTH-LENS", "CAP-PORT-FAMILY-LOCATION-LENS"]},
+      "disagreement_kinds": ["TARGET_GRANULARITY", "NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-PORT-CLIENT-WORKSPACE", "class": "H", "module": "Portal", "job": "Use the authorised portal client workspace and section-gated summary", "anchors": ["routes/portal.php:57-65", "app/Http/Controllers/PortalClientController.php:13-147", "app/Services/Portal/PortalClientSectionAccess.php:15-180"]},
+        {"id": "CAP-PORT-FAMILY-DASHBOARD", "class": "H", "module": "Portal", "job": "Use the family dashboard and create or cancel visit requests", "anchors": ["routes/portal.php:69-73", "app/Http/Controllers/Portal/FamilyDashboardController.php:22-572"]},
+        {"id": "CAP-PORT-FAMILY-TIMELINE", "class": "H", "module": "Portal", "job": "Review and interact with the authorised family timeline", "anchors": ["routes/portal.php:104-114", "app/Http/Controllers/Portal/PortalTimelineController.php:13-88", "app/Http/Controllers/Portal/PortalTimelineInteractionController.php:16-140"]},
+        {"id": "CAP-PORT-FAMILY-CALENDAR", "class": "H", "module": "Portal", "job": "Review the section-filtered family calendar and events", "anchors": ["routes/portal.php:88-90", "app/Http/Controllers/Portal/PortalCalendarController.php:17-225"]},
+        {"id": "CAP-PORT-FAMILY-SCHEDULE", "class": "H", "module": "Portal", "job": "Review the authorised family shift and respite schedule", "anchors": ["routes/portal.php:118", "app/Http/Controllers/Portal/PortalScheduleController.php:13-103"]},
+        {"id": "CAP-PORT-FAMILY-DOCUMENTS", "class": "H", "module": "Portal", "job": "Review and upload authorised family-shared documents", "anchors": ["routes/portal.php:120-122", "app/Http/Controllers/Portal/PortalDocumentController.php:13-124"]},
+        {"id": "CAP-PORT-FAMILY-PHOTOS", "class": "H", "module": "Portal", "job": "Review and upload authorised family-shared photos", "anchors": ["routes/portal.php:134-142", "app/Http/Controllers/Portal/PortalPhotoController.php:16-115"]},
+        {"id": "CAP-PORT-FAMILY-HEALTH-LENS", "class": "H", "module": "Portal", "job": "Review the consent and section-filtered family health lens", "anchors": ["routes/portal.php:116", "app/Http/Controllers/Portal/PortalHealthController.php:10-45"]},
+        {"id": "CAP-PORT-FAMILY-LOCATION-LENS", "class": "H", "module": "Portal", "job": "Review consented location, history, and privacy status", "anchors": ["routes/portal.php:126-130", "app/Http/Controllers/Portal/PortalLocationController.php:13-163"]}
+      ],
+      "basis": "Both ledgers under-split the current portal. Separate controllers/pages own dashboard, timeline, calendar, schedule, documents, photos, health, and location, all gated by canonical client access and section/privacy consent."
+    },
+    {
+      "source_id": "CAP-RESP-REFERRAL-REQUEST-BOOKING",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-RESP-REFERRAL-LIFECYCLE", "CAP-RESP-BOOKING-REQUEST-LIFECYCLE", "CAP-RESP-BOOKING-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-RESP-REFERRAL", "CAP-RESP-REQUEST-APPROVAL", "CAP-RESP-BOOKING"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-RESP-REFERRAL-LIFECYCLE", "class": "H", "module": "Respite", "job": "Create, review, and update a respite referral", "anchors": ["routes/respite.php:35-44", "app/Http/Controllers/Respite/RespiteReferralController.php:17"]},
+        {"id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE", "class": "H", "module": "Respite", "job": "Create, review, approve, and promote a respite booking request", "anchors": ["routes/respite.php:47-63", "app/Http/Controllers/Respite/RespiteBookingRequestController.php:25"]},
+        {"id": "CAP-RESP-BOOKING-LIFECYCLE", "class": "H", "module": "Respite", "job": "Create, confirm, view, and update a respite booking", "anchors": ["routes/respite.php:66-77", "app/Http/Controllers/Respite/RespiteBookingController.php:30"]}
+      ],
+      "basis": "RUN-017's lifecycle names match the three source owners and their state transitions."
+    },
+    {
+      "source_id": "CAP-RESP-STAY-CARE-DISCHARGE",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-RESP-STAY-LIFECYCLE", "CAP-RESP-DAILY-CARE-NOTES", "CAP-RESP-RISK-PLAN-LIFECYCLE"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-RESP-STAY-ADMISSION-DISCHARGE", "CAP-RESP-DAILY-CARE-NOTES", "CAP-RESP-RISK-PLAN"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-RESP-STAY-LIFECYCLE", "class": "H", "module": "Respite", "job": "Check in, extend, govern, and discharge a respite stay", "anchors": ["routes/respite.php:80-93", "app/Http/Controllers/Respite/RespiteStayController.php:32-574"]},
+        {"id": "CAP-RESP-DAILY-CARE-NOTES", "class": "H", "module": "Respite", "job": "Create and maintain authorised respite daily-care notes", "anchors": ["routes/respite.php:197-207", "app/Http/Controllers/Respite/RespiteDailyNoteController.php:19"]},
+        {"id": "CAP-RESP-RISK-PLAN-LIFECYCLE", "class": "H", "module": "Respite", "job": "Create, review, activate, suspend, acknowledge, and deactivate a respite risk plan", "anchors": ["routes/respite.php:211-226", "app/Http/Controllers/Respite/RespiteRiskPlanActivationController.php:16"]}
+      ],
+      "basis": "RUN-017's names preserve each full source lifecycle rather than naming only admission/discharge or an unqualified risk plan."
+    },
+    {
+      "source_id": "CAP-RESP-PROCEDURE-TASK-HANDOVER",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-RESP-PROCEDURE-LIFECYCLE", "CAP-RESP-TASK-LIFECYCLE", "CAP-RESP-COMMUNICATION-LOG", "CAP-RESP-HANDOVER-NOTES"]},
+      "run_019": {"decision": "SPLIT", "targets": ["CAP-RESP-PROCEDURE", "CAP-RESP-TASKS", "CAP-RESP-COMMUNICATIONS", "CAP-RESP-HANDOVER"]},
+      "disagreement_kinds": ["NAMING"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-RESP-PROCEDURE-LIFECYCLE", "class": "H", "module": "Respite", "job": "Maintain procedure templates and run, complete, fail, cancel, or escalate procedure runs", "anchors": ["routes/respite.php:107-127", "app/Http/Controllers/Respite/RespiteProcedureTemplateController.php:13", "app/Http/Controllers/Respite/RespiteProcedureRunController.php:18"]},
+        {"id": "CAP-RESP-TASK-LIFECYCLE", "class": "H", "module": "Respite", "job": "Assign, progress, evidence, submit, approve, or reject a respite task", "anchors": ["routes/respite.php:131-148", "app/Http/Controllers/Respite/RespiteTaskController.php:16"]},
+        {"id": "CAP-RESP-COMMUNICATION-LOG", "class": "H", "module": "Respite", "job": "Create, update, and evidence a respite communication log", "anchors": ["routes/respite.php:166-175", "app/Http/Controllers/Respite/RespiteCommunicationLogController.php:15"]},
+        {"id": "CAP-RESP-HANDOVER-NOTES", "class": "H", "module": "Respite", "job": "Create, update, and acknowledge respite handover notes", "anchors": ["routes/respite.php:152-162", "app/Http/Controllers/Respite/RespiteHandoverNoteController.php:15"]}
+      ],
+      "basis": "The final names retain lifecycle, log, and note semantics present in the independent source controllers."
+    },
+    {
+      "source_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "run_017": {"decision": "SPLIT", "targets": ["CAP-RESP-EVIDENCE-PACK-LIFECYCLE", "CAP-RESP-EVIDENCE-PACK-EXPORT"]},
+      "run_019": {"decision": "SURVIVES", "targets": ["CAP-RESP-EVIDENCE-PACK-EXPORT"]},
+      "disagreement_kinds": ["OPERATION", "TARGET_GRANULARITY", "CLASS"],
+      "decision": "SPLIT",
+      "final_targets": [
+        {"id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE", "class": "H", "module": "Respite", "job": "Assemble, update, add or remove items, and seal a respite evidence pack", "anchors": ["routes/respite.php:179-193", "app/Http/Controllers/Respite/RespiteEvidencePackController.php:21"]},
+        {"id": "CAP-RESP-EVIDENCE-PACK-EXPORT", "class": "D", "module": "Respite", "job": "Export an authorised governed respite evidence pack", "anchors": ["routes/respite.php:183", "app/Http/Controllers/Respite/RespiteEvidencePackController.php:21"]}
+      ],
+      "basis": "Pack mutation/sealing and export have different operation classes and disclosure consequences even though one controller owns both."
+    }
+  ],
+  "unresolved_items": [
+    {
+      "source_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+      "target_id": "CAP-SAFE-REPORT-AUDIT-EXPORT",
+      "status": "EVIDENCE_GAP",
+      "reason": "No dedicated current-source safeguarding report/audit-export route, controller, service, or page owner was established at the pin. Do not materialize this target without exact operation and privacy-owner evidence.",
+      "reviewed_anchors": ["routes/safeguarding.php:1-107", "app/Http/Controllers/SafeguardingAttachmentController.php:17-85", "app/Http/Controllers/SafeguardingActionPlanController.php:10-88"]
+    }
+  ],
+  "static_reconciliation_complete": true,
+  "completion_test_met": true,
+  "completion_credit": false,
+  "credit": {
+    "runtime": 0,
+    "browser": 0,
+    "tests": 0,
+    "build": 0,
+    "database": 0,
+    "network": 0,
+    "benchmark": 0,
+    "completion": 0
+  },
+  "evidence_limit": "Source-only canonical-identity reconciliation. No runtime, browser, test, build, database, network, benchmark, release, usability, production-readiness, or comprehensive-audit completion credit.",
+  "application_writes": false,
+  "audit_artifact_writes": ["evidence/source/raw-run-020-canonical-identity-frontline-reconciliation.json"]
+}

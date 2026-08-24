@@ -1,0 +1,543 @@
+{
+  "schema_version": "run_021_platform_reconciliation_v1",
+  "run_id": "RUN-021",
+  "status": "COMPLETE_READ_ONLY_STATIC_RECONCILIATION_MATERIALIZED",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "non_audit_product_diff_count": 0,
+    "run_018_sha256": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629",
+    "run_019_sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"
+  },
+  "scope_validation": {
+    "run_018_candidates": 91,
+    "run_018_unique": 91,
+    "run_018_matches_discovery_module_partition": true,
+    "run_018_ordered_scope_sha256": "7e65975f26d22d14145a6a76f362784f9657a8aacde9a8b86aaf2813bd1d83d9",
+    "run_018_normalized_decisions_sha256": "e504193fc75324a41fe46ca9360f4fb870858339e650174d6ce0e083c7c5071d",
+    "run_019_candidates": 186,
+    "run_019_unique": 186,
+    "run_019_scope_sha256": "7b5ea92ea06025118deb15479382cff5606849215de099d5f3efca7daa38c0a1",
+    "run_019_partition_sha256": "ad28de401a006a1b4c5770be83957a6f18efd2531ab5c852dd040b0bab773981",
+    "run_019_unresolved_graph_references": 0
+  },
+  "comparison": {
+    "exact_agreements": 50,
+    "operation_agreements": 81,
+    "same_operation_target_disagreements": 31,
+    "operation_disagreements": 10,
+    "all_disagreements": 41,
+    "disagreement_ids_sorted_sha256": "0ac3565b6a2484f61ae996ffb55000a8e93ac37e443b2cba1a141ab554183b1d",
+    "operation_disagreement_ids_sorted_sha256": "5cac97c8c5d48317442ec1607556d06b48d1e10f1afffe1fe800e52e19cce0af",
+    "operation_matrix": {
+      "SURVIVES_to_SURVIVES": 45,
+      "SPLIT_to_SPLIT": 33,
+      "MERGE_to_MERGE": 2,
+      "EVIDENCE_GAP_to_EVIDENCE_GAP": 1,
+      "SPLIT_to_SURVIVES": 7,
+      "SURVIVES_to_SPLIT": 2,
+      "SURVIVES_to_MERGE": 1
+    },
+    "disagreement_ids": [
+      "CAP-HR-ONBOARDING-OFFBOARDING",
+      "CAP-HR-COMPLIANCE-VETTING-TRAINING",
+      "CAP-HR-LEAVE-TIME-PAYROLL",
+      "CAP-HR-DOCUMENT-POLICY-SIGNATURE",
+      "CAP-HR-PERFORMANCE-PEOPLE-CASEWORK",
+      "CAP-HR-WEBHOOK-DELIVERY",
+      "CAP-OPS-SHIFT-STAFFING-COVER",
+      "CAP-OPS-TIMESHEET-MANAGER-PAYROLL",
+      "CAP-OPS-STAFF-AVAILABILITY-TIME-OFF",
+      "CAP-FIN-LEDGER-CHART-PERIODS",
+      "CAP-FIN-JOURNAL-POST-REVERSE-RECUR",
+      "CAP-FIN-AP-VENDOR-PO-BILL-CREDIT",
+      "CAP-FIN-PAYMENT-RUN-SETTLEMENT",
+      "CAP-FIN-AR-QUOTE-INVOICE-BILLING",
+      "CAP-FIN-BANK-FEED-RECON-EFTPOS",
+      "CAP-FIN-GST-IRD-COMPLIANCE",
+      "CAP-FIN-CLIENT-PETTY-DONOR-FUNDS",
+      "CAP-FIN-BUDGET-ACTUAL-FORECAST",
+      "CAP-FIN-REPORT-AUDIT-EXPORT",
+      "CAP-GOV-DASHBOARD-REPORT-EVIDENCE",
+      "CAP-GOV-BOARD-MEMBER-INTEREST-EVALUATION",
+      "CAP-GOV-POLICY-VERSION-ATTESTATION",
+      "CAP-GOV-SETTINGS-CONTROL",
+      "CAP-PRIV-RETENTION-POLICY-EXECUTION",
+      "CAP-SITE-CALENDAR-RESOURCE-SCHEDULING",
+      "CAP-SITE-PLAN-ROOM-HARDWARE",
+      "CAP-SITE-CHECKLIST-HAZARD-COMPLIANCE",
+      "CAP-SITE-VAULT-VENDOR-LEDGER",
+      "CAP-SEC-ACCESS-CONTROL",
+      "CAP-SEC-MONITORING-POLICY",
+      "CAP-SEC-DISCOVERY-COLLECTOR",
+      "CAP-SEC-PROVIDER-INTEGRATIONS",
+      "CAP-IT-CHANGE-PROBLEM-MAJOR-INCIDENT",
+      "CAP-INT-ADMIN-CONNECTIONS",
+      "CAP-SET-PERSONAL-ACCOUNT-SECURITY",
+      "CAP-SET-ACCESS-ROLE-USER-SSO",
+      "CAP-SET-ORG-NOTIFICATION-CONFIG",
+      "CAP-PUB-MARKETING-CONTACT-CAREERS",
+      "CAP-ROAD-INITIATIVE-QUARTERLY-DECISION",
+      "CAP-REP-CROSS-MODULE-REPORT-HUB",
+      "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST"
+    ]
+  },
+  "recommendations": [
+    {
+      "source_id": "CAP-HR-ONBOARDING-OFFBOARDING",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-ONBOARDING-LIFECYCLE", "class": "H", "module": "HR", "job": "Onboard staff through governed checklists and tasks", "anchors": ["app/Http/Controllers/Hr/OnboardingController.php:41", "app/Domain/Hr/Services/OnboardingService.php:36"]},
+        {"id": "CAP-HR-OFFBOARDING-LIFECYCLE", "class": "H", "module": "HR", "job": "Offboard staff through governed terminal tasks", "anchors": ["app/Http/Controllers/Hr/OffboardingController.php:19"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-COMPLIANCE-VETTING-TRAINING",
+      "difference": ["target_granularity", "target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-COMPLIANCE-RECORDS", "class": "H", "module": "HR", "job": "Manage staff compliance records", "anchors": ["app/Http/Controllers/Hr/ComplianceController.php:33"]},
+        {"id": "CAP-HR-VETTING-LIFECYCLE", "class": "H", "module": "HR", "job": "Manage staff vetting decisions", "anchors": ["app/Http/Controllers/Hr/VettingController.php:21"]},
+        {"id": "CAP-HR-COMPETENCY-ASSESSMENT", "class": "H", "module": "HR", "job": "Assess and govern staff competencies", "anchors": ["app/Http/Controllers/Hr/CompetencyController.php:20"]},
+        {"id": "CAP-HR-TRAINING-LIFECYCLE", "class": "H", "module": "HR", "job": "Assign and complete staff training", "anchors": ["app/Http/Controllers/Hr/TrainingController.php:35", "app/Domain/Hr/Services/TrainingService.php:24"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-LEAVE-TIME-PAYROLL",
+      "difference": ["target_naming", "module_ownership"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-LEAVE-LIFECYCLE", "class": "H", "module": "HR", "job": "Request, approve, decline, and cancel leave", "anchors": ["app/Http/Controllers/Hr/LeaveController.php:21", "app/Domain/Hr/Services/LeaveService.php:24"]},
+        {"id": "CAP-HR-TIME-ENTRY-LIFECYCLE", "class": "H", "module": "HR", "job": "Administer HR time entries and amendments", "anchors": ["app/Http/Controllers/Hr/TimeTrackingController.php:21", "app/Domain/Hr/Services/TimeTrackingService.php:17"]},
+        {"id": "CAP-HR-PAYROLL-RUN-LIFECYCLE", "class": "H", "module": "HR", "job": "Prepare and govern payroll runs", "anchors": ["app/Http/Controllers/Hr/PayrollExportController.php:25", "app/Domain/Hr/Models/HrPayrollRun.php:18"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-DOCUMENT-POLICY-SIGNATURE",
+      "difference": ["target_granularity", "target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-DOCUMENT-LIBRARY", "class": "H", "module": "HR", "job": "Manage governed HR documents", "anchors": ["app/Http/Controllers/Hr/HrDocumentController.php:35"]},
+        {"id": "CAP-HR-DOCUMENT-SIGNATURE", "class": "H", "module": "HR", "job": "Request and record document signatures", "anchors": ["app/Http/Controllers/Hr/ESignatureController.php:17", "app/Domain/Hr/Models/HrDocumentSignature.php:13"]},
+        {"id": "CAP-HR-POLICY-LIFECYCLE", "class": "H", "module": "HR", "job": "Draft, version, publish, and retire HR policies", "anchors": ["app/Http/Controllers/Hr/PolicyController.php:21"]},
+        {"id": "CAP-HR-POLICY-ATTESTATION", "class": "H", "module": "HR", "job": "Acknowledge and evidence HR policy attestations", "anchors": ["app/Http/Controllers/Hr/PolicyAttestationController.php:12", "app/Domain/Hr/Models/HrPolicyAttestation.php:12"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-PERFORMANCE-PEOPLE-CASEWORK",
+      "difference": ["target_naming", "module_ownership"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-PERFORMANCE-REVIEW", "class": "H", "module": "HR", "job": "Manage staff performance reviews", "anchors": ["app/Http/Controllers/Hr/PerformanceReviewController.php:24"]},
+        {"id": "CAP-HR-CASEWORK-LIFECYCLE", "class": "H", "module": "HR", "job": "Manage confidential HR casework", "anchors": ["app/Http/Controllers/Hr/HrCaseController.php:25"]}
+      ]
+    },
+    {
+      "source_id": "CAP-HR-WEBHOOK-DELIVERY",
+      "difference": ["operation", "target_granularity", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-HR-WEBHOOK-CONFIGURATION", "class": "H", "module": "HR", "job": "Configure governed HR webhook endpoints", "anchors": ["app/Domain/Hr/Services/HrWebhookService.php:190", "app/Domain/Hr/Models/HrWebhookEndpoint.php:13"]},
+        {"id": "CAP-HR-WEBHOOK-DELIVERY", "class": "D", "module": "HR", "job": "Deliver and retry governed HR webhook events", "anchors": ["app/Domain/Hr/Services/HrWebhookService.php:62", "app/Domain/Hr/Jobs/DeliverHrWebhookJob.php:20", "app/Domain/Hr/Models/HrWebhookDelivery.php:11"]}
+      ]
+    },
+    {
+      "source_id": "CAP-OPS-SHIFT-STAFFING-COVER",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT", "class": "H", "module": "Workforce", "job": "Assign eligible staff to shifts", "anchors": ["app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:456"]},
+        {"id": "CAP-OPS-SHIFT-COVER-LIFECYCLE", "class": "H", "module": "Workforce", "job": "Request, claim, approve, and resolve shift cover", "anchors": ["app/Services/ShiftReplacementService.php:31"]}
+      ]
+    },
+    {
+      "source_id": "CAP-OPS-TIMESHEET-MANAGER-PAYROLL",
+      "difference": ["target_identity", "module_ownership"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE", "class": "H", "module": "Workforce", "job": "Approve, reject, return, and amend timesheets", "anchors": ["app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:118", "app/Http/Controllers/TimesheetController.php:1237"]},
+        {"id": "CAP-HR-PAYROLL-RUN-LIFECYCLE", "class": "H", "module": "HR", "job": "Consume authorised time into payroll preparation", "anchors": ["app/Http/Controllers/Hr/PayrollExportController.php:239", "app/Domain/Hr/Models/HrPayrollRun.php:18"]}
+      ]
+    },
+    {
+      "source_id": "CAP-OPS-STAFF-AVAILABILITY-TIME-OFF",
+      "difference": ["target_granularity", "module_ownership"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-OPS-STAFF-AVAILABILITY", "class": "H", "module": "Workforce", "job": "Maintain recurring staff availability", "anchors": ["app/Http/Controllers/StaffAvailabilityController.php:9"]},
+        {"id": "CAP-OPS-ROSTER-TIME-OFF", "class": "H", "module": "Workforce", "job": "Maintain non-leave roster unavailability and training blocks", "anchors": ["app/Http/Controllers/StaffTimeOffController.php:10", "app/Models/StaffTimeOff.php:11"]},
+        {"id": "CAP-HR-LEAVE-LIFECYCLE", "class": "H", "module": "HR", "job": "Own roster-entered leave and leave-balance effects", "anchors": ["app/Http/Controllers/StaffTimeOffController.php:40", "app/Domain/Hr/Services/WorkforceAvailabilityCoverageService.php:38"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-LEDGER-CHART-PERIODS",
+      "difference": ["target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-CHART-OF-ACCOUNTS", "class": "H", "module": "Finance", "job": "Maintain ledger accounts", "anchors": ["app/Domain/Finance/Services/ChartOfAccountsService.php:9"]},
+        {"id": "CAP-FIN-ACCOUNTING-PERIOD-LIFECYCLE", "class": "H", "module": "Finance", "job": "Open, maintain, and close fiscal periods", "anchors": ["app/Domain/Finance/Http/Controllers/FiscalPeriodController.php:11", "routes/finance.php:181"]},
+        {"id": "CAP-FIN-COST-CENTRE-ADMIN", "class": "H", "module": "Finance", "job": "Maintain cost centres", "anchors": ["app/Domain/Finance/Http/Controllers/CostCentreController.php:10", "routes/finance.php:189"]},
+        {"id": "CAP-FIN-FUNDING-STREAM-ADMIN", "class": "H", "module": "Finance", "job": "Maintain funding streams", "anchors": ["app/Domain/Finance/Http/Controllers/FundingStreamController.php:11", "routes/finance.php:197"]},
+        {"id": "CAP-FIN-CURRENCY-ADMIN", "class": "H", "module": "Finance", "job": "Maintain supported currencies", "anchors": ["app/Domain/Finance/Http/Controllers/CurrencyController.php:10", "routes/finance.php:205"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-JOURNAL-POST-REVERSE-RECUR",
+      "difference": ["target_naming", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-MANUAL-JOURNAL-LIFECYCLE", "class": "H", "module": "Finance", "job": "Draft, post, and reverse manual journals", "anchors": ["app/Domain/Finance/Services/JournalPostingService.php:21", "routes/finance.php:160"]},
+        {"id": "CAP-FIN-RECURRING-JOURNAL-EXECUTION", "class": "D", "module": "Finance", "job": "Execute and evidence scheduled recurring journal occurrences", "anchors": ["app/Domain/Finance/Services/RecurringJournalService.php:18"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-AP-VENDOR-PO-BILL-CREDIT",
+      "difference": ["target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-VENDOR-MASTER", "class": "H", "module": "Finance", "job": "Maintain vendor master records", "anchors": ["app/Domain/Finance/Http/Controllers/VendorController.php:14"]},
+        {"id": "CAP-FIN-PURCHASE-ORDER-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create and govern purchase orders", "anchors": ["app/Domain/Finance/Http/Controllers/PurchaseOrderController.php:19"]},
+        {"id": "CAP-FIN-BILL-LIFECYCLE", "class": "H", "module": "Finance", "job": "Capture, approve, and settle supplier bills", "anchors": ["app/Domain/Finance/Http/Controllers/BillController.php:19", "app/Domain/Finance/Services/AccountsPayableService.php:116"]},
+        {"id": "CAP-FIN-CREDIT-NOTE-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create and approve supplier credit notes", "anchors": ["app/Domain/Finance/Http/Controllers/CreditNoteController.php:17", "app/Domain/Finance/Services/AccountsPayableService.php:731"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-PAYMENT-RUN-SETTLEMENT",
+      "difference": ["operation", "target_granularity", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-PAYMENT-RUN-LIFECYCLE", "class": "H", "module": "Finance", "job": "Prepare, approve, and process supplier payment runs", "anchors": ["app/Domain/Finance/Http/Controllers/PaymentRunController.php:13", "app/Domain/Finance/Services/PaymentRunService.php:15"]},
+        {"id": "CAP-FIN-PAYMENT-RUN-EXPORT", "class": "D", "module": "Finance", "job": "Export authorised payment-run data and artifacts", "anchors": ["app/Domain/Finance/Http/Controllers/PaymentRunController.php:64", "app/Domain/Finance/Services/ExternalSettlementService.php:290"]},
+        {"id": "CAP-FIN-PAYMENT-RUN-EXTERNAL-SETTLEMENT", "class": "H", "module": "Finance", "job": "Accept, reject, settle, and reconcile an external payment run", "anchors": ["app/Domain/Finance/Services/ExternalSettlementService.php:334", "app/Domain/Finance/Services/ExternalSettlementService.php:490", "app/Domain/Finance/Services/ExternalSettlementService.php:725"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-AR-QUOTE-INVOICE-BILLING",
+      "difference": ["target_identity", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-QUOTE-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create, send, accept, and convert quotes", "anchors": ["app/Domain/Finance/Services/QuoteLifecycleService.php:16", "routes/finance.php:389"]},
+        {"id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create, send, pay, and cancel invoices", "anchors": ["app/Domain/Finance/Http/Controllers/InvoiceController.php:33", "routes/finance.php:675"]},
+        {"id": "CAP-FIN-CLIENT-STATEMENT", "class": "D", "module": "Finance", "job": "Generate an authorised receivables statement", "anchors": ["app/Domain/Finance/Services/AccountsReceivableService.php:480"]},
+        {"id": "CAP-FIN-RECEIPT-ALLOCATION-LIFECYCLE", "class": "H", "module": "Finance", "job": "Capture and allocate an idempotent receipt", "anchors": ["app/Domain/Finance/Services/AccountsReceivableService.php:296", "app/Domain/Finance/Http/Controllers/AccountsReceivableController.php:127"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-BANK-FEED-RECON-EFTPOS",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-BANK-FEED-IMPORT", "class": "D", "module": "Finance", "job": "Import authorised bank-feed activity", "anchors": ["app/Domain/Finance/Http/Controllers/BankFeedController.php:13", "app/Domain/Finance/Services/BankFeedService.php:10"]},
+        {"id": "CAP-FIN-BANK-STATEMENT-RECONCILIATION", "class": "H", "module": "Finance", "job": "Match, unmatch, complete, and amend bank reconciliations", "anchors": ["app/Domain/Finance/Http/Controllers/BankReconciliationController.php:14", "routes/finance.php:495"]},
+        {"id": "CAP-FIN-EFTPOS-BATCH-RECONCILIATION", "class": "H", "module": "Finance", "job": "Import and reconcile EFTPOS batches", "anchors": ["app/Domain/Finance/Http/Controllers/EftposController.php:15", "app/Domain/Finance/Services/EftposReconciliationService.php:17"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-GST-IRD-COMPLIANCE",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-GST-RETURN-LIFECYCLE", "class": "H", "module": "Finance", "job": "Prepare, file, and amend GST returns", "anchors": ["app/Domain/Finance/Http/Controllers/GstReturnController.php:14", "app/Domain/Finance/Services/GstReturnService.php:21"]},
+        {"id": "CAP-FIN-IRD-FILING-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create, validate, and submit IRD filings", "anchors": ["app/Domain/Finance/Http/Controllers/IrdFilingController.php:15", "app/Domain/Finance/Services/IrdFilingService.php:12"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-CLIENT-PETTY-DONOR-FUNDS",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-CLIENT-FUND-LIFECYCLE", "class": "H", "module": "Finance", "job": "Govern Client-fund transactions and approvals", "anchors": ["app/Domain/Finance/Services/ClientFundTransactionService.php:16"]},
+        {"id": "CAP-FIN-PETTY-CASH-LIFECYCLE", "class": "H", "module": "Finance", "job": "Maintain petty-cash funds and transactions", "anchors": ["app/Domain/Finance/Http/Controllers/PettyCashController.php:14"]},
+        {"id": "CAP-FIN-DONOR-FUND-LIFECYCLE", "class": "H", "module": "Finance", "job": "Maintain restricted donor funds and transactions", "anchors": ["app/Domain/Finance/Http/Controllers/DonorFundController.php:24", "app/Domain/Finance/Services/DonorFundService.php:23"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-BUDGET-ACTUAL-FORECAST",
+      "difference": ["target_naming", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-BUDGET-ACTUAL-VARIANCE", "class": "D", "module": "Finance", "job": "Calculate and present budget-to-actual variance", "anchors": ["app/Domain/Finance/Http/Controllers/BudgetActualsController.php:11", "app/Domain/Finance/Services/BudgetVarianceService.php:21"]},
+        {"id": "CAP-FIN-CASH-FLOW-FORECAST-LIFECYCLE", "class": "H", "module": "Finance", "job": "Create and review cash-flow forecasts", "anchors": ["app/Domain/Finance/Http/Controllers/CashFlowForecastController.php:11", "app/Domain/Finance/Services/CashFlowForecastService.php:14"]}
+      ]
+    },
+    {
+      "source_id": "CAP-FIN-REPORT-AUDIT-EXPORT",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT", "class": "D", "module": "Finance", "job": "Generate and export financial statements", "anchors": ["app/Domain/Finance/Http/Controllers/FinancialReportController.php:10", "app/Domain/Finance/Services/FinancialReportService.php:14"]},
+        {"id": "CAP-FIN-ENCRYPTED-AUDIT-PACK", "class": "D", "module": "Finance", "job": "Generate and download encrypted finance audit packs", "anchors": ["app/Domain/Finance/Http/Controllers/AuditExportController.php:12", "app/Domain/Finance/Services/AuditExportService.php:20"]}
+      ]
+    },
+    {
+      "source_id": "CAP-GOV-DASHBOARD-REPORT-EVIDENCE",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-GOV-DASHBOARD-READ-LENS", "class": "H", "module": "Governance", "job": "Review the authorised governance overview", "anchors": ["app/Domain/Governance/Http/Controllers/DashboardController.php:13", "app/Domain/Governance/Services/DashboardAggregatorService.php:29"]},
+        {"id": "CAP-GOV-REPORTING-EXPORT", "class": "D", "module": "Governance", "job": "Generate and export governance reports", "anchors": ["app/Domain/Governance/Http/Controllers/ReportController.php:17", "app/Domain/Governance/Http/Controllers/ReportController.php:183"]},
+        {"id": "CAP-GOV-AUDIT-EVIDENCE-PACK", "class": "D", "module": "Governance", "job": "Generate governance audit-evidence packs", "anchors": ["app/Domain/Governance/Services/AuditEvidencePackService.php:11"]}
+      ]
+    },
+    {
+      "source_id": "CAP-GOV-BOARD-MEMBER-INTEREST-EVALUATION",
+      "difference": ["target_collision", "target_identity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-GOV-BOARD-MEMBERSHIP", "class": "H", "module": "Governance", "job": "Administer board membership", "anchors": ["app/Domain/Governance/Http/Controllers/BoardMemberAdminController.php:12"]},
+        {"id": "CAP-GOV-INTEREST-REGISTER", "class": "H", "module": "Governance", "job": "Record and govern board-member interests", "anchors": ["app/Domain/Governance/Http/Controllers/BoardInterestController.php:11"]},
+        {"id": "CAP-GOV-BOARD-EVALUATION", "class": "H", "module": "Governance", "job": "Conduct board evaluations", "anchors": ["app/Domain/Governance/Http/Controllers/BoardEvaluationController.php:12"]}
+      ],
+      "rejected_target": {
+        "id": "CAP-GOV-PERFORMANCE-REVIEW",
+        "reason": "BoardEvaluationController and PerformanceReviewController are distinct owners.",
+        "anchors": ["app/Domain/Governance/Http/Controllers/PerformanceReviewController.php:12"]
+      }
+    },
+    {
+      "source_id": "CAP-GOV-POLICY-VERSION-ATTESTATION",
+      "difference": ["operation", "target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-GOV-POLICY-LIFECYCLE", "class": "H", "module": "Governance", "job": "Draft, approve, publish, and version governance policies", "anchors": ["app/Domain/Governance/Http/Controllers/GovernancePolicyController.php:13", "app/Domain/Governance/Http/Controllers/GovernancePolicyController.php:156"]},
+        {"id": "CAP-GOV-POLICY-ATTESTATION", "class": "H", "module": "Governance", "job": "Acknowledge and evidence governance policy attestations", "anchors": ["app/Domain/Governance/Http/Controllers/GovernancePolicyController.php:171", "app/Domain/Governance/Models/PolicyAttestation.php:10"]}
+      ]
+    },
+    {
+      "source_id": "CAP-GOV-SETTINGS-CONTROL",
+      "difference": ["operation", "fabricated_target", "class"],
+      "decision": "SURVIVES",
+      "targets": [
+        {"id": "CAP-GOV-SETTINGS-CONTROL", "class": "H", "module": "Governance", "job": "Configure governed spend, escalation, and variance settings", "anchors": ["app/Domain/Governance/Http/Controllers/GovernanceSettingController.php:13", "app/Domain/Governance/Http/Controllers/GovernanceSettingController.php:25", "app/Domain/Governance/Http/Controllers/GovernanceSettingController.php:109"]}
+      ],
+      "rejected_target": {
+        "id": "CAP-GOV-WORKFLOW-SETTINGS",
+        "reason": "No workflow-settings definition or owner exists in the current controller."
+      }
+    },
+    {
+      "source_id": "CAP-PRIV-RETENTION-POLICY-EXECUTION",
+      "difference": ["operation", "target_granularity", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE", "class": "H", "module": "Privacy", "job": "Define, preview, approve, and revise retention policies", "anchors": ["app/Http/Controllers/DataRetentionPolicyController.php:16", "app/Http/Controllers/DataRetentionPolicyController.php:66"]},
+        {"id": "CAP-PRIV-RETENTION-EXECUTION-EVIDENCE", "class": "D", "module": "Privacy", "job": "Execute approved retention and preserve governed evidence", "anchors": ["app/Http/Controllers/DataDeletionLogController.php:50", "app/Domain/Privacy/Retention/RetentionExecutionService.php:125"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SITE-CALENDAR-RESOURCE-SCHEDULING",
+      "difference": ["operation", "target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SITE-CALENDAR-EVENT-LIFECYCLE", "class": "H", "module": "Sites & Locations", "job": "Create, approve, update, and cancel Site calendar events", "anchors": ["app/Http/Controllers/Sites/SiteCalendarController.php:24", "app/Http/Controllers/Sites/SiteCalendarController.php:101"]},
+        {"id": "CAP-SITE-RESOURCE-REGISTER", "class": "H", "module": "Sites & Locations", "job": "Maintain Site calendar resources", "anchors": ["app/Http/Controllers/Sites/SiteResourceController.php:10", "app/Http/Controllers/Sites/SiteResourceController.php:38"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SITE-PLAN-ROOM-HARDWARE",
+      "difference": ["target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SITE-TYPE-PLAN-LIFECYCLE", "class": "H", "module": "Sites & Locations", "job": "Maintain Site plans and governed plan pins", "anchors": ["app/Services/Sites/SiteTypePlanService.php:16"]},
+        {"id": "CAP-SITE-ROOM-ZONE-LIFECYCLE", "class": "H", "module": "Sites & Locations", "job": "Maintain Site rooms and zones", "anchors": ["app/Services/Sites/SitePhysicalRoomService.php:21"]},
+        {"id": "CAP-SITE-HARDWARE-REGISTER", "class": "H", "module": "Sites & Locations", "job": "Maintain Site hardware and physical placement", "anchors": ["app/Http/Controllers/Sites/SiteHardwareController.php:19"]},
+        {"id": "CAP-SITE-EMERGENCY-PLAN-LIFECYCLE", "class": "H", "module": "Sites & Locations", "job": "Maintain Site emergency plans", "anchors": ["app/Http/Controllers/Sites/SiteEmergencyPlanController.php:15"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SITE-CHECKLIST-HAZARD-COMPLIANCE",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SITE-CHECKLIST-RUN", "class": "H", "module": "Sites & Locations", "job": "Execute and complete Site checklist runs", "anchors": ["app/Services/Sites/SiteChecklistRunExecutionService.php:20"]},
+        {"id": "CAP-SITE-HAZARD-REGISTER", "class": "H", "module": "Sites & Locations", "job": "Record and govern Site hazards", "anchors": ["app/Http/Controllers/Sites/SiteHazardController.php:30"]},
+        {"id": "CAP-SITE-INSPECTION-LIFECYCLE", "class": "H", "module": "Sites & Locations", "job": "Schedule and evidence Site inspections", "anchors": ["app/Http/Controllers/Sites/SiteInspectionController.php:16"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SITE-VAULT-VENDOR-LEDGER",
+      "difference": ["target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SITE-VENDOR-REGISTER", "class": "H", "module": "Sites & Locations", "job": "Maintain Site vendor records", "anchors": ["app/Http/Controllers/Sites/SiteVendorController.php:17"]},
+        {"id": "CAP-SITE-CREDENTIAL-VAULT", "class": "H", "module": "Sites & Locations", "job": "Maintain protected Site credentials", "anchors": ["app/Http/Controllers/Sites/SiteCredentialController.php:18"]},
+        {"id": "CAP-SITE-CONTACTS", "class": "H", "module": "Sites & Locations", "job": "Maintain Site contacts", "anchors": ["app/Http/Controllers/SiteContactController.php:13"]},
+        {"id": "CAP-SITE-HOUSE-LEDGER", "class": "H", "module": "Sites & Locations", "job": "Maintain and reconcile the Site house ledger", "anchors": ["app/Services/Sites/HouseLedgerService.php:12"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SEC-ACCESS-CONTROL",
+      "difference": ["operation", "target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE", "class": "H", "module": "Security Devices", "job": "Create, version, and deactivate access schedules", "anchors": ["app/Domain/SecurityDevices/AccessControl/Services/AccessControlLifecycleService.php:26", "app/Domain/SecurityDevices/AccessControl/Services/AccessControlLifecycleService.php:77"]},
+        {"id": "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE", "class": "H", "module": "Security Devices", "job": "Issue, reconcile, and revoke access credentials", "anchors": ["app/Domain/SecurityDevices/AccessControl/Services/AccessControlLifecycleService.php:181", "app/Domain/SecurityDevices/AccessControl/Services/AccessControlLifecycleService.php:201"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SEC-MONITORING-POLICY",
+      "difference": ["target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE", "class": "H", "module": "Security Devices", "job": "Create and govern native monitor definitions", "anchors": ["app/Domain/Monitoring/Services/NativeMonitoringDefinitionService.php:27"]},
+        {"id": "CAP-SEC-MONITORING-COVERAGE-POLICY", "class": "H", "module": "Security Devices", "job": "Author monitoring coverage expectations", "anchors": ["app/Domain/SecurityDevices/Http/Controllers/MonitoringCoverageSettingsController.php:11"]},
+        {"id": "CAP-SEC-MONITORING-MAINTENANCE-POLICY", "class": "H", "module": "Security Devices", "job": "Author and cancel monitoring maintenance windows", "anchors": ["app/Domain/SecurityDevices/Http/Controllers/MonitoringMaintenanceSettingsController.php:11"]},
+        {"id": "CAP-SEC-MONITORING-RETENTION-POLICY", "class": "H", "module": "Security Devices", "job": "Author monitoring retention policies", "anchors": ["app/Domain/SecurityDevices/Http/Controllers/MonitoringRetentionSettingsController.php:11"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SEC-DISCOVERY-COLLECTOR",
+      "difference": ["operation", "target_granularity", "class"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE", "class": "H", "module": "Security Devices", "job": "Create, validate, apply, and deactivate approved Site discovery scopes", "anchors": ["app/Domain/Monitoring/Services/NativeMonitoringDefinitionService.php:240", "app/Domain/SecurityDevices/Http/Controllers/DiscoveryScopeLifecycleController.php:20"]},
+        {"id": "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE", "class": "H", "module": "Security Devices", "job": "Issue, re-enrol, and revoke Site-scoped monitoring collectors", "anchors": ["app/Domain/SecurityDevices/Http/Controllers/MonitoringCollectorLifecycleController.php:15"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SEC-PROVIDER-INTEGRATIONS",
+      "difference": ["target_set", "module_ownership"],
+      "decision": "MERGE",
+      "targets": [
+        {"id": "CAP-INT-SITE-PROVIDER-CONNECTION", "class": "H", "module": "Integrations", "job": "Configure Site provider connections and governed secrets", "anchors": ["app/Services/Integration/IntegrationSecretManager.php:21", "routes/security-devices.php:504"]},
+        {"id": "CAP-INT-SITE-PROVIDER-SYNC", "class": "D", "module": "Integrations", "job": "Synchronise provider Sites, applications, and devices", "anchors": ["app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:382", "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:514", "routes/security-devices.php:521"]}
+      ]
+    },
+    {
+      "source_id": "CAP-IT-CHANGE-PROBLEM-MAJOR-INCIDENT",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-IT-SERVICE-MANAGEMENT-SETUP", "class": "H", "module": "IT & Support", "job": "Configure IT teams, queues, and services", "anchors": ["app/Domain/It/Services/ItServiceManagementSetupService.php:16"]},
+        {"id": "CAP-IT-CHANGE-LIFECYCLE", "class": "H", "module": "IT & Support", "job": "Create and transition IT changes", "anchors": ["app/Domain/It/Services/ItChangeService.php:21"]},
+        {"id": "CAP-IT-PROBLEM-LIFECYCLE", "class": "H", "module": "IT & Support", "job": "Create and transition IT problems", "anchors": ["app/Domain/It/Services/ItProblemService.php:16"]},
+        {"id": "CAP-IT-MAJOR-INCIDENT-LIFECYCLE", "class": "H", "module": "IT & Support", "job": "Create, update, and transition major IT incidents", "anchors": ["app/Domain/It/Services/ItMajorIncidentService.php:24"]}
+      ]
+    },
+    {
+      "source_id": "CAP-INT-ADMIN-CONNECTIONS",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-INT-API-KEY-ADMIN", "class": "H", "module": "Integrations", "job": "Issue and revoke API keys", "anchors": ["app/Http/Controllers/Settings/ApiSettingsController.php:17", "routes/settings.php:205"]},
+        {"id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION", "class": "H", "module": "Integrations", "job": "Configure and test outbound webhooks", "anchors": ["app/Http/Controllers/Settings/ApiSettingsController.php:17", "routes/settings.php:211"]},
+        {"id": "CAP-INT-CALENDAR-CONNECTION", "class": "H", "module": "Integrations", "job": "Configure calendar synchronisation connections", "anchors": ["app/Http/Controllers/Settings/CalendarSyncSettingsController.php:22"]},
+        {"id": "CAP-INT-MAILBOX-CONNECTION", "class": "H", "module": "Integrations", "job": "Configure IT mailbox connections", "anchors": ["app/Http/Controllers/Settings/ItMailboxSettingsController.php:21"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SET-PERSONAL-ACCOUNT-SECURITY",
+      "difference": ["operation", "target_granularity"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SET-PERSONAL-PROFILE", "class": "H", "module": "Public & Settings Platform", "job": "Maintain the signed-in user's profile", "anchors": ["app/Http/Controllers/Settings/ProfileController.php:23", "routes/settings.php:39"]},
+        {"id": "CAP-SET-PERSONAL-PASSWORD", "class": "H", "module": "Public & Settings Platform", "job": "Change the signed-in user's password", "anchors": ["app/Http/Controllers/Settings/PasswordController.php:12", "routes/settings.php:46"]},
+        {"id": "CAP-SET-PERSONAL-PREFERENCES", "class": "H", "module": "Public & Settings Platform", "job": "Maintain appearance and UI preferences", "anchors": ["app/Http/Controllers/Settings/AppearanceController.php:18", "routes/settings.php:52"]},
+        {"id": "CAP-SET-PERSONAL-TWO-FACTOR", "class": "H", "module": "Public & Settings Platform", "job": "Review and manage personal two-factor security", "anchors": ["app/Http/Controllers/Settings/TwoFactorAuthenticationController.php:11", "routes/settings.php:59"]}
+      ]
+    },
+    {
+      "source_id": "CAP-SET-ACCESS-ROLE-USER-SSO",
+      "difference": ["target_identity", "single_tenant_site_boundary"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SET-ROLE-PERMISSION-ADMIN", "class": "H", "module": "Public & Settings Platform", "job": "Create roles and attach permissions", "anchors": ["app/Http/Controllers/Settings/RolesController.php:11", "routes/settings.php:82"]},
+        {"id": "CAP-SET-USER-ACCESS-ADMIN", "class": "H", "module": "Public & Settings Platform", "job": "Approve users and administer role or permission overrides", "anchors": ["app/Http/Controllers/Settings/AccessController.php:13", "routes/settings.php:62"]},
+        {"id": "CAP-SET-SESSION-ADMIN", "class": "H", "module": "Public & Settings Platform", "job": "Terminate a user's active sessions", "anchors": ["app/Http/Controllers/System/UsersController.php:490", "app/Http/Controllers/System/UsersController.php:512"]},
+        {"id": "CAP-SET-SSO-MAPPING", "class": "H", "module": "Public & Settings Platform", "job": "Configure SSO and group mappings", "anchors": ["app/Http/Controllers/Settings/SsoConfigController.php:11", "app/Http/Controllers/Settings/SsoGroupController.php:14"]}
+      ],
+      "rejected_target": {
+        "id": "CAP-SET-USER-SITE-MEMBERSHIP",
+        "reason": "The supplied Settings controllers do not mutate approved-Site membership. Site access remains derived from canonical staff/Site ownership and UserSiteAccessService, not a tenant or invented Settings owner."
+      }
+    },
+    {
+      "source_id": "CAP-SET-ORG-NOTIFICATION-CONFIG",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-SET-TERMINOLOGY-CONFIG", "class": "H", "module": "Public & Settings Platform", "job": "Configure organisation terminology", "anchors": ["app/Http/Controllers/Settings/TerminologyController.php:9", "routes/settings.php:99"]},
+        {"id": "CAP-SET-NOTIFICATION-CONFIG", "class": "H", "module": "Public & Settings Platform", "job": "Configure personal and role notification preferences", "anchors": ["app/Http/Controllers/Settings/NotificationPreferencesController.php:13", "routes/settings.php:131"]},
+        {"id": "CAP-SET-EMAIL-CONFIG", "class": "H", "module": "Public & Settings Platform", "job": "Configure application email delivery", "anchors": ["app/Http/Controllers/Settings/EmailSettingsController.php:13"]},
+        {"id": "CAP-SET-SECURITY-POLICY", "class": "H", "module": "Public & Settings Platform", "job": "Configure application security policy", "anchors": ["app/Http/Controllers/Settings/SecurityPolicyController.php:13", "routes/settings.php:194"]},
+        {"id": "CAP-SET-MODULE-CONFIG", "class": "H", "module": "Public & Settings Platform", "job": "Configure enabled application modules", "anchors": ["app/Http/Controllers/Settings/ModuleSettingsController.php:9"]}
+      ]
+    },
+    {
+      "source_id": "CAP-PUB-MARKETING-CONTACT-CAREERS",
+      "difference": ["target_naming", "target_scope"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-PUB-MARKETING-PAGES", "class": "H", "module": "Public & Settings Platform", "job": "Read public product and policy pages", "anchors": ["routes/web.php:74", "routes/web.php:82", "routes/web.php:96"]},
+        {"id": "CAP-PUB-CONTACT-SUBMISSION", "class": "H", "module": "Public & Settings Platform", "job": "Submit a public contact request", "anchors": ["app/Http/Controllers/ContactController.php:14", "routes/web.php:108"]},
+        {"id": "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE", "class": "H", "module": "Public & Settings Platform", "job": "Apply for a role and use token-bound application, offer, and reference flows", "anchors": ["app/Http/Controllers/Careers/CareerPortalController.php:21", "app/Http/Controllers/Careers/CareerPortalController.php:148", "routes/web.php:114"]}
+      ]
+    },
+    {
+      "source_id": "CAP-ROAD-INITIATIVE-QUARTERLY-DECISION",
+      "difference": ["target_naming"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-ROAD-SUGGESTION-LIFECYCLE", "class": "H", "module": "Roadmap", "job": "Ingest, triage, and convert roadmap suggestions", "anchors": ["app/Domain/Roadmap/Http/Controllers/SuggestionController.php:17", "routes/roadmap.php:39"]},
+        {"id": "CAP-ROAD-INITIATIVE-LIFECYCLE", "class": "H", "module": "Roadmap", "job": "Create, score, update, and transition initiatives", "anchors": ["app/Domain/Roadmap/Http/Controllers/InitiativeController.php:19", "routes/roadmap.php:20"]},
+        {"id": "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE", "class": "H", "module": "Roadmap", "job": "Generate, review, approve, publish, and revise quarterly plans", "anchors": ["app/Domain/Roadmap/Http/Controllers/QuarterlyPlanController.php:15", "routes/roadmap.php:52"]},
+        {"id": "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE", "class": "H", "module": "Roadmap", "job": "Review and resolve roadmap decision requests", "anchors": ["app/Domain/Roadmap/Http/Controllers/DecisionRequestController.php:15", "routes/roadmap.php:84"]}
+      ]
+    },
+    {
+      "source_id": "CAP-REP-CROSS-MODULE-REPORT-HUB",
+      "difference": ["operation", "target_granularity", "cross_module_ownership"],
+      "decision": "SPLIT",
+      "targets": [
+        {"id": "CAP-REP-REPORT-CATALOG-HUB", "class": "H", "module": "Reporting", "job": "Browse authorised report families and report KPIs", "anchors": ["app/Http/Controllers/ReportsController.php:17", "routes/reports.php:22"]},
+        {"id": "CAP-REP-COMBINED-REPORTS", "class": "D", "module": "Reporting", "job": "View and export care-quality, workforce-operations, and compliance-risk combined reports", "anchors": ["app/Http/Controllers/CombinedReportController.php:19", "app/Http/Controllers/CombinedReportController.php:70", "routes/reports.php:32"]}
+      ],
+      "merge_relations": [
+        {
+          "source": "app/Http/Controllers/ModuleReportController.php:12",
+          "target_rule": "Merge each generic module-report instance into its existing module-specific reporting/export feature; do not create a second cross-module owner."
+        }
+      ]
+    },
+    {
+      "source_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "difference": ["blocked_target_treatment"],
+      "decision": "EVIDENCE_GAP",
+      "targets": [],
+      "basis": "The controller only authorises and renders a page; no checklist record, lifecycle, mutation owner, or dedicated product permission is established.",
+      "anchors": ["app/Http/Controllers/QualityChecklistController.php:7", "app/Http/Controllers/QualityChecklistController.php:14", "routes/web.php:130"]
+    }
+  ],
+  "unresolved_items": [
+    {
+      "id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "status": "EXCLUDE_PENDING_CANONICAL_OWNER_AND_REACHABILITY_EVIDENCE"
+    },
+    {
+      "id": "CAP-FIN-RECURRING-JOURNAL-EXECUTION",
+      "status": "STATIC_DERIVED_OWNER_FOUND_BUT_USER_FACING_SCHEDULE_ADMIN_REACHABILITY_NOT_ESTABLISHED"
+    },
+    {
+      "id": "CAP-REP-CROSS-MODULE-REPORT-HUB",
+      "status": "STATIC_SPLIT_RESOLVED_BUT_MODULE_REPORT_MERGE_RELATIONS_REQUIRE_GLOBAL_LEDGER_DEDUPLICATION"
+    }
+  ],
+  "architecture_boundary": "Single tenant across multiple Sites. Roles and action permissions, approved-Site access, canonical ownership, concealed direct IDs, and privacy remain the boundaries. No Settings Site-membership or tenant owner was invented.",
+  "credits": {
+    "execution": 0,
+    "browser": 0,
+    "test": 0,
+    "build": 0,
+    "database": 0,
+    "benchmark": 0,
+    "completion": 0
+  },
+  "limits": "Static source identity reconciliation only. Route groups were used as locators, never as sufficient canonical-owner proof.",
+  "original_run_wrote_files": false,
+  "materialization": {
+    "authorized_after_adjudication": true,
+    "path": "evidence/source/raw-run-021-canonical-identity-platform-reconciliation.json",
+    "scope": "This JSON only; no application, runtime, test, build, database, benchmark, or completion credit."
+  }
+}
