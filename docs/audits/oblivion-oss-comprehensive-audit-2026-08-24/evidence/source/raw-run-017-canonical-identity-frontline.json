@@ -1,0 +1,1361 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-017",
+  "status": "COMPLETE_READ_ONLY_STATIC_ADJUDICATION_MATERIALIZED_BY_ROOT_AUTHORIZATION",
+  "generated_at": "2026-08-24T18:30:00+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "product_paths_match": true
+  },
+  "inputs": [
+    "evidence/source/current-feature-discovery-wave-01.json",
+    "evidence/source/current-feature-discovery-wave-02.json",
+    "evidence/source/current-feature-discovery-wave-03.json",
+    "03-feature-to-benchmark-matrix.csv"
+  ],
+  "scope_modules": [
+    "Care & Clinical",
+    "Catering",
+    "Clients",
+    "Complaints & Feedback",
+    "Compliance",
+    "Control Room",
+    "eMAR",
+    "Fleet & Assets",
+    "Frontline Workspaces",
+    "Health & Safety",
+    "Incidents & Safeguarding",
+    "Operations",
+    "Portal",
+    "Respite",
+    "Safeguarding"
+  ],
+  "scope_candidate_ids": [
+    "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+    "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+    "CAP-MED-CLIENT-MEDICAL-PROFILE",
+    "CAP-CLI-CLIENT-SUPPORT-ASSESSMENT-RISK",
+    "CAP-CLI-CLIENT-ASSIGNMENT-NOTES",
+    "OPS-CLIENT-CONSENT",
+    "CAP-OPS-CARE-PLAN-LIFECYCLE",
+    "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+    "CAP-CLIN-MODULE-DASHBOARD",
+    "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+    "CAP-CLIN-EVENT-REGISTER-RECORD",
+    "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+    "CAP-CLIN-BEHAVIOUR-AND-MONITORING",
+    "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+    "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+    "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+    "CAP-MED-WORKER-TODAY-WORKLIST",
+    "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+    "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+    "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+    "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+    "CAP-MED-CD-REGISTER-BALANCE",
+    "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+    "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+    "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+    "CAP-MED-API-CURRENT-SURFACES",
+    "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+    "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+    "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+    "CAP-INC-SAFEGUARDING-INTAKE-TRIAGE-SENSITIVITY",
+    "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+    "CAP-INC-EVIDENCE-DOWNLOADS",
+    "CAP-INC-REPORT-AUDIT-EXPORTS",
+    "CAP-DAY-MY-DAY-WORKSPACE",
+    "CAP-DAY-MY-ROSTER",
+    "CAP-DAY-MY-CALENDAR",
+    "CAP-DAY-ALL-TASKS-WORKBENCH",
+    "CAP-DAY-TASK-REPORT",
+    "CAP-OPS-DASHBOARD-ACTIVITY",
+    "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF",
+    "CAP-OPS-CLIENT-ONBOARDING",
+    "CAP-OPS-HANDOVER-SHIFT-NOTES",
+    "CAP-OPS-FUNDING-CLAIMS",
+    "CAP-OPS-REPORTING-EXPORT",
+    "CAP-OPS-CALENDAR-SYNC",
+    "CAP-HS-DASHBOARD-ANALYTICS",
+    "CAP-HS-EVENT-REGISTER-HANDOVER",
+    "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+    "CAP-HS-INVESTIGATION-ASSURANCE",
+    "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+    "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+    "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+    "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+    "CAP-HS-FIRST-AID-REGISTER",
+    "CAP-HS-RESTRAINT-REGISTER",
+    "CAP-HS-SAFE-WORK-PROCEDURES",
+    "CAP-HS-WORKER-PARTICIPATION",
+    "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+    "CAP-HS-EMERGENCY-DRILLS",
+    "CAP-HS-WORKPLACE-INJURY-RTW",
+    "CAP-HS-LONE-WORKER-SAFETY",
+    "CAP-HS-PPE-REGISTER",
+    "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+    "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+    "CAP-SAFE-INVESTIGATION-RISK",
+    "CAP-SAFE-EXTERNAL-REPORT",
+    "CAP-SAFE-EVIDENCE-ACTION-PLAN",
+    "CAP-SAFE-TERMINAL-PROJECTION",
+    "CAP-COMPLAINT-SITE-FEEDBACK",
+    "CAP-COMPLAINT-RESPITE-STAY",
+    "CAP-COMPLAINT-HR-CASEWORK",
+    "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+    "CAP-FLEET-ASSET-VEHICLE-REGISTER",
+    "CAP-FLEET-VEHICLE-BOOKING",
+    "CAP-FLEET-MAINTENANCE-COMPLIANCE",
+    "CAP-FLEET-KEY-HANDOVER",
+    "CAP-FLEET-RESIDENT-TRANSPORT",
+    "CAP-FLEET-TRACKING-GEOFENCE-REALTIME",
+    "CAP-FLEET-INCIDENT-OUTING-MILEAGE",
+    "CAP-FLEET-REPORTING-EXPORT",
+    "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+    "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+    "CAP-CR-SHIFT-HANDOVER",
+    "CAP-CR-COMMUNICATION-COLLABORATION",
+    "CAP-CR-EVIDENCE-REPORT-SLA",
+    "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS",
+    "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+    "CAP-SITE-MEAL-PLANNER-RECIPE-INVENTORY",
+    "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+    "CAP-PORT-CLIENT-FAMILY-WORKSPACE",
+    "CAP-PORT-FAMILY-MESSAGING-NOTES",
+    "CAP-RESP-REFERRAL-REQUEST-BOOKING",
+    "CAP-RESP-STAY-CARE-DISCHARGE",
+    "CAP-RESP-PROCEDURE-TASK-HANDOVER",
+    "CAP-RESP-EVIDENCE-PACK-EXPORT"
+  ],
+  "anchor_policy": "Unchanged KEEP rows inherit the exact anchors in the three discovery inputs and matrix. Changed rows below retain only the decisive anchors needed for split, merge, or reclassification.",
+  "decisions": {
+    "keep_h": [
+      "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+      "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "CAP-CLIN-MODULE-DASHBOARD",
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "CAP-MED-WORKER-TODAY-WORKLIST",
+      "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+      "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+      "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "CAP-MED-CD-REGISTER-BALANCE",
+      "CAP-DAY-MY-DAY-WORKSPACE",
+      "CAP-DAY-MY-ROSTER",
+      "CAP-DAY-MY-CALENDAR",
+      "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "CAP-DAY-TASK-REPORT",
+      "CAP-OPS-DASHBOARD-ACTIVITY",
+      "CAP-OPS-CLIENT-ONBOARDING",
+      "CAP-OPS-FUNDING-CLAIMS",
+      "CAP-OPS-CALENDAR-SYNC",
+      "CAP-HS-DASHBOARD-ANALYTICS",
+      "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+      "CAP-HS-INVESTIGATION-ASSURANCE",
+      "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+      "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+      "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+      "CAP-HS-FIRST-AID-REGISTER",
+      "CAP-HS-RESTRAINT-REGISTER",
+      "CAP-HS-SAFE-WORK-PROCEDURES",
+      "CAP-HS-WORKER-PARTICIPATION",
+      "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+      "CAP-HS-EMERGENCY-DRILLS",
+      "CAP-HS-WORKPLACE-INJURY-RTW",
+      "CAP-HS-LONE-WORKER-SAFETY",
+      "CAP-HS-PPE-REGISTER",
+      "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "CAP-SAFE-EXTERNAL-REPORT",
+      "CAP-SAFE-TERMINAL-PROJECTION",
+      "CAP-FLEET-VEHICLE-BOOKING",
+      "CAP-FLEET-RESIDENT-TRANSPORT",
+      "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+      "CAP-CR-SHIFT-HANDOVER",
+      "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "CAP-COMP-EXCEPTION-COMMAND-CENTRE"
+    ],
+    "keep_d": [
+      "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "CAP-MED-API-CURRENT-SURFACES",
+      "CAP-OPS-REPORTING-EXPORT",
+      "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "CAP-FLEET-REPORTING-EXPORT"
+    ],
+    "keep_m": [
+      "CAP-WHISTLE-PROTECTED-DISCLOSURE"
+    ],
+    "reclassify": [
+      {
+        "source_id": "OPS-CLIENT-CONSENT",
+        "current_class": "H",
+        "final_id": "CAP-CLI-CLIENT-CONSENT-LIFECYCLE",
+        "final_class": "H",
+        "module": "Clients",
+        "user_job": "Request, decide, validate, withdraw, and evidence client consent",
+        "primary_actor": "ConsentRequestService and ConsentDecisionEvidenceService",
+        "decisive_anchors": {
+          "navigation": ["resources/js/pages/operations/clients/tabs/_groups.ts"],
+          "route": ["routes/operations.php:180-208", "routes/operations.php:355-364"],
+          "page": ["resources/js/pages/operations/clients/consents/Index.tsx", "resources/js/pages/operations/clients/consent-requests/Show.tsx"],
+          "backend": ["app/Services/ConsentRequestService.php", "app/Services/ConsentDecisionEvidenceService.php"],
+          "test": ["tests/Feature/Consents/ConsentRequestIntegrityTest.php"]
+        },
+        "reason": "The stable identity and module prefix were inconsistent with canonical client consent ownership."
+      },
+      {
+        "source_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+        "current_class": "H",
+        "final_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+        "final_class": "H",
+        "module": "Operations",
+        "user_job": "Create, review, attest, export, and close a care plan",
+        "primary_actor": "CarePlanController, CarePlanService, and CarePlanAttestationService",
+        "decisive_anchors": {
+          "navigation": ["resources/js/components/app-sidebar.tsx"],
+          "route": ["routes/operations.php:638-686"],
+          "page": ["resources/js/pages/operations/care-plans/Index.tsx", "resources/js/pages/operations/care-plans/Show.tsx"],
+          "backend": ["app/Services/Operations/CarePlanService.php", "app/Services/Operations/CarePlanAttestationService.php"],
+          "test": ["tests/Feature/Operations/CarePlanSignOffTest.php"]
+        },
+        "reason": "Operations owns the canonical care-plan lifecycle; Clients and Care & Clinical expose read lenses over it."
+      },
+      {
+        "source_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+        "current_class": "H",
+        "final_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+        "final_class": "H",
+        "module": "Incidents",
+        "user_job": "Author an incident from an authorised template",
+        "primary_actor": "IncidentController and the incident-template owner",
+        "decisive_anchors": {
+          "navigation": ["resources/js/components/app-sidebar.tsx"],
+          "route": ["routes/incidents.php:16-139"],
+          "page": ["resources/js/pages/incidents/index.tsx", "resources/js/pages/incidents/templates/index.tsx"],
+          "backend": ["app/Http/Controllers/IncidentController.php:1475-1790"],
+          "test": ["tests/Feature/IncidentControllerTest.php"]
+        },
+        "reason": "Incident authoring must not share a synthetic owner with sensitivity-governed safeguarding."
+      },
+      {
+        "source_id": "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+        "current_class": "H",
+        "final_id": "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+        "final_class": "H",
+        "module": "Incidents",
+        "user_job": "Add incident evidence and follow-up actions",
+        "primary_actor": "Incident evidence and journey owners",
+        "decisive_anchors": {
+          "navigation": ["resources/js/pages/incidents/show.tsx"],
+          "route": ["routes/incidents.php:16-139"],
+          "page": ["resources/js/pages/incidents/show.tsx"],
+          "backend": ["app/Http/Controllers/IncidentController.php:1475-1790"],
+          "test": ["tests/Feature/IncidentControllerTest.php"]
+        },
+        "reason": "Incident evidence/follow-up has a distinct canonical journey and privacy boundary."
+      },
+      {
+        "source_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "current_class": "H",
+        "final_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "final_class": "H",
+        "module": "Incidents",
+        "user_job": "Review and close an incident",
+        "primary_actor": "IncidentController and IncidentJourney",
+        "decisive_anchors": {
+          "navigation": ["resources/js/pages/incidents/show.tsx"],
+          "route": ["routes/incidents.php:16-139"],
+          "page": ["resources/js/pages/incidents/show.tsx"],
+          "backend": ["app/Http/Controllers/IncidentController.php:1475-1790"],
+          "test": ["tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php"]
+        },
+        "reason": "Incident review/closure is distinct from safeguarding terminal projection."
+      },
+      {
+        "source_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+        "current_class": "H",
+        "final_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+        "final_class": "H",
+        "module": "Sites & Locations",
+        "user_job": "Record and respond to Site complaints or feedback",
+        "primary_actor": "SiteComplianceController",
+        "decisive_anchors": {
+          "navigation": [],
+          "route": ["routes/sites.php"],
+          "page": [],
+          "backend": ["app/Http/Controllers/Sites/SiteComplianceController.php:415-548"],
+          "test": ["tests/Feature/Sites/SiteComplianceWorkflowTest.php:287-359"]
+        },
+        "reason": "The Site compliance owner, approved-Site scope, and Site record chain determine ownership."
+      },
+      {
+        "source_id": "CAP-COMPLAINT-RESPITE-STAY",
+        "current_class": "H",
+        "final_id": "CAP-COMPLAINT-RESPITE-STAY",
+        "final_class": "H",
+        "module": "Respite",
+        "user_job": "Record respite complaints and HDC escalation state",
+        "primary_actor": "RespiteStayController and evidence-pack owner",
+        "decisive_anchors": {
+          "navigation": ["resources/js/pages/respite/stays/show.tsx"],
+          "route": ["routes/respite.php:80-93"],
+          "page": ["resources/js/pages/respite/stays/show.tsx"],
+          "backend": ["app/Http/Controllers/Respite/RespiteStayController.php:544-574"],
+          "test": ["tests/Feature/Respite/RespiteNzWorkflowCompletionTest.php:319-370"]
+        },
+        "reason": "The canonical stay and evidence-pack chain determines ownership."
+      },
+      {
+        "source_id": "CAP-COMPLAINT-HR-CASEWORK",
+        "current_class": "H",
+        "final_id": "CAP-COMPLAINT-HR-CASEWORK",
+        "final_class": "H",
+        "module": "HR",
+        "user_job": "Manage confidential grievance and complaint casework",
+        "primary_actor": "HrCaseController and HrCaseAccessService",
+        "decisive_anchors": {
+          "navigation": ["resources/js/components/app-sidebar.tsx"],
+          "route": ["routes/hr.php"],
+          "page": ["resources/js/pages/hr/cases/index.tsx"],
+          "backend": ["app/Http/Controllers/Hr/HrCaseController.php:359-375"],
+          "test": ["tests/Feature/Hr/AuditFixPayrollCasesTest.php:238-257"]
+        },
+        "reason": "Confidential HR case authority and canonical employment records determine ownership."
+      }
+    ],
+    "merge": [
+      {
+        "source_id": "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF",
+        "current_class": "H",
+        "final_ids": ["CAP-OPS-CARE-PLAN-LIFECYCLE"],
+        "user_job": "Review and sign off a care plan",
+        "primary_actor": "CarePlanService and CarePlanAttestationService",
+        "decisive_anchors": {
+          "navigation": ["resources/js/components/app-sidebar.tsx"],
+          "route": ["routes/operations.php:638-686"],
+          "page": ["resources/js/pages/operations/care-plans/Show.tsx"],
+          "backend": ["app/Services/Operations/CarePlanService.php", "app/Services/Operations/CarePlanAttestationService.php"],
+          "test": ["tests/Feature/Operations/CarePlanSignOffTest.php"]
+        },
+        "reason": "Review and sign-off are operations within one coherent care-plan lifecycle, not a second user capability."
+      }
+    ],
+    "splits": [
+      {
+        "source_id": "CAP-CLI-CLIENT-SUPPORT-ASSESSMENT-RISK",
+        "current_class": "H",
+        "source_user_job": "Record support assessments and risks",
+        "source_primary_actor": "Client assessment and risk owners",
+        "final_features": [
+          {
+            "id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+            "class": "H",
+            "module": "Clients",
+            "user_job": "Maintain the authorised client's support plan",
+            "primary_actor": "ClientSupportPlanController",
+            "decisive_anchors": ["routes/clients.php:156-157", "resources/js/pages/operations/clients/tabs/care-support-plan.tsx"]
+          },
+          {
+            "id": "CAP-CLI-CLIENT-ASSESSMENT",
+            "class": "H",
+            "module": "Clients",
+            "user_job": "Record and maintain client assessments",
+            "primary_actor": "ClientAssessmentController",
+            "decisive_anchors": ["routes/clients.php:160-165", "app/Http/Controllers/ClientAssessmentController.php"]
+          },
+          {
+            "id": "CAP-CLI-CLIENT-RISK-REGISTER",
+            "class": "H",
+            "module": "Clients",
+            "user_job": "Record and maintain client risks",
+            "primary_actor": "ClientRiskController",
+            "decisive_anchors": ["routes/clients.php:242-259", "resources/js/pages/operations/clients/tabs/risk-management.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CLI-CLIENT-ASSIGNMENT-NOTES",
+        "current_class": "H",
+        "source_user_job": "Manage client assignments and scoped notes",
+        "source_primary_actor": "Client assignment owners",
+        "final_features": [
+          {
+            "id": "CAP-CLI-CLIENT-ASSIGNMENT",
+            "class": "H",
+            "module": "Clients",
+            "user_job": "Assign authorised workers to a client",
+            "primary_actor": "ClientAssignmentController",
+            "decisive_anchors": ["routes/clients.php:173-177", "resources/js/pages/operations/clients/assignments.tsx"]
+          },
+          {
+            "id": "CAP-CLI-CLIENT-NOTES",
+            "class": "H",
+            "module": "Clients",
+            "user_job": "Record and pin privacy-scoped client notes",
+            "primary_actor": "ClientNoteController",
+            "decisive_anchors": ["routes/clients.php:181-186", "resources/js/pages/operations/clients/tabs/communication-notes.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CLIN-BEHAVIOUR-AND-MONITORING",
+        "current_class": "H",
+        "source_user_job": "Record behaviour and monitoring evidence",
+        "source_primary_actor": "Clinical recording services",
+        "final_features": [
+          {
+            "id": "CAP-CLIN-BEHAVIOUR-REGISTER",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Record and review behaviour evidence",
+            "primary_actor": "BehaviourAbcController and clinical behaviour owner",
+            "decisive_anchors": ["routes/health-clinical.php:51-53", "routes/health-clinical.php:108-113", "resources/js/pages/health-clinical/Behaviour.tsx"]
+          },
+          {
+            "id": "CAP-CLIN-HEALTH-MONITORING",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Review governed health-monitoring observations",
+            "primary_actor": "HealthClinicalDashboardController",
+            "decisive_anchors": ["routes/health-clinical.php:57-59", "resources/js/pages/health-clinical/HealthMonitoring.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+        "current_class": "H",
+        "source_user_job": "Create and run an assessment protocol",
+        "source_primary_actor": "Clinical protocol services",
+        "final_features": [
+          {
+            "id": "CAP-CLIN-ASSESSMENT-RECORD",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Record and review a clinical assessment",
+            "primary_actor": "HealthClinicalDashboardController",
+            "decisive_anchors": ["routes/health-clinical.php:63-68", "resources/js/pages/health-clinical/Assessments.tsx"]
+          },
+          {
+            "id": "CAP-CLIN-PROTOCOL-LIFECYCLE",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Create, edit, activate, and use a clinical protocol",
+            "primary_actor": "HealthClinicalProtocolController",
+            "decisive_anchors": ["routes/health-clinical.php:69-86", "resources/js/pages/health-clinical/Protocols.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+        "current_class": "H",
+        "source_user_job": "Review trends and care-summary lenses",
+        "source_primary_actor": "Clinical dashboard presenters",
+        "final_features": [
+          {
+            "id": "CAP-CLIN-TRENDS-LENS",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Review Site and client clinical trends",
+            "primary_actor": "HealthClinicalClientTrendsController",
+            "decisive_anchors": ["routes/health-clinical.php:60-62", "routes/health-clinical.php:92-94", "resources/js/pages/health-clinical/Trends.tsx"]
+          },
+          {
+            "id": "CAP-CLIN-CLIENT-SUMMARY-LENS",
+            "class": "H",
+            "module": "Care & Clinical",
+            "user_job": "Review a governed client clinical summary",
+            "primary_actor": "HealthClinicalController",
+            "decisive_anchors": ["routes/health-clinical.php:95-97", "resources/js/pages/health-clinical/ClientSummary.tsx"]
+          },
+          {
+            "id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+            "class": "H",
+            "module": "Operations",
+            "user_job": "Create, review, attest, export, and close a care plan",
+            "primary_actor": "CarePlanController and CarePlanAttestationService",
+            "decisive_anchors": ["routes/health-clinical.php:54-56", "routes/operations.php:638-686", "resources/js/pages/operations/care-plans/Show.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+        "current_class": "H",
+        "source_user_job": "Manage reviews, competency, rounds, and self-administration",
+        "source_primary_actor": "Medication governance services",
+        "final_features": [
+          {
+            "id": "CAP-MED-MEDICATION-REVIEW",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Record and maintain medication reviews",
+            "primary_actor": "Medication review owner",
+            "decisive_anchors": ["routes/emar.php:109-111", "routes/emar.php:167-169", "resources/js/pages/emar/Reviews.tsx"]
+          },
+          {
+            "id": "CAP-MED-STAFF-COMPETENCY",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Assess medication competency",
+            "primary_actor": "Medication competency owner",
+            "decisive_anchors": ["routes/emar.php:104-106", "resources/js/pages/emar/Competency.tsx"]
+          },
+          {
+            "id": "CAP-MED-ROUND-LIFECYCLE",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Generate, run, and complete medication rounds",
+            "primary_actor": "GuidedRoundController and medication-round owner",
+            "decisive_anchors": ["routes/emar.php:118-130", "resources/js/pages/emar/Rounds.tsx"]
+          },
+          {
+            "id": "CAP-MED-SELF-ADMINISTRATION",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Govern client self-administration",
+            "primary_actor": "Medication self-administration owner",
+            "decisive_anchors": ["routes/emar.php:134-136", "resources/js/pages/emar/SelfAdmin.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+        "current_class": "H",
+        "source_user_job": "Record destruction, stock movement, and pharmacy actions",
+        "source_primary_actor": "Medication stock and destruction owners",
+        "final_features": [
+          {
+            "id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Record governed medication destruction",
+            "primary_actor": "Medication destruction owner",
+            "decisive_anchors": ["routes/emar.php:139-141", "resources/js/pages/emar/Destructions.tsx"]
+          },
+          {
+            "id": "CAP-MED-STOCK-MOVEMENT",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Record stock counts and movements",
+            "primary_actor": "Medication stock owner",
+            "decisive_anchors": ["routes/emar.php:94-96", "resources/js/pages/emar/StockManagement.tsx"]
+          },
+          {
+            "id": "CAP-MED-PHARMACY-ACTIONS",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Perform authorised pharmacy-facing medication actions",
+            "primary_actor": "EmarController and pharmacy action services",
+            "decisive_anchors": ["app/Http/Controllers/Emar/EmarController.php:1954-2279", "resources/js/pages/emar/Medications.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+        "current_class": "H",
+        "source_user_job": "Handle medication handover, emergency access, correction, and error",
+        "source_primary_actor": "Medication governance lifecycle owners",
+        "final_features": [
+          {
+            "id": "CAP-MED-SHIFT-HANDOVER",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Prepare and acknowledge medication handover",
+            "primary_actor": "Medication handover owner",
+            "decisive_anchors": ["routes/emar.php:144-150", "resources/js/pages/emar/Handovers.tsx"]
+          },
+          {
+            "id": "CAP-MED-BREAK-GLASS-ACCESS",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Open and close emergency medication access",
+            "primary_actor": "BreakGlassController",
+            "decisive_anchors": ["routes/clients.php:204-209", "app/Http/Controllers/BreakGlassController.php"]
+          },
+          {
+            "id": "CAP-MED-ADMINISTRATION-CORRECTION",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Record an immutable administration correction",
+            "primary_actor": "MedicationAdministrationCorrectionController",
+            "decisive_anchors": ["routes/clients.php:199-201", "app/Http/Controllers/MedicationAdministrationCorrectionController.php"]
+          },
+          {
+            "id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+            "class": "H",
+            "module": "eMAR",
+            "user_job": "Report, review, and resolve a medication error",
+            "primary_actor": "Medication error lifecycle owner",
+            "decisive_anchors": ["resources/js/pages/emar/MedicationErrors.tsx", "resources/js/pages/emar/_error-dialogs.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-INC-SAFEGUARDING-INTAKE-TRIAGE-SENSITIVITY",
+        "current_class": "H",
+        "source_user_job": "Intake and triage a sensitivity-scoped safeguarding concern",
+        "source_primary_actor": "Safeguarding intake owner",
+        "final_features": [
+          {
+            "id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Raise, assign, and triage a safeguarding concern",
+            "primary_actor": "SafeguardingConcernController",
+            "decisive_anchors": ["routes/safeguarding.php:19-52", "resources/js/pages/safeguarding/index.tsx"]
+          },
+          {
+            "id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Restrict and govern concern declassification",
+            "primary_actor": "SafeguardingSensitivityService",
+            "decisive_anchors": ["routes/safeguarding.php:55-64", "app/Services/Safeguarding/SafeguardingSensitivityService.php:35-287"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+        "current_class": "H",
+        "source_user_job": "Investigate and complete a safeguarding terminal transition",
+        "source_primary_actor": "SafeguardingTerminalTransitionService",
+        "final_features": [
+          {
+            "id": "CAP-SAFE-INVESTIGATION",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Open and update a safeguarding investigation",
+            "primary_actor": "SafeguardingInvestigationController",
+            "decisive_anchors": ["routes/safeguarding.php:66-73", "app/Http/Controllers/SafeguardingInvestigationController.php"]
+          },
+          {
+            "id": "CAP-SAFE-RISK-ASSESSMENT",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Record safeguarding risk",
+            "primary_actor": "SafeguardingRiskAssessmentController",
+            "decisive_anchors": ["routes/safeguarding.php:84-86", "app/Http/Controllers/SafeguardingRiskAssessmentController.php"]
+          },
+          {
+            "id": "CAP-SAFE-TERMINAL-PROJECTION",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Complete the linked safeguarding terminal transition",
+            "primary_actor": "SafeguardingTerminalTransitionService",
+            "decisive_anchors": ["app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:45-225"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-INC-EVIDENCE-DOWNLOADS",
+        "current_class": "D",
+        "source_user_job": "Download authorised incident or safeguarding evidence",
+        "source_primary_actor": "Evidence download controllers",
+        "final_features": [
+          {
+            "id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+            "class": "D",
+            "module": "Incidents",
+            "user_job": "Download authorised incident evidence",
+            "primary_actor": "Incident evidence download owner",
+            "decisive_anchors": ["routes/incidents.php:16-139", "resources/js/pages/incidents/show.tsx"]
+          },
+          {
+            "id": "CAP-SAFE-EVIDENCE-DOWNLOAD",
+            "class": "D",
+            "module": "Safeguarding",
+            "user_job": "Download need-to-know safeguarding evidence",
+            "primary_actor": "SafeguardingAttachmentController",
+            "decisive_anchors": ["routes/safeguarding.php:88-96", "app/Http/Controllers/SafeguardingAttachmentController.php:21-75"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+        "current_class": "D",
+        "source_user_job": "Export authorised incident and safeguarding audit evidence",
+        "source_primary_actor": "Incident reporting owners",
+        "final_features": [
+          {
+            "id": "CAP-INC-INCIDENT-REPORT-AUDIT-EXPORT",
+            "class": "D",
+            "module": "Incidents",
+            "user_job": "Export authorised incident audit evidence",
+            "primary_actor": "Incident reporting owner",
+            "decisive_anchors": ["routes/incidents.php:16-139", "app/Http/Controllers/IncidentController.php:1475-1790"]
+          },
+          {
+            "id": "CAP-SAFE-REPORT-AUDIT-EXPORT",
+            "class": "D",
+            "module": "Safeguarding",
+            "user_job": "Export sensitivity-governed safeguarding audit evidence",
+            "primary_actor": "EVIDENCE_GAP_NO_DEDICATED_CURRENT_OWNER",
+            "decisive_anchors": ["EVIDENCE_GAP:no dedicated route/page established"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-OPS-HANDOVER-SHIFT-NOTES",
+        "current_class": "H",
+        "source_user_job": "Record handover and shift notes",
+        "source_primary_actor": "ShiftHandoverService and shift-note owner",
+        "final_features": [
+          {
+            "id": "CAP-OPS-SHIFT-HANDOVER",
+            "class": "H",
+            "module": "Operations",
+            "user_job": "Prepare and accept shift handover",
+            "primary_actor": "ShiftHandoverService",
+            "decisive_anchors": ["resources/js/pages/operations/handovers/Index.tsx", "app/Services/ShiftHandoverService.php"]
+          },
+          {
+            "id": "CAP-OPS-SHIFT-NOTES",
+            "class": "H",
+            "module": "Operations",
+            "user_job": "Record and review shift notes",
+            "primary_actor": "Shift-note owner",
+            "decisive_anchors": ["resources/js/pages/operations/shift-notes/Index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-HS-EVENT-REGISTER-HANDOVER",
+        "current_class": "H",
+        "source_user_job": "Find safety events and accept incident handover",
+        "source_primary_actor": "HsEventController and HsEventService",
+        "final_features": [
+          {
+            "id": "CAP-HS-EVENT-REGISTER",
+            "class": "H",
+            "module": "Health & Safety",
+            "user_job": "Find and review safety events",
+            "primary_actor": "HsEventController",
+            "decisive_anchors": ["routes/health-safety.php:44-48", "resources/js/pages/health-safety/events/index.tsx"]
+          },
+          {
+            "id": "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+            "class": "H",
+            "module": "Health & Safety",
+            "user_job": "Accept an incident into canonical H&S ownership",
+            "primary_actor": "HsEventController and HsEventService",
+            "decisive_anchors": ["routes/health-safety.php:66", "app/Services/HealthSafety/HsEventService.php:269-322"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-SAFE-INVESTIGATION-RISK",
+        "current_class": "H",
+        "source_user_job": "Open investigations and record safeguarding risk",
+        "source_primary_actor": "Safeguarding investigation and risk controllers",
+        "final_features": [
+          {
+            "id": "CAP-SAFE-INVESTIGATION",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Open and update a safeguarding investigation",
+            "primary_actor": "SafeguardingInvestigationController",
+            "decisive_anchors": ["routes/safeguarding.php:66-73", "app/Http/Controllers/SafeguardingInvestigationController.php"]
+          },
+          {
+            "id": "CAP-SAFE-RISK-ASSESSMENT",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Record safeguarding risk",
+            "primary_actor": "SafeguardingRiskAssessmentController",
+            "decisive_anchors": ["routes/safeguarding.php:84-86", "app/Http/Controllers/SafeguardingRiskAssessmentController.php"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-SAFE-EVIDENCE-ACTION-PLAN",
+        "current_class": "H",
+        "source_user_job": "Manage need-to-know evidence and protective action plans",
+        "source_primary_actor": "Safeguarding attachment and action-plan controllers",
+        "final_features": [
+          {
+            "id": "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Add and remove need-to-know safeguarding evidence",
+            "primary_actor": "SafeguardingAttachmentController",
+            "decisive_anchors": ["routes/safeguarding.php:88-96", "app/Http/Controllers/SafeguardingAttachmentController.php"]
+          },
+          {
+            "id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+            "class": "H",
+            "module": "Safeguarding",
+            "user_job": "Create, update, and complete a protective action plan",
+            "primary_actor": "SafeguardingActionPlanController",
+            "decisive_anchors": ["routes/safeguarding.php:98-106", "app/Http/Controllers/SafeguardingActionPlanController.php"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-FLEET-ASSET-VEHICLE-REGISTER",
+        "current_class": "H",
+        "source_user_job": "Maintain asset and vehicle registers with custody provenance",
+        "source_primary_actor": "Asset and Vehicle controllers with AssetMutationIntegrityService",
+        "final_features": [
+          {
+            "id": "CAP-FLEET-ASSET-REGISTER",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Maintain assets with custody provenance",
+            "primary_actor": "AssetController and AssetMutationIntegrityService",
+            "decisive_anchors": ["routes/fleet-assets.php:71-80", "resources/js/pages/fleet-assets/assets/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-VEHICLE-REGISTER",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Maintain vehicles and vehicle-specific state",
+            "primary_actor": "VehicleController",
+            "decisive_anchors": ["routes/fleet-assets.php:51-66", "resources/js/pages/fleet-assets/vehicles/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-FLEET-MAINTENANCE-COMPLIANCE",
+        "current_class": "H",
+        "source_user_job": "Run checks, inspections, maintenance, and work orders",
+        "source_primary_actor": "WorkOrderController and fleet maintenance owners",
+        "final_features": [
+          {
+            "id": "CAP-FLEET-DAILY-CHECK-INSPECTION",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Record vehicle checks and inspections",
+            "primary_actor": "Fleet inspection owners",
+            "decisive_anchors": ["resources/js/pages/fleet-assets/daily-check.tsx", "resources/js/pages/fleet-assets/inspections/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-MAINTENANCE-SCHEDULE",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Plan fleet maintenance schedules",
+            "primary_actor": "Fleet maintenance schedule owner",
+            "decisive_anchors": ["resources/js/pages/fleet-assets/maintenance/schedules/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Create and progress a maintenance work order",
+            "primary_actor": "WorkOrderController",
+            "decisive_anchors": ["routes/fleet-assets.php:163-183", "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-FLEET-KEY-HANDOVER",
+        "current_class": "H",
+        "source_user_job": "Transfer keys and create, accept, or dispute handover",
+        "source_primary_actor": "KeyController and HandoverController",
+        "final_features": [
+          {
+            "id": "CAP-FLEET-KEY-CUSTODY",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Check out, return, and transfer fleet keys",
+            "primary_actor": "KeyController",
+            "decisive_anchors": ["routes/fleet-assets.php:197-204", "resources/js/pages/fleet-assets/keys/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Create, accept, or dispute a fleet handover",
+            "primary_actor": "HandoverController",
+            "decisive_anchors": ["routes/fleet-assets.php:254-270", "resources/js/pages/fleet-assets/handovers/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-FLEET-TRACKING-GEOFENCE-REALTIME",
+        "current_class": "H",
+        "source_user_job": "View consented resident tracking, geofences, and panic state",
+        "source_primary_actor": "ResidentTrackingController and realtime authorization owners",
+        "final_features": [
+          {
+            "id": "CAP-FLEET-RESIDENT-TRACKING",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "View consented resident location and history",
+            "primary_actor": "ResidentTrackingController",
+            "decisive_anchors": ["routes/fleet-assets.php:212-223", "resources/js/pages/fleet-assets/resident-tracking/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-GEOFENCE-MANAGEMENT",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Create and maintain approved geofences",
+            "primary_actor": "Fleet geofence owner",
+            "decisive_anchors": ["resources/js/pages/fleet-assets/geofences/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-PANIC-REALTIME-RESPONSE",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Locate a resident and acknowledge authorised panic state",
+            "primary_actor": "ResidentTrackingController",
+            "decisive_anchors": ["routes/fleet-assets.php:217", "routes/fleet-assets.php:224", "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:575-986"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-FLEET-INCIDENT-OUTING-MILEAGE",
+        "current_class": "H",
+        "source_user_job": "Record fleet incidents, outings, return, and mileage outcomes",
+        "source_primary_actor": "Fleet incident, outing, and mileage controllers",
+        "final_features": [
+          {
+            "id": "CAP-FLEET-INCIDENT-RECORD",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Record a fleet incident",
+            "primary_actor": "Fleet incident controller",
+            "decisive_anchors": ["routes/fleet-assets.php:274-302", "resources/js/pages/fleet-assets/incidents/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-OUTING-LIFECYCLE",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Create, start, complete, or cancel an outing",
+            "primary_actor": "OutingController",
+            "decisive_anchors": ["routes/fleet-assets.php:303-315", "resources/js/pages/fleet-assets/outings/index.tsx"]
+          },
+          {
+            "id": "CAP-FLEET-MILEAGE-RECORD",
+            "class": "H",
+            "module": "Fleet & Assets",
+            "user_job": "Record and approve fleet mileage",
+            "primary_actor": "MileageController",
+            "decisive_anchors": ["routes/fleet-assets.php:320-330", "resources/js/pages/fleet-assets/mileage/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+        "current_class": "H",
+        "source_user_job": "Work follow-ups, alert tasks, escalations, and H&S transfer",
+        "source_primary_actor": "Control Room task and escalation owners",
+        "final_features": [
+          {
+            "id": "CAP-CR-ALERT-TASK-QUEUE",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Work owned alert follow-ups and tasks",
+            "primary_actor": "Control Room task owner",
+            "decisive_anchors": ["routes/control-room.php:143-180", "resources/js/pages/control-room/my-tasks.tsx"]
+          },
+          {
+            "id": "CAP-CR-ESCALATION-LIFECYCLE",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Triage and progress Control Room escalations",
+            "primary_actor": "Control Room escalation owner",
+            "decisive_anchors": ["routes/control-room.php:143-180", "resources/js/pages/control-room/escalations.tsx"]
+          },
+          {
+            "id": "CAP-CR-HS-TRANSFER",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Transfer an alert into canonical H&S ownership",
+            "primary_actor": "Control Room H&S transfer owner",
+            "decisive_anchors": ["routes/control-room.php:143-180", "tests/Feature/ControlRoom/ControlRoomNestedRecordAuthorizationTest.php:63-216"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CR-COMMUNICATION-COLLABORATION",
+        "current_class": "H",
+        "source_user_job": "Broadcast, message, discuss, watch, and record time",
+        "source_primary_actor": "ControlRoomMessagingController and collaboration owners",
+        "final_features": [
+          {
+            "id": "CAP-CR-BROADCAST",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Publish an authorised Control Room broadcast",
+            "primary_actor": "ControlRoomMessagingController",
+            "decisive_anchors": ["resources/js/pages/control-room/broadcast.tsx", "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:24-304"]
+          },
+          {
+            "id": "CAP-CR-MESSAGING-DISCUSSION",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Exchange scoped Control Room messages and discussion",
+            "primary_actor": "ControlRoomMessagingController",
+            "decisive_anchors": ["resources/js/pages/control-room/messaging.tsx", "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:24-304"]
+          },
+          {
+            "id": "CAP-CR-ALERT-WATCH",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Watch or unwatch an authorised alert",
+            "primary_actor": "Control Room alert collaboration owner",
+            "decisive_anchors": ["routes/control-room.php", "resources/js/pages/control-room/show.tsx"]
+          },
+          {
+            "id": "CAP-CR-TIME-RECORDING",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Record time against authorised Control Room work",
+            "primary_actor": "Control Room time-recording owner",
+            "decisive_anchors": ["routes/control-room.php", "resources/js/pages/control-room/show.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CR-EVIDENCE-REPORT-SLA",
+        "current_class": "D",
+        "source_user_job": "Build evidence packs and export scoped SLA reports",
+        "source_primary_actor": "ControlRoomEvidenceController and ControlRoomReportService",
+        "final_features": [
+          {
+            "id": "CAP-CR-EVIDENCE-PACK",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Assemble governed Control Room alert evidence",
+            "primary_actor": "ControlRoomEvidenceController",
+            "decisive_anchors": ["routes/control-room.php", "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php"]
+          },
+          {
+            "id": "CAP-CR-SLA-REPORTING-EXPORT",
+            "class": "D",
+            "module": "Control Room",
+            "user_job": "Review and export Site-scoped SLA reports",
+            "primary_actor": "ControlRoomReportService",
+            "decisive_anchors": ["app/Services/ControlRoom/ControlRoomReportService.php:38-641", "resources/js/pages/control-room/reports.tsx", "resources/js/pages/control-room/sla/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-CR-DEVICE-MAP-PLAYBOOK-SETTINGS",
+        "current_class": "H",
+        "source_user_job": "Use live maps and manage playbooks, signals, queues, and recovery",
+        "source_primary_actor": "Device visibility, playbook, and settings owners",
+        "final_features": [
+          {
+            "id": "CAP-CR-DEVICE-MAP",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "View authorised devices and the live Control Room map",
+            "primary_actor": "Control Room device visibility owner",
+            "decisive_anchors": ["routes/control-room.php:329-408", "resources/js/pages/control-room/map.tsx", "resources/js/pages/control-room/devices/index.tsx"]
+          },
+          {
+            "id": "CAP-CR-PLAYBOOK-LIFECYCLE",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Create and use Control Room response playbooks",
+            "primary_actor": "Control Room playbook owner",
+            "decisive_anchors": ["routes/control-room.php:329-408", "resources/js/pages/control-room/playbooks/index.tsx"]
+          },
+          {
+            "id": "CAP-CR-SIGNAL-QUEUE-CONFIGURATION",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Configure signal handling and queues",
+            "primary_actor": "Control Room settings owner",
+            "decisive_anchors": ["routes/control-room.php:329-408", "resources/js/pages/control-room/settings.tsx"]
+          },
+          {
+            "id": "CAP-CR-RECOVERY-SETTINGS",
+            "class": "H",
+            "module": "Control Room",
+            "user_job": "Govern Control Room recovery settings",
+            "primary_actor": "Control Room settings owner",
+            "decisive_anchors": ["routes/control-room.php:329-408", "resources/js/pages/control-room/settings.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-SITE-MEAL-PLANNER-RECIPE-INVENTORY",
+        "current_class": "H",
+        "source_user_job": "Plan meals and govern recipes, restrictions, inventory, and shopping",
+        "source_primary_actor": "Site meal-planning and Catering domain owners",
+        "final_features": [
+          {
+            "id": "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+            "class": "H",
+            "module": "Catering",
+            "user_job": "Plan meals for an approved Site",
+            "primary_actor": "Site meal-plan owner",
+            "decisive_anchors": ["routes/catering.php:20-27", "routes/sites.php:295-421", "resources/js/pages/catering/meal-planner.tsx"]
+          },
+          {
+            "id": "CAP-CATER-RECIPE-LIBRARY",
+            "class": "H",
+            "module": "Catering",
+            "user_job": "Maintain the catering recipe library",
+            "primary_actor": "RecipeController",
+            "decisive_anchors": ["routes/catering.php:29-46", "resources/js/pages/catering/recipes/index.tsx"]
+          },
+          {
+            "id": "CAP-CATER-PRODUCT-INVENTORY",
+            "class": "H",
+            "module": "Catering",
+            "user_job": "Maintain catering products and stock",
+            "primary_actor": "ProductController",
+            "decisive_anchors": ["routes/catering.php:49-59", "resources/js/pages/catering/products/index.tsx"]
+          },
+          {
+            "id": "CAP-CATER-DIETARY-TAG-LIBRARY",
+            "class": "H",
+            "module": "Catering",
+            "user_job": "Maintain dietary restriction tags",
+            "primary_actor": "DietaryTagController",
+            "decisive_anchors": ["routes/catering.php:62-72", "resources/js/pages/catering/tags/index.tsx"]
+          },
+          {
+            "id": "CAP-CATER-SITE-SHOPPING-LIST",
+            "class": "H",
+            "module": "Catering",
+            "user_job": "Prepare the Site shopping list from the meal plan",
+            "primary_actor": "Site meal-planning owner",
+            "decisive_anchors": ["routes/sites.php:295-421", "resources/js/pages/sites/meal-planner/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-PORT-CLIENT-FAMILY-WORKSPACE",
+        "current_class": "H",
+        "source_user_job": "Use the authorised client or family dashboard, timeline, calendar, documents, photos, health, and location",
+        "source_primary_actor": "PortalClientController and FamilyDashboardController read projections",
+        "final_features": [
+          {
+            "id": "CAP-PORT-CLIENT-WORKSPACE",
+            "class": "H",
+            "module": "Portal",
+            "user_job": "Use the canonically linked client portal workspace",
+            "primary_actor": "PortalClientController",
+            "decisive_anchors": ["routes/portal.php:49-180", "resources/js/pages/portal/client.tsx"]
+          },
+          {
+            "id": "CAP-PORT-FAMILY-WORKSPACE",
+            "class": "H",
+            "module": "Portal",
+            "user_job": "Use the canonically linked family dashboard and read lenses",
+            "primary_actor": "FamilyDashboardController",
+            "decisive_anchors": ["routes/portal.php:232-302", "resources/js/pages/portal/family-dashboard.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-PORT-FAMILY-MESSAGING-NOTES",
+        "current_class": "H",
+        "source_user_job": "Exchange authorised portal messages and family notes",
+        "source_primary_actor": "PortalMessageController and PortalFamilyNoteController",
+        "final_features": [
+          {
+            "id": "CAP-PORT-FAMILY-MESSAGING",
+            "class": "H",
+            "module": "Portal",
+            "user_job": "Exchange messages within an authorised client relationship",
+            "primary_actor": "PortalMessageController",
+            "decisive_anchors": ["app/Http/Controllers/Portal/PortalMessageController.php", "resources/js/pages/portal/messages.tsx"]
+          },
+          {
+            "id": "CAP-PORT-FAMILY-NOTES",
+            "class": "H",
+            "module": "Portal",
+            "user_job": "Record and review authorised family notes",
+            "primary_actor": "PortalFamilyNoteController",
+            "decisive_anchors": ["app/Http/Controllers/Portal/PortalFamilyNoteController.php", "resources/js/pages/portal/family-notes.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-RESP-REFERRAL-REQUEST-BOOKING",
+        "current_class": "H",
+        "source_user_job": "Intake, review, approve, and book respite",
+        "source_primary_actor": "Respite referral, request, and booking controllers",
+        "final_features": [
+          {
+            "id": "CAP-RESP-REFERRAL-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Create and maintain a respite referral",
+            "primary_actor": "RespiteReferralController",
+            "decisive_anchors": ["routes/respite.php:35-44", "resources/js/pages/respite/referrals/show.tsx"]
+          },
+          {
+            "id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Create, review, approve, and promote a respite request",
+            "primary_actor": "RespiteBookingRequestController",
+            "decisive_anchors": ["routes/respite.php:47-63", "resources/js/pages/respite/requests/show.tsx"]
+          },
+          {
+            "id": "CAP-RESP-BOOKING-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Create, confirm, and maintain a respite booking",
+            "primary_actor": "RespiteBookingController",
+            "decisive_anchors": ["routes/respite.php:66-77", "resources/js/pages/respite/bookings/show.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-RESP-STAY-CARE-DISCHARGE",
+        "current_class": "H",
+        "source_user_job": "Check in, document daily care and risk, extend, and discharge a respite stay",
+        "source_primary_actor": "Respite stay, daily-note, and risk-plan owners",
+        "final_features": [
+          {
+            "id": "CAP-RESP-STAY-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Check in, extend, hold, and discharge a respite stay",
+            "primary_actor": "RespiteStayController",
+            "decisive_anchors": ["routes/respite.php:80-93", "resources/js/pages/respite/stays/show.tsx"]
+          },
+          {
+            "id": "CAP-RESP-DAILY-CARE-NOTES",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Record and review respite daily care notes",
+            "primary_actor": "RespiteDailyNoteController",
+            "decisive_anchors": ["routes/respite.php:197-207", "resources/js/pages/respite/daily-notes/index.tsx"]
+          },
+          {
+            "id": "CAP-RESP-RISK-PLAN-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Create, activate, review, suspend, and acknowledge a respite risk plan",
+            "primary_actor": "RespiteRiskPlanActivationController",
+            "decisive_anchors": ["routes/respite.php:211-226", "resources/js/pages/respite/risk-plan-activations/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-RESP-PROCEDURE-TASK-HANDOVER",
+        "current_class": "H",
+        "source_user_job": "Run respite procedures, tasks, communications, and handovers",
+        "source_primary_actor": "Respite procedure, task, communication, and handover controllers",
+        "final_features": [
+          {
+            "id": "CAP-RESP-PROCEDURE-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Define and run respite procedures",
+            "primary_actor": "RespiteProcedureTemplateController and RespiteProcedureRunController",
+            "decisive_anchors": ["routes/respite.php:107-127", "resources/js/pages/respite/procedure-runs/index.tsx"]
+          },
+          {
+            "id": "CAP-RESP-TASK-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Assign, perform, approve, or reject respite tasks",
+            "primary_actor": "RespiteTaskController",
+            "decisive_anchors": ["routes/respite.php:131-148", "resources/js/pages/respite/tasks/index.tsx"]
+          },
+          {
+            "id": "CAP-RESP-COMMUNICATION-LOG",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Record governed respite stay communications",
+            "primary_actor": "RespiteCommunicationLogController",
+            "decisive_anchors": ["routes/respite.php:166-175", "resources/js/pages/respite/communication-logs/index.tsx"]
+          },
+          {
+            "id": "CAP-RESP-HANDOVER-NOTES",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Create and acknowledge respite handover notes",
+            "primary_actor": "RespiteHandoverNoteController",
+            "decisive_anchors": ["routes/respite.php:152-162", "resources/js/pages/respite/handover-notes/index.tsx"]
+          }
+        ]
+      },
+      {
+        "source_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+        "current_class": "D",
+        "source_user_job": "Assemble, seal, and export governed respite evidence",
+        "source_primary_actor": "RespiteEvidencePackController",
+        "final_features": [
+          {
+            "id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+            "class": "H",
+            "module": "Respite",
+            "user_job": "Assemble, update, and seal a governed respite evidence pack",
+            "primary_actor": "RespiteEvidencePackController",
+            "decisive_anchors": ["routes/respite.php:179-193", "resources/js/pages/respite/evidence-packs/show.tsx"]
+          },
+          {
+            "id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+            "class": "D",
+            "module": "Respite",
+            "user_job": "Export a sealed governed respite evidence pack",
+            "primary_actor": "RespiteEvidencePackController",
+            "decisive_anchors": ["routes/respite.php:183", "app/Http/Controllers/Respite/RespiteEvidencePackController.php"]
+          }
+        ]
+      }
+    ]
+  },
+  "operation_surface_rule": {
+    "read": "Read/list/detail/dashboard operations remain separate from mutation authority.",
+    "mutation": "Create/update/assign/approve/acknowledge operations require their exact action capability.",
+    "export": "Download/report/export operations retain separate derived-feature identities where disclosure differs.",
+    "external": "WorkSafe, pharmacy, portal, and other external-facing operations retain explicit authority and privacy boundaries.",
+    "terminal": "Close, discharge, seal, complete, dispose, and other terminal transitions remain bound to canonical records and independent prerequisites."
+  },
+  "site_role_privacy_rule": "Single tenant, multiple Sites: require the exact action capability, approved-Site scope, canonical record ownership, concealed foreign direct IDs, and applicable privacy or sensitivity rules. Global Site visibility broadens scope only and never replaces action authority.",
+  "counts": {
+    "assigned_modules": 15,
+    "input_candidates": 95,
+    "keep_h": 46,
+    "keep_d": 7,
+    "keep_m": 1,
+    "reclassify": 8,
+    "merge": 1,
+    "split_required": 32,
+    "decision_partition_total": 95,
+    "proposed_unique_final_features": 143,
+    "proposed_class_counts": {
+      "H": 129,
+      "D": 13,
+      "M": 1
+    },
+    "changed_unique_proposed_ids": 92,
+    "changed_ids_overlapping_kept_ids": 3,
+    "static_final_id_supportable_unchanged_rows": 53
+  },
+  "hashes": {
+    "ordered_candidate_ids_sha256": "af4cad5aa34302a75d264a90ef34edc057120a5f9684dc78169177c5b7dcafee",
+    "normalized_decisions_sha256": "eab6233065ba54b56f49e65ebfb1be14518ec2bc99febcfceae7d12087a165a9",
+    "normalized_decisions_rule": "candidate_id|current_class|decision|comma_ordered_canonical_ids joined with LF as UTF-8, no trailing LF"
+  },
+  "disagreements": [
+    "The 186-row discovery floor is not a final denominator; 32 scoped composites require splitting.",
+    "Care-plan review/sign-off is not an independent capability and merges into the Operations care-plan lifecycle.",
+    "Incident and safeguarding identities must be owned separately because their authority, sensitivity, direct-object concealment, and terminal workflows differ.",
+    "Site, respite, and HR complaint workflows remain owned by their canonical modules rather than a synthetic Complaints module.",
+    "CAP-WHISTLE-PROTECTED-DISCLOSURE remains M because no dedicated current-source owner was established.",
+    "CAP-SAFE-REPORT-AUDIT-EXPORT retains an explicit route/page ownership evidence gap."
+  ],
+  "evidence_count": 95,
+  "evidence_count_basis": "One normalized adjudication record per scoped candidate; unchanged anchors inherit the inputs and decisive changed-row anchors are materialized here.",
+  "completion_test_met": true,
+  "completion_credit": false,
+  "execution_credit": {
+    "runtime": 0,
+    "browser": 0,
+    "tests": 0,
+    "build": 0,
+    "database": 0,
+    "network": 0,
+    "benchmark": 0,
+    "completion": 0
+  },
+  "evidence_limit": "Static source identity only. No runtime, route execution, browser, benchmark, release, usability, production-readiness, or comprehensive-audit credit.",
+  "adjudication_wrote_files": false,
+  "materialization_wrote_files": true
+}
