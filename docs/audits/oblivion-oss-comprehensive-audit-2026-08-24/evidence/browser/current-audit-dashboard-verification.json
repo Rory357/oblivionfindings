@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "status": "PASS_FOR_AUDIT_DASHBOARD_PRESENTATION_ONLY",
+  "verified_at": "2026-08-24T16:17:34+12:00",
+  "dashboard_url": "http://127.0.0.1:8771/audit-dashboard.html?v=c08b216e",
+  "source_application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "audit_integration_input_commit": "c08b216e92f4689e277db4052c138a549bf86e8c",
+  "server": {
+    "bind": "127.0.0.1",
+    "port": 8771,
+    "dashboard_http_status": 200,
+    "semantic_census_http_status": 200
+  },
+  "desktop_check": {
+    "requested_viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "observed_viewport": {
+      "width": 1137,
+      "height": 912
+    },
+    "browser_window_cap_note": "The retained in-app browser capped the requested desktop width; the exact observed viewport is recorded rather than claiming 1440px execution.",
+    "document_client_width": 1122,
+    "document_scroll_width": 1122,
+    "horizontal_document_overflow": false,
+    "title": "Oblivion Findings current-source audit",
+    "heading": "Fresh current-source audit",
+    "status_badge": "IN PROGRESS · NOT COMPREHENSIVE",
+    "progress_cards": 8,
+    "tables": 3,
+    "visual_inspection": "PASS"
+  },
+  "mobile_check": {
+    "requested_viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "observed_viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "document_client_width": 375,
+    "document_scroll_width": 375,
+    "horizontal_document_overflow": false,
+    "progress_cards_per_row": 2,
+    "navigation_behavior": "The sticky section navigation intentionally scrolls inside its own bounded container.",
+    "visual_inspection": "PASS"
+  },
+  "linked_evidence_http_checks": [
+    {
+      "path": "00-executive-summary.md",
+      "status": 200
+    },
+    {
+      "path": "01-repository-module-map.md",
+      "status": 200
+    },
+    {
+      "path": "evidence/source/current-static-semantic-census.json",
+      "status": 200
+    },
+    {
+      "path": "evidence/source/current-feature-discovery-wave-01.json",
+      "status": 200
+    },
+    {
+      "path": "evidence/source/formal-source-wave-01-agent-register.json",
+      "status": 200
+    },
+    {
+      "path": "13-unresolved-questions-and-evidence-gaps.md",
+      "status": 200
+    }
+  ],
+  "browser_console_warnings_or_errors": [],
+  "credit_boundary": "This verifies only the locally generated audit dashboard presentation and its links. It grants no current-application build, route, journey, responsive-family, runtime, test, or production-release credit."
+}

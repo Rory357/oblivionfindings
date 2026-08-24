@@ -42,19 +42,36 @@ These are deterministic path counts, not semantic feature or runtime denominator
 
 The direct old-tree/current-tree change set is 2,372 additions, 2,991 modifications, and 75 deletions. Twenty-three route files and 987 page-tree files differ. Those figures require a fresh route, page, backend, data, test, visual, feature, ownership, and journey census.
 
+## First semantic source wave
+
+Three formal read-only assignments returned and reported no file writes. The orchestrator reconciled their current-source evidence into a partial semantic census and a grouped capability-discovery register:
+
+- 3,217 static route declaration callsites across the 38 route files. This is a source locator, not a framework/provider runtime-route denominator.
+- 963 non-test TSX files in the current Inertia resolver: 711 matched backend render roots, 227 unrendered imported paths, and 25 unrendered/unimported paths. The 25 require manual adjudication before a page denominator can be frozen.
+- 62 grouped capability candidates across Clients, Care & Clinical, eMAR, Incidents & Safeguarding, HR, Workforce, Frontline Workspaces, and Operations: 54 H, eight D, and zero M candidates. This is not the final canonical feature denominator.
+- Three provisional eMAR P1 source claims—`MED-RBAC-01`, `MED-CD-SCOPE-01`, and `MED-CD-ATOMICITY-01`—require independent current-source review and the matching role/Site, runtime, failure, or concurrency gates before they can become final findings.
+
+Static backend, migration, test, and page-visual locators were also reconciled. Their directory, declaration, history, and callsite scopes remain deliberately separate and receive no execution or completion credit.
+
 ## Evidence created in this batch
 
 - `inventory.json`: the full current committed-file census, including Git object IDs, byte sizes, and conservative path categories.
 - `evidence/source/current-source-census.json`: the exact 5,438-path direct-tree reconciliation.
 - `evidence/source/audit-run-manifest.json`: prompt/source pins, writer boundary, and zero-credit execution boundary.
+- `evidence/source/current-static-semantic-census.json`: route, page, backend, async, migration, test, and bounded page-visual source locators with explicit denominator limits.
+- `evidence/source/current-feature-discovery-wave-01.json`: the 62 grouped source-discovery candidates and provisional finding register.
+- `evidence/source/formal-source-wave-01-agent-register.json`: normalized RUN-001 through RUN-003 returns, no-write attestations, and orchestrator reconciliation.
+- `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
+- `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
 - `generators/build-current-source-census.py`: the deterministic static collector. It reads committed Git objects and writes only inside this audit directory.
+- `generators/integrate-source-wave-01.py`: deterministic normalization for the first formal semantic/source wave and dashboard.
 
 The collector was rerun twice with identical output hashes. It did not boot Laravel, access a database, run tests or a build, use a browser, or mutate an external system.
 
 ## Immediate work order
 
-1. Rebuild semantic route/page/backend/data/test denominators from current source.
-2. Re-discover and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
+1. Finish manual page/support adjudication, framework-route evidence, and canonical backend/data/test ownership; the current semantic wave is partial.
+2. Continue module discovery and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, visual states, and all eight pass ledgers.
 4. Revalidate the 97-project benchmark register through separate observer, neutralizer, and native-comparator assignments.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Oblivion Findings current-source audit</title>
+  <style>
+    :root{color-scheme:light;--ink:#172033;--muted:#5f6b7d;--line:#dce2ec;--panel:#fff;--bg:#f4f6fb;--brand:#5b55f6;--warn:#a04800;--warnbg:#fff2db;--ok:#08794f;--shadow:0 8px 24px rgba(27,35,58,.07)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:#413ad8;text-decoration-thickness:1px;text-underline-offset:3px}a:focus-visible{outline:3px solid #8d88ff;outline-offset:3px;border-radius:4px}
+    header{background:linear-gradient(135deg,#1c2140 0%,#3f399f 100%);color:#fff;padding:28px max(20px,calc((100vw - 1180px)/2)) 32px}
+    .eyebrow{font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#cbc9ff}.hero{display:flex;gap:24px;align-items:end;justify-content:space-between}.hero h1{font-size:clamp(1.8rem,4vw,3rem);line-height:1.08;margin:7px 0 8px;max-width:820px}.hero p{margin:0;color:#e5e4ff;max-width:780px}.badge{display:inline-flex;white-space:nowrap;align-items:center;border:1px solid #f2c675;background:#3e2b18;color:#ffe5b5;border-radius:999px;padding:9px 13px;font-weight:800}
+    nav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:4;overflow:auto}nav div{max-width:1180px;margin:auto;display:flex;gap:20px;padding:11px 20px;white-space:nowrap}nav a{color:#39445a;font-weight:700;text-decoration:none}
+    main{max-width:1180px;margin:0 auto;padding:24px 20px 64px}.notice{background:var(--warnbg);border-left:5px solid #e58d22;padding:14px 16px;border-radius:10px;margin-bottom:22px;color:#633000}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card,.panel{background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:14px}.card{padding:17px}.card strong{display:block;font-size:1.65rem;line-height:1.15}.card span{display:block;color:var(--muted);margin-top:5px}.card small{display:block;margin-top:9px;color:#717d90}.panel{min-width:0;padding:20px;margin-top:20px}.panel h2{font-size:1.25rem;margin:0 0 5px}.panel>p{color:var(--muted);margin:0 0 16px}.table-wrap{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;min-width:680px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f7f8fc;color:#414d62;font-size:.82rem}tr:last-child td{border-bottom:0}.zero{color:#a03920;font-weight:800}.partial{color:var(--warn);font-weight:800}.good{color:var(--ok);font-weight:800}.split{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}.split>*{min-width:0}.list{margin:0;padding-left:20px}.list li+li{margin-top:8px}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}.footer{color:var(--muted);font-size:.88rem;margin-top:24px}
+    @media(max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.badge{align-self:flex-start}}
+    @media(max-width:520px){header{padding:22px 16px 26px}main{padding:18px 14px 48px}.cards{grid-template-columns:1fr 1fr;gap:10px}.card{padding:14px}.card strong{font-size:1.35rem}.panel{padding:16px}.badge{white-space:normal}nav div{padding-inline:16px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Oblivion Findings · comprehensive audit restart</div>
+    <div class="hero"><div><h1>Fresh current-source audit</h1><p>Evidence is pinned to application commit <span class="mono">a0493442b9e3</span>. Historical audit percentages are retained only as provenance and are not promoted.</p></div><div class="badge">IN PROGRESS · NOT COMPREHENSIVE</div></div>
+  </header>
+  <nav aria-label="Audit sections"><div><a href="#progress">Progress</a><a href="#pages">Pages</a><a href="#backend">Backend</a><a href="#features">Features</a><a href="#findings">Provisional findings</a><a href="#gaps">Gaps</a></div></nav>
+  <main>
+    <div class="notice" role="status"><strong>No completion claim:</strong> current runtime routes, tests, task/ease scores, benchmark mappings, journeys, responsive families, material states, and all-eight-pass module credit remain at zero or unestablished.</div>
+    <section id="progress" class="cards" aria-label="Current audit progress">
+      <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div>
+      <div class="card"><strong>3,217</strong><span>static route callsites</span><small>not runtime routes</small></div>
+      <div class="card"><strong>963</strong><span>resolver TSX paths</span><small>semantic page denominator open</small></div>
+      <div class="card"><strong>62</strong><span>grouped feature candidates</span><small>54 H · 8 D · 0 M</small></div>
+      <div class="card"><strong>3 / 11</strong><span>formal assignments</span><small>minimum not met</small></div>
+      <div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>not executed</small></div>
+      <div class="card"><strong class="zero">0</strong><span>current-build browser credit</span><small>deployment identity unknown</small></div>
+      <div class="card"><strong class="zero">0</strong><span>all-pass modules</span><small>module denominator still open</small></div>
+    </section>
+
+    <section id="pages" class="panel"><h2>Current Inertia page partition</h2><p>The current resolver has an exact source partition, but the 25 unimported candidates still need manual adjudication.</p><div class="table-wrap"><table><thead><tr><th>Partition</th><th>Count</th><th>Credit</th></tr></thead><tbody><tr><td>Matched backend render roots</td><td>711</td><td class="partial">source locator</td></tr><tr><td>Unrendered but imported</td><td>227</td><td class="partial">requires ownership classification</td></tr><tr><td>Unrendered and unimported</td><td>25</td><td class="partial">manual adjudication required</td></tr><tr><td><strong>Resolver total</strong></td><td><strong>963</strong></td><td class="zero">not a final page denominator</td></tr></tbody></table></div></section>
+
+    <div class="split">
+      <section id="backend" class="panel"><h2>Static backend reconciliation</h2><p>Directory and declaration scopes are kept separate.</p><div class="table-wrap"><table><thead><tr><th>Family</th><th>Current source locator</th></tr></thead><tbody><tr><td>Controller-directory PHP paths</td><td>561</td></tr><tr><td>Controller-suffix named classes</td><td>544</td></tr><tr><td>Eloquent model candidates app-wide</td><td>779</td></tr><tr><td>Policy-directory classes</td><td>75</td></tr><tr><td>Service-directory paths</td><td>725</td></tr><tr><td><span class="mono">app/Domain</span> declarations</td><td>1,384</td></tr><tr><td>Migrations</td><td>978</td></tr><tr><td>Test-tree paths</td><td>1,509</td></tr></tbody></table></div></section>
+      <section id="features" class="panel"><h2>Discovery wave 01</h2><p>Eight module families are partially represented.</p><ul class="list"><li>Clients: 8</li><li>Care &amp; Clinical: 8</li><li>eMAR: 10</li><li>Incidents &amp; Safeguarding: 7</li><li>HR: 9</li><li>Workforce: 8</li><li>Frontline Workspaces: 5</li><li>Operations: 7</li></ul></section>
+    </div>
+
+    <section id="findings" class="panel"><h2>Provisional current-source P1 claims</h2><p>These are not final findings. Each needs independent review and the matching runtime, role/Site, failure, or concurrency gate.</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Source concern</th><th>Status</th></tr></thead><tbody><tr><td class="mono">MED-RBAC-01</td><td>Broad medication-order authority appears to reach controlled operations despite dedicated controlled capabilities.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">MED-CD-SCOPE-01</td><td>Controlled-drug and destruction relationship IDs may not all pass through canonical medication scope decisions before use.</td><td class="partial">independent review pending</td></tr><tr><td class="mono">MED-CD-ATOMICITY-01</td><td>Register, stock, destruction, and relationship checks may not share one owner-first transactional boundary.</td><td class="partial">concurrency review pending</td></tr></tbody></table></div></section>
+
+    <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Current framework/provider runtime routes</li><li>Final page and canonical feature denominators</li><li>Complete backend/data/test ownership</li><li>97-project observer/neutralizer/comparator evidence</li><li>One task script and ten ease dimensions per human feature</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Hero, overlay, trigger, and material-state universes</li><li>Current-build browser and safe runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8 review, freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
+
+    <section class="panel"><h2>Evidence files</h2><ul class="list"><li><a href="00-executive-summary.md">Executive summary</a></li><li><a href="01-repository-module-map.md">Module and capability map</a></li><li><a href="evidence/source/current-static-semantic-census.json">Static semantic census JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-01.json">Feature discovery JSON</a></li><li><a href="evidence/source/formal-source-wave-01-agent-register.json">Formal assignment register JSON</a></li><li><a href="13-unresolved-questions-and-evidence-gaps.md">Unresolved evidence gaps</a></li></ul></section>
+    <p class="footer">Generated deterministically at 2026-08-24T16:08:22+12:00. Audit artifacts only; no application remediation is authorised by this dashboard.</p>
+  </main>
+</body>
+</html>

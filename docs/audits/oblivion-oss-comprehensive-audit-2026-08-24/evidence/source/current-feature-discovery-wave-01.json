@@ -1,0 +1,1435 @@
+{
+  "schema_version": 1,
+  "status": "DISCOVERY_WAVE_PARTIAL_NOT_CANONICAL",
+  "generated_at": "2026-08-24T16:08:22+12:00",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "c08b216e92f4689e277db4052c138a549bf86e8c",
+    "non_audit_product_diff_from_application_commit": 0
+  },
+  "candidate_count": 62,
+  "class_counts": {
+    "D": 8,
+    "H": 54
+  },
+  "module_counts": {
+    "Care & Clinical": 8,
+    "Clients": 8,
+    "Frontline Workspaces": 5,
+    "HR": 9,
+    "Incidents & Safeguarding": 7,
+    "Operations": 7,
+    "Workforce": 8,
+    "eMAR": 10
+  },
+  "machine_capability_candidates": 0,
+  "candidates": [
+    {
+      "ordinal": 1,
+      "candidate_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Create, view, update, and archive an authorised client record",
+      "canonical_owner": "ClientController and client lifecycle services",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 2,
+      "candidate_id": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Manage the authorised client's staff document library",
+      "canonical_owner": "Client document controllers and storage services",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 3,
+      "candidate_id": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Maintain the authorised client's medical profile",
+      "canonical_owner": "Client medical controller and medication scope services",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 4,
+      "candidate_id": "CAP-CLI-CLIENT-SUPPORT-ASSESSMENT-RISK",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Record support assessments and risks",
+      "canonical_owner": "Client assessment and risk owners",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 5,
+      "candidate_id": "CAP-CLI-CLIENT-ASSIGNMENT-NOTES",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Manage client assignments and scoped notes",
+      "canonical_owner": "Client assignment owners",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 6,
+      "candidate_id": "OPS-CLIENT-CONSENT",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Request, decide, validate, and evidence consent",
+      "canonical_owner": "ConsentRequestService and ConsentDecisionEvidenceService",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 7,
+      "candidate_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "module": "Clients",
+      "feature_class": "H",
+      "user_job": "Create, review, sign off, and close a care plan",
+      "canonical_owner": "Operations CarePlanService and attestation owner",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 8,
+      "candidate_id": "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "module": "Clients",
+      "feature_class": "D",
+      "user_job": "Export authorised client document and audit evidence",
+      "canonical_owner": "Client document export owner",
+      "production_anchors": [
+        "routes/clients.php:30-259",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "app/Services/ConsentDecisionEvidenceService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ClientControllerTest.php:1",
+        "tests/Feature/Consents/ConsentRequestIntegrityTest.php:1"
+      ],
+      "site_role_privacy_note": "Single tenant, multiple Sites: client visibility and mutation require action capability, approved-Site scope, canonical client ownership, and concealed foreign direct IDs.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 9,
+      "candidate_id": "CAP-CLIN-MODULE-DASHBOARD",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Review the clinical module dashboard for approved Sites",
+      "canonical_owner": "HealthClinicalDashboardController",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 10,
+      "candidate_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Record and review a clinical observation",
+      "canonical_owner": "ClinicalObservationService",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 11,
+      "candidate_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Record a clinical event",
+      "canonical_owner": "ClinicalEventService",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 12,
+      "candidate_id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Review, escalate, and close a clinical event",
+      "canonical_owner": "Clinical event lifecycle owner",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 13,
+      "candidate_id": "CAP-CLIN-BEHAVIOUR-AND-MONITORING",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Record behaviour and monitoring evidence",
+      "canonical_owner": "Clinical recording services",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 14,
+      "candidate_id": "CAP-CLIN-ASSESSMENT-PROTOCOL-LIFECYCLE",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Create and run an assessment protocol",
+      "canonical_owner": "Clinical protocol services",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 15,
+      "candidate_id": "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+      "module": "Care & Clinical",
+      "feature_class": "H",
+      "user_job": "Review trends and care-summary lenses",
+      "canonical_owner": "Clinical dashboard presenters",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 16,
+      "candidate_id": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "module": "Care & Clinical",
+      "feature_class": "D",
+      "user_job": "Load governed context for a clinical record wizard",
+      "canonical_owner": "Clinical context API controllers",
+      "production_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Domain/Clinical/HealthClinicalSiteAuthorizationTest.php:1",
+        "tests/Feature/Domain/Clinical/ObservationRegisterTest.php:1"
+      ],
+      "site_role_privacy_note": "Clinical write ownership is service-led; dashboard and care lenses do not by themselves prove authority to record, review, schedule, or close clinical evidence.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 17,
+      "candidate_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Review today's authorised medication work",
+      "canonical_owner": "MyDayMedicationsController and medication scope owner",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 18,
+      "candidate_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Record scheduled and PRN dose outcomes",
+      "canonical_owner": "Medication administration lifecycle owner",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 19,
+      "candidate_id": "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Manage medication orders in the eMAR workspace",
+      "canonical_owner": "EmarController and medication order services",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 20,
+      "candidate_id": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Verify a medication order before use",
+      "canonical_owner": "Medication order verification owner",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 21,
+      "candidate_id": "CAP-MED-REVIEW-COMPETENCY-ROUND-SELFADMIN",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Manage reviews, competency, rounds, and self-administration",
+      "canonical_owner": "Medication governance services",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 22,
+      "candidate_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Maintain the controlled-drug register and balance",
+      "canonical_owner": "Controlled-drug register owner",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 23,
+      "candidate_id": "CAP-MED-DESTRUCTION-STOCK-PHARMACY",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Record destruction, stock movement, and pharmacy actions",
+      "canonical_owner": "Medication stock and destruction owners",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 24,
+      "candidate_id": "CAP-MED-HANDOVER-BREAKGLASS-CORRECTION-ERROR",
+      "module": "eMAR",
+      "feature_class": "H",
+      "user_job": "Handle medication handover, emergency access, correction, and error",
+      "canonical_owner": "Medication governance lifecycle owners",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 25,
+      "candidate_id": "CAP-MED-REPORT-PDF-AUDIT-EXPORTS",
+      "module": "eMAR",
+      "feature_class": "D",
+      "user_job": "Generate authorised medication reports and audit exports",
+      "canonical_owner": "Medication reporting owner",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 26,
+      "candidate_id": "CAP-MED-API-CURRENT-SURFACES",
+      "module": "eMAR",
+      "feature_class": "D",
+      "user_job": "Use current governed medication API surfaces",
+      "canonical_owner": "Medication API controllers",
+      "production_anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121",
+        "app/Services/Medication/MedicationScopeDecisionService.php:40-221",
+        "app/Services/Eligibility/Rules/MedicationCompetencyRule.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Emar/MedicationScopeAuthorizationTest.php:1",
+        "tests/Feature/Emar/MedicationCompetencyPolicyTest.php:1",
+        "tests/Feature/Emar/ControlledDrugsTest.php:1"
+      ],
+      "site_role_privacy_note": "Site scope broadening never replaces the medication action or witness capability. Client, order, medication, stock, witness, and Site relationships require canonical validation before side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 27,
+      "candidate_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "H",
+      "user_job": "Author an incident from an authorised template",
+      "canonical_owner": "IncidentController and template owner",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 28,
+      "candidate_id": "CAP-INC-INCIDENT-EVIDENCE-FOLLOWUP",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "H",
+      "user_job": "Add incident evidence and follow-up actions",
+      "canonical_owner": "Incident evidence and journey owners",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 29,
+      "candidate_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "H",
+      "user_job": "Review and close an incident",
+      "canonical_owner": "IncidentController and IncidentJourney",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 30,
+      "candidate_id": "CAP-INC-SAFEGUARDING-INTAKE-TRIAGE-SENSITIVITY",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "H",
+      "user_job": "Intake and triage a sensitivity-scoped safeguarding concern",
+      "canonical_owner": "Safeguarding intake owner",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 31,
+      "candidate_id": "CAP-INC-SAFEGUARDING-INVESTIGATION-TERMINAL",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "H",
+      "user_job": "Investigate and complete a safeguarding terminal transition",
+      "canonical_owner": "SafeguardingTerminalTransitionService",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 32,
+      "candidate_id": "CAP-INC-EVIDENCE-DOWNLOADS",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "D",
+      "user_job": "Download authorised incident or safeguarding evidence",
+      "canonical_owner": "Evidence download controllers",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 33,
+      "candidate_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+      "module": "Incidents & Safeguarding",
+      "feature_class": "D",
+      "user_job": "Export authorised incident and safeguarding audit evidence",
+      "canonical_owner": "Incident reporting owners",
+      "production_anchors": [
+        "routes/incidents.php:16-139",
+        "routes/safeguarding.php:17-106",
+        "app/Http/Controllers/IncidentController.php:1475-1790",
+        "app/Services/Safeguarding/SafeguardingTerminalTransitionService.php:31-272"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/IncidentControllerTest.php:1",
+        "tests/Architecture/IncidentAlertLifecycleOwnershipBoundaryTest.php:1",
+        "tests/Architecture/SafeguardingTerminalTransitionOwnershipTest.php:1"
+      ],
+      "site_role_privacy_note": "Incident and safeguarding evidence is sensitivity-scoped. Terminal transitions and cross-module signals require canonical owners and cannot be inferred from a page or route alone.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 34,
+      "candidate_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Manage an employee profile through its lifecycle",
+      "canonical_owner": "EmployeeProfileController and canonical HR identity owners",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 35,
+      "candidate_id": "CAP-HR-RECRUITMENT-CANDIDATE-HIRE",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Recruit, assess, and hire a candidate",
+      "canonical_owner": "Recruitment and candidate controllers",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 36,
+      "candidate_id": "CAP-HR-ONBOARDING-OFFBOARDING",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Onboard and offboard staff",
+      "canonical_owner": "Onboarding and offboarding controllers",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 37,
+      "candidate_id": "CAP-HR-COMPLIANCE-VETTING-TRAINING",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Manage compliance, vetting, competency, and training",
+      "canonical_owner": "HR compliance and training owners",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 38,
+      "candidate_id": "CAP-HR-LEAVE-TIME-PAYROLL",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Manage leave, time, and payroll preparation",
+      "canonical_owner": "HR leave, time, and payroll owners",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 39,
+      "candidate_id": "CAP-HR-DOCUMENT-POLICY-SIGNATURE",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Publish documents and policies and obtain signatures",
+      "canonical_owner": "HR document, policy, and signature owners",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 40,
+      "candidate_id": "CAP-HR-PERFORMANCE-PEOPLE-CASEWORK",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Manage performance and people casework",
+      "canonical_owner": "HR performance and casework owners",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 41,
+      "candidate_id": "CAP-HR-REPORTING-EXPORT",
+      "module": "HR",
+      "feature_class": "D",
+      "user_job": "Run governed HR reports and exports",
+      "canonical_owner": "HR report and export controllers",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 42,
+      "candidate_id": "CAP-HR-WEBHOOK-DELIVERY",
+      "module": "HR",
+      "feature_class": "H",
+      "user_job": "Configure and deliver governed HR webhooks",
+      "canonical_owner": "HrWebhookService and delivery job",
+      "production_anchors": [
+        "routes/hr.php:1-1420",
+        "app/Http/Controllers/Hr/EmployeeProfileController.php:1",
+        "app/Domain/Hr/Services/AttendanceService.php:1",
+        "app/Domain/Hr/Services/HrWebhookService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Architecture/HrStaffCreationWorkflowBoundaryTest.php:1",
+        "tests/Architecture/HrComplianceExportPermissionBoundaryTest.php:1",
+        "tests/Architecture/HrWebhookEgressBoundaryTest.php:1"
+      ],
+      "site_role_privacy_note": "HR records remain single-application records with Site privacy. Staff creation, disclosure, export, attendance, and webhook egress each retain their own action authority.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 43,
+      "candidate_id": "CAP-OPS-SHIFT-LIFECYCLE",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Create, publish, start, and close a shift",
+      "canonical_owner": "ShiftLifecycleService",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 44,
+      "candidate_id": "CAP-OPS-SHIFT-STAFFING-COVER",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Assign staff and arrange shift cover",
+      "canonical_owner": "Shift staffing and coverage services",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 45,
+      "candidate_id": "CAP-OPS-ROSTER-PLAN-PUBLISH",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Plan, validate, and publish a roster",
+      "canonical_owner": "RosterPublishingService",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 46,
+      "candidate_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Clock attendance and end a governed session",
+      "canonical_owner": "AttendanceService",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 47,
+      "candidate_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Author and submit a timesheet",
+      "canonical_owner": "DraftTimesheetService",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 48,
+      "candidate_id": "CAP-OPS-TIMESHEET-MANAGER-PAYROLL",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Approve, amend, and prepare timesheets for payroll",
+      "canonical_owner": "TimesheetApprovalService and operations reconciliation",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 49,
+      "candidate_id": "CAP-OPS-STAFF-AVAILABILITY-TIME-OFF",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Manage staff availability and time off",
+      "canonical_owner": "Availability and leave owners",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 50,
+      "candidate_id": "CAP-HR-STAFF-ASSIGNMENT-CREDENTIAL",
+      "module": "Workforce",
+      "feature_class": "H",
+      "user_job": "Assign staff using governed credential and eligibility evidence",
+      "canonical_owner": "ShiftStaffEligibilityService and HR assignment owners",
+      "production_anchors": [
+        "routes/shifts.php:1-127",
+        "routes/operations.php:1-1336",
+        "app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php:1",
+        "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/ShiftLifecycleHardeningTest.php:1",
+        "tests/Feature/TimesheetSafetyGuardsTest.php:1",
+        "tests/Unit/Rostering/EligibilityScoringStrategyTest.php:1"
+      ],
+      "site_role_privacy_note": "Shift, attendance, roster, availability, assignment, and timesheet transitions have distinct canonical owners; foreign-Site object IDs must be concealed before workflow side effects.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 51,
+      "candidate_id": "CAP-DAY-MY-DAY-WORKSPACE",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Use the personalised My Day workspace",
+      "canonical_owner": "My Day presenters with canonical action owners",
+      "production_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "resources/js/hooks/use-my-day-labels.ts:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/MyDayActiveSiteTest.php:1",
+        "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:1",
+        "tests/Feature/Tasks/TaskNavigationFailureIsolationTest.php:1"
+      ],
+      "site_role_privacy_note": "Aggregated frontline surfaces are lenses over canonical modules. A task row or dashboard card must not silently become the mutation owner or leak inaccessible linked records.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 52,
+      "candidate_id": "CAP-DAY-MY-ROSTER",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Review the worker's roster",
+      "canonical_owner": "Roster read lens",
+      "production_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "resources/js/hooks/use-my-day-labels.ts:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/MyDayActiveSiteTest.php:1",
+        "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:1",
+        "tests/Feature/Tasks/TaskNavigationFailureIsolationTest.php:1"
+      ],
+      "site_role_privacy_note": "Aggregated frontline surfaces are lenses over canonical modules. A task row or dashboard card must not silently become the mutation owner or leak inaccessible linked records.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 53,
+      "candidate_id": "CAP-DAY-MY-CALENDAR",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Review the worker's calendar",
+      "canonical_owner": "Calendar read lens",
+      "production_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "resources/js/hooks/use-my-day-labels.ts:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/MyDayActiveSiteTest.php:1",
+        "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:1",
+        "tests/Feature/Tasks/TaskNavigationFailureIsolationTest.php:1"
+      ],
+      "site_role_privacy_note": "Aggregated frontline surfaces are lenses over canonical modules. A task row or dashboard card must not silently become the mutation owner or leak inaccessible linked records.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 54,
+      "candidate_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Work authorised tasks across modules",
+      "canonical_owner": "Task providers and canonical linked-record owners",
+      "production_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "resources/js/hooks/use-my-day-labels.ts:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/MyDayActiveSiteTest.php:1",
+        "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:1",
+        "tests/Feature/Tasks/TaskNavigationFailureIsolationTest.php:1"
+      ],
+      "site_role_privacy_note": "Aggregated frontline surfaces are lenses over canonical modules. A task row or dashboard card must not silently become the mutation owner or leak inaccessible linked records.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 55,
+      "candidate_id": "CAP-DAY-TASK-REPORT",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Report task status without leaking linked records",
+      "canonical_owner": "Task reporting owner",
+      "production_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "resources/js/hooks/use-my-day-labels.ts:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/MyDayActiveSiteTest.php:1",
+        "tests/Feature/Tasks/AllTasksPermissionRecoveryTest.php:1",
+        "tests/Feature/Tasks/TaskNavigationFailureIsolationTest.php:1"
+      ],
+      "site_role_privacy_note": "Aggregated frontline surfaces are lenses over canonical modules. A task row or dashboard card must not silently become the mutation owner or leak inaccessible linked records.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 56,
+      "candidate_id": "CAP-OPS-DASHBOARD-ACTIVITY",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Review operations dashboard activity",
+      "canonical_owner": "Operations dashboard presenters",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 57,
+      "candidate_id": "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Review and sign off a care plan",
+      "canonical_owner": "CarePlanService and CarePlanAttestationService",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 58,
+      "candidate_id": "CAP-OPS-CLIENT-ONBOARDING",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Run governed client onboarding",
+      "canonical_owner": "Client onboarding owner",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 59,
+      "candidate_id": "CAP-OPS-HANDOVER-SHIFT-NOTES",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Record handover and shift notes",
+      "canonical_owner": "ShiftHandoverService and shift-note owner",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 60,
+      "candidate_id": "CAP-OPS-FUNDING-CLAIMS",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Prepare and manage governed funding claims",
+      "canonical_owner": "Operations funding owner",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 61,
+      "candidate_id": "CAP-OPS-REPORTING-EXPORT",
+      "module": "Operations",
+      "feature_class": "D",
+      "user_job": "Run governed operations reports and exports",
+      "canonical_owner": "Operations reporting owners",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    },
+    {
+      "ordinal": 62,
+      "candidate_id": "CAP-OPS-CALENDAR-SYNC",
+      "module": "Operations",
+      "feature_class": "H",
+      "user_job": "Synchronise authorised operational calendar obligations",
+      "canonical_owner": "Calendar sync owner",
+      "production_anchors": [
+        "routes/operations.php:1-1336",
+        "app/Services/Operations/CarePlanService.php:1",
+        "app/Services/Operations/TimesheetReconciliationService.php:1",
+        "app/Services/ShiftHandoverService.php:1"
+      ],
+      "representative_test_anchors": [
+        "tests/Unit/Operations/ClientSafetyPayloadTest.php:1",
+        "tests/Unit/Operations/TimesheetReconciliationServiceTest.php:1",
+        "tests/Unit/Services/ShiftHandoverServiceTest.php:1"
+      ],
+      "site_role_privacy_note": "Operations dashboards and reports remain read lenses. Care plans, client onboarding, handovers, claims, and calendar sync retain separate permissions, Site scope, and canonical owners.",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Static source locators only; no route execution, test result, browser result, benchmark match, ease score, or production-readiness credit."
+    }
+  ],
+  "historical_crosswalk": {
+    "source_contracts_present_runtime_closure_not_promoted": [
+      "CONSENT-AUTH-01",
+      "CONSENT-CAPACITY-01",
+      "CARE-SIGNOFF-01",
+      "CLIN-SCHEDULE-01",
+      "MED-SCOPE-01",
+      "MED-COMP-01",
+      "MED-VERIFY-01",
+      "INCIDENT-ALERT-LIFECYCLE-01",
+      "SAFE-NESTED-01",
+      "SAFE-TERMINAL-SYNC-01",
+      "HR-STAFF-CREATION-PATH-01",
+      "TASK-RBAC-001"
+    ],
+    "still_source_supported": [
+      "MED-RBAC-01"
+    ],
+    "credit_rule": "A current source contract or historical crosswalk does not establish runtime closure, current benchmark credit, or all-pass completion."
+  },
+  "provisional_findings": [
+    {
+      "finding_id": "MED-RBAC-01",
+      "provisional_severity": "P1",
+      "source_claim": "Broad medications.orders.manage routing appears to reach controlled-drug, destruction, and stock operations even though dedicated controlled capabilities exist; cited controller methods do not visibly enforce the exact controlled action capability.",
+      "anchors": [
+        "routes/emar.php:30-395",
+        "app/Http/Controllers/Emar/EmarController.php:4023-4121"
+      ],
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_REVIEW_AND_RUNTIME_GATE"
+    },
+    {
+      "finding_id": "MED-CD-SCOPE-01",
+      "provisional_severity": "P1",
+      "source_claim": "Controlled-drug and destruction paths appear to accept independently supplied client, medication, Site, or witness identifiers without consistently routing every relationship through the canonical medication scope decision service before disclosure or mutation.",
+      "anchors": [
+        "app/Http/Controllers/Emar/EmarController.php:4732-4826",
+        "app/Services/Medication/MedicationScopeDecisionService.php:374-547"
+      ],
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_REVIEW_AND_RUNTIME_GATE"
+    },
+    {
+      "finding_id": "MED-CD-ATOMICITY-01",
+      "provisional_severity": "P1",
+      "source_claim": "Controlled-drug entry and stock update appear not to share one encompassing transaction with owner-first locking; destruction relationship checks appear later than the first mutation boundary.",
+      "anchors": [
+        "app/Http/Controllers/Emar/EmarController.php:4986-5314"
+      ],
+      "status": "PROVISIONAL_REQUIRES_INDEPENDENT_CURRENT_SOURCE_REVIEW_AND_CONCURRENCY_GATE"
+    }
+  ],
+  "completion_credit": false,
+  "limits": [
+    "This is a grouped discovery wave, not the final feature denominator.",
+    "No candidate has benchmark, ease, journey, browser, runtime, test, all-pass, or production-readiness credit.",
+    "Historical finding crosswalks are locators; source contracts and test files were not executed.",
+    "The three provisional eMAR P1 candidates are not final findings until independently re-reviewed and reconciled."
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "status": "FORMAL_SOURCE_WAVE_01_RECONCILED_AUDIT_INCOMPLETE",
+  "generated_at": "2026-08-24T16:08:22+12:00",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "writer_boundary": "Only the root orchestrator wrote audit artifacts; RUN-001 through RUN-003 returned evidence in messages and reported wrote_files=false.",
+  "formal_assignments_eligible": 3,
+  "literal_final_minimum": 11,
+  "minimum_met": false,
+  "all_returned": true,
+  "all_completion_tests_met": true,
+  "all_reported_no_writes": true,
+  "assignment_returns": [
+    {
+      "assignment_id": "RUN-001",
+      "scope": "Current semantic route, page, backend, data, test, and bounded visual source census",
+      "candidate_count": null,
+      "evidence_count": 43,
+      "completion_test_met": true,
+      "wrote_files": false,
+      "runtime_gates": null,
+      "return_status": "RECONCILED",
+      "root_reconciliation": "Static callsites are not runtime route counts; page partitions are orthogonal; root app scopes and app/Domain scopes must not be summed or substituted.",
+      "normalized_payload_sha256": "0d6514ee6c7b5f95c4a9d58d368b5c7a0b97ab01f4431280ddea776226ea0c3a"
+    },
+    {
+      "assignment_id": "RUN-002",
+      "scope": "Clients, care and clinical, eMAR, incidents, and safeguarding grouped capability discovery",
+      "candidate_count": 33,
+      "class_counts": {
+        "H": 27,
+        "D": 6,
+        "M": 0
+      },
+      "evidence_count": 99,
+      "completion_test_met": true,
+      "wrote_files": false,
+      "runtime_gates": null,
+      "return_status": "RECONCILED_WITH_PROVISIONAL_FINDINGS",
+      "root_reconciliation": "Grouped candidates are not the canonical feature denominator; source-remediation crosswalks carry no runtime closure; three eMAR P1 claims remain provisional.",
+      "normalized_payload_sha256": "40984c6e59e85441e22542c5ce148c4c17ffb98b9ad28b28d96f6e959e90efd4"
+    },
+    {
+      "assignment_id": "RUN-003",
+      "scope": "HR, workforce, frontline workspaces, and operations grouped capability discovery",
+      "candidate_count": 29,
+      "class_counts": {
+        "H": 27,
+        "D": 2,
+        "M": 0
+      },
+      "evidence_count": 44,
+      "completion_test_met": true,
+      "wrote_files": false,
+      "runtime_gates": null,
+      "return_status": "RECONCILED",
+      "root_reconciliation": "The visible candidate register reconciles to 9 HR, 8 Workforce, 5 Frontline, and 7 Operations candidates; historical P0/P1 rows remain crosswalks unless current evidence independently supports them.",
+      "normalized_payload_sha256": "2efce2ddabbba68da44eeac371b424b0a7bd86a58b4ccb90fd97686163996268"
+    }
+  ],
+  "finalization_gate": false
+}

@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "status": "PARTIAL_STATIC_SEMANTIC_CENSUS_NOT_RUNTIME_DENOMINATORS",
+  "generated_at": "2026-08-24T16:08:22+12:00",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "c08b216e92f4689e277db4052c138a549bf86e8c",
+    "non_audit_product_diff_from_application_commit": 0
+  },
+  "methods": [
+    "PHP token_get_all callsite/declaration scan",
+    "TypeScript AST and current Inertia resolver/import graph scan",
+    "committed-path and conservative declaration reconciliation"
+  ],
+  "execution_credit": {
+    "laravel_boot": 0,
+    "runtime_routes": 0,
+    "tests": 0,
+    "browser_current_build": 0,
+    "database": 0,
+    "network": 0
+  },
+  "routes": {
+    "route_php_files": 38,
+    "static_route_declaration_callsites": 3217,
+    "fluent_name_callsites": 3245,
+    "method_callsites": {
+      "get": 1218,
+      "post": 1364,
+      "put": 295,
+      "patch": 76,
+      "delete": 213,
+      "match": 4,
+      "redirect": 41,
+      "permanentRedirect": 5,
+      "resource": 1
+    },
+    "denominator_status": "STATIC_CALLSITE_LOCATOR_ONLY_NOT_FRAMEWORK_ROUTE_DENOMINATOR"
+  },
+  "inertia_pages": {
+    "tree_paths": 1058,
+    "tsx_paths": 1007,
+    "ts_paths": 51,
+    "resolver_non_test_tsx": 963,
+    "backend_render_calls": 745,
+    "unique_backend_render_names": 722,
+    "existing_render_roots": 711,
+    "missing_render_targets": [
+      "hr/recruitment/jobs",
+      "hr/recruitment/kits",
+      "hr/training/index",
+      "operations/timesheets/approvals",
+      "training/competencies/index",
+      "training/competencies/show",
+      "training/inductions/index",
+      "training/inductions/show",
+      "training/records/index",
+      "training/records/show",
+      "training/records/user"
+    ],
+    "resolver_partition": {
+      "matched_render_roots": 711,
+      "unrendered_imported": 227,
+      "unrendered_unimported": 25,
+      "sum": 963
+    },
+    "default_export_candidates": 801,
+    "unmatched_default_export_candidates": 90,
+    "support_without_default_export": 162,
+    "non_test_ts_helpers": 32,
+    "page_test_spec_paths": 63,
+    "denominator_status": "NOT_FINAL_UNTIL_25_UNIMPORTED_CANDIDATES_ARE_MANUALLY_ADJUDICATED"
+  },
+  "backend_declarations": {
+    "root_scope_app_http_controllers": {
+      "paths": 436,
+      "classes": 422,
+      "traits": 13,
+      "declarations": 435
+    },
+    "root_scope_app_models": {
+      "paths": 434,
+      "eloquent_classes": 430,
+      "traits": 4
+    },
+    "root_scope_app_policies": {
+      "paths": 32,
+      "classes": 32
+    },
+    "root_scope_app_services": {
+      "declarations": 364,
+      "classes": 339,
+      "interfaces": 24,
+      "enums": 1
+    },
+    "app_domain": {
+      "paths": 1381,
+      "declarations": 1384,
+      "classes": 1311,
+      "interfaces": 38,
+      "enums": 33,
+      "traits": 2
+    },
+    "recursive_directory_reconciliation": {
+      "controllers_directory_paths": 561,
+      "controller_suffix_named_classes": 544,
+      "non_suffix_base_or_traits": 17,
+      "models_directory_paths": 782,
+      "models_directory_named_classes": 778,
+      "models_directory_traits": 4,
+      "eloquent_model_candidates_app_wide": 779,
+      "policies_directory_paths": 75,
+      "policies_directory_classes": 75,
+      "services_directory_paths": 725,
+      "service_suffix_classes": 404,
+      "non_class_service_contract_enum_files": 28
+    },
+    "denominator_status": "SCOPES_ARE_ORTHOGONAL_AND_MUST_NOT_BE_SUMMED_OR_SUBSTITUTED_FOR_FINAL_OWNERSHIP_COUNTS"
+  },
+  "async": {
+    "jobs_paths": 126,
+    "events_paths": 14,
+    "listeners_paths": 12,
+    "outbox_named_candidates": 12,
+    "observers": 29,
+    "notifications": 176,
+    "notification_classes": 174,
+    "notification_interfaces": 2
+  },
+  "migrations": {
+    "paths": 978,
+    "schema_callsites": 4701,
+    "create": 859,
+    "table": 1488,
+    "dropIfExists": 868,
+    "hasTable": 404,
+    "hasColumn": 1082,
+    "unique_literal_create_table_candidates": 838,
+    "altered_table_candidates": 322,
+    "denominator_status": "MIGRATION_HISTORY_NOT_CURRENT_RUNTIME_SCHEMA"
+  },
+  "tests_static": {
+    "tests_tree_paths": 1509,
+    "php_paths": 1381,
+    "test_php_basenames": 1357,
+    "repo_wide_js_ts_test_spec_paths": 261,
+    "pest_test_it_callsites": 4574,
+    "direct_testcase_subclasses": 505,
+    "named_test_classes": 588,
+    "execution_credit": 0
+  },
+  "page_tsx_visual_locators": {
+    "pagehero_jsx_sites": 497,
+    "pagehero_files": 486,
+    "other_hero_banner_sites": 93,
+    "other_hero_banner_symbols": 42,
+    "primitive_overlay_root_sites": 333,
+    "primitive_overlay_roots": {
+      "Dialog": 253,
+      "AlertDialog": 42,
+      "Popover": 33,
+      "Sheet": 5
+    },
+    "custom_overlay_usage_sites": 652,
+    "custom_overlay_symbols": 388,
+    "denominator_status": "PAGE_TSX_LOCATORS_ONLY; SHARED_COMPONENTS_AND_EXACT_TRIGGERS_NOT_INCLUDED"
+  },
+  "unresolved_semantic_work": [
+    "Framework/provider runtime route denominator remains unexecuted.",
+    "Twenty-five resolver-imported TSX candidates need manual page/support adjudication.",
+    "Controller/model/policy/service/domain scopes require canonical ownership and reachability classification.",
+    "Migration history is not a current schema snapshot.",
+    "Static test structures do not establish passing, failure, concurrency, or coverage evidence.",
+    "Visual locators require full production TSX, trigger, state, route, viewport, and browser evidence."
+  ]
+}
