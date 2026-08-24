@@ -18,13 +18,14 @@ from pathlib import Path
 
 AUDIT_DIR = Path(__file__).resolve().parents[1]
 HISTORICAL_DIR = AUDIT_DIR.parent / "oblivion-oss-comprehensive-audit-2026-08-12"
-GENERATED_AT = "2026-08-24T17:26:22+12:00"
+GENERATED_AT = "2026-08-24T17:43:00+12:00"
 APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 AUDIT_INPUT_COMMIT = "ec11042ea09d7bc56dff5b992b4d6ebfb03ad9df"
 PROJECT_REGISTER_SHA256 = "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe"
 WAVE_01_SHA256 = "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb"
 WAVE_02_SHA256 = "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71"
+WAVE_03_SHA256 = "7eec5a50d8f38184696a827bafb35c4e1c1f94fc8104abc7d075f502ce7f4c42"
 HISTORICAL_904_SHA256 = "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7"
 HISTORICAL_902_SHA256 = "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
 GOVERNING_PROMPT_SHA256 = "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
@@ -74,6 +75,7 @@ project_register_path = HISTORICAL_DIR / "06-open-source-benchmark-register.csv"
 assert sha256_file(project_register_path) == PROJECT_REGISTER_SHA256
 assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-01.json") == WAVE_01_SHA256
 assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-02.json") == WAVE_02_SHA256
+assert sha256_file(AUDIT_DIR / "evidence/source/current-feature-discovery-wave-03.json") == WAVE_03_SHA256
 
 with project_register_path.open(encoding="utf-8", newline="") as handle:
     historical_reader = csv.DictReader(handle)
@@ -90,9 +92,10 @@ project_index = {row["project"]: row for row in historical_projects}
 
 wave1 = read_json("evidence/source/current-feature-discovery-wave-01.json")
 wave2 = read_json("evidence/source/current-feature-discovery-wave-02.json")
-candidates = wave1["candidates"] + wave2["candidates"]
-assert len(candidates) == 172
-assert len({row["candidate_id"] for row in candidates}) == 172
+wave3 = read_json("evidence/source/current-feature-discovery-wave-03.json")
+candidates = wave1["candidates"] + wave2["candidates"] + wave3["candidates"]
+assert len(candidates) == 186
+assert len({row["candidate_id"] for row in candidates}) == 186
 candidate_ids = {row["candidate_id"] for row in candidates}
 
 
@@ -437,6 +440,7 @@ BENCHMARK_PAYLOAD = {
         },
         "current_candidate_wave_01_sha256": WAVE_01_SHA256,
         "current_candidate_wave_02_sha256": WAVE_02_SHA256,
+        "current_candidate_wave_03_sha256": WAVE_03_SHA256,
         "historical_final_904_sha256": HISTORICAL_904_SHA256,
         "historical_final_902_sha256": HISTORICAL_902_SHA256,
     },
@@ -500,7 +504,8 @@ BENCHMARK_PAYLOAD = {
         "result_counts": dict(Counter(row["neutralized_result"] for row in neutralizer_records)),
         "collision_groups": [{"group_id": group_id, "candidate_ids": ids} for group_id, ids in COLLISION_GROUPS],
         "coverage_gaps": {
-            "current_candidate_rows": 172,
+            "RUN_008_scope_candidate_rows": 172,
+            "current_provisional_candidate_rows_after_RUN_012": 186,
             "fresh_target_specific_benchmark_or_bounded_no_match_credit": 0,
             "historical_904_exact_id_intersection": 25,
             "historical_exact_credit_rows_not_inherited": 15,
@@ -520,7 +525,7 @@ BENCHMARK_PAYLOAD = {
         "benchmark_credit_awarded": False,
     },
     "current_feature_gate": {
-        "partial_grouped_candidates": 172,
+        "partial_grouped_candidates": 186,
         "frozen_canonical_denominator": None,
         "verified_benchmark_or_documented_no_credible_match": 0,
         "completion_percentage": None,

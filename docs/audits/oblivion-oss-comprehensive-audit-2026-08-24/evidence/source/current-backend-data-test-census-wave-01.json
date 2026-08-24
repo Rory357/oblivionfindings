@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_BACKEND_DATA_TEST_CENSUS_WAVE_01_RECONCILED_NO_EXECUTION_CREDIT",
+  "generated_at": "2026-08-24T17:43:00+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "779fdea9d24b444738396698c2b9001c686ba144",
+    "non_audit_product_diff": 0
+  },
+  "methods": [
+    "Committed-path enumeration",
+    "Lexical PHP declaration/import scan",
+    "Candidate anchor reconciliation",
+    "Static schema-dump and migration-ledger text comparison"
+  ],
+  "denominators": [
+    {
+      "scope": "app_php",
+      "paths": 3110,
+      "declarations_or_static_units": 3111,
+      "sorted_path_sha256": "8fc18a3299bc3eb64d46a6c1a5cecde1ece314f55e6dd84cd1895cf776e479ea"
+    },
+    {
+      "scope": "app_domain_php",
+      "paths": 1381,
+      "declarations_or_static_units": 1384,
+      "sorted_path_sha256": "b28d1596ea1efcee0491619b44a3641e78247ce84d814b27c941b28948beb79f"
+    },
+    {
+      "scope": "controller_directories",
+      "paths": 561,
+      "declarations_or_static_units": 560,
+      "sorted_path_sha256": "4932ff0338cd82906ed2372ff473e9df4cc1c37146d7e99a3a4e4199ec8e2b3f"
+    },
+    {
+      "scope": "service_entry_union",
+      "paths": 735,
+      "declarations_or_static_units": 735,
+      "sorted_path_sha256": "4259534e12194522c2f418ab2821f4e0d877f21d5af5d0aa4cd3088eb74ca2e8"
+    },
+    {
+      "scope": "model_directories",
+      "paths": 782,
+      "declarations_or_static_units": 782,
+      "sorted_path_sha256": "c2991205d806d6afee62f8488a3526bc9a9ba8da676ba972e31cf86840bede30"
+    },
+    {
+      "scope": "policy_directories",
+      "paths": 75,
+      "declarations_or_static_units": 75,
+      "sorted_path_sha256": "5d54347fb0f68c16a3a0a6151cd4e108c7995f122e6c6aad9f95dd7c35616a8a"
+    },
+    {
+      "scope": "job_directories",
+      "paths": 126,
+      "declarations_or_static_units": 126,
+      "sorted_path_sha256": "8f4e3fdd0b88e25baa89e83bdd5c3ed8e2dd690986cb9f79e8e3ef2d8323e1ae"
+    },
+    {
+      "scope": "event_directories",
+      "paths": 14,
+      "declarations_or_static_units": 14,
+      "sorted_path_sha256": "af8bac96fb3fe68e45552972280709021843e8bc4671f7366f1987444d97a70a"
+    },
+    {
+      "scope": "listeners",
+      "paths": 12,
+      "declarations_or_static_units": 12,
+      "sorted_path_sha256": "949b9d1095f90081655fde745b6a3769fda2dfddc746eb68f87e78100592ace0"
+    },
+    {
+      "scope": "observers",
+      "paths": 29,
+      "declarations_or_static_units": 29,
+      "sorted_path_sha256": "5d44e0be6ebddf1a72fe4e66904237887e207b5f50a88776abfbdfb5931ca46d"
+    },
+    {
+      "scope": "notification_path_lens",
+      "paths": 176,
+      "declarations_or_static_units": 176,
+      "sorted_path_sha256": "35a754f4c95bbc81b2c7dac893fbf1283e11eb4baf605fa8c40b749d0c992045"
+    },
+    {
+      "scope": "migrations",
+      "paths": 978,
+      "declarations_or_static_units": 978,
+      "sorted_path_sha256": "91fa419a68468ac67213be95f2c898c2c1fe2dbb5352c3608f12049d606085b8"
+    },
+    {
+      "scope": "php_test_files",
+      "paths": 1381,
+      "declarations_or_static_units": 9895,
+      "sorted_path_sha256": "f1bb1a295a3b172a656f0147e3eb4ad5509446acaf6158ba7badfad93932dd99"
+    },
+    {
+      "scope": "factories",
+      "paths": 145,
+      "declarations_or_static_units": 145,
+      "sorted_path_sha256": "c5b65bb13c5c125eea0dd4675790fb83ef56eabe20aecf5489e31451db494898"
+    },
+    {
+      "scope": "seeders_php",
+      "paths": 83,
+      "declarations_or_static_units": 83,
+      "sorted_path_sha256": "0ed48e90edb1fa37da70089d2842468eeee0ec30996a552092a2c0e159ffeb9e"
+    }
+  ],
+  "module_arithmetic": {
+    "domain": {
+      "Clinical": 42,
+      "Finance": 263,
+      "Governance": 138,
+      "Hr": 324,
+      "It": 43,
+      "Monitoring": 266,
+      "Privacy": 7,
+      "Roadmap": 57,
+      "Rostering": 10,
+      "SecurityDevices": 223,
+      "Shifts": 8,
+      "total": 1381,
+      "hash": "2974ddeadba9b80cf8f0525f67fbf0de05280513428018e23778bd802f15e201"
+    },
+    "controllers": {
+      "domain": 125,
+      "http": 436,
+      "total": 561,
+      "hash": "f055fb7cab73e4d58e0ace143c93da6c2f71e1e32096aa8453467dc4bbf2dec3"
+    },
+    "service_entry_union": {
+      "domain": 371,
+      "top_level": 364,
+      "total": 735,
+      "hash": "86675b783251e6f7ac8d17027cc6fced4bdee418aee31ea90a571e98073c19d5"
+    },
+    "models": {
+      "domain": 348,
+      "top_level": 434,
+      "total": 782,
+      "hash": "3fab9fa2b12e07943d4a0f50c2e0616ff0e67a8dfa92c0e62b4d8c426aafdd65"
+    },
+    "policies": {
+      "domain": 43,
+      "top_level": 32,
+      "total": 75,
+      "hash": "a6c9faf6560a0416a789a21aca522cfbd93113708bd619ff0f68c54193954a24"
+    },
+    "jobs": {
+      "domain": 74,
+      "top_level": 52,
+      "total": 126,
+      "hash": "137d2799a2ee1132ac09680d1bc89294ec1ddc4286561667bb6c86f30d18c41e"
+    },
+    "events": {
+      "domain": 8,
+      "top_level": 6,
+      "total": 14,
+      "hash": "232c1f78bbeedb87b1210a57e9fc45bdede0b60e009b8c2afe1238ed9b2b97b9"
+    },
+    "listeners": {
+      "total": 12,
+      "hash": "17bfb3e4e7fd5a5319792090a32ce22100bad1d3bbd8d614623278e25d5ed990"
+    },
+    "observers": {
+      "total": 29,
+      "hash": "1cf47c4ab0207b61ff1e003c0bb47fcb46549c87d06ae22c9f53b4c796003c16"
+    }
+  },
+  "migration_filename_primary_mapping": {
+    "Clinical/eMAR/Clients/Care": 153,
+    "Finance": 119,
+    "Fleet/Assets/Sites": 106,
+    "Governance/Roadmap": 45,
+    "H&S/Safeguarding/Incidents": 90,
+    "HR/Workforce/Operations": 209,
+    "IT/Integrations": 46,
+    "Platform/System": 61,
+    "Privacy/Audit": 16,
+    "Security Devices/Monitoring": 63,
+    "Unclassified": 70,
+    "total": 978,
+    "mapping_hash": "0c3cdc231a9ebf2c2cfbf25fe71b92518f9a366465935367a231a09f5ac626e2",
+    "multi_rule_paths": 209,
+    "multi_rule_hash": "657c6f6e48c9fc0a0a1f7e2b930eac9f32ed55fbb030fc1b3049bc038b7ed00a",
+    "unclassified_hash": "f49f79c71361efc74133814ab206c1a2aca9517e249c14a44e81912a8379a34c",
+    "limit": "Filename mapping is heuristic and migration history is not current schema truth."
+  },
+  "tests_static": {
+    "php_files": 1381,
+    "lexical_cases": 9895,
+    "non_php_artifacts": 128,
+    "families": {
+      "Architecture": [
+        52,
+        134
+      ],
+      "Browser": [
+        118,
+        600
+      ],
+      "Feature": [
+        1042,
+        8287
+      ],
+      "Integration": [
+        1,
+        2
+      ],
+      "Performance": [
+        1,
+        5
+      ],
+      "Support": [
+        18,
+        0
+      ],
+      "Unit": [
+        145,
+        867
+      ],
+      "fixtures": [
+        1,
+        0
+      ],
+      "root_support": [
+        3,
+        0
+      ]
+    },
+    "primary_mapping_hash": "a8167347abdc4aa8bb5475a0ede89960fe51de8e681213a73dd2834fea480177",
+    "execution_credit": 0
+  },
+  "candidate_linkage": {
+    "candidate_rows": 172,
+    "candidate_id_hash": "ccba3c435b0155313bec4b0038f298e04f056d294a2087a27949ea7c13493ea5",
+    "production_anchor_occurrences": 358,
+    "distinct_production_anchor_strings": 141,
+    "normalized_production_paths": 130,
+    "test_anchor_occurrences": 280,
+    "distinct_test_anchor_strings": 132,
+    "normalized_test_paths": 121,
+    "exact_controller_paths": 62,
+    "controller_candidate_ids": 102,
+    "exact_service_entry_paths": 54,
+    "service_candidate_ids": 100,
+    "exact_domain_paths": 45,
+    "domain_candidate_ids": 65,
+    "exact_model_policy_job_event_listener_observer_notification_migration_paths": 0,
+    "named_owner_candidates": 120,
+    "candidates_without_class_like_owner_names": 52,
+    "candidates_omitting_existing_named_owner": 50,
+    "omitted_candidate_owner_pairs": 62,
+    "omitted_pair_hash": "e63098c38f4ac8e226639af9e10b4092c042a9f92a676a27750277d828ba4fe8",
+    "candidates_omitting_every_named_owner": 19,
+    "all_omitted_names_resolve_to_source": true,
+    "limit": "The linkage measures exact anchors in the prior 172-row discovery register; it is not coverage of the 14 RUN-012 additions and grants no canonical ownership credit."
+  },
+  "ownership_operability_locators": {
+    "explicit_policy_map_pairs": 65,
+    "models_without_explicit_map": 717,
+    "models_without_explicit_map_or_local_scope_method": 444,
+    "policy_files_outside_explicit_map": 10,
+    "jobs_without_explicit_retry_failure_signal": 61,
+    "jobs_without_basename_test_reference": 47,
+    "jobs_in_both_sets": 31,
+    "jobs_without_external_basename_reference": 12,
+    "outbox_app_files": 45,
+    "named_outbox_owners": 12,
+    "outbox_migration_files": 7,
+    "outbox_test_files": 32,
+    "cross_domain_import_occurrences": 328,
+    "cross_domain_import_files": 159,
+    "directed_domain_edges": 27,
+    "reciprocal_edge_pairs": 11,
+    "limit": "These are review locators. Policy auto-discovery, service/query authorization, runtime reachability, and dependency cycles were not executed or proven."
+  },
+  "conservative_high_risk_records": [
+    {
+      "record_id": "SRC-CALENDAR-SYNC-TRUTHFULNESS",
+      "summary": "The trigger updates last_synced_at and returns success while dispatch is commented out; SyncCalendarJob catches provider exceptions without rethrowing.",
+      "anchors": [
+        "app/Http/Controllers/Operations/CalendarSyncController.php:73-89",
+        "app/Jobs/SyncCalendarJob.php:21-56",
+        "tests/Feature/Operations/CalendarSyncTriggerTest.php:9-22"
+      ],
+      "status": "PROVISIONAL_STATIC_CLAIM_NOT_FINAL_FINDING"
+    },
+    {
+      "record_id": "SRC-AUTH-EVENT-SUBSCRIBER-REACHABILITY",
+      "summary": "AuthEventSubscriber owns authentication evidence but has no external basename reference; discovery is disabled and EventServiceProvider does not list it.",
+      "anchors": [
+        "app/Listeners/AuthEventSubscriber.php:13-66",
+        "app/Providers/EventServiceProvider.php:41-90",
+        "app/Models/UserLoginLog.php:9"
+      ],
+      "status": "PROVISIONAL_STATIC_CLAIM_NOT_FINAL_FINDING"
+    },
+    {
+      "record_id": "SRC-FINANCE-POSTING-PARTIAL-FAILURE",
+      "summary": "Three finance posting jobs catch per-aggregate failures and continue; none has an exact class-name test reference.",
+      "anchors": [
+        "app/Domain/Finance/Jobs/PostLeaveProvisionJob.php",
+        "app/Domain/Finance/Jobs/PostSiteRentJob.php",
+        "app/Domain/Finance/Jobs/PostSiteUtilitiesJob.php"
+      ],
+      "status": "PROVISIONAL_STATIC_CLAIM_NOT_FINAL_FINDING"
+    },
+    {
+      "record_id": "SRC-SCHEMA-HISTORY-DRIFT",
+      "summary": "The committed schema dump has 784 CREATE TABLE statements and 905 migration-ledger rows; 73 of 978 migration files are absent from that ledger. Six table names have duplicate guarded forward-create owners.",
+      "anchors": [
+        "database/schema/mysql-schema.sql"
+      ],
+      "status": "PROVISIONAL_STATIC_SCHEMA_HISTORY_LOCATOR_NOT_DATABASE_TRUTH"
+    },
+    {
+      "record_id": "SRC-LEGACY-ARTIFACT-LOCATORS",
+      "summary": "Two definite artifact locators are an 11-byte unreferenced AllowedSiteTypes.php containing only -NoNewline and a zero-byte app/Services/Rag/test blob.",
+      "anchors": [
+        "app/Http/Controllers/Concerns/AllowedSiteTypes.php",
+        "app/Services/Rag/test"
+      ],
+      "status": "PROVISIONAL_STATIC_ARTIFACT_LOCATOR"
+    }
+  ],
+  "evidence_count": 5648,
+  "evidence_count_basis": {
+    "unique_committed_php_paths_across_app_migrations_tests": 5469,
+    "prior_candidate_rows": 172,
+    "verified_source_subtree_identities": 7
+  },
+  "execution_credit": {
+    "runtime": 0,
+    "tests": 0,
+    "database": 0,
+    "build": 0,
+    "network": 0,
+    "browser": 0
+  },
+  "completion_test_met": true
+}

@@ -81,6 +81,16 @@ An independent reconciliation could not reproduce RUN-010's reported global enum
 
 RUN-011 initially returned NO-GO on five bounded evidence defects, including the unreproduced source count and over-broad wording. After correction, the same independent no-write reviewer returned GO across 54 checks. This closes only the bounded static file identity question and brings the fresh run to 11 reconciled formal no-write assignments. Framework-expanded route reachability, build resolution, route/page-to-feature mapping, signed-in application observation, deployment identity, and release behavior remain unproved; no runtime, build, test, database, network, or application-browser work occurred.
 
+## Expanded static coverage wave
+
+RUN-012 through RUN-014 returned read-only and reported no writes, bringing the reconciled formal-assignment count to 14. RUN-012 accounted for all 38 route PHP files, 3,217 static route callsites, 3,245 fluent name callsites, and 162 named navigation/tab source files. It found 14 owner-backed route/navigation families omitted from the first 172 grouped candidates: 12 H, one D, and one M. They cover admin/Today dashboards, notifications, Catering, Compliance, Portal, Respite, Roadmap, cross-module Reporting, and the internal quality checklist. The current discovery floor is therefore 186 rows—157 H, 27 D, and two M—but collisions may still split or collapse identities, so this is not a frozen canonical feature denominator.
+
+RUN-013 parsed all 1,761 production JS/TS files with TypeScript 5.9.3 and zero parse diagnostics. Its separate static universes contain 57 hero definitions and 659 hero instances, 473 overlay definitions and 1,211 overlay instances, and 115 declarative primitive trigger tags. Direct handlers, named handlers, state transitions, excluded close/change bindings, inline hero candidates, and inline ARIA dialogs remain separate ledgers to avoid overlap. These are static AST denominators with zero rendered visual, role/Site, viewport, screenshot, interaction, or accessibility credit; full row materialization into the required visual matrix remains open.
+
+RUN-014 established source-only denominators of 561 controller-directory paths, 735 service entries, 782 model paths, 75 policy paths, 126 queued job paths, 14 event paths, 12 listeners, 29 observers, 978 migrations, and 1,381 PHP test files containing 9,895 lexical test cases. Exact anchors in the prior 172 candidates cover only 62 controller paths and 54 service entries and cover zero model, policy, async-owner, notification, or migration paths. Migration filenames and the committed schema dump are history locators rather than database truth, and lexical tests were not executed.
+
+The new `02-eight-pass-coverage-ledger.csv` contains 38 provisional route-file ownership rows so Pass gaps are measurable. It is not the canonical module/submodule denominator: every row remains incomplete, and no module has all eight passes.
+
 ## Current official New Zealand source baseline
 
 The six official-source families required by the governing prompt were refreshed from current official pages: the Health Information Privacy Code 2020 including its 1 May 2026 indirect-collection amendment, HISO 10029:2022, the NZ FHIR Base Implementation Guide, Ngā Paerewa NZS 8134:2021, the Code of Health and Disability Services Consumers' Rights, and WorkSafe's HSWA guidance. The structured evidence separates each official source fact from the audit inference and the qualified specialist decision still required.
@@ -105,6 +115,11 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the six-assignment snapshot toward the planned target of 11.
 - `evidence/source/current-page-adjudication-wave-01.json`: all 25 page/support candidates, all 11 missing render targets, exact classifications and ownership anchors, and the bounded 711-page source denominator.
 - `evidence/source/current-page-agent-register.json`: normalized RUN-010 and corrected RUN-011 returns, no-write attestations, initial NO-GO traceability, replacement GO, and the cumulative 11-assignment state.
+- `evidence/source/current-route-navigation-gap-wave-01.json`: all route-file classifications, navigation and literal-render denominators, collisions, and 14 owner-backed additions.
+- `evidence/source/current-visual-static-census-wave-01.json`: production TS/TSX hero, overlay, material-state, trigger, and static linkage denominators with zero rendered credit.
+- `evidence/source/current-backend-data-test-census-wave-01.json`: backend, data-history, async, policy, migration, schema-dump, and static test denominators and review locators.
+- `evidence/source/current-feature-discovery-wave-03.json`: the 14 route/navigation gap additions and 186-row provisional discovery floor.
+- `evidence/source/current-static-coverage-agent-register.json`: normalized RUN-012 through RUN-014 returns and the cumulative 14-assignment state.
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and zero-credit evidence.
 - `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
@@ -113,9 +128,11 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `evidence/browser/deployed-build-identity-assessment.json`: read-only deployed/local asset identity assessment with zero current-source application-browser credit.
 - `evidence/browser/current-audit-dashboard-verification-runtime-gates-01.json`: responsive audit-dashboard and local evidence-link verification after the runtime/build gate update.
 - `evidence/browser/current-audit-dashboard-verification-benchmark-denominator-01.json`: responsive dashboard and local evidence-link verification after correcting the prompt project denominator.
+- `evidence/browser/current-audit-dashboard-verification-static-wave-01.json`: responsive dashboard and local evidence-link verification after RUN-012 through RUN-014 reconciliation.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
-- `03-feature-to-benchmark-matrix.csv`: interim 172-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
+- `02-eight-pass-coverage-ledger.csv`: 38 provisional route-file ownership rows with explicit P1–P8 gaps and zero completed row.
+- `03-feature-to-benchmark-matrix.csv`: interim 186-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
 - `06-open-source-benchmark-register.csv`: 95 exact prompt-repository rows plus three historical extras, with prompt occurrence weights totalling 98 and zero current upstream refresh or mapping credit.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
 - `generators/build-current-source-census.py`: the deterministic static collector. It reads committed Git objects and writes only inside this audit directory.
@@ -130,7 +147,7 @@ The collector was rerun twice with identical output hashes. It did not boot Lara
 ## Immediate work order
 
 1. Preserve the 711-file static page-root denominator and finish framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership; the semantic/runtime graph remains partial.
-2. Continue module discovery and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
+2. Adjudicate collisions and ownership across the 186-row discovery floor before freezing H/D/M identities; use the historical 904 register only as a crosswalk.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, visual states, and all eight pass ledgers.
 4. Refresh all 95 unique prompt repositories from official upstream evidence, reconcile all 98 category occurrences, and finish one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen; the first A/B/C evidence wave grants zero mapping credit.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.

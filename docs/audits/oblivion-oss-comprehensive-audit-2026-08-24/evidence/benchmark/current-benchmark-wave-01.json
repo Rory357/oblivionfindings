@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "CURRENT_BENCHMARK_WAVE_01_RECONCILED_NO_COMPLETION_CREDIT",
-  "generated_at": "2026-08-24T17:26:22+12:00",
+  "generated_at": "2026-08-24T17:43:00+12:00",
   "source": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -19,6 +19,7 @@
     },
     "current_candidate_wave_01_sha256": "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb",
     "current_candidate_wave_02_sha256": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
+    "current_candidate_wave_03_sha256": "7eec5a50d8f38184696a827bafb35c4e1c1f94fc8104abc7d075f502ce7f4c42",
     "historical_final_904_sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
     "historical_final_902_sha256": "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
   },
@@ -627,7 +628,8 @@
       }
     ],
     "coverage_gaps": {
-      "current_candidate_rows": 172,
+      "RUN_008_scope_candidate_rows": 172,
+      "current_provisional_candidate_rows_after_RUN_012": 186,
       "fresh_target_specific_benchmark_or_bounded_no_match_credit": 0,
       "historical_904_exact_id_intersection": 25,
       "historical_exact_credit_rows_not_inherited": 15,
@@ -907,7 +909,7 @@
     "benchmark_credit_awarded": false
   },
   "current_feature_gate": {
-    "partial_grouped_candidates": 172,
+    "partial_grouped_candidates": 186,
     "frozen_canonical_denominator": null,
     "verified_benchmark_or_documented_no_credible_match": 0,
     "completion_percentage": null,

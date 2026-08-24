@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_VISUAL_STATIC_CENSUS_WAVE_01_RECONCILED_NO_RENDERED_CREDIT",
+  "generated_at": "2026-08-24T17:43:00+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "779fdea9d24b444738396698c2b9001c686ba144",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "non_audit_product_diff": 0
+  },
+  "parser": {
+    "typescript_version": "5.9.3",
+    "parse_diagnostics": 0,
+    "tracked_js_ts_paths": 1965,
+    "excluded_test_story_paths": 204,
+    "production_scope": 1761,
+    "tsx": 1636,
+    "ts": 125,
+    "production_path_list_sha256": "93b62ffe757fdbaa57022a4f3150dcf304809c8316e3230614e3e0cedd99c3fa",
+    "path_blob_manifest_sha256": "2c1da9967c585adad456f76bba7d7957ea341068564ae119d50f2123ac2b0abb",
+    "excluded_path_list_sha256": "4c43b515a16ed11af74497f949223734bf702b2bdbd29b1ef0aa4ff33672ca21"
+  },
+  "heroes": {
+    "definitions": 57,
+    "definition_partition": {
+      "primitive": 2,
+      "wrapper": 24,
+      "custom": 31
+    },
+    "reuse_locator": {
+      "shared": 11,
+      "single_consumer": 34,
+      "no_external_consumer": 12
+    },
+    "instances": 659,
+    "instance_partition": {
+      "primitive": 553,
+      "defined_surface": 106
+    },
+    "primitive_instances": {
+      "PageHero": 504,
+      "HeroShell": 49
+    },
+    "unresolved_named_instance_symbols": 0,
+    "inline_candidate_locators_outside_definitions": 79,
+    "hashes": {
+      "definitions": "6fb3ee77e7c19d8179962cf40649268031903cf1f4661247b007aab417282cc2",
+      "instances": "6ff0785548a0c49a0520ba767882ce84307643279e1f9375e02790813a691cce",
+      "inline_locators": "0c4761e6a262f15e52443ebb59405208022b489fa12d1d8af0315825619c0aa0"
+    }
+  },
+  "overlays": {
+    "definitions": 473,
+    "definition_partition": {
+      "primitive": 4,
+      "wrapper": 272,
+      "custom_or_host": 197
+    },
+    "reuse_locator": {
+      "shared": 97,
+      "single_consumer": 273,
+      "no_external_consumer": 103
+    },
+    "instances": 1211,
+    "instance_partition": {
+      "primitive_root": 494,
+      "defined_wrapper": 715,
+      "injectable_alias": 2
+    },
+    "primitive_roots": {
+      "Dialog": 379,
+      "AlertDialog": 52,
+      "Popover": 45,
+      "Sheet": 18
+    },
+    "material_state_partition": {
+      "controlled_expression": 795,
+      "literal_open": 162,
+      "conditional_mount": 155,
+      "no_explicit_open_state": 99
+    },
+    "inline_aria_dialogs_outside_named_definitions": 5,
+    "hashes": {
+      "definitions": "2380b7ae9a1016d46d311693929a4b69f79d9cb1d3db7d8eb9508011830daf00",
+      "instances": "84462377b62d34d49c25bc78c361579a3f821637a8aaa37d2b4219483d40d1b6",
+      "state_partition": "bae0692de118725b68d4f7bb537fa87d92cf0ac7f666d0080604935eca6f1310",
+      "inline_aria_dialogs": "067e8e53b7a2189f25b3d7c140bf88e83f71b44e92a266d7c942c5d7172b65d3",
+      "no_explicit_state": "c531bb133099dc2110f98b8a4cba27ff72cbff063797a7260a033c0303fb5d43"
+    }
+  },
+  "triggers": {
+    "declarative_primitive_tags": 115,
+    "declarative_partition": {
+      "DialogTrigger": 57,
+      "PopoverTrigger": 45,
+      "AlertDialogTrigger": 10,
+      "SheetTrigger": 3
+    },
+    "exact_use_state_setter_pairs": 664,
+    "setter_transitions": 2162,
+    "setter_transition_partition": {
+      "close": 1034,
+      "value_open": 640,
+      "explicit_open": 458,
+      "bidirectional_or_toggle": 30
+    },
+    "direct_inline_opening_handler_sites": 689,
+    "local_named_handler_reference_sites": 138,
+    "excluded_change_or_close_bindings": 44,
+    "positive_transition_calls_supporting_only": 1098,
+    "hashes": {
+      "declarative": "bc0f21fc8b9e858c0786d9b1f91803ee805892b533cd3c247261348d2c5fac63",
+      "state_transitions": "1d68655c73099455736dbf5ec3ea75dcf75ae68a4a8bfdb96c1a66b9afb8ce57",
+      "inline_handlers": "34fe8392d3fdcba8d1bcacbdd0f00c57b0c87fc2b37f901a825d4f03cf086cfd",
+      "named_handlers": "a5fe095ec8727fa2c8d395978d7dd8f4cbd8b3568a7e7731c9bfaac629c2c07f",
+      "excluded_bindings": "bf30e7c9839fd816664551a9a780c961e27da7738e05fe3c975721f4428a81fd"
+    }
+  },
+  "static_linkage": {
+    "hero_sites": {
+      "unique_rendered_page_root": 619,
+      "multiple_rendered_roots": 26,
+      "unresolved_rendered_root": 14,
+      "direct_literal_render_owner": 645,
+      "route_owner_inferred": 644,
+      "direct_candidate_anchor_match": 134,
+      "route_inferred_candidate_match": 420,
+      "role_capability_token_hint": 135,
+      "site_token_hint": 90,
+      "privacy_token_hint": 43
+    },
+    "overlay_sites": {
+      "unique_rendered_page_root": 987,
+      "multiple_rendered_roots": 184,
+      "unresolved_rendered_root": 40,
+      "direct_literal_render_owner": 1171,
+      "route_owner_inferred": 1171,
+      "direct_candidate_anchor_match": 347,
+      "route_inferred_candidate_match": 854,
+      "role_capability_token_hint": 458,
+      "site_token_hint": 449,
+      "privacy_token_hint": 84
+    },
+    "limit": "Route ownership is inferred through static controller references; candidate and access-hint linkage is source-only and grants no final identity or authorization credit."
+  },
+  "evidence_count": 4276,
+  "evidence_count_basis": {
+    "scanned_files": 1761,
+    "hero_definitions": 57,
+    "hero_instances": 659,
+    "overlay_definitions": 473,
+    "overlay_instances": 1211,
+    "declarative_trigger_tags": 115
+  },
+  "execution_credit": {
+    "browser": 0,
+    "build": 0,
+    "runtime": 0,
+    "route_execution": 0,
+    "tests": 0,
+    "database": 0,
+    "network": 0,
+    "rendered_visual_coverage": 0,
+    "access_control": 0
+  },
+  "completion_test_met": true,
+  "row_materialization_status": "OPEN_RUN_016_REPRODUCTION_CONTRACT_PENDING"
+}

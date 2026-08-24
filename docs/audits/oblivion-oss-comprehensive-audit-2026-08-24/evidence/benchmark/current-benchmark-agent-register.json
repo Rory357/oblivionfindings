@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "FORMAL_BENCHMARK_WAVE_01_RECONCILED_AUDIT_INCOMPLETE",
-  "generated_at": "2026-08-24T17:26:22+12:00",
+  "generated_at": "2026-08-24T17:43:00+12:00",
   "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
   "writer_boundary": "Only the root orchestrator wrote audit artifacts; RUN-007 through RUN-009 returned evidence in messages and reported wrote_files=false.",
   "wave_formal_assignments_eligible": 3,

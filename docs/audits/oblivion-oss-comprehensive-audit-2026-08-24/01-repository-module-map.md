@@ -105,6 +105,16 @@ The separate backend scan contains 11 literal render names with no file: four ar
 
 This denominator is limited to committed file-backed Inertia roots at the application pin. Final prompt classification of the 711 roots, framework-expanded route reachability, build resolution, browser observation, deployment identity, release status, and route/page-to-`FEATURE-ID` coverage remain open. The 25 candidate rows additionally carry the prompt taxonomy (`Redirect/legacy`, `Duplicate`, `Dead/unreachable`, or `Out of product scope`) in the structured evidence.
 
+## RUN-012 through RUN-014 static coverage reconciliation
+
+All 38 route PHP files are now classified at source level: 21 represented by the earlier grouped candidates, five compatibility/alias route files, six composite route files, and six missing or partially represented route families. The route scan contains 3,217 static `Route::…` callsites and 3,245 fluent `->name()` callsites. These are separate locators, not a framework-expanded route denominator. The named navigation/tab universe contains 162 production source files; 33 persistent or canonical registries contain 121 groups/sets and 492 declared items/tabs.
+
+Fourteen owner-backed additions close the named route/navigation family gaps at discovery level: admin and Today dashboards, the personal notification inbox, Catering/meal planning, the Compliance exception command centre, two Portal families, four Respite families, Roadmap, cross-module Reporting, and the internal quality checklist. They add 12 H, one D, and one M row, taking the provisional discovery floor from 172 to **186 rows: 157 H, 27 D, and two M**. This total is not frozen because eight identical anchor groups cover 62 earlier rows and multiple semantic collisions still require split/collapse adjudication.
+
+The expanded production frontend census covers 1,761 JS/TS files and establishes 57 hero definitions / 659 instances, 473 overlay definitions / 1,211 instances, and 115 declarative trigger tags. The separate backend/data/test census establishes 561 controller paths, 735 service entries, 782 model paths, 75 policy paths, 126 job paths, 14 events, 12 listeners, 29 observers, 978 migrations, and 1,381 PHP test files / 9,895 lexical cases. These are source denominators only. No rendered instance, route execution, schema state, test outcome, queue behavior, role/Site behavior, or completion credit follows.
+
+The required `02-eight-pass-coverage-ledger.csv` now has one provisional row per route file. It makes Pass gaps explicit but is not yet the canonical module/submodule ledger; every row remains incomplete across the eight-pass gate.
+
 
 ## Provisional P1 source claims
 

@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_FEATURE_DISCOVERY_WAVE_03_PARTIAL_NOT_CANONICAL_DENOMINATOR",
+  "generated_at": "2026-08-24T17:43:00+12:00",
+  "source": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_input_commit": "779fdea9d24b444738396698c2b9001c686ba144",
+    "non_audit_product_diff": 0
+  },
+  "candidate_count": 14,
+  "class_counts": {
+    "H": 12,
+    "D": 1,
+    "M": 1
+  },
+  "module_counts": {
+    "Platform Dashboards": 1,
+    "Frontline Workspaces": 1,
+    "Notifications": 1,
+    "Catering": 1,
+    "Compliance": 1,
+    "Portal": 2,
+    "Respite": 4,
+    "Roadmap": 1,
+    "Reporting": 1,
+    "Quality/Internal": 1
+  },
+  "cumulative_discovery_counts": {
+    "prior_rows": 172,
+    "new_rows": 14,
+    "provisional_floor": 186,
+    "H": 157,
+    "D": 27,
+    "M": 2
+  },
+  "candidates": [
+    {
+      "candidate_id": "CAP-PLAT-ADMIN-DASHBOARD",
+      "module": "Platform Dashboards",
+      "feature_class": "H",
+      "user_job": "Review the authorised organisation and Site operational overview",
+      "canonical_owner": "DashboardController",
+      "production_anchors": [
+        "routes/web.php:128",
+        "app/Http/Controllers/DashboardController.php:24-480"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/DashboardControllerTest.php"
+      ],
+      "site_role_privacy_note": "Require the exact dashboard authority and approved-Site scope; global Site visibility never replaces action authority.",
+      "ordinal": 1,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "module": "Frontline Workspaces",
+      "feature_class": "H",
+      "user_job": "Review today's authorised shifts, medication work, and attention items",
+      "canonical_owner": "TodayDashboardController",
+      "production_anchors": [
+        "routes/web.php:129",
+        "app/Http/Controllers/TodayDashboardController.php:13-124"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Pages/TodayTest.php"
+      ],
+      "site_role_privacy_note": "Show only approved Sites and authorised Clients or assigned work; the aggregate remains a read lens over canonical owners.",
+      "ordinal": 2,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-NOTIF-PERSONAL-INBOX-ACK",
+      "module": "Notifications",
+      "feature_class": "H",
+      "user_job": "Read, mark, and acknowledge owned notifications",
+      "canonical_owner": "NotificationInboxController and the canonical user notification relation",
+      "production_anchors": [
+        "routes/portal.php:181-231",
+        "app/Http/Controllers/NotificationInboxController.php:9-45"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Notifications/NotificationsTest.php"
+      ],
+      "site_role_privacy_note": "Query through canonical user ownership and conceal another user's notification direct ID.",
+      "ordinal": 3,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-SITE-MEAL-PLANNER-RECIPE-INVENTORY",
+      "module": "Catering",
+      "feature_class": "H",
+      "user_job": "Plan meals and govern recipes, restrictions, inventory, and shopping",
+      "canonical_owner": "Site meal-planning and Catering domain owners",
+      "production_anchors": [
+        "routes/catering.php:20-72",
+        "routes/sites.php:295-421",
+        "app/Http/Controllers/Catering/DashboardController.php:41"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Catering/SiteMealPlannerSiteAccessTest.php",
+        "tests/Feature/Catering/SiteMealPlanScopeIntegrityTest.php"
+      ],
+      "site_role_privacy_note": "Require approved Site plus the exact meal action; clinical restriction author and approval authority remain separate.",
+      "ordinal": 4,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+      "module": "Compliance",
+      "feature_class": "H",
+      "user_job": "Review Site-scoped compliance exceptions, due work, and triage",
+      "canonical_owner": "ComplianceDashboardController and ComplianceMetricsService",
+      "production_anchors": [
+        "routes/compliance.php:15-18",
+        "app/Http/Controllers/Compliance/ComplianceDashboardController.php:24-89"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Compliance/ComplianceDashboardTest.php",
+        "tests/Feature/Compliance/ComplianceDashboardSiteScopeTest.php"
+      ],
+      "site_role_privacy_note": "Require compliance.view and accessible staff/incident scope; manage and triage actions retain separate permissions.",
+      "ordinal": 5,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-PORT-CLIENT-FAMILY-WORKSPACE",
+      "module": "Portal",
+      "feature_class": "H",
+      "user_job": "Use the authorised client or family dashboard, timeline, calendar, documents, photos, health, and location",
+      "canonical_owner": "PortalClientController and FamilyDashboardController read projections",
+      "production_anchors": [
+        "routes/portal.php:49-180",
+        "routes/portal.php:232-302",
+        "app/Http/Controllers/PortalClientController.php:147",
+        "app/Http/Controllers/Portal/FamilyDashboardController.php:371"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Portal/PortalSurfaceTest.php",
+        "tests/Feature/Portal/PortalDirectRouteAuthorizationTest.php"
+      ],
+      "site_role_privacy_note": "Bind the canonical portal-user/client relationship, consent and privacy rules, and conceal unrelated client IDs.",
+      "ordinal": 6,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-PORT-FAMILY-MESSAGING-NOTES",
+      "module": "Portal",
+      "feature_class": "H",
+      "user_job": "Exchange authorised portal messages and family notes",
+      "canonical_owner": "PortalMessageController and PortalFamilyNoteController",
+      "production_anchors": [
+        "app/Http/Controllers/Portal/PortalMessageController.php",
+        "app/Http/Controllers/Portal/PortalFamilyNoteController.php"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Portal/PortalMessageMediaSecurityTest.php",
+        "tests/Feature/Operations/ClientFamilyCommunicationSecurityTest.php"
+      ],
+      "site_role_privacy_note": "Check conversation membership and the client relationship before media or message disclosure.",
+      "ordinal": 7,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-RESP-REFERRAL-REQUEST-BOOKING",
+      "module": "Respite",
+      "feature_class": "H",
+      "user_job": "Intake, review, approve, and book respite",
+      "canonical_owner": "Respite referral, request, and booking controllers",
+      "production_anchors": [
+        "routes/respite.php:20-77"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Respite/RespiteIntakeTest.php",
+        "tests/Feature/Respite/RespiteScopeIntegrityTest.php"
+      ],
+      "site_role_privacy_note": "Require exact action authority and the canonical Site, Client, request, and booking chain.",
+      "ordinal": 8,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-RESP-STAY-CARE-DISCHARGE",
+      "module": "Respite",
+      "feature_class": "H",
+      "user_job": "Check in, document daily care and risk, extend, and discharge a respite stay",
+      "canonical_owner": "Respite stay, daily-note, and risk-plan owners",
+      "production_anchors": [
+        "routes/respite.php:80-95",
+        "routes/respite.php:196-227"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Respite/RespiteAdmissionSafetyTest.php",
+        "tests/Feature/Respite/RespiteStateTransitionIntegrityTest.php"
+      ],
+      "site_role_privacy_note": "Require approved Site and Client scope, canonical booking/stay ownership, and concealed direct IDs.",
+      "ordinal": 9,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-RESP-PROCEDURE-TASK-HANDOVER",
+      "module": "Respite",
+      "feature_class": "H",
+      "user_job": "Run respite procedures, tasks, communications, and handovers",
+      "canonical_owner": "Respite procedure, task, communication, and handover controllers",
+      "production_anchors": [
+        "routes/respite.php:107-175"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Respite/RespiteActionsTest.php",
+        "tests/Feature/Respite/RespiteNzWorkflowCompletionTest.php"
+      ],
+      "site_role_privacy_note": "Keep view, manage, and approve permissions distinct; Site scope does not grant transitions.",
+      "ordinal": 10,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "module": "Respite",
+      "feature_class": "D",
+      "user_job": "Assemble, seal, and export governed respite evidence",
+      "canonical_owner": "RespiteEvidencePackController",
+      "production_anchors": [
+        "routes/respite.php:178-194",
+        "app/Http/Controllers/Respite/RespiteEvidencePackController.php"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Respite/RespiteScopeIntegrityTest.php",
+        "tests/Feature/Respite/RespiteNzWorkflowCompletionTest.php"
+      ],
+      "site_role_privacy_note": "Require exact evidence view, manage, and seal authority, canonical stay binding, and an immutable sealed digest.",
+      "ordinal": 11,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-ROAD-INITIATIVE-QUARTERLY-DECISION",
+      "module": "Roadmap",
+      "feature_class": "H",
+      "user_job": "Manage suggestions, initiatives, quarterly plans, decisions, and approvals",
+      "canonical_owner": "Roadmap domain controllers and services",
+      "production_anchors": [
+        "routes/roadmap.php:1-97",
+        "app/Domain/Roadmap/Http/Controllers/RoadmapDashboardController.php"
+      ],
+      "representative_test_anchors": [
+        "tests/Feature/Roadmap/RoadmapWorkflowTest.php",
+        "tests/Feature/Roadmap/RoadmapPermissionsTest.php"
+      ],
+      "site_role_privacy_note": "Use exact role/action permissions, with Site/object scope only where the records carry it.",
+      "ordinal": 12,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-REP-CROSS-MODULE-REPORT-HUB",
+      "module": "Reporting",
+      "feature_class": "H",
+      "user_job": "Browse authorised report families and combined summaries",
+      "canonical_owner": "ReportsController, CombinedReportController, and ModuleReportController",
+      "production_anchors": [
+        "routes/reports.php:1-62",
+        "app/Http/Controllers/ReportsController.php",
+        "app/Http/Controllers/CombinedReportController.php",
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Reports/ReportsTest.php"
+      ],
+      "site_role_privacy_note": "Require each module's report permission and source-object Site/privacy scope; a hub never grants family-inherited export authority.",
+      "ordinal": 13,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    },
+    {
+      "candidate_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "module": "Quality/Internal",
+      "feature_class": "M",
+      "user_job": "Review the authenticated internal quality checklist",
+      "canonical_owner": "QualityChecklistController",
+      "production_anchors": [
+        "routes/web.php:130",
+        "app/Http/Controllers/QualityChecklistController.php:7-15"
+      ],
+      "representative_test_anchors": [
+        "tests/Browser/Misc/MiscPagesTest.php:76-80"
+      ],
+      "site_role_privacy_note": "Its intended production role and exact reports, audit, or settings permission remain an explicit decision gap.",
+      "ordinal": 14,
+      "assignment_id": "RUN-012",
+      "adjudication_status": "GROUPED_DISCOVERY_CANDIDATE_NOT_FINAL_DENOMINATOR",
+      "evidence_limit": "Owner-backed static source and test-presence evidence only; no runtime, test execution, browser, benchmark, ease, release, final feature identity, or completion credit."
+    }
+  ],
+  "provisional_findings": [],
+  "limits": [
+    "These additions close named route/navigation family gaps only.",
+    "The 186-row sum is a provisional discovery floor; it is not a frozen canonical feature denominator.",
+    "No runtime, browser, test, benchmark, ease, journey, release, or completion credit is awarded."
+  ]
+}

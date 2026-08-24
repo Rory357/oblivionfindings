@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T17:49:17.2290777+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=static-wave-01-final",
+  "dashboard_sha256": "b62dfe1499bada478b6363305a642b13c481097aba003f5c01b39e76afc10c11",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_static_wave_content_observed": {
+    "grouped_candidate_floor": 186,
+    "candidate_classes": {"H": 157, "D": 27, "M": 2},
+    "formal_assignments_reconciled": 14,
+    "route_files": 38,
+    "static_route_callsites": 3217,
+    "named_navigation_tab_source_files": 162,
+    "hero_definitions": 57,
+    "hero_instances": 659,
+    "overlay_definitions": 473,
+    "overlay_instances": 1211,
+    "declarative_trigger_tags": 115,
+    "models": 782,
+    "policies": 75,
+    "service_entries": 735,
+    "jobs": 126,
+    "events": 14,
+    "listeners": 12,
+    "migrations": 978,
+    "lexical_php_test_cases": 9895,
+    "runtime_tests_credited": 0,
+    "rendered_visual_instances_credited": 0,
+    "current_source_browser_routes_credited": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_horizontal_overflow": false,
+      "expanded_static_panel_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 771,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "expanded_static_panel_observed": true,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 22,
+    "http_200": 22,
+    "failures": []
+  },
+  "generator_determinism": {
+    "static_outputs_successful_runs": 2,
+    "static_outputs_identical_sha256": true,
+    "benchmark_matrix_successful_runs_after_wave_03": 2,
+    "benchmark_matrix_identical_sha256": true,
+    "dashboard_successful_runs": 2,
+    "dashboard_identical_sha256": true
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current-build application browser, rendered visual, route, workflow, benchmark, runtime, test, build, release, or audit-completion credit."
+}

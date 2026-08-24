@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "FORMAL_STATIC_COVERAGE_WAVE_01_RECONCILED_AUDIT_INCOMPLETE",
+  "generated_at": "2026-08-24T17:43:00+12:00",
+  "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "writer_boundary": "Only the root orchestrator wrote audit artifacts; RUN-012 through RUN-014 returned evidence in messages and reported wrote_files=false.",
+  "wave_formal_assignments_eligible": 3,
+  "cumulative_formal_assignments_eligible": 14,
+  "literal_prompt_minimum": 8,
+  "literal_prompt_minimum_met": true,
+  "planned_formal_assignments_target": 11,
+  "planned_target_met": true,
+  "all_returned": true,
+  "all_completion_tests_met": true,
+  "all_reported_no_writes": true,
+  "outstanding_required_roles_or_waves": [
+    "RUN-015 official GitHub metadata normalization",
+    "RUN-016 full visual-row materialization contract",
+    "canonical identity/collision adjudication",
+    "fresh Pass 8 cross-reviewers",
+    "final no-live-agent reconciliation"
+  ],
+  "assignment_returns": [
+    {
+      "assignment_id": "RUN-012",
+      "agent_task_path": "/root/current_module_route_gap",
+      "role": "route, navigation, and module-gap reconciler",
+      "pass_lens": "Pass 1 repository census and reachability",
+      "scope": "38 route files, 162 named navigation/tab files, literal render owners, prior 172 candidates, and 14 owner-backed additions",
+      "evidence_count": 4461,
+      "observed_heads": [
+        "c7538c937185c78a2f14111a029ca1a6cad3b12f",
+        "066fc516fe489048c26e4ddc7a4d4ae1267b78ed"
+      ],
+      "completion_test_met": true,
+      "wrote_files": false,
+      "root_reconciliation": "All 38 route files and 162 navigation/tab files are accounted statically; 14 additions raise only the provisional discovery floor to 186.",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
+      "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+      "normalized_payload_sha256": "6a9dfd879f6d3afda621ac207f6e462e1ca6397195ea2a74c4644277c5c32413"
+    },
+    {
+      "assignment_id": "RUN-013",
+      "agent_task_path": "/root/current_visual_static_census",
+      "role": "production hero, overlay, and trigger census",
+      "pass_lens": "Pass 1 visual denominator and Pass 4 static support",
+      "scope": "1,761 production JS/TS files; hero, overlay, material-state, and trigger universes",
+      "evidence_count": 4276,
+      "observed_heads": [
+        "c7538c937185c78a2f14111a029ca1a6cad3b12f",
+        "066fc516fe489048c26e4ddc7a4d4ae1267b78ed"
+      ],
+      "completion_test_met": true,
+      "wrote_files": false,
+      "root_reconciliation": "Primary static universes reconcile; full row materialization and rendered/browser evidence remain open.",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
+      "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+      "normalized_payload_sha256": "5ec2f003d555db7db071b67bc864fd95575bc16a321572778c57616d586c6420"
+    },
+    {
+      "assignment_id": "RUN-014",
+      "agent_task_path": "/root/current_backend_data_test_census",
+      "role": "backend, data-history, async, policy, and test census",
+      "pass_lens": "Passes 1, 5, and 7 static support",
+      "scope": "Application PHP, controllers, services, models, policies, async owners, migrations, schema dump, factories, seeders, and PHP tests",
+      "evidence_count": 5648,
+      "observed_heads": [
+        "c7538c937185c78a2f14111a029ca1a6cad3b12f",
+        "779fdea9d24b444738396698c2b9001c686ba144"
+      ],
+      "completion_test_met": true,
+      "wrote_files": false,
+      "root_reconciliation": "Directory/declaration denominators and locators are accepted as static evidence only; schema truth, execution coverage, runtime reachability, and final findings remain open.",
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "architecture_rule": "Single tenant, multiple Sites; roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
+      "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
+      "normalized_payload_sha256": "4d2a01017db7b15323e70c6106c92eda03a18b269020fbd418a8b99462dba8f3"
+    }
+  ],
+  "finalization_gate": false
+}
