@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T17:29:46.6722131+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=benchmark-denominator-01",
+  "dashboard_sha256": "4f048a591f60c65aff21d06b0e404fff7127dd86f462e4208b7596f57d50b3e0",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_benchmark_denominator_content_observed": {
+    "prompt_listed_url_occurrences": 98,
+    "prompt_unique_repositories": 95,
+    "prompt_repeated_repositories": 3,
+    "physical_carry_forward_rows": 98,
+    "historical_extra_rows": 3,
+    "current_upstream_unique_repository_refreshes": 0,
+    "current_upstream_prompt_occurrence_refreshes": 0,
+    "promoted_feature_mappings_or_final_no_matches": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_horizontal_overflow": false,
+      "benchmark_panel_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 661,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "benchmark_panel_observed": true,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 16,
+    "http_200": 16,
+    "failures": []
+  },
+  "generator_determinism": {
+    "benchmark_outputs_successful_runs": 2,
+    "benchmark_outputs_identical_sha256": true,
+    "dashboard_successful_runs": 2,
+    "dashboard_identical_sha256": true
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current upstream project, current-build application browser, feature benchmark, route, workflow, runtime, test, build, release, or audit-completion credit."
+}

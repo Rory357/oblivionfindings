@@ -18,7 +18,7 @@ from pathlib import Path
 
 AUDIT_DIR = Path(__file__).resolve().parents[1]
 HISTORICAL_DIR = AUDIT_DIR.parent / "oblivion-oss-comprehensive-audit-2026-08-12"
-GENERATED_AT = "2026-08-24T16:38:42+12:00"
+GENERATED_AT = "2026-08-24T17:26:22+12:00"
 APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 AUDIT_INPUT_COMMIT = "ec11042ea09d7bc56dff5b992b4d6ebfb03ad9df"
@@ -27,6 +27,18 @@ WAVE_01_SHA256 = "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2a
 WAVE_02_SHA256 = "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71"
 HISTORICAL_904_SHA256 = "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7"
 HISTORICAL_902_SHA256 = "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
+GOVERNING_PROMPT_SHA256 = "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+PROMPT_URL_OCCURRENCE_MULTISET_SHA256 = "a11def3fd47294297fb8aac9b327287059e063aeb58ccd2045d8afb9347f49f5"
+PROMPT_DUPLICATE_PROJECTS = {
+    "glpi-project/glpi",
+    "netbox-community/netbox",
+    "opf/openproject",
+}
+HISTORICAL_EXTRA_PROJECTS = {
+    "Bahmni/openmrs-module-ipd": "HISTORICAL_EXTRA_OUTSIDE_PROMPT",
+    "medplum/medplum-provider": "HISTORICAL_EXTRA_OUTSIDE_PROMPT",
+    "frappe/frappe": "SUPPLEMENTAL_OBSERVER_PROJECT_OUTSIDE_PROMPT",
+}
 
 
 def read_json(relative: str) -> dict:
@@ -69,7 +81,11 @@ with project_register_path.open(encoding="utf-8", newline="") as handle:
     historical_projects = list(historical_reader)
 
 assert len(historical_projects) == 98
-assert sum(row["project"] != "frappe/frappe" for row in historical_projects) == 97
+prompt_unique_projects = [row for row in historical_projects if row["project"] not in HISTORICAL_EXTRA_PROJECTS]
+assert len(prompt_unique_projects) == 95
+assert len({row["project"].lower() for row in prompt_unique_projects}) == 95
+assert PROMPT_DUPLICATE_PROJECTS <= {row["project"] for row in prompt_unique_projects}
+assert sum(2 if row["project"] in PROMPT_DUPLICATE_PROJECTS else 1 for row in prompt_unique_projects) == 98
 project_index = {row["project"]: row for row in historical_projects}
 
 wave1 = read_json("evidence/source/current-feature-discovery-wave-01.json")
@@ -333,8 +349,8 @@ ASSIGNMENTS = [
         "application_commit": APPLICATION_COMMIT,
         "architecture_rule": "Single tenant, multiple Sites; evaluate roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
         "pass_lens": "Pass 3 observer",
-        "scope": "Historical 97-project register structural validation and 30 provisional observed relations",
-        "benchmark_subset": "All 98 physical historical rows (97 prompt projects plus one supplemental) and 29 current grouped candidates",
+        "scope": "Agent-reported historical register structural validation and 30 provisional observed relations; the orchestrator subsequently corrected the prompt denominator",
+        "benchmark_subset": "All 98 physical historical rows and 29 current grouped candidates; corrected composition is 95 exact prompt repositories plus three historical extras",
         "evidence_schema": "Pins, structural counts, provisional mappings, limits, evidence count, completion test, runtime gate, and write attestation",
         "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
         "completion_test": "Validate every historical row structurally and return bounded provisional observations without upstream or completion inference.",
@@ -346,7 +362,7 @@ ASSIGNMENTS = [
         "wrote_files": False,
         "runtime_gates": None,
         "unresolved_gaps": "Current upstream activity/ref/licence/edition/behaviour refresh, exact target-specific neutral requirements, and feature completion remain open.",
-        "root_reconciliation": "Structural committed-local evidence only; no current upstream truth, licence refresh, current maintenance refresh, selected benchmark, or completion credit.",
+        "root_reconciliation": "Structural committed-local evidence only; no current upstream truth, licence refresh, current maintenance refresh, selected benchmark, or completion credit. The agent's 97-plus-one prompt composition was rejected: the literal prompt has 98 URL occurrences, 95 unique repositories, and three repeated repositories, while the physical register has those 95 exact repositories plus three historical extras.",
     },
     {
         "assignment_id": "RUN-008",
@@ -411,23 +427,57 @@ BENCHMARK_PAYLOAD = {
         "non_audit_product_diff_from_application_commit": 0,
     },
     "pins": {
-        "historical_project_register": {"sha256": PROJECT_REGISTER_SHA256, "physical_rows": 98, "prompt_denominator": 97, "supplemental_rows": 1},
+        "historical_project_register": {
+            "sha256": PROJECT_REGISTER_SHA256,
+            "physical_unique_rows": 98,
+            "exact_prompt_unique_rows": 95,
+            "historical_extra_rows": 3,
+            "prompt_listed_url_occurrences": 98,
+            "prompt_unique_repositories": 95,
+        },
         "current_candidate_wave_01_sha256": WAVE_01_SHA256,
         "current_candidate_wave_02_sha256": WAVE_02_SHA256,
         "historical_final_904_sha256": HISTORICAL_904_SHA256,
         "historical_final_902_sha256": HISTORICAL_902_SHA256,
     },
     "project_register_current_audit": {
-        "prompt_projects": 97,
-        "historical_rows_structurally_validated_local_only": 97,
-        "supplemental_rows_structurally_validated_local_only": 1,
-        "current_upstream_project_refreshes": 0,
+        "prompt_listed_url_occurrences": 98,
+        "prompt_unique_repositories": 95,
+        "prompt_repeated_repositories": {
+            "glpi-project/glpi": 2,
+            "netbox-community/netbox": 2,
+            "opf/openproject": 2,
+        },
+        "physical_unique_rows": 98,
+        "exact_prompt_unique_rows_structurally_validated_local_only": 95,
+        "historical_extra_rows_structurally_validated_local_only": 3,
+        "current_upstream_unique_repository_refreshes": 0,
+        "current_upstream_prompt_occurrence_refreshes": 0,
         "current_project_triage_completion_credit": 0,
         "licence_noassertion_rows": 11,
-        "prompt_denominator_outcomes": {"native_benchmark": 72, "reject": 15, "separate_future_decision": 10, "pending": 0},
-        "supplemental_outcomes": {"native_benchmark": 1},
+        "prompt_unique_repository_historical_outcomes": {"native_benchmark": 71, "reject": 14, "separate_future_decision": 10, "pending": 0},
+        "prompt_occurrence_weighted_historical_outcomes": {"native_benchmark": 74, "reject": 14, "separate_future_decision": 10, "pending": 0},
+        "historical_extra_outcomes": {"native_benchmark": 2, "reject": 1},
         "physical_row_outcomes": {"native_benchmark": 73, "reject": 15, "separate_future_decision": 10, "pending": 0},
-        "evidence_limit": "The committed historical rows are structurally complete enough to carry forward as provenance. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24.",
+        "evidence_limit": "The 95 exact prompt repositories and three historical extras are committed-local provenance. The 98 prompt URL occurrences include three duplicate repository listings. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24.",
+    },
+    "prompt_project_denominator_reconciliation": {
+        "status": "CORRECTED_NO_COMPLETION_CREDIT",
+        "governing_prompt_sha256": GOVERNING_PROMPT_SHA256,
+        "prompt_line_range": "496-515",
+        "reproduction": "Extract GitHub owner/repository URLs, lowercase and trim trailing slashes; sort with duplicates retained for the occurrence hash; also count unique URLs.",
+        "prompt_url_occurrence_multiset_sha256": PROMPT_URL_OCCURRENCE_MULTISET_SHA256,
+        "listed_url_occurrences": 98,
+        "unique_repositories": 95,
+        "duplicate_repository_occurrences": {project: 2 for project in sorted(PROMPT_DUPLICATE_PROJECTS)},
+        "physical_register_unique_rows": 98,
+        "exact_prompt_unique_rows": 95,
+        "historical_extra_rows": [
+            {"project": project, "classification": classification}
+            for project, classification in sorted(HISTORICAL_EXTRA_PROJECTS.items())
+        ],
+        "superseded_claim": "97 prompt projects plus one supplemental",
+        "consequence": "The superseded composition is not used for current project-triage percentages. Upstream refresh is measured as unique prompt repositories and prompt URL occurrences separately.",
     },
     "observer": {
         "assignment_id": "RUN-007",
@@ -499,7 +549,7 @@ AGENT_PAYLOAD = {
     "all_completion_tests_met": True,
     "all_reported_no_writes": True,
     "outstanding_required_roles_or_waves": ["RUN-010 page/support adjudication reconciliation", "additional formal assignment(s) toward planned 11", "fresh Pass 8 cross-reviewers", "final no-live-agent reconciliation"],
-    "contradictions_and_reconciliation": ["RUN-009 initially returned completion_test_met=false; a bounded follow-up returned all requested packets and a replacement completion audit with assignment-only completion_test_met=true.", "Historical verified benchmark labels and RUN-007 observer strength labels are not promoted into current candidate credit."],
+    "contradictions_and_reconciliation": ["RUN-009 initially returned completion_test_met=false; a bounded follow-up returned all requested packets and a replacement completion audit with assignment-only completion_test_met=true.", "Historical verified benchmark labels and RUN-007 observer strength labels are not promoted into current candidate credit.", "RUN-007 and the first orchestration pass described the register as 97 prompt projects plus one supplemental. Literal prompt reconciliation supersedes that claim with 98 URL occurrences, 95 unique prompt repositories, three repeated repositories, and three historical-extra register rows."],
     "live_agent_finalization_state": "NOT_EVALUATED_FOR_FINALIZATION; audit remains active and fresh Pass 8 has not run.",
     "assignment_returns": ASSIGNMENTS,
     "finalization_gate": False,
@@ -593,6 +643,7 @@ for candidate in candidates:
 
 CURRENT_REGISTER_FIELDS = historical_fields + [
     "current_audit_prompt_denominator_membership",
+    "current_prompt_occurrence_count",
     "current_local_structural_validation",
     "current_upstream_refresh_status",
     "current_target_specific_mapping_credit",
@@ -601,9 +652,16 @@ CURRENT_REGISTER_FIELDS = historical_fields + [
 current_register_rows = []
 for row in historical_projects:
     current = dict(row)
+    if row["project"] in HISTORICAL_EXTRA_PROJECTS:
+        membership = HISTORICAL_EXTRA_PROJECTS[row["project"]]
+        occurrence_count = 0
+    else:
+        membership = "IN_PROMPT_UNIQUE_95"
+        occurrence_count = 2 if row["project"] in PROMPT_DUPLICATE_PROJECTS else 1
     current.update(
         {
-            "current_audit_prompt_denominator_membership": "SUPPLEMENTAL_OUTSIDE_PROMPT_97" if row["project"] == "frappe/frappe" else "IN_PROMPT_97",
+            "current_audit_prompt_denominator_membership": membership,
+            "current_prompt_occurrence_count": occurrence_count,
             "current_local_structural_validation": "HISTORICAL_ROW_STRUCTURALLY_VALIDATED_COMMITTED_LOCAL_ONLY",
             "current_upstream_refresh_status": "NOT_REFRESHED_2026-08-24_CURRENT_AUDIT",
             "current_target_specific_mapping_credit": "false",
@@ -616,6 +674,16 @@ for row in historical_projects:
 def main() -> None:
     write_json("evidence/benchmark/current-benchmark-wave-01.json", BENCHMARK_PAYLOAD)
     write_json("evidence/benchmark/current-benchmark-agent-register.json", AGENT_PAYLOAD)
+    write_json(
+        "evidence/benchmark/current-prompt-project-denominator-reconciliation.json",
+        {
+            "schema_version": 1,
+            "status": "PROMPT_PROJECT_DENOMINATOR_RECONCILED_NO_UPSTREAM_OR_COMPLETION_CREDIT",
+            "generated_at": GENERATED_AT,
+            **BENCHMARK_PAYLOAD["prompt_project_denominator_reconciliation"],
+            "credit_boundary": "This corrects the project denominator only. It grants zero current upstream, licence, activity, behaviour, benchmark-selection, feature-mapping, or audit-completion credit.",
+        },
+    )
     write_csv("03-feature-to-benchmark-matrix.csv", MATRIX_FIELDS, matrix_rows)
     write_csv("06-open-source-benchmark-register.csv", CURRENT_REGISTER_FIELDS, current_register_rows)
 

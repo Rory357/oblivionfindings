@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "status": "CORRECTED_NO_COMPLETION_CREDIT",
+  "generated_at": "2026-08-24T17:26:22+12:00",
+  "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+  "prompt_line_range": "496-515",
+  "reproduction": "Extract GitHub owner/repository URLs, lowercase and trim trailing slashes; sort with duplicates retained for the occurrence hash; also count unique URLs.",
+  "prompt_url_occurrence_multiset_sha256": "a11def3fd47294297fb8aac9b327287059e063aeb58ccd2045d8afb9347f49f5",
+  "listed_url_occurrences": 98,
+  "unique_repositories": 95,
+  "duplicate_repository_occurrences": {
+    "glpi-project/glpi": 2,
+    "netbox-community/netbox": 2,
+    "opf/openproject": 2
+  },
+  "physical_register_unique_rows": 98,
+  "exact_prompt_unique_rows": 95,
+  "historical_extra_rows": [
+    {
+      "project": "Bahmni/openmrs-module-ipd",
+      "classification": "HISTORICAL_EXTRA_OUTSIDE_PROMPT"
+    },
+    {
+      "project": "frappe/frappe",
+      "classification": "SUPPLEMENTAL_OBSERVER_PROJECT_OUTSIDE_PROMPT"
+    },
+    {
+      "project": "medplum/medplum-provider",
+      "classification": "HISTORICAL_EXTRA_OUTSIDE_PROMPT"
+    }
+  ],
+  "superseded_claim": "97 prompt projects plus one supplemental",
+  "consequence": "The superseded composition is not used for current project-triage percentages. Upstream refresh is measured as unique prompt repositories and prompt URL occurrences separately.",
+  "credit_boundary": "This corrects the project denominator only. It grants zero current upstream, licence, activity, behaviour, benchmark-selection, feature-mapping, or audit-completion credit."
+}

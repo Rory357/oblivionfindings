@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "FORMAL_BENCHMARK_WAVE_01_RECONCILED_AUDIT_INCOMPLETE",
-  "generated_at": "2026-08-24T16:38:42+12:00",
+  "generated_at": "2026-08-24T17:26:22+12:00",
   "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
   "writer_boundary": "Only the root orchestrator wrote audit artifacts; RUN-007 through RUN-009 returned evidence in messages and reported wrote_files=false.",
   "wave_formal_assignments_eligible": 3,
@@ -21,7 +21,8 @@
   ],
   "contradictions_and_reconciliation": [
     "RUN-009 initially returned completion_test_met=false; a bounded follow-up returned all requested packets and a replacement completion audit with assignment-only completion_test_met=true.",
-    "Historical verified benchmark labels and RUN-007 observer strength labels are not promoted into current candidate credit."
+    "Historical verified benchmark labels and RUN-007 observer strength labels are not promoted into current candidate credit.",
+    "RUN-007 and the first orchestration pass described the register as 97 prompt projects plus one supplemental. Literal prompt reconciliation supersedes that claim with 98 URL occurrences, 95 unique prompt repositories, three repeated repositories, and three historical-extra register rows."
   ],
   "live_agent_finalization_state": "NOT_EVALUATED_FOR_FINALIZATION; audit remains active and fresh Pass 8 has not run.",
   "assignment_returns": [
@@ -33,8 +34,8 @@
       "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
       "architecture_rule": "Single tenant, multiple Sites; evaluate roles/action authority, approved-Site scope, canonical ownership, concealed direct IDs, and privacy—not tenant isolation.",
       "pass_lens": "Pass 3 observer",
-      "scope": "Historical 97-project register structural validation and 30 provisional observed relations",
-      "benchmark_subset": "All 98 physical historical rows (97 prompt projects plus one supplemental) and 29 current grouped candidates",
+      "scope": "Agent-reported historical register structural validation and 30 provisional observed relations; the orchestrator subsequently corrected the prompt denominator",
+      "benchmark_subset": "All 98 physical historical rows and 29 current grouped candidates; corrected composition is 95 exact prompt repositories plus three historical extras",
       "evidence_schema": "Pins, structural counts, provisional mappings, limits, evidence count, completion test, runtime gate, and write attestation",
       "no_write_rule": "Return structured evidence in the agent message; do not edit repository files.",
       "completion_test": "Validate every historical row structurally and return bounded provisional observations without upstream or completion inference.",
@@ -46,8 +47,8 @@
       "wrote_files": false,
       "runtime_gates": null,
       "unresolved_gaps": "Current upstream activity/ref/licence/edition/behaviour refresh, exact target-specific neutral requirements, and feature completion remain open.",
-      "root_reconciliation": "Structural committed-local evidence only; no current upstream truth, licence refresh, current maintenance refresh, selected benchmark, or completion credit.",
-      "normalized_payload_sha256": "4645856305034f553d926aad261056dc339f69bcce6a81d1428ff52a81745023"
+      "root_reconciliation": "Structural committed-local evidence only; no current upstream truth, licence refresh, current maintenance refresh, selected benchmark, or completion credit. The agent's 97-plus-one prompt composition was rejected: the literal prompt has 98 URL occurrences, 95 unique repositories, and three repeated repositories, while the physical register has those 95 exact repositories plus three historical extras.",
+      "normalized_payload_sha256": "d4fc8292bd6b64b721ba4008c864a14ebcbe4db9b47476f07c8b3dedff199ed2"
     },
     {
       "assignment_id": "RUN-008",

@@ -65,7 +65,7 @@ Nine additional P1 source claims were retained provisionally, bringing the curre
 
 Three separate no-write agents completed the bounded observer, neutralizer, and native-comparator roles, bringing the fresh run to nine reconciled formal assignments at that stage. RUN-010 and the corrected independent RUN-011 page reconciliation below bring the current total to 11. The prompt's numerical minimum of eight and the planned current-run target of 11 are met, but fresh Pass 8 reviewers, all-results-represented proof, and the final no-live-agent gate remain open.
 
-The historical project register remains 98 physical rows: 97 projects in the prompt denominator plus supplemental `frappe/frappe`. All 98 rows passed committed-local structural checks, but zero of the 97 prompt projects was refreshed against current upstream activity, ref reachability, licence, edition boundary, or behaviour on 24 August 2026. The historical rows are provenance, not current project-triage credit.
+Literal reconciliation corrected the project denominator. The prompt contains 98 GitHub URL occurrences representing 95 unique repositories because `glpi-project/glpi`, `netbox-community/netbox`, and `opf/openproject` each appear in two categories. The 98-row physical carry-forward register contains those 95 exact repositories plus three historical extras: `Bahmni/openmrs-module-ipd`, `medplum/medplum-provider`, and supplemental observer project `frappe/frappe`. All rows passed committed-local structural checks, but zero of the 95 prompt repositories—equivalently zero of 98 listed occurrences—was refreshed against current upstream activity, ref reachability, licence, edition boundary, or behaviour on 24 August 2026. The superseded 97-plus-one composition receives no credit.
 
 RUN-007 returned 30 provisional observer relations across 29 of the 172 grouped candidates. RUN-008 challenged 15 samples—five semantic/UI collisions failed, five retained only a partial neutral requirement, and five survived a narrow static requirement—and identified nine collision/composite groups. RUN-009 completed eight high-risk comparison packets: zero copied-baseline classifications, two stronger-native-control observations, four Oblivion-specific gaps, and two domains with no credible comparison at the packet level.
 
@@ -108,13 +108,15 @@ The existing signed-in deployed session at `https://oblivionfindings.com/my-day`
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and zero-credit evidence.
 - `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
+- `evidence/benchmark/current-prompt-project-denominator-reconciliation.json`: literal 98-occurrence/95-unique prompt reconciliation, repeated repositories, historical extras, and the superseded 97-plus-one claim.
 - `evidence/runtime/current-runtime-safety-assessment.json`: sanitized environment and setup-boundary evidence with zero runtime credit.
 - `evidence/browser/deployed-build-identity-assessment.json`: read-only deployed/local asset identity assessment with zero current-source application-browser credit.
 - `evidence/browser/current-audit-dashboard-verification-runtime-gates-01.json`: responsive audit-dashboard and local evidence-link verification after the runtime/build gate update.
+- `evidence/browser/current-audit-dashboard-verification-benchmark-denominator-01.json`: responsive dashboard and local evidence-link verification after correcting the prompt project denominator.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
 - `03-feature-to-benchmark-matrix.csv`: interim 172-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
-- `06-open-source-benchmark-register.csv`: the 98 historical rows carried forward with an explicit 97-plus-one denominator and zero current upstream refresh or mapping credit.
+- `06-open-source-benchmark-register.csv`: 95 exact prompt-repository rows plus three historical extras, with prompt occurrence weights totalling 98 and zero current upstream refresh or mapping credit.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.
 - `generators/build-current-source-census.py`: the deterministic static collector. It reads committed Git objects and writes only inside this audit directory.
 - `generators/integrate-source-wave-01.py`: deterministic normalization for the first formal semantic/source wave and dashboard.
@@ -130,7 +132,7 @@ The collector was rerun twice with identical output hashes. It did not boot Lara
 1. Preserve the 711-file static page-root denominator and finish framework-route reachability, route/page-to-feature mapping, and canonical backend/data/test ownership; the semantic/runtime graph remains partial.
 2. Continue module discovery and adjudicate the H/D/M feature universe; use the historical 904 register only as a crosswalk.
 3. Reconstruct current route/page ownership, module maps, task scripts, eight journeys, visual states, and all eight pass ledgers.
-4. Refresh all 97 prompt projects from official upstream evidence and finish one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen; the first A/B/C evidence wave grants zero mapping credit.
+4. Refresh all 95 unique prompt repositories from official upstream evidence, reconcile all 98 category occurrences, and finish one verified benchmark or documented `No credible match` for every feature after the canonical denominator is frozen; the first A/B/C evidence wave grants zero mapping credit.
 5. Run browser and runtime lanes only when their environment, build identity, roles, fixtures, and non-mutation boundary are proven.
 6. Freeze artifacts, dispatch fresh independent Pass 8 review, integrate only through the orchestrator, validate all literal completion gates, and update the dashboard from current structured evidence.
 

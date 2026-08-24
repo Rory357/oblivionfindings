@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "CURRENT_BENCHMARK_WAVE_01_RECONCILED_NO_COMPLETION_CREDIT",
-  "generated_at": "2026-08-24T16:38:42+12:00",
+  "generated_at": "2026-08-24T17:26:22+12:00",
   "source": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
@@ -11,9 +11,11 @@
   "pins": {
     "historical_project_register": {
       "sha256": "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe",
-      "physical_rows": 98,
-      "prompt_denominator": 97,
-      "supplemental_rows": 1
+      "physical_unique_rows": 98,
+      "exact_prompt_unique_rows": 95,
+      "historical_extra_rows": 3,
+      "prompt_listed_url_occurrences": 98,
+      "prompt_unique_repositories": 95
     },
     "current_candidate_wave_01_sha256": "c422cfd9e4005c083518abe9e8837c16740e8797b249ffdd2a9f9e4e00ad2aeb",
     "current_candidate_wave_02_sha256": "3a9404e19db17d46b88b13bf545f22e1fe4897b41cc119341f56197a8b321a71",
@@ -21,20 +23,35 @@
     "historical_final_902_sha256": "21f182c0a2d8cb3416ab7c8d54a27698673e324e0c7945ee9e5fb3a9a61b961f"
   },
   "project_register_current_audit": {
-    "prompt_projects": 97,
-    "historical_rows_structurally_validated_local_only": 97,
-    "supplemental_rows_structurally_validated_local_only": 1,
-    "current_upstream_project_refreshes": 0,
+    "prompt_listed_url_occurrences": 98,
+    "prompt_unique_repositories": 95,
+    "prompt_repeated_repositories": {
+      "glpi-project/glpi": 2,
+      "netbox-community/netbox": 2,
+      "opf/openproject": 2
+    },
+    "physical_unique_rows": 98,
+    "exact_prompt_unique_rows_structurally_validated_local_only": 95,
+    "historical_extra_rows_structurally_validated_local_only": 3,
+    "current_upstream_unique_repository_refreshes": 0,
+    "current_upstream_prompt_occurrence_refreshes": 0,
     "current_project_triage_completion_credit": 0,
     "licence_noassertion_rows": 11,
-    "prompt_denominator_outcomes": {
-      "native_benchmark": 72,
-      "reject": 15,
+    "prompt_unique_repository_historical_outcomes": {
+      "native_benchmark": 71,
+      "reject": 14,
       "separate_future_decision": 10,
       "pending": 0
     },
-    "supplemental_outcomes": {
-      "native_benchmark": 1
+    "prompt_occurrence_weighted_historical_outcomes": {
+      "native_benchmark": 74,
+      "reject": 14,
+      "separate_future_decision": 10,
+      "pending": 0
+    },
+    "historical_extra_outcomes": {
+      "native_benchmark": 2,
+      "reject": 1
     },
     "physical_row_outcomes": {
       "native_benchmark": 73,
@@ -42,7 +59,39 @@
       "separate_future_decision": 10,
       "pending": 0
     },
-    "evidence_limit": "The committed historical rows are structurally complete enough to carry forward as provenance. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24."
+    "evidence_limit": "The 95 exact prompt repositories and three historical extras are committed-local provenance. The 98 prompt URL occurrences include three duplicate repository listings. Current activity, refs, licences, edition boundaries, and exact upstream behavior were not refreshed on 2026-08-24."
+  },
+  "prompt_project_denominator_reconciliation": {
+    "status": "CORRECTED_NO_COMPLETION_CREDIT",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "prompt_line_range": "496-515",
+    "reproduction": "Extract GitHub owner/repository URLs, lowercase and trim trailing slashes; sort with duplicates retained for the occurrence hash; also count unique URLs.",
+    "prompt_url_occurrence_multiset_sha256": "a11def3fd47294297fb8aac9b327287059e063aeb58ccd2045d8afb9347f49f5",
+    "listed_url_occurrences": 98,
+    "unique_repositories": 95,
+    "duplicate_repository_occurrences": {
+      "glpi-project/glpi": 2,
+      "netbox-community/netbox": 2,
+      "opf/openproject": 2
+    },
+    "physical_register_unique_rows": 98,
+    "exact_prompt_unique_rows": 95,
+    "historical_extra_rows": [
+      {
+        "project": "Bahmni/openmrs-module-ipd",
+        "classification": "HISTORICAL_EXTRA_OUTSIDE_PROMPT"
+      },
+      {
+        "project": "frappe/frappe",
+        "classification": "SUPPLEMENTAL_OBSERVER_PROJECT_OUTSIDE_PROMPT"
+      },
+      {
+        "project": "medplum/medplum-provider",
+        "classification": "HISTORICAL_EXTRA_OUTSIDE_PROMPT"
+      }
+    ],
+    "superseded_claim": "97 prompt projects plus one supplemental",
+    "consequence": "The superseded composition is not used for current project-triage percentages. Upstream refresh is measured as unique prompt repositories and prompt URL occurrences separately."
   },
   "observer": {
     "assignment_id": "RUN-007",
