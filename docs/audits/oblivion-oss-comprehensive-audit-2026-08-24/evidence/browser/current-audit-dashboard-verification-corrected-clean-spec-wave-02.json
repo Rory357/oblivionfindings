@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "status": "CORRECTED_CLEAN_SPEC_AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-25T04:07:01.0508248+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-4437ac007-run057#benchmarks",
+  "dashboard_sha256": "68a24aa869b13ba52a64173b1aa9855f5394f94c97e567cb1a02ee0792c77f6a",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_corrected_chain_content_observed": {
+    "historical_checkpoint": "RUN-047 through RUN-052 retained as superseded provenance only",
+    "current_chain": "RUN-053 through RUN-057",
+    "selected_packets": 24,
+    "agent_a_split": {
+      "exact": 8,
+      "partial_adjacent": 4,
+      "insufficient_adjacent": 12
+    },
+    "neutral_atoms": 252,
+    "neutral_consumed_atoms": 165,
+    "neutral_retained_unknown_atoms": 87,
+    "specification_units": 24,
+    "acceptance_outcomes": 58,
+    "explicit_unknowns_preserved": 85,
+    "source_anchor_occurrences": 155,
+    "source_unique_anchor_strings": 148,
+    "source_anchor_paths": 84,
+    "fresh_c_lens_ratings": 144,
+    "fresh_d_semantic_reviews": 226,
+    "fresh_d_accept": 225,
+    "fresh_d_correct": 1,
+    "fresh_d_reject": 0,
+    "corrected_outcome_id": "AO-A53-024-01",
+    "corrected_outcome_rating": "EVIDENCED_PARTIAL",
+    "formal_edges": 0,
+    "final_no_matches": 0,
+    "promoted_feature_mappings_or_final_no_matches": 0,
+    "canonical_mapping_credit_fraction": "0/340",
+    "stale_twenty_four_exact_facets_current_claim_observed": false
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "document_client_width": 1425,
+      "document_horizontal_overflow": false,
+      "benchmark_panel_observed": true,
+      "corrected_chain_heading_observed": true,
+      "corrected_review_and_zero_credit_text_observed": true,
+      "console_warnings_or_errors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "document_client_width": 375,
+      "document_horizontal_overflow": false,
+      "progress_card_columns": 2,
+      "benchmark_table_scroll_width": 680,
+      "benchmark_table_client_width": 311,
+      "benchmark_table_horizontal_scroll_intentional": true,
+      "corrected_review_and_zero_credit_text_observed": true,
+      "console_warnings_or_errors": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus deterministic filesystem existence validation against the same local audit-only root",
+    "rendered_hrefs": 68,
+    "local_files_checked": 60,
+    "local_files_existing": 60,
+    "missing": 0,
+    "failures": [],
+    "direct_json_navigation": "BLOCKED_BY_BROWSER_CLIENT_AND_NOT_COUNTED_AS_RENDERED_JSON_VERIFICATION",
+    "direct_json_navigation_boundary": "The in-app browser client blocked direct local JSON navigation with ERR_BLOCKED_BY_CLIENT. File existence and exact SHA-256 remain established by deterministic local validation; no rendered JSON claim is made."
+  },
+  "generator_determinism": {
+    "run_057_integration_successful_runs": 2,
+    "run_057_outputs_identical_sha256": true,
+    "run_057_comparison_sha256": "c672dfa178ef5e4f8412e3492506d13ecb702e0dd05826b669476c613b89fb0e",
+    "run_057_register_sha256": "d1f322e926b3d4b16a9c162d5e8a66f4f8c02a3db5a5b09f2e5ad751ad2a64af",
+    "dashboard_successful_runs": 2,
+    "dashboard_identical_sha256": true
+  },
+  "fresh_d_return_integrity": {
+    "artifact_sha256": "02d858172bebe4a98de407be10001bc3db8b8da7c55197153a4c4604f3728bf5",
+    "exact_structured_message_sha256": "c320c886173492482b280798164611b88c3e29d8eb97b2a827b61179e9f397ff",
+    "canonical_row_set_sha256": "e66fde050683c2354a11c656248806b62ad2742c58e88b158c561b25d23714d6",
+    "independent_red_team_after_fix": "PASS"
+  },
+  "canonical_matrix_guard": {
+    "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "unchanged": true,
+    "credited_targets": 0,
+    "canonical_targets": 340
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": {
+    "audit_dashboard_render_verification_only": true,
+    "current_build_application_browser_credit": false,
+    "benchmark_mapping_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  }
+}

@@ -50,7 +50,7 @@ CURRENT_INPUTS = [
     ("RUN-055-INPUT", "raw-run-055-agent-c-comparison-input-wave-02.json", "5422d3b25795189be5fd5070bb18d3e82af17b718fd821f735b5bc0d9c9a57e7", 232684),
     ("RUN-055-OUTPUT", "raw-run-055-fresh-agent-c-current-comparison-wave-02.json", "666c6de668cc8f1db3661e55da309034992d1e27d904c740159bc4f3039fb275", 71099),
     ("RUN-056-INPUT", "raw-run-056-independent-adjudicator-input-wave-02.json", "b611f1e513f1eb8153a6832d179e4708c6b17ae2e326abe6c74e5a0b8746cbc7", 688139),
-    ("RUN-056-OUTPUT", "raw-run-056-fresh-independent-corrected-chain-adjudication-wave-02.json", "f1a8fe263ffcf94ea32972a74365ff9f58b32ec0021e50b7f37a3340d02a92dd", 85350),
+    ("RUN-056-OUTPUT", "raw-run-056-fresh-independent-corrected-chain-adjudication-wave-02.json", "02d858172bebe4a98de407be10001bc3db8b8da7c55197153a4c4604f3728bf5", 85760),
 ]
 HISTORICAL_INPUTS = [
     {"logical_id": "RUN-048", "path": "raw-run-048-blind-neutral-facet-requirements-wave-02.json", "sha256": "fa9b793ad851d90a1871b0ce7de76906026144fce3e54ff8f502352f72584bd6"},
@@ -230,6 +230,11 @@ assert c_output["run_id"] == "RUN-055-AGENT-C-COMPARISON-WAVE-02"
 assert d_input["run_id"] == "RUN-056-INPUT"
 assert d_output["schema_version"] == "RUN-056-D-ADJUDICATION-1"
 assert d_output["status"] == "PASS_WITH_ONE_BOUNDED_SEMANTIC_CORRECTION_ZERO_CREDIT"
+assert d_output["agent_return_integrity"] == {
+    "exact_structured_message_sha256": RUN_056_MESSAGE_SHA256,
+    "canonical_row_set_sha256": RUN_056_ROWS_SHA256,
+    "transport": "Agent returned structured JSON; the orchestrator alone materialized this repository artifact and recorded the exact-message and canonical-row hashes.",
+}
 
 # Sealed provenance.
 assert d_input["manifest_sha256"] == RUN_056_MANIFEST_SHA256

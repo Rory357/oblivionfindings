@@ -117,8 +117,8 @@
     {
       "logical_id": "RUN-056-OUTPUT",
       "path": "raw-run-056-fresh-independent-corrected-chain-adjudication-wave-02.json",
-      "sha256": "f1a8fe263ffcf94ea32972a74365ff9f58b32ec0021e50b7f37a3340d02a92dd",
-      "bytes": 85350
+      "sha256": "02d858172bebe4a98de407be10001bc3db8b8da7c55197153a4c4604f3728bf5",
+      "bytes": 85760
     }
   ],
   "agent_return_integrity": {

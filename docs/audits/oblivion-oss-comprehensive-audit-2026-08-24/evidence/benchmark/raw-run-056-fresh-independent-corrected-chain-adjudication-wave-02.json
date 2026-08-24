@@ -1,6 +1,11 @@
 {
   "schema_version": "RUN-056-D-ADJUDICATION-1",
   "status": "PASS_WITH_ONE_BOUNDED_SEMANTIC_CORRECTION_ZERO_CREDIT",
+  "agent_return_integrity": {
+    "exact_structured_message_sha256": "c320c886173492482b280798164611b88c3e29d8eb97b2a827b61179e9f397ff",
+    "canonical_row_set_sha256": "e66fde050683c2354a11c656248806b62ad2742c58e88b158c561b25d23714d6",
+    "transport": "Agent returned structured JSON; the orchestrator alone materialized this repository artifact and recorded the exact-message and canonical-row hashes."
+  },
   "seal_validation": {
     "allowed_file": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\oblivion-oss-comprehensive-audit-2026-08-24\\evidence\\benchmark\\raw-run-056-independent-adjudicator-input-wave-02.json",
     "expected_sha256": "b611f1e513f1eb8153a6832d179e4708c6b17ae2e326abe6c74e5a0b8746cbc7",
@@ -2244,4 +2249,3 @@
     "writes_or_mutations": false
   }
 }
-
