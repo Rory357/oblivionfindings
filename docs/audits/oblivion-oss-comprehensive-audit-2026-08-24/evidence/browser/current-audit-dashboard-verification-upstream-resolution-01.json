@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "verification_id": "DASHBOARD-RUN-038-RESPONSIVE-01",
+  "verified_at": "2026-08-24T22:29:01+12:00",
+  "dashboard": {
+    "path": "audit-dashboard.html",
+    "sha256": "40a94160b5dd24b8162856202844b8c5df25c4c84f39a92a349a6cd3c89820fe",
+    "served_url": "http://127.0.0.1:8771/audit-dashboard.html?v=run038-precommit#benchmarks",
+    "generator": "generators/build-current-audit-dashboard.py"
+  },
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "audit_integration_base_commit": "d41407a91"
+  },
+  "static_checks": {
+    "href_count": 41,
+    "local_file_links": 33,
+    "missing_local_links": 0,
+    "deterministic_regeneration": true,
+    "diff_check_clean": true,
+    "placeholder_scan_clean": true,
+    "credential_pattern_scan_clean": true,
+    "python_cache_residue": 0
+  },
+  "desktop_browser_check": {
+    "viewport_css_pixels": {"width": 1137, "height": 912},
+    "document_width_css_pixels": 1122,
+    "page_horizontal_overflow": false,
+    "badge": "IN PROGRESS · NOT COMPREHENSIVE",
+    "benchmark_section_visible": true,
+    "observer_denominator": "95 / 95 unique; 98 / 98 occurrence-weighted",
+    "effective_observer_status": "88 complete observer-only; 7 partial",
+    "partial_record_review": "16 / 16 reviewed; 9 resolved observer-only; 7 retained partial",
+    "promoted_mapping_or_final_no_match": "0 / 340",
+    "missing_images": 0,
+    "console_error_count": 0
+  },
+  "mobile_browser_check": {
+    "requested_viewport_css_pixels": {"width": 390, "height": 844},
+    "document_client_width_css_pixels": 375,
+    "document_scroll_width_css_pixels": 375,
+    "page_horizontal_overflow": false,
+    "split_layout_columns": 1,
+    "summary_card_columns": 2,
+    "table_wrappers": 6,
+    "table_wrapper_overflow_x": "auto",
+    "console_error_count": 0,
+    "viewport_override_reset_after_check": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_browser_verification_only": true,
+    "current_application_browser_credit": 0,
+    "runtime_credit": 0,
+    "benchmark_mapping_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}
