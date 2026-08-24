@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-054-CORRECTION",
+  "generated_at": "2026-08-25T02:50:00+12:00",
+  "role": "FRESH_AGENT_B_INPUT_BOUNDARY_ATTESTATION_CORRECTION",
+  "responsible_agent_identity": "/root/run054_fresh_agent_b",
+  "orchestrator_writer_identity": "/root",
+  "status": "PROVENANCE_WORDING_CORRECTED_NEUTRAL_PAYLOAD_UNCHANGED_ZERO_CREDIT",
+  "parent_neutral_payload": {
+    "path": "raw-run-054-fresh-agent-b-neutral-requirements-wave-02.json",
+    "file_sha256": "7e1e2203dd5af9852f69b1ff5ad05a5d031e4d8d12096ee39055129954f01a68",
+    "canonical_agent_payload_sha256": "6cd60a87324025e4e63586dd75a5262f5ed06d9081d051882b0d9ad338895b5e",
+    "rows": 24
+  },
+  "correction_id": "RUN-054-INPUT-BOUNDARY-CORRECTION",
+  "signed_by": "/root/run054_fresh_agent_b",
+  "correction_scope": "PROVENANCE_WORDING_ONLY",
+  "corrected_input_boundary": {
+    "members_actually_read": [
+      "packets"
+    ],
+    "attempted_absent_member": "blind_payload_contract.clean_specification_rule",
+    "original_orchestrator_task_contract_used": true,
+    "additional_files_or_inputs_accessed": false
+  },
+  "governing_task_rules_used": {
+    "transformation": "A observed behavior to B neutral actor needs, states, information hierarchy, feedback, safeguards, usability principles, unknowns, and acceptance outcomes",
+    "derivation_classes": {
+      "8_EXACT": "BENCHMARK_DERIVED",
+      "4_PARTIAL": "BOUNDED_ADJACENT_PRINCIPLE",
+      "12_INSUFFICIENT": "NO_EXACT_BENCHMARK_REQUIREMENT"
+    },
+    "limitations_remain_unknown": true,
+    "partial_non_promotable": true,
+    "insufficient_non_promotable": true,
+    "no_current_source_comparison": true,
+    "no_product_or_source_identity_inference": true,
+    "no_benchmark_credit": true
+  },
+  "existing_payload": {
+    "row_count": 24,
+    "canonical_sha256": "6cd60a87324025e4e63586dd75a5262f5ed06d9081d051882b0d9ad338895b5e",
+    "byte_unchanged": true,
+    "semantically_unchanged": true,
+    "neutral_rows_changed": false
+  },
+  "benchmark_credit_count": 0,
+  "writes_performed_for_this_correction": false,
+  "credit_boundary": {
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "benchmark_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "external_mutations_attestation": "Agent B made no semantic row change and performed no write; only the orchestrator materialized this signed provenance correction."
+}

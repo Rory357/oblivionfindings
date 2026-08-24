@@ -1,0 +1,3797 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-054",
+  "generated_at": "2026-08-24T14:32:44.202Z",
+  "role": "FRESH_AGENT_B_IDENTITY_BLIND_NEUTRAL_SPECIFICATION",
+  "responsible_agent_identity": "/root/run054_fresh_agent_b",
+  "orchestrator_writer_identity": "/root",
+  "status": "TWENTY_FOUR_PACKET_NEUTRALIZATION_COMPLETE_ZERO_CREDIT",
+  "parent_agent_a_packet": {
+    "path": "raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json",
+    "file_sha256": "835ec0755a5a4b5543f317969e9ba557bc156b137083df925f05d4b753ccde6b",
+    "packet_set_sha256": "066d6b5c095ffdf66579da90f30f186dcb839666c19ff5c894bf1c5c26a3078c"
+  },
+  "agent_return_integrity": {
+    "exact_structured_message_sha256": "b33ae73eada592843137c7157ef72e14a04fe1fcda2070c8340868c7d793160a",
+    "canonical_payload_sha256": "6cd60a87324025e4e63586dd75a5262f5ed06d9081d051882b0d9ad338895b5e",
+    "transport": "Agent returned structured JSON; the orchestrator alone materialized this repository artifact."
+  },
+  "agent": {
+    "identity": "/root/run054_fresh_agent_b",
+    "role": "fresh_agent_b_neutral_specification_writer"
+  },
+  "input_boundary_attestation": {
+    "files_accessed": [
+      "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\oblivion-oss-comprehensive-audit-2026-08-24\\evidence\\benchmark\\raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json"
+    ],
+    "json_members_used": [
+      "packets",
+      "blind_payload_contract.clean_specification_rule"
+    ],
+    "clean_specification_rule_present": false,
+    "other_repository_inputs_accessed": false,
+    "application_or_runtime_inspected": false,
+    "git_history_inspected": false,
+    "other_audit_artifacts_inspected": false,
+    "internet_accessed": false,
+    "writes_or_vcs_mutations": false
+  },
+  "input_packet_set_sha256": {
+    "value": "066d6b5c095ffdf66579da90f30f186dcb839666c19ff5c894bf1c5c26a3078c",
+    "basis": "orchestrator_asserted"
+  },
+  "atom_disposition_legend": {
+    "consumed": "Used only to express the packet-bounded neutral outcome or its boundary.",
+    "retained_unknown": "Preserved as an absence, limitation, or unresolved matter and not converted into a positive requirement.",
+    "excluded": "Reserved for an input atom omitted from derivation with a stated reason."
+  },
+  "rows": [
+    {
+      "opaque_id": "A53-001",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-001-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-001-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "An existing inactive worker record may be returned to active use while its already-linked access record is restored; this does not establish a distinct re-engagement transaction.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_states_and_transitions:1",
+            "observed_states_and_transitions:2",
+            "observed_information_architecture:1",
+            "explicit_limitations:3"
+          ],
+          "actor_needs": [
+            {
+              "text": "Resume use of the same worker record and its linked access record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A departed or inactive worker record can become active, with linked access changing from disabled to enabled.",
+              "atom_ids": [
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "text": "Clearing the departure association is a separate adjacent lifecycle action.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The observed boundary contains one existing worker record and one linked access record.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Keep the coupled worker-and-access outcome understandable as a change to existing records.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "No distinct confirmation or consequence summary for re-engagement was established.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "A new service period, timing, reason, and separate authority remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Contractual, entitlement, and downstream consequences remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-001-01",
+              "text": "Within the adjacent behavior only, returning the existing worker record to active also enables its linked access record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-001-02",
+              "text": "No acceptance claim is made for a separate re-engagement workflow or its consequences.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "explicit_limitations:1",
+                "explicit_limitations:2",
+                "explicit_limitations:3"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not add a new service period, effective timing, reason, authority, contractual consequence, or downstream effect.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-002",
+      "source_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "derivation_class": "BOUNDED_ADJACENT_PRINCIPLE",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "BAP-A53-002-01"
+      ],
+      "specification_units": [
+        {
+          "id": "BAP-A53-002-01",
+          "unit_type": "SCOPE_LIMITED_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "scope_limitation": {
+            "id": "SL-A53-002",
+            "text": "Applies only to confirming links between selected unmatched bank items and reference records; it does not establish allocation, settlement, posting, actor provenance, durable decision history, or repeat-request behavior.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "observed_feedback_and_recovery:2",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          },
+          "statement": "A user may confirm one or more proposed links only after the selected sources, reference identities, and totals satisfy the observed checks.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_user_visible_behaviour:4"
+          ],
+          "actor_needs": [
+            {
+              "text": "Review selected unmatched source items alongside proposed reference records before confirming their links.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "Eligible, valid source items change from unmatched to matched; invalid submissions remain unmatched.",
+              "atom_ids": [
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "A single confirmation outcome may cover multiple source items and multiple reference entries.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Validation failure prevents confirmation.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Missing, excluded, previously linked, invalidly referenced, or materially unequal inputs produce rejection rather than links.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Observed safeguards cover source eligibility, reference identity, and total consistency only.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Make the distinction between a confirmed link and an unchanged unmatched item evident through the outcome.",
+              "atom_ids": [
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Returning the original outcome for a repeated request was not established.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2",
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "User authority, actor attribution, and retained decision history remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Equivalence to allocation or settlement behavior remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-002-01",
+              "text": "Within SL-A53-002, valid eligible sources, valid references, and consistent totals result in the selected links and matched source states.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4",
+                "observed_states_and_transitions:1"
+              ],
+              "scope_limitation_id": "SL-A53-002",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-002-02",
+              "text": "Within SL-A53-002, an invalid submission produces no confirmation and leaves its sources unmatched.",
+              "atom_ids": [
+                "observed_states_and_transitions:2",
+                "observed_feedback_and_recovery:1"
+              ],
+              "scope_limitation_id": "SL-A53-002",
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_IF_SCOPE_LIMITATION_SL_A53_002_IS_RETAINED",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer payment allocation, settlement, posting, durable provenance, authority, or replay semantics.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 13,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-003",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-003-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-003-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "An active inventory listing may show and order current quantity by lot while omitting destroyed lots; this is not evidence of a physical balance check.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2"
+          ],
+          "actor_needs": [
+            {
+              "text": "Inspect current displayed quantity for each active inventory lot.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A destroyed lot ceases to appear in the active inventory listing.",
+              "atom_ids": [
+                "observed_states_and_transitions:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Quantity is associated with each individual lot.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Support quantity-oriented scanning and ordering within the active-lot list.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Count results, mismatch feedback, and reconciliation outcomes were not observed.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "A physical count, expected-versus-observed comparison, accountable checkers, timing, and pass-or-fail meaning remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "The inventory context was not established as controlled-medication-specific.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-003-01",
+              "text": "Within the adjacent listing behavior, active lots expose per-lot quantity and can be ordered by that quantity.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-003-02",
+              "text": "Destroyed lots do not remain in the active listing.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer a physical count, discrepancy decision, reconciliation flow, witness model, or controlled-medication context.",
+            "atom_ids": [
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 8,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-004",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-004-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-004-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "A correction to an existing clinical observation must create a linked replacement, retain the earlier version, and retain the reason for the change.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_information_architecture:1",
+            "observed_feedback_and_recovery:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Correct a clinical observation without erasing the content that was previously authoritative.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "Observation meaning distinguishes not-final, final, and amended states.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Amending a final observation creates an amended replacement and retires, but does not erase, the earlier version.",
+              "atom_ids": [
+                "observed_states_and_transitions:2",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Successive observation versions retain links that make earlier content traceable.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "The explanation remains associated with the superseded version.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "The retained prior version supplies historical recovery evidence.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "A change explanation is required before an amendment is completed.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep the relationship between the current version, earlier version, and change reason traceable.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_feedback_and_recovery:1",
+                "observed_feedback_and_recovery:2"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Visible confirmation, approval, signature, and assessment of explanation quality remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Concurrent amendments and repeated submissions remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Complete preservation of complex attachments was not established.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            },
+            {
+              "text": "How provenance is shown to end users remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:4"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-004-01",
+              "text": "A completed amendment yields a linked replacement while the prior observation and its change explanation remain available as history.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:2",
+                "observed_information_architecture:1",
+                "observed_feedback_and_recovery:1",
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "id": "AO-A53-004-02",
+              "text": "An amendment is not accepted without a change explanation.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_VERSIONED_OBSERVATION_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not add approval, signature, explanation scoring, concurrency, replay, attachment-completeness, or provenance-display requirements.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3",
+              "explicit_limitations:4"
+            ]
+          }
+        ]
+      },
+      "atom_count": 12,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown",
+        "explicit_limitations:4": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-005",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-005-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-005-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "An authorized profile edit may create an enabled access record from a worker email and link it to the existing worker record; this does not establish an invitation lifecycle.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_states_and_transitions:1",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Attach an access record to a worker profile during an authorized profile change.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A worker profile without linked access becomes one with an enabled linked access record.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The access record is attached to the worker profile.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "Account creation occurs within an authorized worker-profile edit, assigns worker access, and may carry additional access restrictions.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep the new access record associated with the worker record from which it was created.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Delivery and acceptance feedback were not established.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Issuance, one-time activation, delivery state, expiry, acceptance, resend, cancellation, and recovery remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Welcome and credential-setup behavior remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-005-01",
+              "text": "Within the adjacent profile-edit behavior, an access record created from the worker email is enabled, linked to the profile, and assigned the observed worker access.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-005-02",
+              "text": "No acceptance claim is made for invitation delivery, acceptance, expiry, resend, cancellation, or recovery.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "explicit_limitations:1",
+                "explicit_limitations:2"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not reinterpret direct access-record creation as an invitation workflow.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1"
+            ]
+          }
+        ]
+      },
+      "atom_count": 8,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-006",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-006-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-006-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "A scoped generic inventory view may show lot identity, expiry, and quantity, while a controlled classification exists separately; no joined controlled-register behavior is established.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Inspect generic lot information within an allowed facility or storage scope.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "states_and_transitions": [],
+          "information_hierarchy": [
+            {
+              "text": "Generic stock visibility and controlled classification remain separate information areas.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "Inventory visibility may be constrained by facility or storage location.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Present lot identity, expiry, and current quantity together within the generic inventory context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "No controlled-register lifecycle state was observed.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Missing-register, discrepancy, and restricted-record feedback remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Controlled entries, a chronological running balance, person or prescription provenance, and controlled-specific visibility remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-006-01",
+              "text": "Within the adjacent generic inventory behavior, an appropriately scoped view exposes lot identity, expiry, and quantity.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-006-02",
+              "text": "The observed controlled classification remains separate and does not establish a joined register.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1",
+                "explicit_limitations:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer a controlled register, running balance, joined provenance, or controlled-specific visibility.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1"
+            ]
+          }
+        ]
+      },
+      "atom_count": 8,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "retained_unknown",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-007",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-007-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-007-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "A current match may be inspected, rejected when already present, and removed; this does not establish stable replay or immutable provenance.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3"
+          ],
+          "actor_needs": [
+            {
+              "text": "Inspect the currently linked reference and its timestamps, or remove that current relationship.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An unmatched source can become matched, and removal returns it to unmatched.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Only current link identity and timestamps are exposed.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Repeating an attempt against an already-matched source is rejected rather than returning the earlier result.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Keep the current matched or unmatched condition distinguishable.",
+              "atom_ids": [
+                "observed_states_and_transitions:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "No retained recovery trail after removal was established.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "Original-result replay, changed-content conflict feedback, and settlement identity remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Actor, reason, and immutable provenance remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "The observed removal does not preserve match history.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-007-01",
+              "text": "Within the adjacent behavior, attempting to match an already-matched source produces rejection and not original-result replay.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_feedback_and_recovery:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-007-02",
+              "text": "Removing the current relationship returns the source to unmatched and removes the currently exposed link.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer stable replay, conflict semantics, settlement identity, or immutable history.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 11,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-008",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-008-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-008-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "A person with both incident visibility and distinct closure authority can end active work, place the incident in a closed and locked condition, and later use an observed reopen or unlock path.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_states_and_transitions:1",
+            "observed_states_and_transitions:2",
+            "observed_states_and_transitions:3"
+          ],
+          "actor_needs": [
+            {
+              "text": "Close an incident under the observed authority boundary and verify the resulting status.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An active incident changes to closed and locked.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Moving to a later non-closed state clears closure and unlocks the incident.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "text": "A separately authorized edit can also unlock a closed incident.",
+              "atom_ids": [
+                "observed_states_and_transitions:3"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Incident detail carries closure state and activity history, while the list carries corresponding status.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Refreshed detail and list information communicate the successful closure outcome.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Reopening or separately unlocking provides the observed reversal.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2",
+                "observed_states_and_transitions:2",
+                "observed_states_and_transitions:3"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Both record visibility and distinct closure authority are required for closure.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep closure time, lock state, current status, and activity history coherent across detail and list contexts.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Review progress, unfinished work, and corrective work were not established as closure prerequisites.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Closure rationale, confirmation, approval, signature, and effectiveness decisions remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Visible retention of closer identity remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            },
+            {
+              "text": "A single recoverable outcome joining closure with activity history was not established.",
+              "atom_ids": [
+                "explicit_limitations:4"
+              ]
+            },
+            {
+              "text": "Closure immutability remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:5"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-008-01",
+              "text": "When both observed access checks are satisfied, closure ends active work, marks the incident closed, locks it, and refreshes detail and list information.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "id": "AO-A53-008-02",
+              "text": "The closed record exposes closure time, lock state, current status, and activity history.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4",
+                "observed_information_architecture:1"
+              ]
+            },
+            {
+              "id": "AO-A53-008-03",
+              "text": "The observed reopen or separately authorized unlock path clears the locked closed condition as described by its transition.",
+              "atom_ids": [
+                "observed_states_and_transitions:2",
+                "observed_states_and_transitions:3",
+                "observed_feedback_and_recovery:2"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_CLOSE_LOCK_REOPEN_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not add review gates, rationale, confirmation, approval, signature, effectiveness decisions, closer-display guarantees, atomic history guarantees, or immutability.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3",
+              "explicit_limitations:4",
+              "explicit_limitations:5"
+            ]
+          }
+        ]
+      },
+      "atom_count": 16,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_states_and_transitions:3": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown",
+        "explicit_limitations:4": "retained_unknown",
+        "explicit_limitations:5": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-009",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-009-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-009-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "Create one clinical observation in an existing person, care-interaction, and form context, validating and saving the primary observation and its immediate subordinate observations as one outcome.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3"
+          ],
+          "actor_needs": [
+            {
+              "text": "Record a primary observation and immediate subordinate observations within the active clinical context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A new observation template becomes a validated saved observation.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Immediate subordinate observations become associated with the saved parent and care context.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "One primary observation may contain immediate subordinate observations.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Validation failure prevents the grouped save and leaves no partial parent-and-child result.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1",
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "Successful saving returns the persisted observation.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Saving requires the relevant form authority and a valid active request.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Preserve the primary-and-subordinate grouping in the completion outcome.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Durable success history remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Repeat submission and interrupted retry behavior remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Location scope remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            },
+            {
+              "text": "Runtime maturity remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:4"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-009-01",
+              "text": "With valid active context and observed authority, valid primary and subordinate observations are saved together and the persisted primary observation is returned.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4",
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "id": "AO-A53-009-02",
+              "text": "If grouped validation fails, neither a partial parent nor partial subordinate result remains.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1",
+                "observed_feedback_and_recovery:2"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_SINGLE_OBSERVATION_AND_IMMEDIATE_CHILD_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer register creation, template-definition creation, durable history, replay, retry, location, or runtime guarantees.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3",
+              "explicit_limitations:4"
+            ]
+          }
+        ]
+      },
+      "atom_count": 14,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown",
+        "explicit_limitations:4": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-010",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-010-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-010-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "Authorized users may perform generic quantity-changing actions on inventory lots; this does not establish a controlled-medication discrepancy case or governed resolution.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_states_and_transitions:1",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Apply an authorized generic adjustment, consumption, return, or edit to an inventory lot.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "Generic inventory actions can change a lot's quantity.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The observed actions are associated with individual inventory lots.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "Generic quantity changes require the observed adjustment authority.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep generic quantity-changing actions tied to the affected lot.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Discrepancy alerts, recount outcomes, escalation, and resolution confirmation remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "A discrepancy case, safety hold, recount, preserved original balance, investigation, and governed resolution were not established.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Controlled-medication-specific authority and witness behavior were not established.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-010-01",
+              "text": "Within the adjacent generic inventory behavior, an authorized lot action may change quantity.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-010-02",
+              "text": "No acceptance claim is made for detecting, investigating, holding, or resolving a controlled discrepancy.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_feedback_and_recovery:1",
+                "explicit_limitations:1",
+                "explicit_limitations:2"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not transform generic stock changes into a discrepancy-management or governed-resolution requirement.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 7,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-011",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-011-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-011-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "An HR-authorized actor can create a worker profile after validating lifecycle, dates, email, reporting relationships, and preferred contacts, with optional creation of a linked enabled access record when a usable worker email exists.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_user_visible_behaviour:4"
+          ],
+          "actor_needs": [
+            {
+              "text": "Create a validated worker profile and optionally establish its linked access record.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "New worker details become a validated profile, optionally accompanied by an enabled linked access record.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The worker profile and linked access record are related but remain distinguishable.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Invalid lifecycle, date, email, reporting, or contact information prevents completion.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Observed HR roles govern creating, viewing, and updating the worker profile.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3"
+              ]
+            },
+            {
+              "text": "Lifecycle, dates, email, reporting relationships, and preferred contacts are validated before completion.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Assign a generated staff identifier and keep the optional access record visibly distinguishable from the profile.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "A specific recovery presentation was not established.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "Complete record-level access behavior remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Location scope, sensitive-field privacy, concurrent creation, and repeated submission remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-011-01",
+              "text": "Valid worker information submitted under the observed HR authority yields a worker profile with a generated staff identifier.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "id": "AO-A53-011-02",
+              "text": "When the optional side effect is selected and a usable worker email exists, completion may also yield a distinct enabled access record linked to the profile.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4",
+                "observed_states_and_transitions:1",
+                "observed_information_architecture:1"
+              ]
+            },
+            {
+              "id": "AO-A53-011-03",
+              "text": "Invalid lifecycle, date, email, reporting, or contact information prevents profile creation.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_PROFILE_CREATION_AND_OPTIONAL_LINKED_ACCESS_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer complete record-level access, location scope, field privacy, concurrency, replay, or a specific recovery presentation.",
+            "atom_ids": [
+              "observed_feedback_and_recovery:2",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 11,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-012",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-012-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-012-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "An HR-authorized actor can update validated worker-profile fields and synchronize the observed identity, role, image, and access-restriction changes to the linked access record.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3"
+          ],
+          "actor_needs": [
+            {
+              "text": "Maintain a worker profile while keeping selected linked-access details coordinated.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An existing profile becomes an updated validated profile.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Corresponding linked-access details change with the selected worker-profile fields.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Profile and linked-access changes are coordinated from the worker-profile update context.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Invalid profile or relationship information prevents the update.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Editing requires the observed HR authority.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            },
+            {
+              "text": "Lifecycle, dates, email, reporting relationships, account uniqueness, and preferred contacts are revalidated.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep coordinated worker and linked-access changes within one understandable profile-maintenance outcome.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Recovery from a stale edit remains unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "Concurrent editing, repeat submission, and complete durable history remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Sensitive-field and location-specific authority remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-012-01",
+              "text": "A valid HR-authorized update yields a revalidated worker profile and synchronizes the observed corresponding fields to its linked access record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "id": "AO-A53-012-02",
+              "text": "Invalid profile or relationship information prevents the update outcome.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_PROFILE_UPDATE_AND_SELECTED_SYNCHRONIZATION_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer stale-edit recovery, concurrency, replay, complete history, sensitive-field rules, or location authority.",
+            "atom_ids": [
+              "observed_feedback_and_recovery:2",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 11,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-013",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-013-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-013-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "An authorized inventory administrator may enter free-form witness information when recording lot destruction, and that text may reappear in reporting; this is not authenticated witness attestation.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Record descriptive witness information alongside a lot-destruction action.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [],
+          "information_hierarchy": [
+            {
+              "text": "The entered witness text belongs to the destruction details and is repeated in the destruction report.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "The destruction action requires the observed medication-inventory administration authority.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep the entered witness description visible with the destruction information in reporting.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "No witness request, acceptance, refusal, or confirmation state was observed.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "Identity validation, second-person confirmation, refusal, and witness-unavailable feedback remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "The entered witness was not established as an authenticated accountable identity.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Distinct witness authority, competency, independence, signature, and separation from the acting user remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-013-01",
+              "text": "Within the adjacent destruction behavior, an authorized administrator can enter witness text and later see the same descriptive information in reporting.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-013-02",
+              "text": "The descriptive text alone does not satisfy an acceptance outcome for authenticated witness attestation.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "explicit_limitations:1",
+                "explicit_limitations:2"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer authenticated witness identity, authority, competency, independence, signature, or dual-person confirmation from free-form text.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 9,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "retained_unknown",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-014",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-014-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-014-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "A current bank match may expose its source, linked reference, amount, and timestamps, then disappear when removed; this does not establish durable allocation history.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_states_and_transitions:1",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Inspect or remove the currently represented relationship between a source transaction and reference record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "Removing the current relationship returns the source to an unlinked condition.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The observed information represents only the current source-to-reference relationship.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Keep current source, reference, amount, and timestamp information together while the relationship exists.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "A retained history view and restoration path after removal remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Actor, reason, prior state, settlement identity, and review decision were not retained.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Removal did not establish durable allocation history.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Equivalence between bank matching and payment-allocation history remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-014-01",
+              "text": "Within the adjacent current-match behavior, an existing relationship exposes source, reference, amount, and timestamp information.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-014-02",
+              "text": "Removing the relationship returns the source to unlinked and removes the current representation.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer durable allocation history, restoration, actor or reason provenance, settlement identity, or review decisions.",
+            "atom_ids": [
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 9,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-015",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-015-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-015-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "Present one incident's lifecycle, investigation evidence, review-progress indicators, and corrective work together, allowing an observed lifecycle choice to persist immediately.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_user_visible_behaviour:4"
+          ],
+          "actor_needs": [
+            {
+              "text": "Understand incident progress and inspect the evidence and work associated with investigation and review.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A reported incident can progress through investigation and review toward closure.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "A closed incident can move to reopened.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Lifecycle status, investigative material, review progress, preventative work, and corrective actions are associated with the same incident.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Selecting an observed lifecycle state persists that state immediately.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Keep status, review progress, investigative evidence, and corrective work jointly understandable around one incident.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Explicit success confirmation, undo, and error feedback for immediate state changes remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "The checklist and review state were not established as an enforced closure gate.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Formal review completion, reviewer identity, outcome, approval, signature, and effectiveness decisions remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Runtime maturity remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-015-01",
+              "text": "The incident context makes lifecycle, investigative chronology and causes, preventative work, corrective actions, and review-progress information jointly available.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:3",
+                "observed_user_visible_behaviour:4",
+                "observed_information_architecture:1"
+              ]
+            },
+            {
+              "id": "AO-A53-015-02",
+              "text": "Selecting an observed lifecycle state results in that state being saved immediately.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            },
+            {
+              "id": "AO-A53-015-03",
+              "text": "A closed incident can subsequently show the reopened state.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_PRESENTATION_AND_IMMEDIATE_STATE_CHANGE_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not add a closure gate, formal review completion, reviewer outcome, approval, signature, effectiveness decision, feedback behavior, or runtime guarantee.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 12,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-016",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-016-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-016-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "Changing a worker's lifecycle condition must correspondingly disable or restore the already-linked access record, subject to the observed departure validations.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_user_visible_behaviour:4"
+          ],
+          "actor_needs": [
+            {
+              "text": "Change a worker's lifecycle condition while keeping linked access aligned with whether the worker is active.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:4",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An active worker may become inactive, suspended, or departed.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            },
+            {
+              "text": "A non-active worker may return to active.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "text": "Linked access becomes disabled for non-active states and enabled for the active state.",
+              "atom_ids": [
+                "observed_states_and_transitions:3",
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Worker lifecycle condition and linked-access condition remain visibly coupled.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Departure is blocked when its date is missing or active workers still report to the departing person.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "The departure transition requires a departure date and no remaining active reporting relationships.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Make the coupling between worker lifecycle and linked-access availability understandable.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_states_and_transitions:3"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Separate approval, future-effective transitions, and durable lifecycle history remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Returning to active was not established as a separate re-engagement transaction.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Concurrent and repeated state changes remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-016-01",
+              "text": "Moving an active worker to inactive, suspended, or departed disables the linked access record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4",
+                "observed_states_and_transitions:1",
+                "observed_states_and_transitions:3"
+              ]
+            },
+            {
+              "id": "AO-A53-016-02",
+              "text": "Returning a non-active worker to active restores the linked access record.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4",
+                "observed_states_and_transitions:2",
+                "observed_states_and_transitions:3"
+              ]
+            },
+            {
+              "id": "AO-A53-016-03",
+              "text": "A departure lacking a date or leaving active reporting relationships is rejected.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_WORKER_AND_LINKED_ACCESS_LIFECYCLE_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not add approval, future-effective processing, durable history, a distinct re-engagement transaction, concurrency, or repeat semantics.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 13,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "consumed",
+        "observed_states_and_transitions:3": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-017",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-017-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-017-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "A compound care-interaction record may group multiple kinds of clinical information under access levels that differ for creation and editing; this is not a standalone atomic clinical-event requirement.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Create or edit a compound care-interaction context containing multiple related clinical facts and requests.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "New and existing care-interaction conditions are distinguished.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The observed object is a compound container rather than a standalone event.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "Creating a new interaction and editing an existing interaction use different observed access levels.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep the grouped clinical facts understandable as parts of one compound interaction.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Confirmation, failure recovery, and standalone-event completion feedback remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Exact atomic event-record behavior was not observed.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Standalone event fields, categories, provenance, and completion state remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "The bounded observation was not exhaustive.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-017-01",
+              "text": "Within the adjacent compound behavior, one care interaction may group observations, requests, diagnoses, conditions, allergies, participants, location, and visit context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-017-02",
+              "text": "The observed access level differs between creating a new interaction and editing an existing one.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not convert the compound interaction into a standalone atomic event or infer its fields, categories, provenance, completion, or feedback.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 9,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-018",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-018-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-018-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "An authorized administrator may mark a generic medication lot destroyed, capture descriptive destruction details, and review them in a date-bounded report; this is not a controlled-medication ledger projection.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Record destruction of a generic medication lot and later inspect the recorded details.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An active lot becomes destroyed and no longer appears in active inventory.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Date, method, witness text, and notes are associated with the lot and surfaced in a separate date-bounded report.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "The report provides visibility after the destruction action.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "The observed destruction action requires administrator authority.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Make recorded destruction details discoverable through date-based review.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Correction and reversal behavior remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "The observed inventory behavior was generic rather than a controlled-medication register.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Partial destruction, before-and-after balance, and immutable correction remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Witness identity and authority were not validated.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-018-01",
+              "text": "Within the adjacent generic behavior, an authorized destruction action records date, method, witness text, and notes, changes the lot to destroyed, and removes it from active inventory.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-018-02",
+              "text": "A date-bounded report exposes destroyed lots and the observed destruction details.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1",
+                "observed_feedback_and_recovery:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer a controlled register, partial destruction, balance projection, immutable correction, or validated witness authority.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-019",
+      "source_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "derivation_class": "BOUNDED_ADJACENT_PRINCIPLE",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "BAP-A53-019-01"
+      ],
+      "specification_units": [
+        {
+          "id": "BAP-A53-019-01",
+          "unit_type": "SCOPE_LIMITED_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "scope_limitation": {
+            "id": "SL-A53-019",
+            "text": "Applies only to tracked work-information changes; it does not establish complete worker lifecycle coverage, tamper resistance, retention, export, or location filtering.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          },
+          "statement": "Tracked work-information changes may be reviewed from both an individual-worker context and a worker-list context, with an explicit no-history outcome.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2"
+          ],
+          "actor_needs": [
+            {
+              "text": "Review tracked work-information changes for one worker or from the broader worker context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A tracked work-information change adds an activity entry.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "The same bounded history is reachable from individual and list-level contexts.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "An explicit empty outcome distinguishes no tracked changes from loading or display failure.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Provide consistent access to the same bounded history and a clear empty outcome in both observed contexts.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Only work-information changes were established.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Personal-profile, activation, invitation, termination, and re-engagement coverage remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "Tamper resistance, retention, export, and location filtering remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-019-01",
+              "text": "Within SL-A53-019, a tracked work-information change adds an entry to the bounded activity history.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ],
+              "scope_limitation_id": "SL-A53-019",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-019-02",
+              "text": "Within SL-A53-019, the same bounded history can be reached from individual-worker and worker-list contexts.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ],
+              "scope_limitation_id": "SL-A53-019",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-019-03",
+              "text": "Within SL-A53-019, absence of tracked changes yields an explicit empty-history outcome.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ],
+              "scope_limitation_id": "SL-A53-019",
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_IF_SCOPE_LIMITATION_SL_A53_019_IS_RETAINED",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer full lifecycle coverage, integrity guarantees, retention, export, or location filtering.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 9,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-020",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-020-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-020-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "Candidate suggestions may be presented and an already-confirmed relationship may be removed; this does not establish rejection of a proposed candidate.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_states_and_transitions:1",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Review suggested candidates and, where applicable, remove a relationship that has already been confirmed.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "A confirmed item can return to unmatched when its current relationship is removed.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Suggestions and current matches are represented, but no rejection history is established.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Keep suggested candidates distinct from already-confirmed relationships.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "A distinct action for rejecting a suggestion was not observed.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3"
+              ]
+            },
+            {
+              "text": "No proposed-to-rejected transition was established.",
+              "atom_ids": [
+                "observed_states_and_transitions:2"
+              ]
+            },
+            {
+              "text": "Rejection confirmation, reconsideration, and suppression feedback remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Rejected state, candidate identity, reason, reviewer, and rejection time were not retained.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Removing a confirmed relationship is not equivalent to rejecting a proposal.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-020-01",
+              "text": "Within the adjacent behavior, suggested candidates can be presented for review.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-020-02",
+              "text": "Removing an already-confirmed relationship returns the item to unmatched.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-020-03",
+              "text": "No acceptance outcome is asserted for proposal rejection.",
+              "atom_ids": [
+                "observed_job_boundary:1",
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:2",
+                "explicit_limitations:2"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not reinterpret removal of a confirmed relationship as proposal rejection or infer rejection state, reason, reviewer, time, feedback, or suppression.",
+            "atom_ids": [
+              "observed_user_visible_behaviour:3",
+              "observed_states_and_transitions:2",
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "retained_unknown",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_states_and_transitions:2": "retained_unknown",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-021",
+      "source_sufficiency": "EXACT_OBSERVED_BEHAVIOUR",
+      "derivation_class": "BENCHMARK_DERIVED",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [
+        "NR-A53-021-01"
+      ],
+      "stable_adjacent_principle_ids": [],
+      "specification_units": [
+        {
+          "id": "NR-A53-021-01",
+          "unit_type": "NEUTRAL_EXACT_REQUIREMENT",
+          "promotable": true,
+          "statement": "Under the observed read authority, list worker profiles with an active-work emphasis and lifecycle indicators, then expose grouped summary, profile, and relationship information.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_user_visible_behaviour:4"
+          ],
+          "actor_needs": [
+            {
+              "text": "Find workers by lifecycle condition and inspect a selected worker's grouped details.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "This read behavior performs no worker lifecycle transition.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Navigation moves from a lifecycle-oriented worker list to summary, profile, and relationship groups for one worker.",
+              "atom_ids": [
+                "observed_information_architecture:1",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [],
+          "safeguards_and_permissions": [
+            {
+              "text": "General worker and HR roles have the observed read access, while editing remains restricted to HR roles in this boundary.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Emphasize currently active workers initially, distinguish lifecycle conditions, and group detailed information by purpose.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:3"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Concealed-denial and missing-record feedback remain unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Field-level privacy and complete record-level access evaluation remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Location scope and concealed-denial behavior remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-021-01",
+              "text": "A permitted reader initially receives a worker list emphasizing people currently active at work and indicators distinguishing the observed lifecycle conditions.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2",
+                "observed_user_visible_behaviour:4"
+              ]
+            },
+            {
+              "id": "AO-A53-021-02",
+              "text": "Selecting a worker exposes summary, profile, and relationship information without changing lifecycle state.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1",
+                "observed_information_architecture:1"
+              ]
+            },
+            {
+              "id": "AO-A53-021-03",
+              "text": "Within the observed role boundary, general worker and HR roles may read, while editing remains limited to HR roles.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:4"
+              ]
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_WITHIN_WORKER_LIST_AND_GROUPED_READ_BOUNDARY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer field-level privacy, complete record authorization, location scope, or concealed-denial behavior.",
+            "atom_ids": [
+              "observed_feedback_and_recovery:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_user_visible_behaviour:4": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-022",
+      "source_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "derivation_class": "BOUNDED_ADJACENT_PRINCIPLE",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "BAP-A53-022-01"
+      ],
+      "specification_units": [
+        {
+          "id": "BAP-A53-022-01",
+          "unit_type": "SCOPE_LIMITED_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "scope_limitation": {
+            "id": "SL-A53-022",
+            "text": "Applies only to person, care-interaction, and form context with top-level records and immediate children; deeper or configurable hierarchy, complete lookup scoping, location, and privacy behavior are not established.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3",
+              "explicit_limitations:4"
+            ]
+          },
+          "statement": "Observation records may be resolved by the active person, care interaction, and form context, with an empty template for an unresolved record and immediate children grouped beneath top-level records.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_information_architecture:1",
+            "observed_information_architecture:2"
+          ],
+          "actor_needs": [
+            {
+              "text": "Open or review observations in the active person, care-interaction, and form context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "The observed surface distinguishes an unresolved or new record from a resolved existing record.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Selection combines person, care-interaction, and form context.",
+              "atom_ids": [
+                "observed_information_architecture:1"
+              ]
+            },
+            {
+              "text": "The observed hierarchy contains top-level records and immediate children only.",
+              "atom_ids": [
+                "observed_information_architecture:2"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "An unresolved record yields an empty observation template.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Order top-level observations newest first and keep immediate children grouped with their parent.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:2"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Hierarchy beyond immediate children remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Configurable care-plan or template hierarchy remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            },
+            {
+              "text": "One record-resolution observation did not establish care-interaction scoping for every lookup.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            },
+            {
+              "text": "Location scope and privacy behavior remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:4"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-022-01",
+              "text": "Within SL-A53-022, opening an observation uses the active person, care-interaction, and selected form context.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_information_architecture:1"
+              ],
+              "scope_limitation_id": "SL-A53-022",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-022-02",
+              "text": "Within SL-A53-022, an unresolved record produces an empty observation template.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_states_and_transitions:1",
+                "observed_feedback_and_recovery:1"
+              ],
+              "scope_limitation_id": "SL-A53-022",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-022-03",
+              "text": "Within SL-A53-022, top-level observations appear newest first with immediate children grouped beneath their parent.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:2"
+              ],
+              "scope_limitation_id": "SL-A53-022",
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_IF_SCOPE_LIMITATION_SL_A53_022_IS_RETAINED",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer arbitrary depth, configurable hierarchy, universal care-interaction scoping, location scope, or privacy behavior.",
+            "atom_ids": [
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3",
+              "explicit_limitations:4"
+            ]
+          }
+        ]
+      },
+      "atom_count": 12,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_information_architecture:2": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown",
+        "explicit_limitations:4": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-023",
+      "source_sufficiency": "INSUFFICIENT_ADJACENT_BEHAVIOUR",
+      "derivation_class": "NO_EXACT_BENCHMARK_REQUIREMENT",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "NAP-A53-023-01"
+      ],
+      "specification_units": [
+        {
+          "id": "NAP-A53-023-01",
+          "unit_type": "NON_PROMOTABLE_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "statement": "Generic inventory actions may change lot quantity, with dispensing blocked when stock is unavailable, while controlled classification remains separate; this does not establish an append-only controlled ledger.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_states_and_transitions:1",
+            "observed_information_architecture:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Perform the observed generic inventory activities against a lot.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "Lot quantity changes through the observed generic stock activities.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Generic inventory activity and controlled classification remain separate information areas.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "Unavailable inventory prevents dispensing.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [
+            {
+              "text": "Available stock is an observed precondition for dispensing.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "usability_principles": [
+            {
+              "text": "Keep the affected lot and resulting generic quantity change associated.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "A controlled-register correction or recovery path remains unknown.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:2"
+              ]
+            },
+            {
+              "text": "No controlled movement record combining movement type, balances, actor, recipient, reason, and witness was established.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "All-or-nothing movement, concurrent activity, correction semantics, and location-owned register behavior remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-023-01",
+              "text": "Within the adjacent generic behavior, the observed inventory activities may change lot quantity.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-023-02",
+              "text": "A dispensing attempt with unavailable inventory is prevented.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_feedback_and_recovery:1"
+              ],
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-023-03",
+              "text": "Controlled classification remains separate and does not establish a controlled movement ledger.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1",
+                "explicit_limitations:1"
+              ],
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "EXACT_TARGET_UNAVAILABLE_ADJACENT_ONLY",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer an append-only controlled ledger, joined movement provenance, atomicity, concurrency behavior, correction semantics, or location ownership.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "observed_feedback_and_recovery:2",
+              "explicit_limitations:1",
+              "explicit_limitations:2"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "observed_feedback_and_recovery:2": "retained_unknown",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown"
+      }
+    },
+    {
+      "opaque_id": "A53-024",
+      "source_sufficiency": "PARTIAL_ADJACENT_BEHAVIOUR",
+      "derivation_class": "BOUNDED_ADJACENT_PRINCIPLE",
+      "benchmark_credit": false,
+      "stable_neutral_requirement_ids": [],
+      "stable_adjacent_principle_ids": [
+        "BAP-A53-024-01"
+      ],
+      "specification_units": [
+        {
+          "id": "BAP-A53-024-01",
+          "unit_type": "SCOPE_LIMITED_ADJACENT_PRINCIPLE",
+          "promotable": false,
+          "scope_limitation": {
+            "id": "SL-A53-024",
+            "text": "Applies only to ranking likely financial references for selected unmatched bank items by amount and calendar-date proximity; authority, privacy, richer confidence provenance, reviewer history, and receipt-to-invoice allocation equivalence are not established.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          },
+          "statement": "Selecting unmatched bank items may produce reviewable reference candidates ordered by observed amount and date closeness while leaving the source unmatched until separate confirmation.",
+          "atom_ids": [
+            "observed_job_boundary:1",
+            "observed_user_visible_behaviour:1",
+            "observed_user_visible_behaviour:2",
+            "observed_user_visible_behaviour:3",
+            "observed_states_and_transitions:1"
+          ],
+          "actor_needs": [
+            {
+              "text": "Review likely reference candidates for selected unmatched bank items before any separate confirmation.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "states_and_transitions": [
+            {
+              "text": "An unmatched item gains suggestions but remains unmatched until separately confirmed.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ]
+            }
+          ],
+          "information_hierarchy": [
+            {
+              "text": "Candidates from the observed financial categories are grouped around the selected source transaction and ordered by closeness.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:2",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "feedback_error_recovery": [
+            {
+              "text": "The observed explanatory basis is limited to amount and date similarity.",
+              "atom_ids": [
+                "observed_feedback_and_recovery:1"
+              ]
+            }
+          ],
+          "safeguards_and_permissions": [],
+          "usability_principles": [
+            {
+              "text": "Place same-amount, same-day candidates ahead of less-close possibilities and keep the source item unmatched during review.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_states_and_transitions:1",
+                "observed_information_architecture:1"
+              ]
+            }
+          ],
+          "explicit_unknowns": [
+            {
+              "text": "Role authority and privacy scope remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:1"
+              ]
+            },
+            {
+              "text": "Confidence explanation beyond amount and date, rule provenance, and reviewer history remain unknown.",
+              "atom_ids": [
+                "explicit_limitations:2",
+                "observed_feedback_and_recovery:1"
+              ]
+            },
+            {
+              "text": "Equivalence to payment-allocation review remains unknown.",
+              "atom_ids": [
+                "explicit_limitations:3"
+              ]
+            }
+          ],
+          "acceptance_outcomes": [
+            {
+              "id": "AO-A53-024-01",
+              "text": "Within SL-A53-024, selecting unmatched bank items produces candidates from the observed financial categories.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:1",
+                "observed_user_visible_behaviour:2"
+              ],
+              "scope_limitation_id": "SL-A53-024",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-024-02",
+              "text": "Within SL-A53-024, same-amount and same-day candidates precede less-close alternatives, with amount and date as the only established rationale.",
+              "atom_ids": [
+                "observed_user_visible_behaviour:3",
+                "observed_information_architecture:1",
+                "observed_feedback_and_recovery:1"
+              ],
+              "scope_limitation_id": "SL-A53-024",
+              "promotable": false
+            },
+            {
+              "id": "AO-A53-024-03",
+              "text": "Within SL-A53-024, receiving suggestions does not change the source item from unmatched before separate confirmation.",
+              "atom_ids": [
+                "observed_states_and_transitions:1"
+              ],
+              "scope_limitation_id": "SL-A53-024",
+              "promotable": false
+            }
+          ]
+        }
+      ],
+      "target_drift_assessment": {
+        "result": "NO_DRIFT_IF_SCOPE_LIMITATION_SL_A53_024_IS_RETAINED",
+        "boundary_atom_ids": [
+          "observed_job_boundary:1"
+        ],
+        "excluded_expansions": [
+          {
+            "text": "Do not infer allocation review, authority, privacy scope, richer confidence provenance, or reviewer history.",
+            "atom_ids": [
+              "observed_job_boundary:1",
+              "explicit_limitations:1",
+              "explicit_limitations:2",
+              "explicit_limitations:3"
+            ]
+          }
+        ]
+      },
+      "atom_count": 10,
+      "atom_dispositions": {
+        "observed_job_boundary:1": "consumed",
+        "observed_user_visible_behaviour:1": "consumed",
+        "observed_user_visible_behaviour:2": "consumed",
+        "observed_user_visible_behaviour:3": "consumed",
+        "observed_states_and_transitions:1": "consumed",
+        "observed_information_architecture:1": "consumed",
+        "observed_feedback_and_recovery:1": "consumed",
+        "explicit_limitations:1": "retained_unknown",
+        "explicit_limitations:2": "retained_unknown",
+        "explicit_limitations:3": "retained_unknown"
+      }
+    }
+  ],
+  "validation_summary": {
+    "packet_count": 24,
+    "derivation_class_counts": {
+      "BENCHMARK_DERIVED": 8,
+      "BOUNDED_ADJACENT_PRINCIPLE": 4,
+      "NO_EXACT_BENCHMARK_REQUIREMENT": 12
+    },
+    "atom_totals": {
+      "total": 252,
+      "consumed": 165,
+      "retained_unknown": 87,
+      "excluded": 0
+    },
+    "credit_totals": {
+      "true": 0,
+      "false": 24
+    },
+    "duplicate_opaque_ids": [],
+    "missing_opaque_ids": [],
+    "implementation_mechanism_scan": {
+      "result": "PASS",
+      "matches": []
+    },
+    "product_source_identity_scan": {
+      "result": "PASS",
+      "scope": "Neutral row content; the required input-boundary path is excluded from this scan.",
+      "matches": []
+    },
+    "exact_files_accessed": [
+      "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\audits\\oblivion-oss-comprehensive-audit-2026-08-24\\evidence\\benchmark\\raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json"
+    ]
+  },
+  "credit_boundary": {
+    "all_credit_false": true,
+    "benchmark_credit_count": 0,
+    "selection_claim": false,
+    "current_product_comparison": false,
+    "neutral_requirement_credit": false,
+    "current_product_comparison_credit": false,
+    "target_specific_mapping_credit": false,
+    "final_no_match_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "test_execution_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "external_mutations_attestation": "No application, runtime, database, benchmark repository, browser session, or external system was mutated. The fresh Agent B wrote no repository file; only the orchestrator materialized this audit artifact."
+}

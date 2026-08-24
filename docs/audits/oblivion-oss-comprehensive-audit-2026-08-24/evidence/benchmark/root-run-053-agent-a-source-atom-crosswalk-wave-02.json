@@ -1,0 +1,2674 @@
+{
+  "schema_version": 1,
+  "crosswalk_id": "RUN-053-AGENT-A-BLIND-ATOM-LINEAGE",
+  "status": "COMPLETE_READ_ONLY",
+  "accessed_files": [
+    {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json",
+      "sha256": "835ec0755a5a4b5543f317969e9ba557bc156b137083df925f05d4b753ccde6b",
+      "bytes": 37799
+    },
+    {
+      "path": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/current-upstream-facet-refinement-wave-02.json",
+      "sha256": "d41cc046de9b7580e937ca1b9d1df7f9237947dcaed5bf0f95772b667d8d9f3e",
+      "bytes": 70981
+    }
+  ],
+  "ref_grammar": {
+    "local": "Unqualified refs resolve inside the packet's source_feature_id and source_facet_key.",
+    "cross_facet": "feature_id|facet_key::atom_ref resolves against the named sibling RUN-047 facet.",
+    "arrays": "Array atoms are 1-based.",
+    "eligibility_string": "eligibility:1 denotes a scalar eligibility value.",
+    "eligibility_object": "eligibility.<property> denotes an object property."
+  },
+  "transformation_legend": {
+    "paraphrase": "One or more source atoms were restated without product identity, copied wording, implementation identifiers, or added normative content.",
+    "aggregation": "Several source atoms were combined into one blind observation.",
+    "retained-unknown": "A source gap or bounded absence was preserved as an unknown or not-evidenced statement."
+  },
+  "counts": {
+    "packets": 24,
+    "stable_blind_atoms_mapped": 252,
+    "run_047_observed_behaviour_atoms": 73,
+    "run_047_gap_atoms": 72,
+    "entire_semantic_atoms_intentionally_omitted": 7,
+    "bounded_search_records_intentionally_omitted": 12,
+    "unmapped_stable_blind_atoms": 0
+  },
+  "global_sanitization": {
+    "omitted_field_families": [
+      {
+        "fields": [
+          "candidate_project",
+          "official_ref",
+          "anchors",
+          "licence_edition_boundary",
+          "source_partition"
+        ],
+        "reason": "External identity, URLs, revisions, paths, licences, editions, and source provenance are excluded from the blind behavior payload."
+      },
+      {
+        "fields": [
+          "neutral_requirement_credit",
+          "current_product_comparison_credit",
+          "target_specific_mapping_credit",
+          "benchmark_credit",
+          "final_no_match_credit",
+          "completion_credit"
+        ],
+        "reason": "Credit and downstream comparison fields are outside Agent A's observed-behavior role."
+      }
+    ],
+    "partial_content_omissions": [
+      {
+        "content": "Exact field names, persistence primitives, locks, transaction callbacks, event-emission mechanics, framework terms, exact numeric tolerances, and copied UI labels.",
+        "reason": "They are implementation or distinctive-expression details rather than identity-blind product behavior."
+      },
+      {
+        "content": "Project names embedded inside scalar eligibility strings.",
+        "reason": "Eligibility meaning was retained while external identity was stripped."
+      }
+    ]
+  },
+  "packets": [
+    {
+      "blind_packet_id": "A53-001",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "rehire",
+      "facet_record_sha256": "4f58eeb3711e859bc65ca4a8d00058359e13f6f53b998e6576108af64fa7b75d",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:2",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "gaps:2",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "reason": "The documentation behavior was explicitly not edition-matched to the pinned public source and therefore was not stable enough for the blind packet."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-002",
+      "source_feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "source_facet_key": "confirm",
+      "facet_record_sha256": "91855c10407e5b5dccd45a8875fca866ac43255d6948a54fdc75d865b18adff0",
+      "sufficiency_refs": [
+        "gaps:2",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "gaps:2",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "reason": "Deterministic ordering and record-lock mechanics are not user-visible behavior."
+        },
+        {
+          "refs": [
+            "gaps:3"
+          ],
+          "reason": "Low-level transaction-boundary rollback detail was outside the user-visible blind payload."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-003",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "balance_check",
+      "facet_record_sha256": "38ba2c387cf0d574fb6db3d2e160685c58ae71bde1bec4cfc560f776b06bab2e",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-004",
+      "source_feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "source_facet_key": "amendment",
+      "facet_record_sha256": "5f2020880415dd86d5bb773d53fcfdbbd6689e8cc98862f4c114f9e949a6c3f5",
+      "sufficiency_refs": [
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.scope",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "observed_behaviors:5",
+            "eligibility.scope",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:3",
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:3",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:2",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:4": {
+          "refs": [
+            "gaps:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "gaps:3"
+          ],
+          "reason": "The gap used target-shaped location and minimum-disclosure language and was excluded to keep Agent A identity-blind."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-005",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "invite",
+      "facet_record_sha256": "7a51dac6fa48853aa9eb9446a129ed075345a6b9979a71a7ee4c255cdb8af1e6",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "reason": "It supplied an exact documentation label and no additional stable behavior beyond observed_behaviors:1."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-006",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "view",
+      "facet_record_sha256": "ddafb64d757705436f81a3ad37eee0ebc216124e31b7d249e38b966a11323769",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "gaps:1",
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ],
+          "derivation_note": "The feedback absence is a bounded restatement of the unestablished register and visibility behavior, not a separately observed UI state."
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-007",
+      "source_feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "source_facet_key": "settlement_replay_and_provenance",
+      "facet_record_sha256": "61aaa9a4f8ba97f715a970459464776a45ff209d0c3033fe8af587e78ba5f853",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:2",
+        "gaps:3",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "gaps:1",
+            "gaps:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "gaps:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1",
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-008",
+      "source_feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "source_facet_key": "incident_closure",
+      "facet_record_sha256": "f5d03e773346076f5c540bbafb81fdaf475eae86e9c54e9415f2c06cf4a5df09",
+      "sufficiency_refs": [
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.scope",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "gaps:1",
+            "gaps:5",
+            "eligibility.scope",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "gaps:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:3": {
+          "refs": [
+            "gaps:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:4",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:5"
+          ],
+          "transformation": [
+            "aggregation",
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:4": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:5": {
+          "refs": [
+            "gaps:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "reason": "Pre-mutation record-lock mechanics are not independently user-visible."
+        },
+        {
+          "refs": [
+            "bounded_search:1",
+            "bounded_search:2",
+            "bounded_search:3",
+            "bounded_search:4"
+          ],
+          "reason": "Auxiliary project identities, revisions, collision evidence, and search provenance were excluded from the blind behavior packet."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-009",
+      "source_feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "source_facet_key": "create_register",
+      "facet_record_sha256": "bf2727fb802699a51ea469b6b9196f4c2d40ca12298b16185216d7960bbeb6ef",
+      "sufficiency_refs": [
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.scope",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "observed_behaviors:5",
+            "eligibility.scope",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ],
+          "derivation_note": "The statement that this creates an observation rather than a register or template definition is a scope boundary drawn from the initial-observation eligibility scope and the actual created object."
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:3",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:4": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "gaps:1"
+          ],
+          "reason": "The in-place update caveat concerns the separate amendment facet and was intentionally excluded from this initial-create packet."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-010",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "discrepancy_resolution",
+      "facet_record_sha256": "da558702730c65bc0039a2ad2f0bdcf02dff3a54cc3bbe4c05a9f9e0003575cb",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:3",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "gaps:1",
+            "gaps:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-011",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "create",
+      "facet_record_sha256": "62de9bf8acc2aae9e052cfb4eb794ad3d675421cbaa536ffeb25bc25c9ca21b1",
+      "sufficiency_refs": [
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-012",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "update",
+      "facet_record_sha256": "d82950e966d27dac395ea760ca89c6ef1ebfce8f141ab3b17b9b3e2e588ad029",
+      "sufficiency_refs": [
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-013",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "witness_authority",
+      "facet_record_sha256": "791d8d41d678281e8beac55786fae464f46d6604143ce7e30566caa359edf052",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:2",
+        "gaps:3",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1",
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2",
+            "gaps:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-014",
+      "source_feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "source_facet_key": "allocation_history_review",
+      "facet_record_sha256": "bf9af9a8f0dad2ef761380c654211306ef92c2e7196d42c2783bd5662d3127c2",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:3",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "gaps:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-015",
+      "source_feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "source_facet_key": "incident_review",
+      "facet_record_sha256": "933d9ec0cee1608f3532cc530eeec28d3a8cc091dcb0f7656cf884b8fe67896b",
+      "sufficiency_refs": [
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.scope",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "gaps:1",
+            "gaps:2",
+            "eligibility.scope",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "bounded_search:1",
+            "bounded_search:2",
+            "bounded_search:3",
+            "bounded_search:4"
+          ],
+          "reason": "Auxiliary project identities, revisions, collision evidence, and search provenance were excluded from the blind behavior packet."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-016",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "set_active",
+      "facet_record_sha256": "39fce4745b1462f0ecdd412cf082deed30005b667ce2ddbfc84b20d20ed36ca7",
+      "sufficiency_refs": [
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "gaps:2",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_states_and_transitions:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-017",
+      "source_feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "source_facet_key": "initial_event_record",
+      "facet_record_sha256": "75d1a09f854f7953d9878d587baa8d95e8511e06fed958d63892d8742d73b7bc",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:3",
+        "gaps:4",
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "gaps:1",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1",
+            "gaps:3",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": [
+        {
+          "refs": [
+            "bounded_search.projects_and_queries:1",
+            "bounded_search.projects_and_queries:2",
+            "bounded_search.projects_and_queries:3",
+            "bounded_search.projects_and_queries:4"
+          ],
+          "reason": "Project/query identities and individual search results were excluded; the bounded, non-exhaustive conclusion was retained through gaps:3 and gaps:4."
+        }
+      ]
+    },
+    {
+      "blind_packet_id": "A53-018",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "destruction_projection",
+      "facet_record_sha256": "57b5a2d91a43210a8003d0fd9279d5010a302013fe4e8ac71693a0765b17bb37",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "CAP-MED-CD-REGISTER-BALANCE|balance_check::observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ],
+          "derivation_note": "No reversal path is a bounded restatement of the absent immutable correction behavior."
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-019",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "longitudinal_history",
+      "facet_record_sha256": "903b4da71fc4ef92cdac233d592745466358b685e4002c6fb1e25cf112163ccb",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ],
+          "derivation_note": "The distinction between no changes and display failure is the information value of the evidenced explicit empty state, not a separately inspected error state."
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "gaps:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-020",
+      "source_feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "source_facet_key": "reject",
+      "facet_record_sha256": "8f35c3b78c387c7da20e8da186d05e6153ece686dac3e5c58ba1fb73903a5b61",
+      "sufficiency_refs": [
+        "gaps:1",
+        "gaps:2",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "gaps:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-021",
+      "source_feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "source_facet_key": "view",
+      "facet_record_sha256": "234491e9931bab588a0e2db204445c80e0e24252c35c7a65b0a3629d955b10ef",
+      "sufficiency_refs": [
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:4": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ],
+          "derivation_note": "No transition was attributed because the evidenced scope is a view candidate."
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-022",
+      "source_feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "source_facet_key": "care_context_template_hierarchy_filtering",
+      "facet_record_sha256": "16dcba6303fdd94a998666c3f763d0737b335a22d28b2d09500c8f8c28ee51db",
+      "sufficiency_refs": [
+        "eligibility.eligible_for_later_clean_comparison",
+        "eligibility.scope",
+        "eligibility.reason"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2",
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "observed_behaviors:5",
+            "gaps:1",
+            "gaps:2",
+            "eligibility.scope",
+            "eligibility.reason"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "observed_behaviors:4"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_information_architecture:2": {
+          "refs": [
+            "observed_behaviors:3",
+            "observed_behaviors:4",
+            "observed_behaviors:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:4"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:4": {
+          "refs": [
+            "gaps:3",
+            "gaps:5"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-023",
+      "source_feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "source_facet_key": "register_movement",
+      "facet_record_sha256": "c2c042919b5f74d777f9bb746a078d12ccc65eec457286d68b2b890b9ac51112",
+      "sufficiency_refs": [
+        "gaps:1",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "gaps:1",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_feedback_and_recovery:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "retained-unknown"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    },
+    {
+      "blind_packet_id": "A53-024",
+      "source_feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "source_facet_key": "suggested_match_review",
+      "facet_record_sha256": "a3048481a12ee56ad35eb02561811e8333525308fe008ff4d9188d5d7ef72446",
+      "sufficiency_refs": [
+        "gaps:3",
+        "eligibility:1"
+      ],
+      "atom_map": {
+        "observed_job_boundary:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3",
+            "gaps:3",
+            "eligibility:1"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_user_visible_behaviour:1": {
+          "refs": [
+            "observed_behaviors:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:2": {
+          "refs": [
+            "observed_behaviors:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_user_visible_behaviour:3": {
+          "refs": [
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "observed_states_and_transitions:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "CAP-FIN-ALLOCATION-MATCH-HISTORY|confirm::observed_behaviors:1",
+            "CAP-FIN-ALLOCATION-MATCH-HISTORY|confirm::observed_behaviors:4"
+          ],
+          "transformation": [
+            "aggregation"
+          ],
+          "derivation_note": "The unchanged unmatched state until separate confirmation uses the sibling confirmation facet to delimit suggestion review from confirmation."
+        },
+        "observed_information_architecture:1": {
+          "refs": [
+            "observed_behaviors:1",
+            "observed_behaviors:3"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "observed_feedback_and_recovery:1": {
+          "refs": [
+            "observed_behaviors:3",
+            "gaps:2"
+          ],
+          "transformation": [
+            "aggregation"
+          ]
+        },
+        "explicit_limitations:1": {
+          "refs": [
+            "gaps:1"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:2": {
+          "refs": [
+            "gaps:2"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        },
+        "explicit_limitations:3": {
+          "refs": [
+            "gaps:3"
+          ],
+          "transformation": [
+            "paraphrase"
+          ]
+        }
+      },
+      "omitted_upstream_atoms": []
+    }
+  ],
+  "attestation": {
+    "current_product_source_accessed": false,
+    "current_product_runtime_accessed": false,
+    "application_browser_accessed": false,
+    "downstream_neutral_requirements_accessed": false,
+    "downstream_current_comparison_accessed": false,
+    "downstream_adjudication_or_credit_performed": false,
+    "external_projects_or_urls_accessed_for_this_crosswalk": false,
+    "third_party_source_code_or_schema_copied": false,
+    "third_party_wording_or_distinctive_layout_copied": false,
+    "files_created_or_modified": false,
+    "files_staged": false,
+    "commits_created": false,
+    "pushes_performed": false,
+    "root_remains_sole_writer": true
+  },
+  "responsible_agent_identity": "/root/run053_agent_a_sanitizer",
+  "orchestrator_writer_identity": "/root",
+  "materialization_boundary": {
+    "materialized_after_fresh_agent_b_returned": true,
+    "fresh_agent_b_identity": "/root/run054_fresh_agent_b",
+    "fresh_agent_b_exact_input_files": [
+      "raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json"
+    ],
+    "fresh_agent_b_crosswalk_access": false,
+    "reason": "The sealed source-identity crosswalk was absent from the repository until Agent B completed its identity-blind neutralization."
+  },
+  "agent_return_integrity": {
+    "exact_structured_message_sha256": "75b882a4b14647f2f047567caaaad32e703c9b91d6e098df6ec0160741015bfe",
+    "canonical_payload_sha256": "b41fabcaef6f4a5aac9ffa16c0c4329f26e9ee19f719bd3fdf1293ad25e75bf8",
+    "transport": "Agent returned structured JSON; the orchestrator alone materialized this repository artifact after Agent B completed."
+  }
+}
