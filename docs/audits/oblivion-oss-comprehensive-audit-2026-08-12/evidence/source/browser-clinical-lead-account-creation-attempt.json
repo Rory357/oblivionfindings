@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "artifact": "browser-clinical-lead-account-creation-attempt",
+  "observed_at": "2026-08-13T14:11:02.0794648+12:00",
+  "environment": "signed-in test/development server",
+  "status": "blocked_ui_inconsistency_no_account_created",
+  "requested_account": {
+    "display_name": "Demo Clinical Lead",
+    "email": "clinical.lead@demo.test",
+    "role": "Clinical Lead",
+    "onboarding_email_requested": false,
+    "invite_requested": false
+  },
+  "observations": [
+    "The Sites workspace visibly listed 20 active test sites.",
+    "The HR People workspace reported zero people across zero sites.",
+    "The employee wizard required a Primary site, but its site picker contained no options.",
+    "The review step showed 100% completion with the requested name, email and role, but Add employee remained disabled.",
+    "A forced click did not submit the form or create a record."
+  ],
+  "impact": "A dedicated Clinical/Medication Lead test identity could not be created through the visible product workflow, so the required actor class remains 11/12 sampled and task-level clinical-lead validation remains blocked.",
+  "likely_boundary": "Deployed HR People site-option data and/or client-side final-submit validation is inconsistent with the visible Sites register and with the intended nullable primary-site backend contract.",
+  "safe_next_check": "Reconcile the HR People site-options payload and final-submit validation against the active Sites register, then retry with a resettable test fixture.",
+  "mutation_boundary": "No site, employee, account, invitation, onboarding email or other domain record was created. Only browser navigation and pre-submit interaction occurred.",
+  "classification": "newly_observed_test_workflow_bug_not_a_canonical_product-fix",
+  "secrets_recorded": false
+}

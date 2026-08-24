@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-904-wave36",
+  "generated_at": "2026-08-21T22:30:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eight current medication completion-unproved targets independently reviewed; one bounded direct comparator decision and seven retained-unproved decisions.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "Comparator source evidence only; no Oblivion product, runtime, API execution, browser, representative-task, Site-policy or release credit.",
+    "no_copy_rule": "Behavioural evidence only; no source, schema, UI or wording is copied.",
+    "selection_preimage_rule": "Packet-order IDs joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "4575845f55f67ec857f676294b6054e79670793ad23c0a3c627a84fa9cfec25e",
+    "independent_review_verdict": "GO_1_direct_7_retained"
+  },
+  "selected_target_ids": [
+    "CAP-MED-ALERT-TRIAGE-RESOLUTION",
+    "CAP-MED-API-SHIFT-SUMMARY",
+    "CAP-MED-HANDOVER-ACKNOWLEDGEMENT",
+    "CAP-MED-INR-MONITORING",
+    "CAP-MED-MAR-CHART-REVIEW",
+    "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API",
+    "CAP-MED-WORKER-PRN-EFFECTIVENESS",
+    "CAP-MED-WORKER-TODAY-WORKLIST"
+  ],
+  "input_pins": {
+    "benchmark_final_904_before_wave": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "0923c6681011fe90c1e9e71bbea6c1ac5dbed33b4773c884fae2958fe1df869b",
+      "bytes": 662257
+    }
+  },
+  "repository_snapshots": {
+    "BAHMNI_IPD_FRONTEND": {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "url": "https://github.com/Bahmni/openmrs-module-ipd-frontend",
+      "commit": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+      "tree": "45a9d806a093eb75a3c22f663daa86dc8437e5fb",
+      "repository_root_licence": "MPL-2.0 with OpenMRS healthcare disclaimer"
+    },
+    "BAHMNI_MEDICATION_ADMINISTRATION": {
+      "repo": "Bahmni/openmrs-module-medicationadministration",
+      "url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+      "commit": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+      "tree": "60d811565b010e60541fcada7d8fd50476255dd5",
+      "repository_root_licence": "MPL-2.0 with OpenMRS healthcare disclaimer"
+    }
+  },
+  "verified_files": [
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "LICENSE",
+      "blob": "53465c6cc453b4d66ebc891368b8a05205af2e66",
+      "sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+      "loci": "L1-L25,L370-L401"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/DrugChart/DrugChartView.jsx",
+      "blob": "0495a51d1d6e0d58d2a8e789d5363b2558d653f0",
+      "sha256": "2355760271e0441540cfc090ebfbb3f03c1f394181590277f4bd9625a239a5ab",
+      "loci": "L84-L119,L131-L176,L214-L266,L274-L327"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/DrugChart/DrugChart.jsx",
+      "blob": "38348203ed2a00a3a7b06b65d5e5f3304855cbd6",
+      "sha256": "3ad02d642d91dbf6a8b1e351f6b4a92b3aca94641af188368c09100ed7197b30",
+      "loci": "L13-L25,L106-L147"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/DrugChart/CalendarRow.jsx",
+      "blob": "dfcb628e97ba0ed111c6957777baaad7f5d7977a",
+      "sha256": "fb132bd9fb3c62923d13f6bc8f145b01a9bfcd31fd33ae1d88d0e83c5691182f",
+      "loci": "L23-L105"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/DrugChart/DrugListCell.jsx",
+      "blob": "82c49382697db57aff646111445cb6698deb5828",
+      "sha256": "b8594759173c997c899e6f642ce13526bb9103f2915267559bfd1e7186fc616c",
+      "loci": "L23-L29,L121-L132,L200-L315"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/NursingTasks/NursingTasks.jsx",
+      "blob": "c1b203089ca099978010e12d788dc005bacc2e9c",
+      "sha256": "5b5a7ae52125e1e684edafee3d4de5a02e34d792af0009fca9fe35f584284368",
+      "loci": "L49-L84,L93-L105,L236-L250,L335-L415,L421-L535,L582-L589"
+    },
+    {
+      "repo": "Bahmni/openmrs-module-ipd-frontend",
+      "path": "src/components/NursingTasks/NursingTasksUtils.js",
+      "blob": "9718893283241503b4a763da8bfa7452644df53a",
+      "sha256": "b034a0f5b7a0b098b7c38ad3702ba4856eef27a2da4a28f455a4e54f9342fcbb",
+      "loci": "L18-L31,L49-L67,L75-L94,L135-L212,L253-L268"
+    }
+  ],
+  "counts": {
+    "evaluated": 8,
+    "direct": 1,
+    "retained_unproved": 7,
+    "documented_ncm": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-MED-ALERT-TRIAGE-RESOLUTION",
+      "candidate": "Bahmni IPD nursing tasks",
+      "status": "retain",
+      "reason": "Patient task display has no medication-alert instance triage, ownership, resolution or replay lifecycle.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-API-SHIFT-SUMMARY",
+      "candidate": "Bahmni IPD nursing task API",
+      "status": "retain",
+      "reason": "Patient/time retrieval and client categorisation are not a server-owned shift summary aggregate.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-HANDOVER-ACKNOWLEDGEMENT",
+      "candidate": "Bahmni IPD shift screens",
+      "status": "retain",
+      "reason": "No handover record, recipient acknowledgement, state, actor/time or exception workflow is present.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-INR-MONITORING",
+      "candidate": "Bahmni medication administration",
+      "status": "retain",
+      "reason": "No INR/warfarin result, range, review, escalation or dosing-monitoring locus is present.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-MAR-CHART-REVIEW",
+      "candidate": "Bahmni IPD Drug Chart",
+      "status": "direct",
+      "requirement": "Review a patient medication chart across a shift window with schedule, dose/route and administration outcome provenance.",
+      "loci": "Bahmni/openmrs-module-ipd-frontend@cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9 :: DrugChartView.jsx L84-L119,L131-L176,L214-L266,L274-L327; DrugChart.jsx L13-L25,L106-L147; CalendarRow.jsx L23-L105; DrugListCell.jsx L23-L29,L121-L132,L200-L315",
+      "behavior": "A patient and shift-window drug chart renders scheduled medicines, dose/route, administered or not-administered status, performer/time/notes and shift navigation.",
+      "reason": "No Oblivion Site/access, cross-client, administration write, stock, correction or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API",
+      "candidate": "Bahmni IPD shift screens",
+      "status": "retain",
+      "reason": "No outgoing-shift composite of due/given/missed/refused doses, PRN reviews, omissions and stock/CD state.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-WORKER-PRN-EFFECTIVENESS",
+      "candidate": "Bahmni PRN scheduling and administration",
+      "status": "retain",
+      "reason": "PRN scheduling/administration lacks a post-dose outcome, reassessment time, effectiveness decision and escalation record.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-MED-WORKER-TODAY-WORKLIST",
+      "candidate": "Bahmni IPD nursing tasks",
+      "status": "retain",
+      "reason": "A single-patient shift screen is not an assigned-worker multi-client full-day board with rounds, stock and follow-ups.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    }
+  ],
+  "collision_disclosure": {
+    "prior_named_wave_packets": 30,
+    "prior_unique_evaluated_ids": 304,
+    "prior_unique_id_set_sha256": "b9f66d9a448966257441f5e82e5af88a4cf07a015b9c030854f7e28467aa374b",
+    "selected_target_intersection": 0,
+    "selected_routes_unique": "14/14",
+    "target_source_tuple_sha256": "a1000cd6178ade5c20a59159db445e7c83325b49e1df6faf8d85cad916fefb83",
+    "source_reuse": "NursingTasksUtils and medication-administration model/DAO reuse is disclosed and earns no new credit; the direct DrugChart loci are new. Shared pages transfer no family credit."
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 1,
+    "eligible_total": 1,
+    "completion_unproved": -1,
+    "documented_ncm": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark_direct": 362,
+    "verified_benchmark_total": 384,
+    "documented_ncm": 89,
+    "eligible_total": 473,
+    "completion_unproved": 431
+  }
+}

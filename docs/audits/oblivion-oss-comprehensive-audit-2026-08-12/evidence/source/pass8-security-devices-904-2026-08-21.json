@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-security-devices-904-2026-08-21",
+  "generated_at": "2026-08-22T01:25:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_existing_finding_verification_failure_no_new_finding_no_completion_credit",
+  "module": {
+    "id": "SECURITY_DEVICES",
+    "targets": 37,
+    "classes": {
+      "H": 36,
+      "D": 0,
+      "M": 1
+    },
+    "benchmark_decided": 13,
+    "benchmark_unproved": 24
+  },
+  "finding": {
+    "id": "ARCH-P0-B",
+    "priority": "P0",
+    "status": "in_progress",
+    "feature_id": "SEC-ALERTS-EVENTS",
+    "route_id": "ROUTE-2529",
+    "page_id": "PAGE-0814",
+    "co_link_preserved": "ARCH-P0-C"
+  },
+  "source_pins": [
+    {
+      "path": "app/Domain/SecurityDevices/Http/Controllers/AlertsEventsController.php",
+      "audited": "d1a4d530751b9c2db26873f431a95408bbd1fe9e17cc1cdf510daa9b82d43cf7",
+      "current": "cdb14692b7788da761e3104b9366ca56d4e0d2008c2e9d9f3eabcb86805f288e",
+      "loci": "audited L23-L33,L92-L101; current L18-L24,L30-L39,L98-L109,L125-L150"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php",
+      "audited": "1bb84f4d5bdf6f2b8d454fe82b2c67ff2750871cd1962ee89bdd0b65d2b6b7b7",
+      "current": "5f98d973f3bfcd72e7b025433bfa9b70d93a639c526a3fc50ff851f8f32a96ad",
+      "loci": "current L38-L57,L118-L166"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "audited": null,
+      "current": "40085ca9fe543a91ba74cecb439b09c3ca143e1ed5c759271630616ec8faa007",
+      "loci": "current L530-L590"
+    },
+    {
+      "path": "routes/security-devices.php",
+      "audited": "6a3ad91c504ebce8640afac368b63602f4d7e893bef3eda508601e9c6f613544",
+      "current": "c92b48d3edf7b0d89bd5bdcd77c74b4139d2959fd459b9a53c08fc71e7b0ba3f",
+      "loci": "current L47-L50,L328-L330"
+    },
+    {
+      "path": "database/seeders/SecurityDevicesPermissionsSeeder.php",
+      "audited": "0eb5c550af86e6f1e6cc4ca2f17b0b06438b971be9a21f149fdc745be379c754",
+      "current": "4aa44f654fb533f148ff4459f354e8c324e6cb3203744e919b9cab5cd7eef4ad",
+      "loci": "current L95-L123,L136-L160"
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/AlertsEventsControllerTest.php",
+      "audited": "1ff3a92633f7cadc9171f9d0fe3e9149506d533abcca480f3c9f07dc161cdec0",
+      "current": "572526c96aa7c78ac5d6ab56332d3a705a6d689bd3d6e887f45a471bf88064f6",
+      "loci": "current L332-L366; all-Sites happy path only"
+    },
+    {
+      "path": "resources/js/pages/security-devices/alerts-events.tsx",
+      "audited": "c85951dca9445f50241abe63c02ac690ee6020b8f8b5eb55f4988c9397d108e6",
+      "current": "95ed7d5d1ff1b9ea58b7b38200c9c8d15f2d80a210756c3c2eb5094b16b6f749",
+      "loci": "PAGE-0814 exact routed page"
+    }
+  ],
+  "verification_failure": {
+    "root": "Historical event scope uses current device visibility rather than occurred-at temporal custody.",
+    "failure_sequence": "A device records event A under Site A, transfers to Site B, then the current-device scope exposes event A to B and removes it from A instead of evaluating custody at occurred_at.",
+    "canonical_comparison": "ReportsController calls SecurityDevicesAccessService::applyTemporalEventCustodyScope; AlertsEventsController does not.",
+    "runtime_executed": false,
+    "browser_executed": false
+  },
+  "pass_reconciliation": {
+    "P1": "37/37 static identities reviewed",
+    "P2": "0/36 representative tasks executed",
+    "P3": "13/37 benchmark/NCM decided; 24 unproved",
+    "P4": "0/36 representative visual/security tasks executed",
+    "P5": "37/37 static architecture reviewed; runtime effects 0",
+    "P6": "4/37 target rows linked; official propositions frame risk only",
+    "P7": "4/37 target rows linked; tests executed 0",
+    "P8": "fresh module challenge 1; module completion 0/37"
+  },
+  "visual": {
+    "visual_id": "VIS-020827",
+    "classification": "Not safely reproducible",
+    "finding_association_added": true,
+    "runtime_or_visual_credit_delta": 0
+  },
+  "count_delta": {
+    "findings": 0,
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "finding_links": 1,
+    "literal_links": 1,
+    "literal_targets": 0,
+    "runtime": 0,
+    "browser": 0,
+    "benchmark": 0,
+    "remediation_completion": 0,
+    "overall_completion": 0
+  },
+  "completion_boundary": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE; no product, runtime, browser, test-execution, benchmark, release, remediation-completion or overall-audit completion credit."
+}

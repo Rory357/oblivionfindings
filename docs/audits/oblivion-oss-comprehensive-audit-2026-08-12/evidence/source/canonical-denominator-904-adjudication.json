@@ -1,0 +1,216 @@
+{
+  "schema_version": "1.0",
+  "artifact": "canonical-denominator-904-adjudication",
+  "generated_at": "2026-08-21T17:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reconciled_static_denominator_runtime_and_completion_blocked",
+  "audit_boundary": "Audit artifacts and audited source inspection only. No application code, runtime, browser, data, test, deployment, or Git-history mutation; no runtime or completion credit.",
+  "inputs": [
+    {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9"
+    },
+    {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c"
+    },
+    {
+      "path": "evidence/source/route-page-gap-reconciliation-902.json",
+      "sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb"
+    },
+    {
+      "path": "evidence/source/full-distinct-capability-adjudication.json",
+      "sha256": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715"
+    },
+    {
+      "path": "inventory.json",
+      "sha256": "076015a57c9368cdc737d0e8139589ba5708d0fa6bcee1d6654c2e72b4b9889a"
+    },
+    {
+      "path": "findings.json",
+      "sha256": "4aacd5e5e7587578d7f242f1ed789ede6fcdcb05892eee0ab2ad5a07f8bf5ec7"
+    },
+    {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "b1082f6ebd02715b3a88123927b0189df87c70b356bf8928837eddf915ac79bf"
+    },
+    {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "f16d04ab2d25f30caca370bcbbb2ba504f0dd2d211b7b552018dd3bf7ec3d608"
+    },
+    {
+      "path": "04-workflow-usability-scorecard.csv",
+      "sha256": "db680bb3a4aa46de8124cf890debc5ccd4fe2647927bf5ad87be0683bb02e3af"
+    },
+    {
+      "path": "routes/clients.php",
+      "sha256": "4b0b75d442291eb0fe6064be06c7d86283c7b37734dc807e412a9f4a4d6b04a6",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "routes/operations.php",
+      "sha256": "fa810e000f222e6e9e7e97325cfe9a2bb36665af0b6f1e380a901608d31c3d2b",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "app/Http/Controllers/ClientMedicalController.php",
+      "sha256": "86f02f0f405aebe49deedbdcd45c614f48867c442e085aa0dae0f820b531fa63",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "app/Models/ClientCondition.php",
+      "sha256": "fba28af92cc0376fb48406f79ad7b3e48cc7c2e2b6d9cbb93acfe69b3ab0aa67",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "app/Models/ClientMedicalProfile.php",
+      "sha256": "eacd11f310b03ee009c4966a3298762475852042f7c7c9cb638df0492e8d8b44",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "resources/js/pages/clients/medical.tsx",
+      "sha256": "008a36479b8b179dd2fbabf16ed99adbb23204b216cd51acef57b2a04820fda4",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "resources/js/pages/operations/clients/medical.tsx",
+      "sha256": "2ffabc35640315308eca5aeb351f9432c96213c3e8d2c3f429e144bf3d987b4a",
+      "kind": "audited_product_source"
+    },
+    {
+      "path": "tests/Feature/MedicationControllerTest.php",
+      "sha256": "5c79ca009b2bc5cb3de4b5e6afdf8b82cd92c4b2634f9b19ec3a58456f6cf583",
+      "kind": "audited_product_source"
+    }
+  ],
+  "prior_denominator": {
+    "total": 902,
+    "H": 788,
+    "D": 111,
+    "M": 3
+  },
+  "accepted_denominator": {
+    "total": 904,
+    "H": 790,
+    "D": 111,
+    "M": 3
+  },
+  "accepted_additions": [
+    {
+      "working_key": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "id": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "candidate_id": "CAP-MED-CLIENT-MEDICAL-PROFILE-CONDITIONS",
+      "id_status": "audit_assigned_stable_name",
+      "class": "H",
+      "canonical_module": "EMAR",
+      "source_family_ids": [
+        "MED-CLIENT-MEDICAL"
+      ],
+      "route_ids": [
+        "ROUTE-0168",
+        "ROUTE-0169",
+        "ROUTE-0170",
+        "ROUTE-2012",
+        "ROUTE-2013",
+        "ROUTE-2014"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientMedicalController.php"
+      ],
+      "origin_files": [
+        "canonical-denominator-904-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "route-page-gap-reconciliation-902.json"
+      ],
+      "absorbed_occurrences": [],
+      "proof": {
+        "routes": [
+          "routes/clients.php:124-141",
+          "routes/operations.php:289-307"
+        ],
+        "controller": [
+          "app/Http/Controllers/ClientMedicalController.php:672-715",
+          "app/Http/Controllers/ClientMedicalController.php:717-743",
+          "app/Http/Controllers/ClientMedicalController.php:745-763"
+        ],
+        "ui": [
+          "resources/js/pages/clients/medical.tsx:749,790",
+          "resources/js/pages/operations/clients/medical.tsx:1832,1890"
+        ],
+        "tests": [
+          "tests/Feature/MedicationControllerTest.php:1845-1954"
+        ],
+        "aggregate": "ClientCondition collection"
+      }
+    },
+    {
+      "working_key": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "id": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "candidate_id": "CAP-MED-CLIENT-MEDICAL-PROFILE-CONDITIONS",
+      "id_status": "audit_assigned_stable_name",
+      "class": "H",
+      "canonical_module": "EMAR",
+      "source_family_ids": [
+        "MED-CLIENT-MEDICAL"
+      ],
+      "route_ids": [
+        "ROUTE-0180",
+        "ROUTE-2023"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientMedicalController.php"
+      ],
+      "origin_files": [
+        "canonical-denominator-904-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "route-page-gap-reconciliation-902.json"
+      ],
+      "absorbed_occurrences": [],
+      "proof": {
+        "routes": [
+          "routes/clients.php:124-141",
+          "routes/operations.php:289-307"
+        ],
+        "controller": [
+          "app/Http/Controllers/ClientMedicalController.php:89-125"
+        ],
+        "ui": [
+          "resources/js/pages/clients/medical.tsx:336",
+          "resources/js/pages/operations/clients/medical.tsx:1241"
+        ],
+        "tests": [
+          "tests/Feature/MedicationControllerTest.php:417-452"
+        ],
+        "aggregate": "ClientMedicalProfile singleton"
+      }
+    }
+  ],
+  "decision": {
+    "reason": "The 902 register omitted two already-distinct source-owned medical jobs: collection CRUD over ClientCondition and singleton upsert of ClientMedicalProfile. Shared permission and source family do not collapse different aggregates, state, actions, UI sections, and test oracles.",
+    "legacy_combined_id": "CAP-MED-CLIENT-MEDICAL-PROFILE-CONDITIONS",
+    "legacy_combined_disposition": "superseded source-family projection evidence only; never an accepted 904 target",
+    "wrong_owner_rejected": "CAP-MED-MEDICATION-ORDER-LIFECYCLE",
+    "wrong_owner_reason": "Medication-order lifecycle owns a different aggregate and cannot absorb condition/profile mutations.",
+    "pages_retained_excluded": [
+      "PAGE-0038",
+      "PAGE-0590"
+    ],
+    "page_reason": "ClientMedicalController::show redirects to the canonical eMAR medication entry rather than rendering either legacy medical.tsx page; mutation callers prove source ownership, not current page reachability."
+  },
+  "projected_static_counts": {
+    "benchmark_decided": 451,
+    "benchmark_unproved": 453,
+    "task_scripts_before_successor_generation": "788/790",
+    "accepted_routes": 2993,
+    "excluded_routes": 31,
+    "route_inventory": 3024,
+    "accepted_pages": 945,
+    "excluded_pages": 17,
+    "page_inventory": 962,
+    "accepted_route_page_union": 3938,
+    "route_page_inventory": 3986
+  },
+  "completion_credit": false
+}

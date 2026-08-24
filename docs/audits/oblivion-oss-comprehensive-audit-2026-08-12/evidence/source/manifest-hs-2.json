@@ -1,0 +1,31 @@
+{
+  "partition":"GOV_HS_PRIV_SOURCE_UNION",
+  "chunk":"HS_2_of_3",
+  "targets":[
+    {"id":"CAP-HS-INJURY-CAPACITY-LIFECYCLE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RETURN-TO-WORK"],"route_ids":["ROUTE-1127","ROUTE-1128","ROUTE-1129","ROUTE-1130","ROUTE-1131","ROUTE-1132","ROUTE-1134","ROUTE-1136","ROUTE-1137"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0373","PAGE-0385"]},
+    {"id":"CAP-HS-RETURN-TO-WORK-PLAN-DUTIES","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RETURN-TO-WORK"],"route_ids":["ROUTE-1135","ROUTE-1139","ROUTE-1140"],"page_ids":["PAGE-0385"]},
+    {"id":"CAP-HS-INJURY-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RETURN-TO-WORK"],"route_ids":["ROUTE-1133"],"page_ids":["PAGE-0385"]},
+    {"id":"CAP-HS-INJURY-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RETURN-TO-WORK"],"route_ids":["ROUTE-1138"],"page_ids":["PAGE-0385"]},
+    {"id":"CAP-HS-LONE-WORKER-SESSION-CHECKIN","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-LONE-WORKER"],"route_ids":["ROUTE-1145","ROUTE-1147","ROUTE-1149","ROUTE-1150","ROUTE-1151"],"page_ids":["PAGE-0373","PAGE-0386"]},
+    {"id":"CAP-HS-LONE-WORKER-SESSION-OVERSIGHT","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-LONE-WORKER"],"route_ids":["ROUTE-1141","ROUTE-1146","ROUTE-1148","ROUTE-1152"],"page_ids":["PAGE-0386"]},
+    {"id":"CAP-HS-LONE-WORKER-ALERT-RESPONSE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-LONE-WORKER"],"route_ids":["ROUTE-1142","ROUTE-1143"],"page_ids":["PAGE-0386"]},
+    {"id":"CAP-HS-PPE-ALLOCATIONS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1154","ROUTE-1155","ROUTE-1156","ROUTE-1157","ROUTE-1159"],"page_ids":["PAGE-0387","PAGE-0388","PAGE-0390","PAGE-0391","PAGE-0392"]},
+    {"id":"CAP-HS-PPE-ALLOCATION-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1158"],"page_ids":["PAGE-0387","PAGE-0390"]},
+    {"id":"CAP-HS-PPE-INSPECTIONS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1161","ROUTE-1162","ROUTE-1172"],"page_ids":["PAGE-0387","PAGE-0388","PAGE-0391","PAGE-0392"]},
+    {"id":"CAP-HS-PPE-INSPECTION-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1163"],"page_ids":["PAGE-0387"]},
+    {"id":"CAP-HS-PPE-INVENTORY","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1153","ROUTE-1164","ROUTE-1165","ROUTE-1166","ROUTE-1167","ROUTE-1168","ROUTE-1170","ROUTE-1171"],"page_ids":["PAGE-0387","PAGE-0388","PAGE-0389","PAGE-0390","PAGE-0391","PAGE-0392"]},
+    {"id":"CAP-HS-PPE-INVENTORY-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1169"],"page_ids":["PAGE-0387","PAGE-0390"]},
+    {"id":"CAP-HS-PPE-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1160"],"page_ids":["PAGE-0387"]},
+    {"id":"CAP-HS-PPE-TYPES","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-PPE"],"route_ids":["ROUTE-1173","ROUTE-1174","ROUTE-1175","ROUTE-1176"],"page_ids":["PAGE-0387","PAGE-0389","PAGE-0391","PAGE-0392"]},
+    {"id":"CAP-HS-PROCEDURE-AUTHORING-EVIDENCE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1177","ROUTE-1178","ROUTE-1179","ROUTE-1180","ROUTE-1184","ROUTE-1185","ROUTE-1187","ROUTE-1192"],"page_ids":["PAGE-0364","PAGE-0374","PAGE-0393"]},
+    {"id":"CAP-HS-PROCEDURE-REVIEW-APPROVAL","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1182","ROUTE-1188","ROUTE-1189","ROUTE-1191"],"page_ids":["PAGE-0393"]},
+    {"id":"CAP-HS-PROCEDURE-ACKNOWLEDGEMENT","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1181"],"page_ids":["PAGE-0393"]},
+    {"id":"CAP-HS-PROCEDURE-ARCHIVE-RESTORE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1183","ROUTE-1190"],"page_ids":["PAGE-0393"]},
+    {"id":"CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1186"],"page_ids":["PAGE-0393"]},
+    {"id":"CAP-HS-PROCEDURE-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SAFE-WORK-PROCEDURE"],"route_ids":["ROUTE-1193"],"page_ids":["PAGE-0393"]},
+    {"id":"CAP-HS-REPORT-BOARD-SUMMARY-API","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-GOVERNANCE-REPORT"],"route_ids":["ROUTE-1194"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0375"]},
+    {"id":"CAP-HS-REPORT-CORRECTIVE-TRACEABILITY-API","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-GOVERNANCE-REPORT"],"route_ids":["ROUTE-1195"],"page_ids":["PAGE-0364","PAGE-0365"]},
+    {"id":"CAP-HS-REPORT-INVESTIGATION-OUTCOMES-API","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-GOVERNANCE-REPORT"],"route_ids":["ROUTE-1196"],"page_ids":["PAGE-0364","PAGE-0365"]}
+  ],
+  "proof_boundary":"Exact static IDs/classes/routes/pages. Runtime actor, state, recovery, and completion are unproved."
+}

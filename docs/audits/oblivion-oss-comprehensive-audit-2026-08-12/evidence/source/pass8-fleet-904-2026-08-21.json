@@ -1,0 +1,176 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-fleet-904-2026-08-21",
+  "generated_at": "2026-08-21T22:20:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "selection": {
+    "method": "Risk-ranked feature-linked unresolved finding score: 100×P0 + 10×P1 + P2.",
+    "selected_module": "FLEET",
+    "selected_score": 330,
+    "next_scores": {
+      "SECURITY_DEVICES": 220,
+      "CLINICAL": 210,
+      "OPERATIONS": 191,
+      "SITES": 160
+    }
+  },
+  "module_counts": {
+    "targets": 49,
+    "H": 48,
+    "D": 1,
+    "M": 0,
+    "benchmark_decided": 30,
+    "benchmark_unproved": 19,
+    "linked_p0_p1_before_wave": 6,
+    "linked_p0_p1_after_wave": 7,
+    "runtime_unexecuted": 49,
+    "routes": 157,
+    "resolver_pages": 61,
+    "test_inventory_rows": 6
+  },
+  "eight_pass": {
+    "P1": {
+      "reviewed": 49,
+      "denominator": 49,
+      "boundary": "Static identity, routes, owners and source call graph."
+    },
+    "P2": {
+      "executed": 0,
+      "denominator": 49,
+      "boundary": "Representative persisted tasks unexecuted."
+    },
+    "P3": {
+      "decided": 30,
+      "denominator": 49,
+      "unproved": 19,
+      "boundary": "Benchmark evidence only; no local behavior credit."
+    },
+    "P4": {
+      "executed": 0,
+      "denominator": 49,
+      "boundary": "Happy/error/recovery/handoff/responsive/accessibility execution absent."
+    },
+    "P5": {
+      "static_reviewed": 49,
+      "denominator": 49,
+      "runtime_data_effects_verified": 0
+    },
+    "P6": {
+      "exact_source_finding_official_links": 1,
+      "denominator": 49,
+      "boundary": "Official propositions are guidance only."
+    },
+    "P7": {
+      "source_constraint_failure_links": 1,
+      "denominator": 49,
+      "tests_executed": 0
+    },
+    "P8": {
+      "static_identity_challenged": 49,
+      "denominator": 49,
+      "module_completion_credit": false
+    }
+  },
+  "new_finding": {
+    "id": "FLEET-BOOKING-SITE-PRIVACY-01",
+    "priority": "P0",
+    "feature_ids": [
+      "CAP-FLEET-VEHICLE-BOOKING-REQUEST",
+      "CAP-FLEET-VEHICLE-BOOKING-DECISION",
+      "CAP-FLEET-VEHICLE-BOOKING-CHECKOUT-RETURN"
+    ],
+    "route_ids": [
+      "ROUTE-0712",
+      "ROUTE-0713",
+      "ROUTE-0714",
+      "ROUTE-0715",
+      "ROUTE-0716",
+      "ROUTE-0717",
+      "ROUTE-0718",
+      "ROUTE-0719",
+      "ROUTE-0720"
+    ],
+    "page_ids": [
+      "PAGE-0209",
+      "PAGE-0210",
+      "PAGE-0211"
+    ],
+    "verdict": "independently_reviewed_new_nonduplicate_p0_static_only"
+  },
+  "source_chain": [
+    {
+      "path": "routes/fleet-assets.php",
+      "baseline_blob": "b93cd9e4e5de55b3807c5aec389d52724749eec2",
+      "baseline_loci": "L108-L126",
+      "current_blob": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+      "current_loci": "L108-L126"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+      "baseline_blob": "666253e172538c55438fb4a78a074446262fd8d5",
+      "baseline_loci": "L23-L100,L202-L375,L391-L511",
+      "current_blob": "25a32a6f4061652045f5f1874573fae8eee6882b",
+      "current_loci": "L23-L100,L202-L375,L391-L511"
+    },
+    {
+      "path": "app/Models/FleetVehicleBooking.php",
+      "baseline_blob": "b505a9089db79f9e395b41a3720bea281ef50a94",
+      "baseline_loci": "model",
+      "current_blob": "4ce4836c453172d187a090bb84951c2d1962c0a3",
+      "current_loci": "model"
+    },
+    {
+      "path": "app/Policies/AssetPolicy.php",
+      "baseline_blob": "d5841ed53e076a6fae71a7cefb512db771f0ec66",
+      "baseline_loci": "L17-L21",
+      "current_blob": "ef4931d4c88542a85f7de7bf343da8d668e49f57",
+      "current_loci": "L17-L21"
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "baseline_blob": "fed7affe854534221417be93dc2b2d8445488c8d",
+      "baseline_loci": "L53-L83,L825-L833",
+      "current_blob": "41d3ed5c671c1774b4865b62e88e053e8aea55a8",
+      "current_loci": "L53-L83,L825-L833"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "baseline_blob": "4859ab64c19b8a35ba0656ef2f9e40b18943cc98",
+      "baseline_loci": "Fleet permissions",
+      "current_blob": "317c399b138d42edcb2d001323f2edb085ab4e41",
+      "current_loci": "L732-L759"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/bookings/book-vehicle-wizard.tsx",
+      "baseline_blob": "d2f638e26a7ce787ff2b8ffc5c51eb23be139c5f",
+      "baseline_loci": "L345-L373,L628-L661",
+      "current_blob": "378ea55793f55b7cc1d7d115a591b2f8ed15f6fd",
+      "current_loci": "L345-L373,L628-L661"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/bookings/show.tsx",
+      "baseline_blob": "73caafda66153e4b443a1522dd4de83811321a0e",
+      "baseline_loci": "L194-L228",
+      "current_blob": "a8be925713d46869e5b60dc02611623f08bcb703",
+      "current_loci": "L194-L228"
+    }
+  ],
+  "duplicate_boundary": {
+    "existing_finding_count": 95,
+    "related_not_duplicate": [
+      "ASSET-RBAC-01",
+      "FLEET-TRANSPORT-01",
+      "FLEET-MED-WITNESS-01"
+    ],
+    "distinction": "This finding owns the vehicle-booking aggregate, booking routes and Client/Site privacy boundary."
+  },
+  "credit_boundary": {
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "module_completion_delta": 0,
+    "finding_delta": 1
+  }
+}

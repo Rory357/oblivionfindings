@@ -1,0 +1,440 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-901",
+  "generated_at": "2026-08-13T08:37:33.3421351+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Fresh target-specific benchmark or bounded No Credible Match adjudication for 20 current capabilities whose split, regroup, new identity, or corrected lineage prevents mechanical inheritance from the prior 894-target map.",
+  "methodology": {
+    "candidate_rule": "A verified-benchmark row records a neutral Oblivion requirement and an official repository pinned to an immutable commit and exact source locus that proves a material slice of the same user job. It never asserts full parity.",
+    "ncm_rule": "A documented-NCM row records target-specific search terms and every evaluated repository in the bounded corpus with an explicit rejection reason. It is not a global non-existence claim.",
+    "lineage_rule": "Split, regrouped, merged, newly named, and source-lineage-corrected targets receive no inherited completion credit. Each row below is a fresh target-specific adjudication.",
+    "no_copy_rule": "Benchmark evidence is behavioural only. Do not copy source code, schemas, UI, wording, icons, data models, or distinctive layout.",
+    "runtime_boundary": "No application tests, browser journeys, databases, queues, jobs, external workflows, commits, pushes, deployments, or product mutations were executed for this research artifact."
+  },
+  "input_pins": {
+    "working_capability_manifest_901": {
+      "path": "evidence/source/working-capability-manifest-901.json",
+      "file_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900"
+    },
+    "working_manifest_generation_summary": {
+      "path": "evidence/source/working-capability-manifest-901-generation-summary.json",
+      "file_sha256": "ee26f859d753b2c4b45418819449c0303a4e19e4ddb4a57e9fe4806c94d6da72"
+    },
+    "route_page_gap_reconciliation": {
+      "path": "evidence/source/route-page-gap-reconciliation-901.json",
+      "file_sha256": "00ed9729f729e8d52a9fe8adafc1243d2e676572ef5c5ad941952bfcbec5eec2"
+    },
+    "selected_benchmark_adjudication": {
+      "path": "evidence/source/selected-benchmark-adjudication.json",
+      "file_sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3"
+    },
+    "no_credible_match_adjudication": {
+      "path": "evidence/source/no-credible-match-adjudication.json",
+      "file_sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71"
+    }
+  },
+  "repository_snapshots": {
+    "repo:bahmni-medication-administration": {"url": "https://github.com/Bahmni/openmrs-module-medicationadministration", "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0"},
+    "repo:bahmni-ipd-frontend": {"url": "https://github.com/Bahmni/openmrs-module-ipd-frontend", "commit_sha": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9"},
+    "repo:openmrs-core": {"url": "https://github.com/openmrs/openmrs-core", "commit_sha": "8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e"},
+    "repo:openmrs-patient-management": {"url": "https://github.com/openmrs/openmrs-esm-patient-management", "commit_sha": "710bf9b201f0663ed6dd0afb7af0591a9db4f3d4"},
+    "repo:openemr": {"url": "https://github.com/openemr/openemr", "commit_sha": "312b5d042f7fa49cc78ebed041155fba339a991c"},
+    "repo:beaconhs": {"url": "https://github.com/braedonsaunders/beaconhs", "commit_sha": "7de18df3532a96883e1098dea0a4b4dba70909fd"},
+    "repo:frappe-hrms": {"url": "https://github.com/frappe/hrms", "commit_sha": "450f6ca52c5386020a1023b2f24e4af0ab20521e"},
+    "repo:frappe-erpnext": {"url": "https://github.com/frappe/erpnext", "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9"},
+    "repo:svix-webhooks": {"url": "https://github.com/svix/svix-webhooks", "commit_sha": "1c462379329b31bba747264735af3798f3baa197"},
+    "repo:thingsboard": {"url": "https://github.com/thingsboard/thingsboard", "commit_sha": "684f92bbfd0cf48015b6e42f5592bc0c2fc18038"},
+    "repo:keycloak": {"url": "https://github.com/keycloak/keycloak", "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d"},
+    "repo:grocy": {"url": "https://github.com/grocy/grocy", "commit_sha": "c4e7acda48c1f27a163ffaf66c14cca876675622"},
+    "repo:ciso-assistant": {"url": "https://github.com/intuitem/ciso-assistant-community", "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3"},
+    "repo:openproject": {"url": "https://github.com/opf/openproject", "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f"},
+    "repo:primero": {"url": "https://github.com/primeroIMS/primero", "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a"},
+    "repo:traccar": {"url": "https://github.com/traccar/traccar", "commit_sha": "17e7a330e8a07896f000898b37dc770f2df3c142"},
+    "repo:traccar-web": {"url": "https://github.com/traccar/traccar-web", "commit_sha": "bdcd40a0b0d2c5d1421d729673281a3a8752f0c3"},
+    "repo:snipe-it": {"url": "https://github.com/grokability/snipe-it", "commit_sha": "5fced85cafa5f49bb820b83d68850bb9e62d62f5"},
+    "repo:oca-fleet": {"url": "https://github.com/OCA/fleet", "commit_sha": "08953b7fbd10d766f5c816cadd98f1000fcf995c"},
+    "repo:grash-cmms": {"url": "https://github.com/Grashjs/cmms", "commit_sha": "5c8e395c5f40280b0ae5fb6cf63b8d3a84c0e55a"},
+    "repo:calcom": {"url": "https://github.com/calcom/cal.diy", "commit_sha": "176037d0afbe572f870a3c702985e7cd83fe6c0c"},
+    "repo:care": {"url": "https://github.com/ohcnetwork/care", "commit_sha": "c64a1ef0e726b06788b63bf4537dea5d16af2269"},
+    "repo:care-fe": {"url": "https://github.com/ohcnetwork/care_fe", "commit_sha": "912477accb940e370db85dcb4bb98ebafbb5a45e"},
+    "repo:timefold": {"url": "https://github.com/TimefoldAI/timefold-solver", "commit_sha": "4f17e1389c70fdd86d9c8b92ae0c62c41dd43ea8"},
+    "repo:kimai": {"url": "https://github.com/kimai/kimai", "commit_sha": "fd8989e9011aeff0a9ed573c294707140b4401b0"},
+    "repo:rocket-chat": {"url": "https://github.com/RocketChat/Rocket.Chat", "commit_sha": "8362719f64716dc37db413b2d15d52701cd785f2"},
+    "repo:opensign": {"url": "https://github.com/OpenSignLabs/OpenSign", "commit_sha": "7f114dc124c55860ef03f03becd7c679bf72db68"}
+  },
+  "counts": {
+    "targets": 20,
+    "verified_benchmark_direct": 11,
+    "documented_ncm_direct": 9
+  },
+  "targets": [
+    {
+      "working_key": "CAP-MED-API-ADMINISTRATION-RECORD-CORRECT",
+      "adjudication_id": "fresh-901:CAP-MED-API-ADMINISTRATION-RECORD-CORRECT",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-MED-API-ADMINISTRATION-RECORD-CORRECT",
+      "neutral_requirement": "An authorised medication worker must be able to record an administration and correct an erroneous record while preserving the original, correction reason, actor/time, authorisation, downstream reconciliation, and an auditable terminal outcome.",
+      "search_terms": ["medication administration correction reversal audit trail open source", "eMAR correct administration preserve original reason actor timestamp", "site:github.com medication administration record status reason performer dose route"],
+      "evidence_loci": ["Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0 :: api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java :: L27-L59"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+        "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+        "source_loci": ["api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java:L27-L59"],
+        "proven_slice": "Persisted administration identity includes patient, encounter, order, performer, status/reason, administered time, dose, units, route, site, and notes.",
+        "parity_limits": "Material record slice only. It does not prove correction authorisation, immutable-original lineage, reversal, correction-reason enforcement, downstream stock/MAR reconciliation, or Oblivion access/privacy controls."
+      },
+      "inheritance_boundary": "No mechanical inheritance from MED-MEDICATIONS-API. Candidate credit is limited to the independently checked record slice; correction semantics remain unproved."
+    },
+    {
+      "working_key": "CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+      "adjudication_id": "fresh-901:CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+      "neutral_requirement": "An authorised H&S actor must create or seed a corrective action, assign an owner and due date, start and complete delivery, capture action/evidence, verify or return it for rework, and close it with actor/time and source linkage.",
+      "search_terms": ["corrective action owner due date start complete verify close evidence open source H&S", "CAPA pending verification return for rework closure audit trail", "site:github.com beaconhs corrective-actions status verification evidence"],
+      "evidence_loci": ["braedonsaunders/beaconhs@7de18df3532a96883e1098dea0a4b4dba70909fd :: packages/db/src/schema/corrective-actions.ts :: L32-L123"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/braedonsaunders/beaconhs",
+        "commit_sha": "7de18df3532a96883e1098dea0a4b4dba70909fd",
+        "source_loci": ["packages/db/src/schema/corrective-actions.ts:L32-L123"],
+        "proven_slice": "Corrective actions have open, in-progress, pending-verification, closed, and cancelled states plus owner, due date, root cause, action taken, verification evidence, and source linkage.",
+        "parity_limits": "Does not prove Oblivion's exact command gates, incident alternate-entry convergence, site/direct-object boundaries, notification handoff, or runtime completion."
+      },
+      "inheritance_boundary": "The three-family regroup could not inherit; only the independently checked corrective-action lifecycle slice receives credit."
+    },
+    {
+      "working_key": "CAP-HS-EVENT-LIFECYCLE",
+      "adjudication_id": "fresh-901:CAP-HS-EVENT-LIFECYCLE",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-HS-EVENT-LIFECYCLE",
+      "neutral_requirement": "An authorised H&S actor must list and inspect an event, retain occurrence/reporting and ownership evidence, and close it only through an explicit governance transition with closure evidence, actor/time, and a terminal outcome.",
+      "search_terms": ["health safety event incident lifecycle open investigating monitoring closed owner root cause", "incident occurrence reported timestamp investigator closure summary audit", "site:github.com beaconhs incidents schema status closure"],
+      "evidence_loci": ["braedonsaunders/beaconhs@7de18df3532a96883e1098dea0a4b4dba70909fd :: packages/db/src/schema/incidents.ts :: L50-L168"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/braedonsaunders/beaconhs",
+        "commit_sha": "7de18df3532a96883e1098dea0a4b4dba70909fd",
+        "source_loci": ["packages/db/src/schema/incidents.ts:L50-L168"],
+        "proven_slice": "Incident records retain lifecycle status, occurrence/reporting timestamps, investigator, root cause, and closure fields.",
+        "parity_limits": "Does not prove Oblivion's investigation/corrective-action closure gate, override reason, closure-summary rule, monitoring phase, site/direct-object boundary, or runtime completion."
+      },
+      "inheritance_boundary": "No family-level inheritance; the incident schema was rechecked only against this target's index/show/close envelope."
+    },
+    {
+      "working_key": "OPS-ROSTER",
+      "adjudication_id": "fresh-901:OPS-ROSTER",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:OPS-ROSTER",
+      "neutral_requirement": "A signed-in worker must resolve to an active employee and see only their authorised roster, with deterministic shift dates/times, an upcoming subset, history/empty states, and the applicable organisation/site and timezone boundary.",
+      "search_terms": ["open source HR self service upcoming shifts active employee roster", "signed in user employee shift assignment submitted active ordered start date", "site:github.com/frappe/hrms roster upcoming shifts active employee"],
+      "evidence_loci": ["frappe/hrms@450f6ca52c5386020a1023b2f24e4af0ab20521e :: hrms/api/__init__.py :: L41-L59,L92-L96,L319-L342", "frappe/hrms@450f6ca52c5386020a1023b2f24e4af0ab20521e :: frontend/src/views/attendance/Dashboard.vue :: L23-L30,L74-L95"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "450f6ca52c5386020a1023b2f24e4af0ab20521e",
+        "source_loci": ["hrms/api/__init__.py:L41-L59", "hrms/api/__init__.py:L92-L96", "hrms/api/__init__.py:L319-L342", "frontend/src/views/attendance/Dashboard.vue:L23-L30", "frontend/src/views/attendance/Dashboard.vue:L74-L95"],
+        "proven_slice": "Resolve the signed-in user to an Active employee, fail without that mapping, query only that employee's Active submitted shift assignments joined to shift times and ordered by start date, then present Upcoming Shifts with history and empty state.",
+        "parity_limits": "Does not prove Oblivion's timezone windows, organisation/site visibility, client/task/timesheet joins, care rules, permissions/privacy, or runtime acceptance."
+      },
+      "inheritance_boundary": "Supersedes the pending Timefold analogy. No solver evidence is inherited."
+    },
+    {
+      "working_key": "CAP-PLAT-WEBHOOK-RECEIVER",
+      "adjudication_id": "fresh-901:CAP-PLAT-WEBHOOK-RECEIVER",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-PLAT-WEBHOOK-RECEIVER",
+      "neutral_requirement": "A provider-scoped webhook endpoint must reject unknown or unauthorised integrations, verify the unmodified payload when signing is required, parse/normalise only after verification, deduplicate source events, persist receipt/outcome evidence, route the accepted signal, and return explicit outcomes.",
+      "search_terms": ["open source inbound webhook receiver verify before parse forward integration endpoint", "webhook per integration signature validation payload transformation output error status", "site:github.com/svix/svix-webhooks bridge webhook_receiver"],
+      "evidence_loci": ["svix/svix-webhooks@1c462379329b31bba747264735af3798f3baa197 :: bridge/svix-bridge/src/webhook_receiver/mod.rs :: L30-L40,L111-L200", "svix/svix-webhooks@1c462379329b31bba747264735af3798f3baa197 :: bridge/svix-bridge/src/webhook_receiver/types.rs :: L50-L84,L225-L282", "svix/svix-webhooks@1c462379329b31bba747264735af3798f3baa197 :: bridge/svix-bridge/src/webhook_receiver/verification.rs :: L41-L62"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/svix/svix-webhooks",
+        "commit_sha": "1c462379329b31bba747264735af3798f3baa197",
+        "source_loci": ["bridge/svix-bridge/src/webhook_receiver/mod.rs:L30-L40", "bridge/svix-bridge/src/webhook_receiver/mod.rs:L111-L200", "bridge/svix-bridge/src/webhook_receiver/types.rs:L50-L84", "bridge/svix-bridge/src/webhook_receiver/types.rs:L225-L282", "bridge/svix-bridge/src/webhook_receiver/verification.rs:L41-L62"],
+        "proven_slice": "Per-integration receipt rejects unknown routes, verifies before processing, parses/transforms JSON, forwards output, and distinguishes invalid request/payload from forwarding failure.",
+        "parity_limits": "Verification may be configured off. It does not prove Oblivion API-key lookup, mandatory provider signing, deduplication, durable persistence, site attribution, provider normalisation, or alert routing."
+      },
+      "inheritance_boundary": "No outbound CISO webhook evidence is inherited; the Svix pin proves only receive/verify/parse/forward."
+    },
+    {
+      "working_key": "CAP-CR-ALERT-SENSOR-VALIDATION",
+      "adjudication_id": "fresh-901:CAP-CR-ALERT-SENSOR-VALIDATION",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-CR-ALERT-SENSOR-VALIDATION",
+      "neutral_requirement": "An authorised operator must receive an alert with validated source identity, type, severity and state, then acknowledge, assign and close it through explicit non-duplicate transitions with actor/time, evidence/reason, and a visible terminal outcome.",
+      "search_terms": ["IoT alarm validate originator type severity status acknowledge assign clear audit", "sensor alert operator acknowledge assign close duplicate transition rejection", "site:github.com/thingsboard/thingsboard AlarmDataValidator DefaultTbAlarmService"],
+      "evidence_loci": ["thingsboard/thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038 :: dao/src/main/java/org/thingsboard/server/dao/service/validator/AlarmDataValidator.java :: L33-L49", "thingsboard/thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038 :: application/src/main/java/org/thingsboard/server/service/entitiy/alarm/DefaultTbAlarmService.java :: L102-L160", "thingsboard/thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038 :: common/data/src/main/java/org/thingsboard/server/common/data/alarm/Alarm.java :: L62-L98,L154-L165"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/thingsboard/thingsboard",
+        "commit_sha": "684f92bbfd0cf48015b6e42f5592bc0c2fc18038",
+        "source_loci": ["dao/src/main/java/org/thingsboard/server/dao/service/validator/AlarmDataValidator.java:L33-L49", "application/src/main/java/org/thingsboard/server/service/entitiy/alarm/DefaultTbAlarmService.java:L102-L160", "common/data/src/main/java/org/thingsboard/server/common/data/alarm/Alarm.java:L62-L98", "common/data/src/main/java/org/thingsboard/server/common/data/alarm/Alarm.java:L154-L165"],
+        "proven_slice": "Reject missing alarm identity/severity/status/owner and perform explicit acknowledge, clear, and assign actions with timestamps, comments, actor audit actions, and repeat-action rejection.",
+        "parity_limits": "Does not validate physical sensor truth, false positives, confidence, evidence attachments, integration filtering, Oblivion site/SLA/reasons, or clinical escalation."
+      },
+      "inheritance_boundary": "OneUptime family evidence is not inherited; the validator and service were independently checked for this target."
+    },
+    {
+      "working_key": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "adjudication_id": "fresh-901:CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "neutral_requirement": "An authorised HR actor must create and maintain an employee profile, enforce valid employment states/dates/reporting and linked-user uniqueness, activate or deactivate access with employee state, and make reactivation/rehire and bulk changes explicit, auditable and recoverable.",
+      "search_terms": ["open source employee profile lifecycle active inactive suspended left linked user", "employee leaving relieving date active reports linked account disable enable", "site:github.com/frappe/erpnext employee.py status user permissions lifecycle"],
+      "evidence_loci": ["frappe/erpnext@83e33b343cfac160f3811461d1737e67be82efd9 :: erpnext/setup/doctype/employee/employee.py :: L120-L195,L255-L329,L435-L482", "frappe/erpnext@83e33b343cfac160f3811461d1737e67be82efd9 :: erpnext/setup/doctype/employee/employee.json :: L199-L216,L620-L627"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+        "source_loci": ["erpnext/setup/doctype/employee/employee.py:L120-L195", "erpnext/setup/doctype/employee/employee.py:L255-L329", "erpnext/setup/doctype/employee/employee.py:L435-L482", "erpnext/setup/doctype/employee/employee.json:L199-L216", "erpnext/setup/doctype/employee/employee.json:L620-L627"],
+        "proven_slice": "Constrain employee states, validate dates/reporting and linked-user uniqueness, create an enabled Employee-role user, block leaving with active reports, require relieving date, and synchronise linked-user enablement when employee status changes.",
+        "parity_limits": "Returning to Active is reactivation only. It does not prove Oblivion rehire/history append, bulk actions, intake/invite/site/privacy/compliance workflow, or NZ employment-law fit."
+      },
+      "inheritance_boundary": "The overextended HRMS shift citation is discarded; only the independently verified create/status/linked-account lifecycle receives credit."
+    },
+    {
+      "working_key": "OPS-CLIENT-FUND",
+      "adjudication_id": "fresh-901:OPS-CLIENT-FUND",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:OPS-CLIENT-FUND",
+      "neutral_requirement": "An authorised fund manager must create, inspect and revise a client fund register with a positive controlled amount, defined funding/account period and ownership boundary, duplicate prevention, spend-versus-allocation checks, and an auditable state/outcome; transaction posting is separate.",
+      "search_terms": ["client fund register lifecycle budget allocation account period open source", "positive budget duplicate overlapping period existing expense validation", "site:github.com/frappe/erpnext budget.py budget account fiscal year"],
+      "evidence_loci": ["frappe/erpnext@83e33b343cfac160f3811461d1737e67be82efd9 :: erpnext/accounts/doctype/budget/budget.py :: L28-L246"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+        "source_loci": ["erpnext/accounts/doctype/budget/budget.py:L28-L246"],
+        "proven_slice": "Bind budget to account/cost-centre/project/fiscal period, require positive amount, reject duplicate overlapping budget/account periods and invalid accounts, check existing spend, and allocate before save.",
+        "parity_limits": "Analogous fund-control register only. It does not prove individual-client trust ownership, funding-source/low-balance semantics, NZ disability-funding rules, Oblivion controls, or transaction posting."
+      },
+      "inheritance_boundary": "Source-stable ID was rechecked against the register job only; ROUTE-1931 is excluded."
+    },
+    {
+      "working_key": "CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "adjudication_id": "fresh-901:CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "neutral_requirement": "An authorised actor must record a fund receipt/payment/transfer against the owning fund, preserve amount/date/reference/party and actor evidence, prevent duplicate effects, update balance atomically, and expose durable posting/reconciliation outcome and recovery.",
+      "search_terms": ["client fund ledger transaction payment receipt transfer reference allocation open source", "idempotent fund transaction running balance journal reconciliation", "site:github.com/frappe/erpnext payment_entry.py payment party paid received reference"],
+      "evidence_loci": ["frappe/erpnext@83e33b343cfac160f3811461d1737e67be82efd9 :: erpnext/accounts/doctype/payment_entry/payment_entry.py :: L63-L150"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "83e33b343cfac160f3811461d1737e67be82efd9",
+        "source_loci": ["erpnext/accounts/doctype/payment_entry/payment_entry.py:L63-L150"],
+        "proven_slice": "Payment Entry persists payment type, party/accounts, paid/received and allocated amounts, posting/reference dates and number, status, deductions, and references.",
+        "parity_limits": "Record structure only. It does not prove Oblivion idempotency, locked running balance, actor evidence, async journal/reconciliation, client-fund ownership, or recovery."
+      },
+      "inheritance_boundary": "The audit-assigned split cannot inherit fund-register evidence; credit is limited to the checked transaction-record slice."
+    },
+    {
+      "working_key": "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "adjudication_id": "fresh-901:CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "neutral_requirement": "An unverified signed-in user must be prompted and sent a time-limited signed verification action, may explicitly resend under abuse controls, and on valid token completion must atomically mark the email verified, remove the required action, record success, and continue safely.",
+      "search_terms": ["open source email verification required action resend signed token lifecycle", "unverified user prompt cooldown verify email mark verified remove required action", "site:github.com/keycloak/keycloak VerifyEmail VerifyEmailActionTokenHandler"],
+      "evidence_loci": ["keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/authentication/requiredactions/VerifyEmail.java :: L68-L174", "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/authentication/actiontoken/verifyemail/VerifyEmailActionTokenHandler.java :: L55-L161"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/keycloak/keycloak",
+        "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d",
+        "source_loci": ["services/src/main/java/org/keycloak/authentication/requiredactions/VerifyEmail.java:L68-L174", "services/src/main/java/org/keycloak/authentication/actiontoken/verifyemail/VerifyEmailActionTokenHandler.java:L55-L161"],
+        "proven_slice": "Add VERIFY_EMAIL for an unverified user, prompt/send with refresh protection and resend cooldown, validate token email/session, mark verified, remove required actions, record success, and continue authentication.",
+        "parity_limits": "Does not prove Laravel/Fortify integration, Oblivion notification delivery, site/role access, or fix the locally documented verification-enforcement bypass."
+      },
+      "inheritance_boundary": "Three source rows were grouped, so no mechanical inheritance; required-action and token-handler loci were checked as one lifecycle."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "adjudication_id": "fresh-901:CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "mapping_status": "verified_benchmark_direct",
+      "source_unit": "current-901:CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "neutral_requirement": "An authorised site worker must mark a planned meal served with actor/time and atomically deduct tracked ingredient stock; unserve must restore correlated deductions or fail safely when dependencies make reversal unsafe, preserving resident/site/dietary controls.",
+      "search_terms": ["meal served consume recipe ingredients atomic stock transaction undo open source", "recipe consumption correlated stock bookings reversal dependent booking", "site:github.com/grocy/grocy ConsumeRecipe UndoTransaction UndoBooking"],
+      "evidence_loci": ["grocy/grocy@c4e7acda48c1f27a163ffaf66c14cca876675622 :: services/RecipesService.php :: L80-L112", "grocy/grocy@c4e7acda48c1f27a163ffaf66c14cca876675622 :: services/StockService.php :: L1486-L1524,L1671-L1684"],
+      "benchmark": {
+        "official_repository_url": "https://github.com/grocy/grocy",
+        "commit_sha": "c4e7acda48c1f27a163ffaf66c14cca876675622",
+        "source_loci": ["services/RecipesService.php:L80-L112", "services/StockService.php:L1486-L1524", "services/StockService.php:L1671-L1684"],
+        "proven_slice": "Recipe consumption groups available ingredient deductions under one transaction inside a database transaction; transaction undo reverses grouped bookings and booking-level undo rejects later dependent bookings.",
+        "parity_limits": "Does not prove served_at/served_by meal state, resident/site ownership, dietary/allergen safety, actor audit, exact stock policy, or Oblivion controls."
+      },
+      "inheritance_boundary": "The invalid SITE-DASHBOARD/NetBox credit is discarded; Grocy consumption and reversal were rechecked for this corrected meal-plan lineage."
+    },
+    {
+      "working_key": "CAP-MED-API-SAFETY-SCAN",
+      "adjudication_id": "fresh-901:CAP-MED-API-SAFETY-SCAN",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-MED-API-SAFETY-SCAN",
+      "neutral_requirement": "An authorised medication worker must generate a medication-linked scan code and verify the unmodified code against the correct client and medication before administration, record matched/mismatched labels and provenance, reject invalid context, and return an auditable safety outcome.",
+      "search_terms": ["medication barcode QR scan verification patient medication safety check administration open source", "five rights medication administration scan mismatch audit trail", "site:github.com Bahmni OpenMRS OpenEMR medication scan verify patient drug code"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-MED-API-SAFETY-SCAN/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:bahmni-medication-administration", "query": "scan barcode QR verify patient medication administration", "rejection": "The administration model has no scan-code generation, patient/medication match, mismatch outcome, or scan provenance."},
+        {"repository_id": "repo:bahmni-ipd-frontend", "query": "medication administration barcode scan verify", "rejection": "The inpatient UI does not establish persisted client-bound scan verification and auditable match/mismatch completion."},
+        {"repository_id": "repo:openmrs-core", "query": "medication barcode QR safety scan workflow", "rejection": "No complete scan-to-verification user journey was established."},
+        {"repository_id": "repo:openemr", "query": "medication administration scan verify patient code audit", "rejection": "No site/client-bound scan, mismatch, and worker-audit boundary was established."}
+      ],
+      "inheritance_boundary": "The administration-record citation cannot inherit into scan safety; this is a bounded official-repository corpus result."
+    },
+    {
+      "working_key": "CAP-MED-API-ADMINISTRATION-EVIDENCE",
+      "adjudication_id": "fresh-901:CAP-MED-API-ADMINISTRATION-EVIDENCE",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-MED-API-ADMINISTRATION-EVIDENCE",
+      "neutral_requirement": "An authorised medication worker must upload, download and delete evidence only within the owning client/administration record, preserving file identity, uploader/time, authorisation, audit events, safe failure, and remaining-record outcome.",
+      "search_terms": ["medication administration attachment evidence upload download delete provenance open source", "MAR administration record attachment patient ownership authorization audit", "site:github.com Bahmni OpenMRS OpenEMR medication administration attachment"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-MED-API-ADMINISTRATION-EVIDENCE/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:bahmni-medication-administration", "query": "MedicationAdministration attachment upload download delete evidence", "rejection": "The model has no attachment aggregate or owned upload/download/delete lifecycle."},
+        {"repository_id": "repo:bahmni-ipd-frontend", "query": "administration evidence attachment upload delete download", "rejection": "The frontend does not prove persisted owning-record attachments or delete/download authorisation."},
+        {"repository_id": "repo:openmrs-core", "query": "medication administration attachment evidence lifecycle", "rejection": "No complete administration-evidence journey was established."},
+        {"repository_id": "repo:openemr", "query": "MAR attachment upload download delete audit", "rejection": "No nested administration ownership, uploader evidence, and all three actions were established."}
+      ],
+      "inheritance_boundary": "The administration model cannot inherit into the distinct attachment lifecycle; the result is target-specific and corpus-bounded."
+    },
+    {
+      "working_key": "CAP-HS-EVENT-WORKSAFE-NOTIFICATION",
+      "adjudication_id": "fresh-901:CAP-HS-EVENT-WORKSAFE-NOTIFICATION",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-HS-EVENT-WORKSAFE-NOTIFICATION",
+      "neutral_requirement": "An authorised H&S lead must record a WorkSafe NZ notification from pending to notified with notification time, method, reference and site-preservation evidence, then regulator acknowledgement from notified to acknowledged with actor/time and auditable failures.",
+      "search_terms": ["WorkSafe New Zealand notifiable event software notify acknowledge reference site preservation open source", "health safety event regulator notification pending notified acknowledged audit trail", "site:github.com beaconhs ciso-assistant openproject primero WorkSafe notification"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-HS-EVENT-WORKSAFE-NOTIFICATION/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:beaconhs", "query": "WorkSafe NZ notifiable event notification acknowledge site preserved", "rejection": "Generic incident/corrective schemas do not implement WorkSafe fields or pending-notified-acknowledged transitions."},
+        {"repository_id": "repo:ciso-assistant", "query": "regulator incident notification acknowledge reference", "rejection": "Risk/privacy/document governance does not establish operational WorkSafe notification and acknowledgement."},
+        {"repository_id": "repo:openproject", "query": "WorkSafe notifiable event notification lifecycle", "rejection": "Project work management has no regulator-specific H&S notification/site-preservation completion."},
+        {"repository_id": "repo:primero", "query": "regulator notification acknowledgement incident reference", "rejection": "Child-protection workflows do not establish the WorkSafe NZ state and evidence contract."}
+      ],
+      "inheritance_boundary": "Generic H&S event evidence cannot inherit into the regulator-notification split."
+    },
+    {
+      "working_key": "CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY",
+      "adjudication_id": "fresh-901:CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY",
+      "neutral_requirement": "An authorised transport worker must pack resident medication for a journey, record custody/handover, administer or return it against the correct resident/transport record, reconcile remaining stock, preserve actor/time and exceptions, and reach a visible terminal custody outcome.",
+      "search_terms": ["resident transport medication custody pack administer return chain of custody open source", "medication in transit driver handover stock reconciliation care transport", "site:github.com traccar fleet care medication custody transport"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:traccar", "query": "resident medication transport custody pack administer return", "rejection": "GPS tracking/commands do not establish medication custody, handover, administration, or reconciliation."},
+        {"repository_id": "repo:traccar-web", "query": "medication custody resident transport UI", "rejection": "Tracking UI has no server-side custody completion."},
+        {"repository_id": "repo:snipe-it", "query": "medication checkout return custody resident", "rejection": "IT asset checkout is not medication administration or clinical stock reconciliation."},
+        {"repository_id": "repo:oca-fleet", "query": "resident transport medication pack administer return", "rejection": "Fleet add-ons do not establish medication or resident safeguards."},
+        {"repository_id": "repo:grash-cmms", "query": "medication custody transport work order", "rejection": "Generic CMMS has no clinical/resident custody workflow."},
+        {"repository_id": "repo:thingsboard", "query": "medication transport custody IoT", "rejection": "IoT alarms/devices do not establish medication packing, administration, return, or reconciliation."},
+        {"repository_id": "repo:calcom", "query": "transport medication custody scheduling", "rejection": "Scheduling infrastructure has no custody completion."},
+        {"repository_id": "repo:beaconhs", "query": "transport medication custody H&S", "rejection": "Generic H&S schema does not establish resident transport medication custody."}
+      ],
+      "inheritance_boundary": "The broader transport NCM could not simply transfer; all eight corpus candidates were rejected again against medication custody."
+    },
+    {
+      "working_key": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "adjudication_id": "fresh-901:CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "neutral_requirement": "An authorised respite coordinator must create or resolve a stay's evidence pack, add/update/remove items while open, preserve provenance, seal it irreversibly or through controlled recovery, and export/show the sealed terminal package with actor/time and ownership checks.",
+      "search_terms": ["respite evidence pack stay add item remove seal export open source", "care evidence pack immutable sealed package provenance", "site:github.com primero OpenMRS care respite evidence pack lifecycle"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-RESP-EVIDENCE-PACK-LIFECYCLE/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:primero", "query": "respite evidence pack add item seal export stay", "rejection": "Child-protection evidence does not implement a respite-stay pack with item membership and sealing."},
+        {"repository_id": "repo:openmrs-core", "query": "respite stay evidence pack seal export", "rejection": "Clinical core has no complete pack lifecycle."},
+        {"repository_id": "repo:openmrs-patient-management", "query": "evidence pack stay seal item", "rejection": "No target actor/state/completion was established."},
+        {"repository_id": "repo:care", "query": "respite evidence pack seal export stay", "rejection": "Clinical facility/EMR workflows do not establish a respite-stay sealed evidence package."},
+        {"repository_id": "repo:care-fe", "query": "evidence pack UI seal export", "rejection": "Frontend state alone is not persisted pack/seal completion."},
+        {"repository_id": "repo:openproject", "query": "evidence pack seal export respite", "rejection": "Project work management has no respite ownership or sealed evidence-pack lifecycle."}
+      ],
+      "inheritance_boundary": "The exact target was re-searched despite the older family NCM; this result is bounded to the six repositories."
+    },
+    {
+      "working_key": "HR-REFERENCE",
+      "adjudication_id": "fresh-901:HR-REFERENCE",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:HR-REFERENCE",
+      "neutral_requirement": "A token-bearing external referee must view the intended reference request and submit the questionnaire once without an internal account, after which responses, received time and completed state are durable and replay or wrong-token access fails safely.",
+      "search_terms": ["external referee reference questionnaire token submit completed received_at open source ATS", "employment reference request public secure token one-time submission audit", "site:github.com frappe hrms erpnext external reference referee questionnaire"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=HR-REFERENCE/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:frappe-hrms", "query": "external referee token questionnaire one-time submit completed", "rejection": "No unauthenticated token-bearing referee and one-time persisted questionnaire completion was established."},
+        {"repository_id": "repo:timefold", "query": "employment reference referee token questionnaire", "rejection": "Solver metadata has no HR reference boundary."},
+        {"repository_id": "repo:kimai", "query": "employee reference external referee questionnaire", "rejection": "Time tracking has no reference workflow."},
+        {"repository_id": "repo:bahmni-ipd-frontend", "query": "employment reference external referee token", "rejection": "Inpatient UI has no HR reference request."},
+        {"repository_id": "repo:frappe-erpnext", "query": "external referee employment reference request token", "rejection": "ERP employee sources do not establish the external-referee token lifecycle."},
+        {"repository_id": "repo:snipe-it", "query": "employment reference referee questionnaire", "rejection": "IT asset custody has no HR reference workflow."},
+        {"repository_id": "repo:rocket-chat", "query": "employment reference external questionnaire token", "rejection": "Messaging is not an authoritative requested-to-completed reference record."},
+        {"repository_id": "repo:opensign", "query": "employment reference questionnaire external token", "rejection": "Signing alone does not implement the referee questionnaire and completion state."},
+        {"repository_id": "repo:ciso-assistant", "query": "external referee reference questionnaire", "rejection": "Governance/document workflows do not establish HR reference operations."}
+      ],
+      "inheritance_boundary": "The source-stable ID was retained, but the exact external-actor/token boundary was freshly adjudicated."
+    },
+    {
+      "working_key": "HR-COMPLIANCE-EXPORT",
+      "adjudication_id": "fresh-901:HR-COMPLIANCE-EXPORT",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:HR-COMPLIANCE-EXPORT",
+      "neutral_requirement": "An actor with staff-compliance-view permission must export only the authorised staff compliance register using the exact staff dataset, nine-column contract and filename, including requirement/status/expiry/exemption evidence, while denying other datasets without separate permissions.",
+      "search_terms": ["staff compliance register CSV export permissions expiry exemption audit open source", "employee compliance status export requirement code valid expires exemption", "site:github.com frappe hrms compliance register csv export"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=HR-COMPLIANCE-EXPORT/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:frappe-hrms", "query": "staff compliance register CSV requirement status expiry exemption", "rejection": "No permission-bound staff compliance aggregate and nine-column CSV contract was established."},
+        {"repository_id": "repo:timefold", "query": "staff compliance register csv export", "rejection": "Solver metadata has no HR compliance export."},
+        {"repository_id": "repo:kimai", "query": "employee compliance status csv expiry exemption", "rejection": "Time tracking has no target dataset/output contract."},
+        {"repository_id": "repo:bahmni-ipd-frontend", "query": "staff compliance register export", "rejection": "Inpatient UI has no authoritative HR compliance export."},
+        {"repository_id": "repo:frappe-erpnext", "query": "employee compliance register csv requirement expiry exemption", "rejection": "ERP sources do not establish the supported-living nine-column dataset and permission boundary."},
+        {"repository_id": "repo:snipe-it", "query": "staff compliance register csv export", "rejection": "IT assets are not HR compliance status."},
+        {"repository_id": "repo:rocket-chat", "query": "staff compliance export csv", "rejection": "Messaging is not an authoritative compliance register."},
+        {"repository_id": "repo:opensign", "query": "employee compliance register export", "rejection": "Signing does not implement compliance aggregation or the CSV contract."},
+        {"repository_id": "repo:ciso-assistant", "query": "staff compliance status csv export", "rejection": "Governance tooling does not establish operational staff-compliance export."}
+      ],
+      "inheritance_boundary": "The source-stable label is retained, but dataset=staff was freshly adjudicated and is not shared with vetting or drivers."
+    },
+    {
+      "working_key": "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "adjudication_id": "fresh-901:CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "neutral_requirement": "An actor with vetting-view permission must export only the vetting-check register with the exact person/check/provider/reference/status/completed/expiry schema and disclosure purpose, filename and audit boundary; other datasets require separate permissions.",
+      "search_terms": ["staff vetting background check register CSV export provider reference status expiry open source", "background check compliance export employee permission disclosure purpose", "site:github.com frappe hrms vetting background check csv register"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-HR-VETTING-CHECK-REGISTER-EXPORT/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:frappe-hrms", "query": "background check vetting register CSV provider reference status expiry", "rejection": "Recruitment overlap does not establish the StaffBackgroundCheck register, permission, and seven-column export."},
+        {"repository_id": "repo:timefold", "query": "vetting check register csv export", "rejection": "Solver metadata has no vetting register."},
+        {"repository_id": "repo:kimai", "query": "background check compliance export", "rejection": "Time tracking has no background-check dataset."},
+        {"repository_id": "repo:bahmni-ipd-frontend", "query": "employee vetting background check export", "rejection": "Inpatient UI has no HR vetting register."},
+        {"repository_id": "repo:frappe-erpnext", "query": "employee background check register csv provider expiry", "rejection": "ERP sources do not establish the background-check aggregate and disclosure contract."},
+        {"repository_id": "repo:snipe-it", "query": "employee vetting check export", "rejection": "IT asset custody has no vetting workflow."},
+        {"repository_id": "repo:rocket-chat", "query": "background check register export", "rejection": "Messaging is not authoritative vetting evidence."},
+        {"repository_id": "repo:opensign", "query": "background check register export", "rejection": "Signing alone does not create or aggregate vetting checks."},
+        {"repository_id": "repo:ciso-assistant", "query": "personnel background check register csv", "rejection": "Governance tooling does not establish HR vetting operations."}
+      ],
+      "inheritance_boundary": "The audit-assigned dataset=vetting split cannot inherit the broader HR export NCM."
+    },
+    {
+      "working_key": "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "adjudication_id": "fresh-901:CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "mapping_status": "documented_ncm_direct",
+      "source_unit": "current-901:CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "neutral_requirement": "An actor with driver-view permission must export only the driver-eligibility register with driver/status/can-drive-clients/licence-class/endorsements/licence-expiry/medical-expiry, filename and audit boundary; other datasets remain separately authorised.",
+      "search_terms": ["driver eligibility register CSV export licence class endorsements can drive clients expiry open source", "driver licence compliance export permission actor audit", "site:github.com traccar OCA fleet driver eligibility register export"],
+      "evidence_loci": ["benchmark-target-specific-adjudication-901.json#target=CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT/bounded-repository-evaluations"],
+      "rejected_repositories": [
+        {"repository_id": "repo:traccar", "query": "driver eligibility licence endorsements medical expiry csv export", "rejection": "GPS tracking does not establish licence/medical eligibility aggregation or the seven-column export."},
+        {"repository_id": "repo:traccar-web", "query": "driver licence eligibility register export", "rejection": "Tracking UI has no server-side export proof."},
+        {"repository_id": "repo:snipe-it", "query": "driver licence eligibility endorsements medical expiry", "rejection": "IT asset custody is not driver eligibility."},
+        {"repository_id": "repo:oca-fleet", "query": "driver eligibility register csv licence endorsements expiry", "rejection": "Fleet add-ons do not establish supported-living driver eligibility and the exact export."},
+        {"repository_id": "repo:grash-cmms", "query": "driver eligibility licence medical expiry export", "rejection": "Generic CMMS has no driver eligibility register."},
+        {"repository_id": "repo:thingsboard", "query": "driver eligibility licence register export", "rejection": "IoT tooling does not establish driver compliance."},
+        {"repository_id": "repo:calcom", "query": "driver eligibility licence expiry export", "rejection": "Scheduling has no driver compliance aggregate."},
+        {"repository_id": "repo:beaconhs", "query": "driver eligibility licence medical expiry register", "rejection": "Generic H&S schema does not establish driver-eligibility export or NZ assurance."}
+      ],
+      "inheritance_boundary": "The cross-module dataset=drivers split cannot inherit HR-export or broader driver-eligibility NCM evidence."
+    }
+  ],
+  "integrity": {
+    "target_count": 20,
+    "verified_benchmark_direct": 11,
+    "documented_ncm_direct": 9,
+    "target_keys_unique": true,
+    "verified_rows_have_official_repo_commit_and_loci": true,
+    "ncm_rows_have_queries_repositories_and_rejections": true,
+    "runtime_or_product_mutations": 0,
+    "target_key_sha256": "d6846c2e0829d98bfb083fc1463df544e9372a9c69e3cfd46876d256af417636"
+  }
+}

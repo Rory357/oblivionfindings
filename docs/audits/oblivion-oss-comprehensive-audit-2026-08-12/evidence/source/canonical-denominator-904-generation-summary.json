@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.0",
+  "artifact": "canonical-denominator-904-generation-summary",
+  "generated_at": "2026-08-21T17:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "validated_static_904_successor_runtime_and_completion_blocked",
+  "generator": "generators/rebuild-canonical-904.py",
+  "input_pins": [
+    {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9"
+    },
+    {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c"
+    },
+    {
+      "path": "evidence/source/route-page-gap-reconciliation-902.json",
+      "sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb"
+    },
+    {
+      "path": "evidence/source/full-distinct-capability-adjudication.json",
+      "sha256": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715"
+    },
+    {
+      "path": "inventory.json",
+      "sha256": "076015a57c9368cdc737d0e8139589ba5708d0fa6bcee1d6654c2e72b4b9889a"
+    },
+    {
+      "path": "findings.json",
+      "sha256": "4aacd5e5e7587578d7f242f1ed789ede6fcdcb05892eee0ab2ad5a07f8bf5ec7"
+    },
+    {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "b1082f6ebd02715b3a88123927b0189df87c70b356bf8928837eddf915ac79bf"
+    },
+    {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "f16d04ab2d25f30caca370bcbbb2ba504f0dd2d211b7b552018dd3bf7ec3d608"
+    },
+    {
+      "path": "04-workflow-usability-scorecard.csv",
+      "sha256": "db680bb3a4aa46de8124cf890debc5ccd4fe2647927bf5ad87be0683bb02e3af"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "evidence/source/canonical-denominator-904-adjudication.json",
+      "sha256": "60e98d2af1b48a95c38c61b51e49b0cafb33e083e276986c881de1d83a91fe90",
+      "bytes": 8098
+    },
+    {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    {
+      "path": "evidence/source/route-page-gap-reconciliation-904.json",
+      "sha256": "1a237628080d225cd32cdfa173ea01737b6c9c32e51bbca183a8ec84a0b8d7be",
+      "bytes": 35842
+    },
+    {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "48b9d5a96aa4373cd6c14eeb0b694752dbbd34c1006811e3b104d2e826278214",
+      "bytes": 670259
+    },
+    {
+      "path": "inventory-904.json",
+      "sha256": "174d6da77a1b5221590fbac626434472bf9f1a651f00168d41883eca57e56e60",
+      "bytes": 12055391
+    },
+    {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "44924537d83a499222ac91dfa07a7eede428eff1c50f16f8f0faaa7b684829bb",
+      "bytes": 1961011
+    },
+    {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "fe48fc81b14d641360891457132d2d6266c9d5dab2ca4639a585fe80c25b4280",
+      "bytes": 3285660
+    },
+    {
+      "path": "04-workflow-usability-scorecard-904.csv",
+      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "bytes": 1082667
+    },
+    {
+      "path": "evidence/source/final-904-task-script-generation-summary.json",
+      "sha256": "90c8386810df9e406f799dc591dd2a1810e85bc32ae6432d650c1c297323f888",
+      "bytes": 180754
+    }
+  ],
+  "invariants": {
+    "manifest": "904 unique = 790 H + 111 D + 3 M",
+    "existing_902_ids_preserved": true,
+    "exact_additions": [
+      "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "CAP-MED-CLIENT-MEDICAL-PROFILE"
+    ],
+    "route_delta": "exactly eight routes moved from excluded surface to unique accepted target",
+    "route_surface": "2993 accepted + 31 excluded = 3024",
+    "page_surface": "945 accepted + 17 excluded = 962",
+    "orphan_pages_preserved": [
+      "PAGE-0038",
+      "PAGE-0590"
+    ],
+    "benchmark": "451 decided + 453 unproved = 904; zero credit delta",
+    "ledger_rows": 904,
+    "matrix_rows": 904,
+    "scorecard_rows": 790,
+    "task_scripts": 790,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "453 benchmark outcomes, 790 representative tasks/scores, runtime routes/states/journeys/tests, visual ownership, all-eight-pass modules, fresh Pass 8 and orchestration/writer gates remain incomplete."
+  }
+}

@@ -1,0 +1,3175 @@
+{
+  "schema_version": "1.0",
+  "artifact": "full_static_route_enrichment",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_enrichment_runtime_unverified",
+  "proof_boundary": {
+    "permitted_scope": "Read-only static route/action/resource/permission/render-page and target-specific frontend call-site evidence at the audited commit.",
+    "excluded_claims": [
+      "representative-role execution",
+      "runtime reachability",
+      "persisted completion",
+      "handoff completion",
+      "browser acceptance",
+      "authorization/direct-object correctness"
+    ],
+    "split_rule": "No whole legacy-family route/page envelope is copied onto every split target. Route actions are allocated by exact job semantics. Shared routes/pages are enumerated explicitly.",
+    "empty_page_rule": "An empty page_ids array on a response-only route means no direct render page was proven; it never means the route or capability does not exist."
+  },
+  "summary": {
+    "target_patch_count": 107,
+    "modules": {
+      "CONTROL_ROOM": {
+        "targets": 37,
+        "targets_with_routes": 37,
+        "targets_with_pages": 36,
+        "route_relations": 108,
+        "page_relations": 49
+      },
+      "INCIDENTS": {
+        "targets": 4,
+        "targets_with_routes": 4,
+        "targets_with_pages": 3,
+        "route_relations": 4,
+        "page_relations": 3
+      },
+      "PUBLIC": {
+        "targets": 3,
+        "targets_with_routes": 3,
+        "targets_with_pages": 3,
+        "route_relations": 8,
+        "page_relations": 7
+      },
+      "RESPITE": {
+        "targets": 21,
+        "targets_with_routes": 21,
+        "targets_with_pages": 21,
+        "route_relations": 99,
+        "page_relations": 51
+      },
+      "ROADMAP": {
+        "targets": 8,
+        "targets_with_routes": 8,
+        "targets_with_pages": 7,
+        "route_relations": 24,
+        "page_relations": 9
+      },
+      "SETTINGS": {
+        "targets": 34,
+        "targets_with_routes": 34,
+        "targets_with_pages": 34,
+        "route_relations": 126,
+        "page_relations": 41
+      }
+    },
+    "route_relations": 369,
+    "unique_route_ids": 365,
+    "page_relations": 160,
+    "unique_page_ids": 111,
+    "deliberate_shared_route_case_count": 3,
+    "deliberate_shared_page_case_count": 21,
+    "unresolved_target_count": 0
+  },
+  "targets": {
+    "CAP-CR-ALERT-COLLABORATION": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-DISCUSSION"
+      ],
+      "route_ids": [
+        "ROUTE-0222",
+        "ROUTE-0223",
+        "ROUTE-0253",
+        "ROUTE-0254"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomDiscussionController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Discussion CRUD route actions; AlertWorkspaceDialog discussion call sites hosted by the two alert render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-MANUAL-INTAKE": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0215"
+      ],
+      "page_ids": [
+        "PAGE-0048"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "POST alerts.store is the manual intake transition; alerts/index imports and launches NewAlertWizard."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048"
+      ]
+    },
+    "CAP-CR-ALERT-OWNERSHIP": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0218",
+        "ROUTE-0219",
+        "ROUTE-0241",
+        "ROUTE-0247"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "assign, assign-to-me, unassign and bulk-assign exact actions; alert dialog and bulk dialog call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-RESPONSE-CLOSURE": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0217",
+        "ROUTE-0220",
+        "ROUTE-0224",
+        "ROUTE-0225",
+        "ROUTE-0233",
+        "ROUTE-0246"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "acknowledge, close, dismiss, escalate, resolve and bulk-acknowledge exact response actions."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-SENSOR-VALIDATION": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0268",
+        "ROUTE-0269",
+        "ROUTE-0270",
+        "ROUTE-0271"
+      ],
+      "page_ids": [
+        "PAGE-0048"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/AlertController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Integration-alert index, acknowledge, assign and close resource; the controller renders the shared alerts index with a distinct base path."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048"
+      ]
+    },
+    "CAP-CR-ALERT-TASKS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-TASK"
+      ],
+      "route_ids": [
+        "ROUTE-0234",
+        "ROUTE-0235",
+        "ROUTE-0236",
+        "ROUTE-0316",
+        "ROUTE-0317",
+        "ROUTE-0318"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Alert task list/create/reorder/update/status/delete exact actions and AlertWorkspaceDialog task call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-TIME-TRACKING": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-TIME-ENTRY"
+      ],
+      "route_ids": [
+        "ROUTE-0237",
+        "ROUTE-0238",
+        "ROUTE-0239",
+        "ROUTE-0319",
+        "ROUTE-0320"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomTimeEntryController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Alert time-entry list/create/start/delete/stop exact actions and AlertWorkspaceDialog time call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-TRIAGE": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0214",
+        "ROUTE-0216",
+        "ROUTE-0221",
+        "ROUTE-0228",
+        "ROUTE-0229",
+        "ROUTE-0240"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Legacy adjudication intake/triage split with manual store removed: index, show, confirm, meta, note and triage."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-ALERT-WATCHERS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-WATCHER"
+      ],
+      "route_ids": [
+        "ROUTE-0242",
+        "ROUTE-0243",
+        "ROUTE-0244",
+        "ROUTE-0245"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomWatcherController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Watcher index/store/destroy/toggle exact actions and alert-dialog watcher call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-BROADCAST-COMPOSE-SEND": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-BROADCAST"
+      ],
+      "route_ids": [
+        "ROUTE-0249"
+      ],
+      "page_ids": [
+        "PAGE-0050"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomBroadcastController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "POST broadcast.store and BroadcastWizard call site on the broadcast render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0050"
+      ]
+    },
+    "CAP-CR-BROADCAST-OVERSIGHT": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-BROADCAST"
+      ],
+      "route_ids": [
+        "ROUTE-0248",
+        "ROUTE-0250"
+      ],
+      "page_ids": [
+        "PAGE-0049",
+        "PAGE-0050"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomBroadcastController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Broadcast index/show reads and their two direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0050"
+      ]
+    },
+    "CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-0290",
+        "ROUTE-0294",
+        "ROUTE-0295",
+        "ROUTE-0296"
+      ],
+      "page_ids": [
+        "PAGE-0062"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted action split: settings index plus config-option store/delete/update."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0062"
+      ]
+    },
+    "CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-0291",
+        "ROUTE-0292",
+        "ROUTE-0293"
+      ],
+      "page_ids": [
+        "PAGE-0062"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted action split: maintenance-window store/update/cancel with exact settings-page call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0062"
+      ]
+    },
+    "CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-0302"
+      ],
+      "page_ids": [
+        "PAGE-0062"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted action split: failed signal-outbox retry and exact settings-page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0062"
+      ]
+    },
+    "CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-0297",
+        "ROUTE-0298"
+      ],
+      "page_ids": [
+        "PAGE-0062"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted action split: response-queue store/update and exact settings-page call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0062"
+      ]
+    },
+    "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-0299",
+        "ROUTE-0300",
+        "ROUTE-0301"
+      ],
+      "page_ids": [
+        "PAGE-0062"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted action split: signal-rule store/delete/update and exact settings-page call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0062"
+      ]
+    },
+    "CAP-CR-DASHBOARD": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0213"
+      ],
+      "page_ids": [
+        "PAGE-0055"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomDashboardController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "One-to-one dashboard route and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-DEVICE-OVERSIGHT": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-DEVICE"
+      ],
+      "route_ids": [
+        "ROUTE-0251",
+        "ROUTE-0252"
+      ],
+      "page_ids": [
+        "PAGE-0051",
+        "PAGE-0052"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Device index/show routes and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-ESCALATION-LIFECYCLE": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-ESCALATION"
+      ],
+      "route_ids": [
+        "ROUTE-0255",
+        "ROUTE-0256",
+        "ROUTE-0257",
+        "ROUTE-0258",
+        "ROUTE-0259"
+      ],
+      "page_ids": [
+        "PAGE-0053"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Escalation queue index, acknowledge, claim, move and bulk-escalate actions with direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-EVIDENCE-DOWNLOAD": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-EVIDENCE"
+      ],
+      "route_ids": [
+        "ROUTE-0261",
+        "ROUTE-0264"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Evidence pack export and evidence-item download GET responses; exact download links are hosted by AlertWorkspaceDialog."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-EVIDENCE-PACK-ASSEMBLY": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-EVIDENCE"
+      ],
+      "route_ids": [
+        "ROUTE-0226",
+        "ROUTE-0227",
+        "ROUTE-0260",
+        "ROUTE-0262",
+        "ROUTE-0263"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Evidence index, pack create/complete and item add/remove actions; exact dialog call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-INCIDENT-OVERSIGHT": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0265"
+      ],
+      "page_ids": [
+        "PAGE-0054"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Incident oversight index and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0054"
+      ]
+    },
+    "CAP-CR-INCIDENT-TO-ALERT": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0266"
+      ],
+      "page_ids": [
+        "PAGE-0054"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "createAlertFromIncident exact action and incidents-page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0054"
+      ]
+    },
+    "CAP-CR-MAP": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-MAP"
+      ],
+      "route_ids": [
+        "ROUTE-0272"
+      ],
+      "page_ids": [
+        "PAGE-0056"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomMapController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "One-to-one control-room map route and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-MESSAGING": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-MESSAGING"
+      ],
+      "route_ids": [
+        "ROUTE-0273",
+        "ROUTE-0274",
+        "ROUTE-0275",
+        "ROUTE-0276"
+      ],
+      "page_ids": [
+        "PAGE-0057"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Message list/read/send/thread actions and direct messaging render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-MY-TASKS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-MY-TASKS"
+      ],
+      "route_ids": [
+        "ROUTE-0277",
+        "ROUTE-0278"
+      ],
+      "page_ids": [
+        "PAGE-0058"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "My-tasks view and follow-up completion with direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-PLAYBOOK-DEFINITION": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-PLAYBOOK"
+      ],
+      "route_ids": [
+        "ROUTE-0279",
+        "ROUTE-0280",
+        "ROUTE-0281",
+        "ROUTE-0282",
+        "ROUTE-0283"
+      ],
+      "page_ids": [
+        "PAGE-0059",
+        "PAGE-0060"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Playbook index/create/show/update/activation actions and direct definition render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-PLAYBOOK-RUN": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-PLAYBOOK"
+      ],
+      "route_ids": [
+        "ROUTE-0230",
+        "ROUTE-0231",
+        "ROUTE-0232"
+      ],
+      "page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Alert-scoped playbook start/advance/skip actions and exact AlertWorkspaceDialog call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0048",
+        "PAGE-0065"
+      ]
+    },
+    "CAP-CR-REPORT-API": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0285",
+        "ROUTE-0287",
+        "ROUTE-0288",
+        "ROUTE-0289"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomReportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "response_only_json_no_page",
+      "proof_basis": [
+        "alerts, SLA, summary and workload JSON response endpoints; no Inertia render is claimed."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-REPORT-CSV": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0286"
+      ],
+      "page_ids": [
+        "PAGE-0061"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomReportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "CSV export response and exact Export CSV call site on reports render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0061"
+      ]
+    },
+    "CAP-CR-REPORT-DASHBOARD": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0284"
+      ],
+      "page_ids": [
+        "PAGE-0061"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomReportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Report dashboard index and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0061"
+      ]
+    },
+    "CAP-CR-SHIFT-HANDOVER": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-HANDOVER",
+        "CR-CONTROL-ROOM-SHIFT"
+      ],
+      "route_ids": [
+        "ROUTE-0305",
+        "ROUTE-0306",
+        "ROUTE-0307"
+      ],
+      "page_ids": [
+        "PAGE-0063"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+        "app/Http/Controllers/ControlRoom/ControlRoomShiftController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Handover acknowledgement, handover page and handover submit actions; direct handover render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-SHIFT-OPERATIONS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SHIFT"
+      ],
+      "route_ids": [
+        "ROUTE-0303",
+        "ROUTE-0304",
+        "ROUTE-0308"
+      ],
+      "page_ids": [
+        "PAGE-0064"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomShiftController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Shift index/start and note actions with direct shift-operations render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-SIGNAL-TO-INCIDENT": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0267"
+      ],
+      "page_ids": [
+        "PAGE-0054"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "flagAsIncident exact action and incidents-page dialog call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0054"
+      ]
+    },
+    "CAP-CR-SLA-BREACH-REVIEW": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SLA",
+        "CR-LEGACY-REDIRECTS"
+      ],
+      "route_ids": [
+        "ROUTE-0311",
+        "ROUTE-0314"
+      ],
+      "page_ids": [
+        "PAGE-0066"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSlaController.php",
+        "Illuminate/Routing/RedirectController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "SLA breach report plus exact legacy redirect alias to the canonical breach route."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-SLA-CONFIG": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SLA"
+      ],
+      "route_ids": [
+        "ROUTE-0309",
+        "ROUTE-0310",
+        "ROUTE-0312",
+        "ROUTE-0313"
+      ],
+      "page_ids": [
+        "PAGE-0067"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomSlaController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "SLA index/store/update/toggle actions and direct configuration render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-CR-STATS": {
+      "canonical_module": "CONTROL_ROOM",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-STATS"
+      ],
+      "route_ids": [
+        "ROUTE-0315"
+      ],
+      "page_ids": [
+        "PAGE-0068"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ControlRoom/ControlRoomStatsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "One-to-one stats route and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-INC-INCIDENT-AUDIT-EXPORT": {
+      "canonical_module": "INCIDENTS",
+      "source_family_ids": [
+        "CLI-AUDIT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0075"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AuditExportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "download_response_no_direct_page",
+      "proof_basis": [
+        "Exact incident audit-export GET response; repository search found no target-specific render-page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-INC-INCIDENT-REPORT-EXPORT": {
+      "canonical_module": "INCIDENTS",
+      "source_family_ids": [
+        "INC-INCIDENT-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2351"
+      ],
+      "page_ids": [
+        "PAGE-0750"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/IncidentReportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "exportCsv exact action and exact reports/incidents export-link call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0750"
+      ]
+    },
+    "CAP-INC-SAFEGUARDING-EVIDENCE-DOWNLOAD": {
+      "canonical_module": "INCIDENTS",
+      "source_family_ids": [
+        "INC-SAFEGUARDING-ATTACHMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2512"
+      ],
+      "page_ids": [
+        "PAGE-0812"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SafeguardingAttachmentController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Attachment download action; safeguarding concern render root hosts the exact download_url evidence UI."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0812"
+      ]
+    },
+    "CLI-PORTAL-INCIDENT-ATTACHMENT": {
+      "canonical_module": "INCIDENTS",
+      "source_family_ids": [
+        "CLI-PORTAL-INCIDENT-ATTACHMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2260"
+      ],
+      "page_ids": [
+        "PAGE-0713"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/PortalIncidentAttachmentController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Portal attachment download route; portal/client render root hosts the exact attachment download_url UI."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0713"
+      ]
+    },
+    "CAP-PUB-CONTACT-LEAD-SUBMISSION": {
+      "canonical_module": "PUBLIC",
+      "source_family_ids": [
+        "PUB-CONTACT"
+      ],
+      "route_ids": [
+        "ROUTE-0211",
+        "ROUTE-0212"
+      ],
+      "page_ids": [
+        "PAGE-0047"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ContactController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Contact form GET/store routes and direct contact render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-PUB-LEGAL-TERMS": {
+      "canonical_module": "PUBLIC",
+      "source_family_ids": [
+        "PUB-ROUTE-TERMS"
+      ],
+      "route_ids": [
+        "ROUTE-2982"
+      ],
+      "page_ids": [
+        "PAGE-0960"
+      ],
+      "backend_anchors": [
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Exact public terms closure and direct terms render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-PUB-PRODUCT-DISCOVERY": {
+      "canonical_module": "PUBLIC",
+      "source_family_ids": [
+        "PUB-ROUTE-ABOUT",
+        "PUB-ROUTE-FEATURES",
+        "PUB-ROUTE-HOME",
+        "PUB-ROUTE-PRICING",
+        "PUB-ROUTE-SMART-MONITORING"
+      ],
+      "route_ids": [
+        "ROUTE-0005",
+        "ROUTE-0446",
+        "ROUTE-0004",
+        "ROUTE-2291",
+        "ROUTE-2915"
+      ],
+      "page_ids": [
+        "PAGE-0001",
+        "PAGE-0112",
+        "PAGE-0400",
+        "PAGE-0729",
+        "PAGE-0942"
+      ],
+      "backend_anchors": [
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Exact public discovery closures and their direct render roots; the five legacy families are merged once into this target."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-BOOKING-LIFECYCLE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-BOOKING",
+        "RESP-ROUTE-RESPITE-BOOKINGS-INDEX"
+      ],
+      "route_ids": [
+        "ROUTE-2364",
+        "ROUTE-2365",
+        "ROUTE-2366",
+        "ROUTE-2367",
+        "ROUTE-2368",
+        "ROUTE-2369"
+      ],
+      "page_ids": [
+        "PAGE-0754",
+        "PAGE-0755",
+        "PAGE-0756"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteBookingController.php",
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Canonical bookings index redirect plus booking create/store/show/update/confirm actions and direct booking render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-BOOKING-REQUEST-APPROVAL": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-BOOKING-REQUEST"
+      ],
+      "route_ids": [
+        "ROUTE-2425",
+        "ROUTE-2426"
+      ],
+      "page_ids": [
+        "PAGE-0790"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteBookingRequestController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Approve/promote exact actions; request show page contains the approval call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0790"
+      ]
+    },
+    "CAP-RESP-BOOKING-REQUEST-INTAKE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-BOOKING-REQUEST",
+        "RESP-ROUTE-RESPITE-REQUESTS-INDEX"
+      ],
+      "route_ids": [
+        "ROUTE-2421",
+        "ROUTE-2422",
+        "ROUTE-2423",
+        "ROUTE-2424",
+        "ROUTE-2427"
+      ],
+      "page_ids": [
+        "PAGE-0788",
+        "PAGE-0789",
+        "PAGE-0790"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteBookingRequestController.php",
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Request index/create/store/show/update intake lifecycle and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0790"
+      ]
+    },
+    "CAP-RESP-COMMUNICATION-LOG": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-COMMUNICATION-LOG"
+      ],
+      "route_ids": [
+        "ROUTE-2372",
+        "ROUTE-2373",
+        "ROUTE-2374",
+        "ROUTE-2375",
+        "ROUTE-2376",
+        "ROUTE-2377",
+        "ROUTE-2447"
+      ],
+      "page_ids": [
+        "PAGE-0758",
+        "PAGE-0759",
+        "PAGE-0760",
+        "PAGE-0761"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteCommunicationLogController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Communication-log index/create/store/show/update/evidence/stay-context actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-DAILY-NOTE-AUTHOR": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-DAILY-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2378",
+        "ROUTE-2379",
+        "ROUTE-2380",
+        "ROUTE-2381",
+        "ROUTE-2382",
+        "ROUTE-2449"
+      ],
+      "page_ids": [
+        "PAGE-0762",
+        "PAGE-0763",
+        "PAGE-0764",
+        "PAGE-0765"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteDailyNoteController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Daily-note index/create/store/show/update/stay-context authoring actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-DAILY-NOTE-CONCERN-OVERSIGHT": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-DAILY-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2383",
+        "ROUTE-2384"
+      ],
+      "page_ids": [
+        "PAGE-0766",
+        "PAGE-0767"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteDailyNoteController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "withConcerns and withIncidents oversight worklists and their direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-EVIDENCE-PACK-DOWNLOAD": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "route_ids": [
+        "ROUTE-2390"
+      ],
+      "page_ids": [
+        "PAGE-0771"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteEvidencePackController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Evidence-pack export response and show-page download call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0771"
+      ]
+    },
+    "CAP-RESP-EVIDENCE-PACK-LIFECYCLE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "route_ids": [
+        "ROUTE-2385",
+        "ROUTE-2386",
+        "ROUTE-2387",
+        "ROUTE-2388",
+        "ROUTE-2389",
+        "ROUTE-2391",
+        "ROUTE-2392",
+        "ROUTE-2393",
+        "ROUTE-2451"
+      ],
+      "page_ids": [
+        "PAGE-0768",
+        "PAGE-0769",
+        "PAGE-0770",
+        "PAGE-0771"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteEvidencePackController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Evidence-pack index/create/store/show/update/item add/remove/seal/stay-context actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0771"
+      ]
+    },
+    "CAP-RESP-PROCEDURE-ESCALATION": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-PROCEDURE-RUN"
+      ],
+      "route_ids": [
+        "ROUTE-2406",
+        "ROUTE-2411"
+      ],
+      "page_ids": [
+        "PAGE-0781",
+        "PAGE-0782"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteProcedureRunController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "escalate action and overdue worklist; show page contains the escalation call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0782"
+      ]
+    },
+    "CAP-RESP-PROCEDURE-INITIATE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-PROCEDURE-RUN"
+      ],
+      "route_ids": [
+        "ROUTE-2402",
+        "ROUTE-2408",
+        "ROUTE-2409"
+      ],
+      "page_ids": [
+        "PAGE-0778",
+        "PAGE-0782"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteProcedureRunController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Run create/store/start actions; create page and show-page start call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0782"
+      ]
+    },
+    "CAP-RESP-PROCEDURE-RUN-EXECUTION": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-PROCEDURE-RUN"
+      ],
+      "route_ids": [
+        "ROUTE-2401",
+        "ROUTE-2403",
+        "ROUTE-2404",
+        "ROUTE-2405",
+        "ROUTE-2407",
+        "ROUTE-2410"
+      ],
+      "page_ids": [
+        "PAGE-0779",
+        "PAGE-0780",
+        "PAGE-0782"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteProcedureRunController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Run index/show/cancel/complete/fail/my-active execution actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0782"
+      ]
+    },
+    "CAP-RESP-PROCEDURE-TEMPLATE-LIFECYCLE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-PROCEDURE-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2412",
+        "ROUTE-2413",
+        "ROUTE-2414",
+        "ROUTE-2415",
+        "ROUTE-2416"
+      ],
+      "page_ids": [
+        "PAGE-0783",
+        "PAGE-0784",
+        "PAGE-0785"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteProcedureTemplateController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Procedure-template index/create/store/show/update actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-RESOURCE-ALLOCATION": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-CLIENT-RESPITE-ALLOCATION",
+        "RESP-RESPITE-RESOURCE-ALLOCATION"
+      ],
+      "route_ids": [
+        "ROUTE-2361",
+        "ROUTE-2362",
+        "ROUTE-2363",
+        "ROUTE-2428",
+        "ROUTE-2429",
+        "ROUTE-2430"
+      ],
+      "page_ids": [
+        "PAGE-0791"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/ClientRespiteAllocationController.php",
+        "app/Http/Controllers/Respite/RespiteResourceAllocationController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Client allocation store/update/delete plus resource index/store/delete; the resource page is the direct rendered allocation work surface."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-RISK-PLAN-ACKNOWLEDGEMENT": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-RISK-PLAN-ACTIVATION"
+      ],
+      "route_ids": [
+        "ROUTE-2371",
+        "ROUTE-2435",
+        "ROUTE-2441",
+        "ROUTE-2457"
+      ],
+      "page_ids": [
+        "PAGE-0793",
+        "PAGE-0794",
+        "PAGE-0796"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteRiskPlanActivationController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted split: client/stay context, acknowledge and needing-acknowledgement routes with direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-RISK-PLAN-LIFECYCLE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-RISK-PLAN-ACTIVATION"
+      ],
+      "route_ids": [
+        "ROUTE-2431",
+        "ROUTE-2432",
+        "ROUTE-2433",
+        "ROUTE-2434",
+        "ROUTE-2436",
+        "ROUTE-2437",
+        "ROUTE-2438",
+        "ROUTE-2439",
+        "ROUTE-2440"
+      ],
+      "page_ids": [
+        "PAGE-0792",
+        "PAGE-0795",
+        "PAGE-0797"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteRiskPlanActivationController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted split: activation index/create/store/show/update/activate/deactivate/review/suspend and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-RESP-STAY-CLINICAL-RECONCILIATION": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-STAY"
+      ],
+      "route_ids": [
+        "ROUTE-2455",
+        "ROUTE-2456"
+      ],
+      "page_ids": [
+        "PAGE-0799"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteStayController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Medication reconciliation and restraint recording actions; stay show page contains both target-specific call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0799"
+      ]
+    },
+    "CAP-RESP-STAY-INCIDENT-COMPLAINT": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-STAY"
+      ],
+      "route_ids": [
+        "ROUTE-2448",
+        "ROUTE-2454"
+      ],
+      "page_ids": [
+        "PAGE-0799"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteStayController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Complaint and incident recording actions; stay show page contains both target-specific call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0799"
+      ]
+    },
+    "CAP-RESP-STAY-LIFECYCLE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-STAY",
+        "RESP-ROUTE-RESPITE-STAYS-INDEX"
+      ],
+      "route_ids": [
+        "ROUTE-2442",
+        "ROUTE-2443",
+        "ROUTE-2444",
+        "ROUTE-2445",
+        "ROUTE-2446",
+        "ROUTE-2450",
+        "ROUTE-2452"
+      ],
+      "page_ids": [
+        "PAGE-0798",
+        "PAGE-0799"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteStayController.php",
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Canonical stays index redirect plus admission/show/bed-hold/check-in/discharge/extension actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0799"
+      ]
+    },
+    "CAP-RESP-TASK-APPROVAL": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-TASK"
+      ],
+      "route_ids": [
+        "ROUTE-2461",
+        "ROUTE-2464",
+        "ROUTE-2466",
+        "ROUTE-2468",
+        "ROUTE-2469",
+        "ROUTE-2470"
+      ],
+      "page_ids": [
+        "PAGE-0800",
+        "PAGE-0802",
+        "PAGE-0803",
+        "PAGE-0804"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteTaskController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted approval/worklist split: approve/reject/submit plus approval, my-task and overdue worklists; show page contains approval actions."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0804"
+      ]
+    },
+    "CAP-RESP-TASK-EXECUTION": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-TASK"
+      ],
+      "route_ids": [
+        "ROUTE-2458",
+        "ROUTE-2459",
+        "ROUTE-2460",
+        "ROUTE-2462",
+        "ROUTE-2463",
+        "ROUTE-2465",
+        "ROUTE-2467"
+      ],
+      "page_ids": [
+        "PAGE-0801",
+        "PAGE-0804"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteTaskController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Accepted execution/evidence split: index/show/evidence/assign/complete/start/checklist and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0804"
+      ]
+    },
+    "CAP-RESP-WORKSPACE": {
+      "canonical_module": "RESPITE",
+      "source_family_ids": [
+        "RESP-RESPITE-WORKSPACE",
+        "RESP-RESPITE-CALENDAR",
+        "RESP-ROUTE-RESPITE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-2360",
+        "ROUTE-2370"
+      ],
+      "page_ids": [
+        "PAGE-0757",
+        "PAGE-0777"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteWorkspaceController.php",
+        "app/Http/Controllers/Respite/RespiteCalendarController.php",
+        "routes/*.php closure"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Respite workspace and canonical calendar alias are merged once; direct workspace/calendar render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-ROAD-DASHBOARD": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-ROADMAP-DASHBOARD",
+        "ROAD-LEGACY-REDIRECTS"
+      ],
+      "route_ids": [
+        "ROUTE-2471",
+        "ROUTE-2474"
+      ],
+      "page_ids": [
+        "PAGE-0805"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/RoadmapDashboardController.php",
+        "Illuminate/Routing/RedirectController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Canonical dashboard plus exact /roadmap legacy redirect alias and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-ROAD-DECISION-REQUEST": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-DECISION-REQUEST"
+      ],
+      "route_ids": [
+        "ROUTE-2475",
+        "ROUTE-2476"
+      ],
+      "page_ids": [
+        "PAGE-0806"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/DecisionRequestController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Decision request index/resolve actions and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-ROAD-INITIATIVE-LIFECYCLE": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-INITIATIVE"
+      ],
+      "route_ids": [
+        "ROUTE-2477",
+        "ROUTE-2478",
+        "ROUTE-2479",
+        "ROUTE-2480",
+        "ROUTE-2481",
+        "ROUTE-2482"
+      ],
+      "page_ids": [
+        "PAGE-0807"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/InitiativeController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Initiative index/create/show/update/score/transition actions and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-ROAD-QUARTERLY-PLAN-APPROVAL-PUBLISH": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-QUARTERLY-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2485",
+        "ROUTE-2486"
+      ],
+      "page_ids": [
+        "PAGE-0809"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/QuarterlyPlanController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "approve/publish exact actions; plan show page contains their exact call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0809"
+      ]
+    },
+    "CAP-ROAD-QUARTERLY-PLAN-PREPARATION": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-QUARTERLY-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2483",
+        "ROUTE-2484",
+        "ROUTE-2487",
+        "ROUTE-2488",
+        "ROUTE-2489",
+        "ROUTE-2490"
+      ],
+      "page_ids": [
+        "PAGE-0808",
+        "PAGE-0809"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/QuarterlyPlanController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Plan index/show/revise/review-submission/generate preparation actions and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0809"
+      ]
+    },
+    "CAP-ROAD-REPORT-API": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2491",
+        "ROUTE-2492"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/ReportController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "response_only_json_no_page",
+      "proof_basis": [
+        "Report snapshot generate/show JSON endpoints; no Inertia render is claimed."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-ROAD-SUGGESTION-INGESTION": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-SUGGESTION"
+      ],
+      "route_ids": [
+        "ROUTE-2496"
+      ],
+      "page_ids": [
+        "PAGE-0805"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/SuggestionController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Suggestion ingest exact action and Roadmap Dashboard ingest call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0805"
+      ]
+    },
+    "CAP-ROAD-SUGGESTION-TRIAGE": {
+      "canonical_module": "ROADMAP",
+      "source_family_ids": [
+        "ROAD-SUGGESTION"
+      ],
+      "route_ids": [
+        "ROUTE-2493",
+        "ROUTE-2494",
+        "ROUTE-2495"
+      ],
+      "page_ids": [
+        "PAGE-0805",
+        "PAGE-0811"
+      ],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/SuggestionController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Suggestion index/convert/triage actions; Suggestions index and Dashboard host exact target call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0805"
+      ]
+    },
+    "CAP-AUTH-SENSITIVE-ACTION-REAUTH": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-CONFIRMABLE-PASSWORD",
+        "SET-CONFIRMED-PASSWORD-STATUS"
+      ],
+      "route_ids": [
+        "ROUTE-3011",
+        "ROUTE-3012",
+        "ROUTE-3013"
+      ],
+      "page_ids": [
+        "PAGE-0008"
+      ],
+      "backend_anchors": [
+        "Laravel/Fortify/Http/Controllers/ConfirmablePasswordController",
+        "Laravel/Fortify/Http/Controllers/ConfirmedPasswordStatusController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Fortify confirm-password page/store/status endpoints and direct confirmation render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-ACCESS-OVERVIEW": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-ACCESS",
+        "SET-ACCESS-CONTROL"
+      ],
+      "route_ids": [
+        "ROUTE-2614",
+        "ROUTE-2950"
+      ],
+      "page_ids": [
+        "PAGE-0837",
+        "PAGE-0951"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/AccessController.php",
+        "app/Http/Controllers/System/AccessControlController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Settings overrides/governance access index plus system access dashboard and their direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0837"
+      ]
+    },
+    "CAP-SET-ACCOUNT-PASSWORD-CHANGE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-PASSWORD"
+      ],
+      "route_ids": [
+        "ROUTE-2668",
+        "ROUTE-2669"
+      ],
+      "page_ids": [
+        "PAGE-0850"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/PasswordController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Password edit/update routes and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-API-CREDENTIAL-LIFECYCLE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-API-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2617",
+        "ROUTE-2618",
+        "ROUTE-2619"
+      ],
+      "page_ids": [
+        "PAGE-0838"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ApiSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Shared API settings index plus API-key create/revoke actions and exact page call sites."
+      ],
+      "deliberate_shared_route_ids": [
+        "ROUTE-2617"
+      ],
+      "deliberate_shared_page_ids": [
+        "PAGE-0838"
+      ]
+    },
+    "CAP-SET-CALENDAR-PROVIDER-CONNECTION": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-CALENDAR-SYNC-OAUTH"
+      ],
+      "route_ids": [
+        "ROUTE-2633",
+        "ROUTE-2634",
+        "ROUTE-2635"
+      ],
+      "page_ids": [
+        "PAGE-0842"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/CalendarSyncOAuthController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "OAuth callback/disconnect/connect endpoints; calendar-sync page hosts exact provider controls."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0842"
+      ]
+    },
+    "CAP-SET-CALENDAR-SYNC-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-CALENDAR-SYNC-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2632",
+        "ROUTE-2636",
+        "ROUTE-2637",
+        "ROUTE-2638",
+        "ROUTE-2639"
+      ],
+      "page_ids": [
+        "PAGE-0842"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/CalendarSyncSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Calendar-sync index/mapping/feed-reset/resources/global-settings actions and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0842"
+      ]
+    },
+    "CAP-SET-CALENDAR-SYNC-RUN": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-CALENDAR-SYNC-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2640"
+      ],
+      "page_ids": [
+        "PAGE-0842"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/CalendarSyncSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "syncNow exact action and calendar-sync page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0842"
+      ]
+    },
+    "CAP-SET-DATA-PRIVACY-COMPLIANCE-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-DATA-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2641",
+        "ROUTE-2642",
+        "ROUTE-2643",
+        "ROUTE-2644",
+        "ROUTE-2648"
+      ],
+      "page_ids": [
+        "PAGE-0843"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/DataSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Data settings index plus breach, compliance, privacy and request actions consolidated into the exact privacy/compliance target."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0843"
+      ]
+    },
+    "CAP-SET-DATA-PROCESSOR-REGISTER": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-DATA-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2645",
+        "ROUTE-2646",
+        "ROUTE-2647"
+      ],
+      "page_ids": [
+        "PAGE-0843"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/DataSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Processor create/delete/update actions and exact shared data-settings page call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0843"
+      ]
+    },
+    "CAP-SET-DATA-RETENTION-POLICY": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-DATA-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2649"
+      ],
+      "page_ids": [
+        "PAGE-0843"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/DataSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Retention update action and exact shared data-settings page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0843"
+      ]
+    },
+    "CAP-SET-EMAIL-DELIVERY-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-EMAIL-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2650",
+        "ROUTE-2651",
+        "ROUTE-2652"
+      ],
+      "page_ids": [
+        "PAGE-0844"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/EmailSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Email settings index/update/test and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-MODULE-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-MODULE-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2655",
+        "ROUTE-2656"
+      ],
+      "page_ids": [
+        "PAGE-0845"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ModuleSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Module settings index/update and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-NOTIFICATION-ESCALATION-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-NOTIFICATION-ESCALATIONS",
+        "SET-LEGACY-REDIRECTS"
+      ],
+      "route_ids": [
+        "ROUTE-2657",
+        "ROUTE-2662",
+        "ROUTE-2663"
+      ],
+      "page_ids": [
+        "PAGE-0848"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/NotificationEscalationsController.php",
+        "Illuminate/Routing/RedirectController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Canonical escalation index/update plus exact legacy redirect alias and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-NOTIFICATION-TEMPLATE-LIFECYCLE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-NOTIFICATION-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2693",
+        "ROUTE-2694",
+        "ROUTE-2695",
+        "ROUTE-2696",
+        "ROUTE-2697"
+      ],
+      "page_ids": [
+        "PAGE-0859"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/NotificationTemplateController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Template index/update/preview/reset/test-send actions and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-ORGANISATION-BRANDING": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-BRANDING"
+      ],
+      "route_ids": [
+        "ROUTE-2630",
+        "ROUTE-2631"
+      ],
+      "page_ids": [
+        "PAGE-0841"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/BrandingController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Branding edit/update routes and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-OUTBOUND-WEBHOOK-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-API-SETTINGS"
+      ],
+      "route_ids": [
+        "ROUTE-2617",
+        "ROUTE-2620",
+        "ROUTE-2621",
+        "ROUTE-2622"
+      ],
+      "page_ids": [
+        "PAGE-0838"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ApiSettingsController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Shared API settings index plus webhook create/delete/test actions and exact page call sites."
+      ],
+      "deliberate_shared_route_ids": [
+        "ROUTE-2617"
+      ],
+      "deliberate_shared_page_ids": [
+        "PAGE-0838"
+      ]
+    },
+    "CAP-SET-PERMISSION-MATRIX": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-ACCESS-CONTROL"
+      ],
+      "route_ids": [
+        "ROUTE-2953"
+      ],
+      "page_ids": [
+        "PAGE-0952"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/System/AccessControlController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "System access matrix route and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-PERMISSION-OVERRIDES": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-ACCESS"
+      ],
+      "route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616"
+      ],
+      "page_ids": [
+        "PAGE-0837"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/AccessController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Access update/approval actions carry explicit permission override payloads; settings/access hosts exact controls."
+      ],
+      "deliberate_shared_route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616"
+      ],
+      "deliberate_shared_page_ids": [
+        "PAGE-0837"
+      ]
+    },
+    "CAP-SET-PERSONAL-APPEARANCE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-APPEARANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2623",
+        "ROUTE-2624",
+        "ROUTE-2625"
+      ],
+      "page_ids": [
+        "PAGE-0839"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/AppearanceController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Appearance edit/update/reset routes and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-PERSONAL-NOTIFICATION-PREFERENCES": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-NOTIFICATION-PREFERENCES",
+        "SET-PUSH-SUBSCRIPTION"
+      ],
+      "route_ids": [
+        "ROUTE-2659",
+        "ROUTE-2660",
+        "ROUTE-2661",
+        "ROUTE-2664",
+        "ROUTE-2665"
+      ],
+      "page_ids": [
+        "PAGE-0849"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/NotificationPreferencesController.php",
+        "app/Http/Controllers/Settings/PushSubscriptionController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Personal notification index/update/delivery plus push subscription create/delete; direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-PERSONAL-PROFILE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-PROFILE",
+        "SET-LEGACY-REDIRECTS"
+      ],
+      "route_ids": [
+        "ROUTE-2613",
+        "ROUTE-2671",
+        "ROUTE-2672",
+        "ROUTE-2673",
+        "ROUTE-2674",
+        "ROUTE-2675"
+      ],
+      "page_ids": [
+        "PAGE-0851"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ProfileController.php",
+        "Illuminate/Routing/RedirectController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Profile edit/update/landing/photo actions plus exact /settings redirect alias to profile; direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0851"
+      ]
+    },
+    "CAP-SET-ROLE-ASSIGNMENTS": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-ACCESS",
+        "SET-ACCESS-CONTROL"
+      ],
+      "route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616",
+        "ROUTE-2628",
+        "ROUTE-2629",
+        "ROUTE-2951",
+        "ROUTE-2952"
+      ],
+      "page_ids": [
+        "PAGE-0837",
+        "PAGE-0950"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/AccessController.php",
+        "app/Http/Controllers/System/AccessControlController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Settings access role/board assignment actions plus system assignment index/update; direct render roots."
+      ],
+      "deliberate_shared_route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616"
+      ],
+      "deliberate_shared_page_ids": [
+        "PAGE-0837"
+      ]
+    },
+    "CAP-SET-ROLE-DEFINITIONS": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-ROLES",
+        "SET-ACCESS-CONTROL"
+      ],
+      "route_ids": [
+        "ROUTE-2676",
+        "ROUTE-2677",
+        "ROUTE-2678",
+        "ROUTE-2679",
+        "ROUTE-2680",
+        "ROUTE-2954",
+        "ROUTE-2955",
+        "ROUTE-2956",
+        "ROUTE-2957",
+        "ROUTE-2958"
+      ],
+      "page_ids": [
+        "PAGE-0852",
+        "PAGE-0853",
+        "PAGE-0953"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/RolesController.php",
+        "app/Http/Controllers/System/AccessControlController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Settings and system role definition index/create/edit/store/update/delete/clone routes and direct render roots."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-ROLE-NOTIFICATION-DEFAULTS": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-NOTIFICATION-PREFERENCES",
+        "SET-LEGACY-REDIRECTS"
+      ],
+      "route_ids": [
+        "ROUTE-2658",
+        "ROUTE-2666",
+        "ROUTE-2667"
+      ],
+      "page_ids": [
+        "PAGE-0847"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/NotificationPreferencesController.php",
+        "Illuminate/Routing/RedirectController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Role notification defaults index/update plus exact legacy redirect alias and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-SECURITY-POLICY": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-SECURITY-POLICY"
+      ],
+      "route_ids": [
+        "ROUTE-2681",
+        "ROUTE-2682"
+      ],
+      "page_ids": [
+        "PAGE-0854"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/SecurityPolicyController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Security policy edit/update and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-SELF-ACCOUNT-DELETION": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-PROFILE"
+      ],
+      "route_ids": [
+        "ROUTE-2670"
+      ],
+      "page_ids": [
+        "PAGE-0851"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ProfileController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "profile.destroy exact self-deletion action and profile-page call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0851"
+      ]
+    },
+    "CAP-SET-SERVICE-CONTEXT-LIFECYCLE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-SERVICE-CONTEXT"
+      ],
+      "route_ids": [
+        "ROUTE-2683",
+        "ROUTE-2684",
+        "ROUTE-2685",
+        "ROUTE-2686"
+      ],
+      "page_ids": [
+        "PAGE-0855"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/ServiceContextController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Service-context index/create/update/default actions and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-SSO-CONFIG-OVERVIEW": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-SSO-CONFIG",
+        "SET-FRONTEND-SETTINGS-SSO"
+      ],
+      "route_ids": [
+        "ROUTE-2687"
+      ],
+      "page_ids": [
+        "PAGE-0856"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/SsoConfigController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Canonical SSO config index renders settings/sso-config; orphan settings/sso.tsx is retained only as source-family context and is not assigned a page ID."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0856"
+      ]
+    },
+    "CAP-SET-SSO-GROUP-MAPPING": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-SSO-GROUP"
+      ],
+      "route_ids": [
+        "ROUTE-2688",
+        "ROUTE-2689",
+        "ROUTE-2690",
+        "ROUTE-2691",
+        "ROUTE-2692"
+      ],
+      "page_ids": [
+        "PAGE-0856",
+        "PAGE-0857"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/SsoGroupController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "SSO group index/create/delete/update/fetch actions; both canonical SSO config and group manager render roots host exact call sites."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0856"
+      ]
+    },
+    "CAP-SET-TERMINOLOGY-CONFIG": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-TERMINOLOGY"
+      ],
+      "route_ids": [
+        "ROUTE-2698",
+        "ROUTE-2699"
+      ],
+      "page_ids": [
+        "PAGE-0860"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/TerminologyController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Terminology edit/update and direct render root."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-TWO-FACTOR-MANAGEMENT": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-SETTINGS-TWO-FACTOR-AUTHENTICATION",
+        "SET-CONFIRMED-TWO-FACTOR-AUTHENTICATION",
+        "SET-CONTROLLERS-TWO-FACTOR-AUTHENTICATION",
+        "SET-TWO-FACTOR-QR-CODE",
+        "SET-RECOVERY-CODE",
+        "SET-TWO-FACTOR-SECRET-KEY"
+      ],
+      "route_ids": [
+        "ROUTE-2700",
+        "ROUTE-3014",
+        "ROUTE-3015",
+        "ROUTE-3016",
+        "ROUTE-3017",
+        "ROUTE-3018",
+        "ROUTE-3019",
+        "ROUTE-3020"
+      ],
+      "page_ids": [
+        "PAGE-0861"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/TwoFactorAuthenticationController.php",
+        "Laravel/Fortify/Http/Controllers/ConfirmedTwoFactorAuthenticationController",
+        "Laravel/Fortify/Http/Controllers/TwoFactorAuthenticationController",
+        "Laravel/Fortify/Http/Controllers/TwoFactorQrCodeController",
+        "Laravel/Fortify/Http/Controllers/RecoveryCodeController",
+        "Laravel/Fortify/Http/Controllers/TwoFactorSecretKeyController"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Two-factor management render plus confirm/enable/disable/QR/recovery-code/secret endpoints used by the canonical two-factor page."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": []
+    },
+    "CAP-SET-USER-ACCOUNT-LIFECYCLE": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-USERS",
+        "SET-USER-MANAGEMENT-REDIRECT",
+        "SET-ACCESS"
+      ],
+      "route_ids": [
+        "ROUTE-2616",
+        "ROUTE-2701",
+        "ROUTE-2702",
+        "ROUTE-2703",
+        "ROUTE-2704",
+        "ROUTE-2707",
+        "ROUTE-2959",
+        "ROUTE-2960",
+        "ROUTE-2961",
+        "ROUTE-2962",
+        "ROUTE-2963",
+        "ROUTE-2964",
+        "ROUTE-2968",
+        "ROUTE-2969"
+      ],
+      "page_ids": [
+        "PAGE-0862",
+        "PAGE-0863",
+        "PAGE-0954"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Settings/AccessController.php",
+        "app/Http/Controllers/Settings/UserManagementRedirectController.php",
+        "app/Http/Controllers/System/UsersController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Access approval plus user redirect/index/show/create/store/update/approve/suspend/delete lifecycle; direct render roots."
+      ],
+      "deliberate_shared_route_ids": [
+        "ROUTE-2616"
+      ],
+      "deliberate_shared_page_ids": [
+        "PAGE-0862",
+        "PAGE-0863"
+      ]
+    },
+    "CAP-SET-USER-IMPERSONATION": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-USERS"
+      ],
+      "route_ids": [
+        "ROUTE-2965",
+        "ROUTE-2970"
+      ],
+      "page_ids": [
+        "PAGE-0862"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/System/UsersController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "System user impersonation start/stop actions; users index contains the exact start call site."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0862"
+      ]
+    },
+    "CAP-SET-USER-SESSION-TERMINATION": {
+      "canonical_module": "SETTINGS",
+      "source_family_ids": [
+        "SET-USERS"
+      ],
+      "route_ids": [
+        "ROUTE-2705",
+        "ROUTE-2706",
+        "ROUTE-2966",
+        "ROUTE-2967"
+      ],
+      "page_ids": [
+        "PAGE-0863"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/System/UsersController.php"
+      ],
+      "enrichment_status": "resolved_exact_static",
+      "page_surface_status": "exact_render_root_or_target_specific_callsite",
+      "proof_basis": [
+        "Settings/system terminate-one/terminate-all session actions; user show page contains exact session controls."
+      ],
+      "deliberate_shared_route_ids": [],
+      "deliberate_shared_page_ids": [
+        "PAGE-0863"
+      ]
+    }
+  },
+  "deliberate_shared_route_cases": [
+    {
+      "route_id": "ROUTE-2615",
+      "working_keys": [
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS"
+      ],
+      "reason": "One update request atomically carries role assignments and per-user permission overrides."
+    },
+    {
+      "route_id": "ROUTE-2616",
+      "working_keys": [
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS",
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+      ],
+      "reason": "User approval atomically establishes account state, role assignments and optional permission overrides."
+    },
+    {
+      "route_id": "ROUTE-2617",
+      "working_keys": [
+        "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+        "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+      ],
+      "reason": "One combined API-settings GET render owns both API-key and outbound-webhook configuration."
+    }
+  ],
+  "deliberate_shared_page_cases": [
+    {
+      "page_id": "PAGE-0048",
+      "working_keys": [
+        "CAP-CR-ALERT-COLLABORATION",
+        "CAP-CR-ALERT-MANUAL-INTAKE",
+        "CAP-CR-ALERT-OWNERSHIP",
+        "CAP-CR-ALERT-RESPONSE-CLOSURE",
+        "CAP-CR-ALERT-SENSOR-VALIDATION",
+        "CAP-CR-ALERT-TASKS",
+        "CAP-CR-ALERT-TIME-TRACKING",
+        "CAP-CR-ALERT-TRIAGE",
+        "CAP-CR-ALERT-WATCHERS",
+        "CAP-CR-EVIDENCE-DOWNLOAD",
+        "CAP-CR-EVIDENCE-PACK-ASSEMBLY",
+        "CAP-CR-PLAYBOOK-RUN"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0050",
+      "working_keys": [
+        "CAP-CR-BROADCAST-COMPOSE-SEND",
+        "CAP-CR-BROADCAST-OVERSIGHT"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0054",
+      "working_keys": [
+        "CAP-CR-INCIDENT-OVERSIGHT",
+        "CAP-CR-INCIDENT-TO-ALERT",
+        "CAP-CR-SIGNAL-TO-INCIDENT"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0061",
+      "working_keys": [
+        "CAP-CR-REPORT-CSV",
+        "CAP-CR-REPORT-DASHBOARD"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0062",
+      "working_keys": [
+        "CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0065",
+      "working_keys": [
+        "CAP-CR-ALERT-COLLABORATION",
+        "CAP-CR-ALERT-OWNERSHIP",
+        "CAP-CR-ALERT-RESPONSE-CLOSURE",
+        "CAP-CR-ALERT-TASKS",
+        "CAP-CR-ALERT-TIME-TRACKING",
+        "CAP-CR-ALERT-TRIAGE",
+        "CAP-CR-ALERT-WATCHERS",
+        "CAP-CR-EVIDENCE-DOWNLOAD",
+        "CAP-CR-EVIDENCE-PACK-ASSEMBLY",
+        "CAP-CR-PLAYBOOK-RUN"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0771",
+      "working_keys": [
+        "CAP-RESP-EVIDENCE-PACK-DOWNLOAD",
+        "CAP-RESP-EVIDENCE-PACK-LIFECYCLE"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0782",
+      "working_keys": [
+        "CAP-RESP-PROCEDURE-ESCALATION",
+        "CAP-RESP-PROCEDURE-INITIATE",
+        "CAP-RESP-PROCEDURE-RUN-EXECUTION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0790",
+      "working_keys": [
+        "CAP-RESP-BOOKING-REQUEST-APPROVAL",
+        "CAP-RESP-BOOKING-REQUEST-INTAKE"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0799",
+      "working_keys": [
+        "CAP-RESP-STAY-CLINICAL-RECONCILIATION",
+        "CAP-RESP-STAY-INCIDENT-COMPLAINT",
+        "CAP-RESP-STAY-LIFECYCLE"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0804",
+      "working_keys": [
+        "CAP-RESP-TASK-APPROVAL",
+        "CAP-RESP-TASK-EXECUTION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0805",
+      "working_keys": [
+        "CAP-ROAD-DASHBOARD",
+        "CAP-ROAD-SUGGESTION-INGESTION",
+        "CAP-ROAD-SUGGESTION-TRIAGE"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0809",
+      "working_keys": [
+        "CAP-ROAD-QUARTERLY-PLAN-APPROVAL-PUBLISH",
+        "CAP-ROAD-QUARTERLY-PLAN-PREPARATION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0837",
+      "working_keys": [
+        "CAP-SET-ACCESS-OVERVIEW",
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0838",
+      "working_keys": [
+        "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+        "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0842",
+      "working_keys": [
+        "CAP-SET-CALENDAR-PROVIDER-CONNECTION",
+        "CAP-SET-CALENDAR-SYNC-CONFIG",
+        "CAP-SET-CALENDAR-SYNC-RUN"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0843",
+      "working_keys": [
+        "CAP-SET-DATA-PRIVACY-COMPLIANCE-CONFIG",
+        "CAP-SET-DATA-PROCESSOR-REGISTER",
+        "CAP-SET-DATA-RETENTION-POLICY"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0851",
+      "working_keys": [
+        "CAP-SET-PERSONAL-PROFILE",
+        "CAP-SET-SELF-ACCOUNT-DELETION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0856",
+      "working_keys": [
+        "CAP-SET-SSO-CONFIG-OVERVIEW",
+        "CAP-SET-SSO-GROUP-MAPPING"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0862",
+      "working_keys": [
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE",
+        "CAP-SET-USER-IMPERSONATION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    },
+    {
+      "page_id": "PAGE-0863",
+      "working_keys": [
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE",
+        "CAP-SET-USER-SESSION-TERMINATION"
+      ],
+      "reason": "Direct render root hosts exact views or call sites for these split targets; it was not copied from the whole legacy-family page envelope."
+    }
+  ],
+  "unresolved_targets": [],
+  "checksums": {
+    "inputs": {
+      "evidence/source/working-capability-manifest-894.json": "0bcef71148e275df3e066a20146ba8389f81bb0121ec5b7708d50921d1aa3b16",
+      "evidence/source/manifest-full-global-exact-ids.json": "ae9703d322228a67494960724f4428391fcfe5387f03702bfd834b79c53c0bfe",
+      "evidence/source/full-distinct-capability-adjudication.json": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715",
+      "inventory.json": "e4ec65d0ee7e1745bb513da220f4efc0d480cbc76e846a7b7b6117a79eed4570"
+    },
+    "target_tuple_sha256": "6e78efa2a5c494109dff6b0276d3cb89c4d1ee2de004caf342c99ab2dc623ea4",
+    "tuple_definition": "UTF-8 lines sorted by working_key: working_key|canonical_module|source_family_ids_csv|route_ids_csv|page_ids_csv|backend_anchors_csv"
+  }
+}

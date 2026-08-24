@@ -1,0 +1,993 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "visual-final-id-adjudication-904-wave03",
+  "generated_at": "2026-08-21T19:45:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_zero_promotion",
+  "audit_boundary": "Static final-ID ownership adjudication only. No browser, runtime, usability, screenshot, finding, benchmark or completion credit is inferred.",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "37cba2c22121ef641e425ba891e60757cc1a0b112ec9ec710ed71e317d673f6e",
+      "bytes": 11769530
+    },
+    "visual_matrix": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "707885a83264c8e2ab3f92898578a2b20ba3e8a2ccdb3ece17156d8c0774c293",
+      "bytes": 8377597
+    }
+  },
+  "selection": {
+    "rule": "Exclude reviewed Waves 01 and 02; require exactly two exact name/path routes with distinct singleton owners, one action controller, both methods present; rank exact controller-anchor rows then remaining rows by visual_id; take 25.",
+    "wave1_exclusion_sha256": "bbec2abef290aaaccce4960da49c9dac2bd0fde12be0d02590c73dbfb6140b41",
+    "wave2_exclusion_sha256": "3000af48cd790aebd2c33d7df5ea61e8edd151d2c5e7cfb2e1540b4522dea171",
+    "combined_exclusion_sha256": "6bda5b208cbcb48d19806b89d7fbb381cc1b863fbd0ca2f8fee0d684f2fa9f62",
+    "ordered_ids": [
+      "VIS-020392",
+      "VIS-020396",
+      "VIS-021250",
+      "VIS-021337",
+      "VIS-021371",
+      "VIS-014175",
+      "VIS-014197",
+      "VIS-014226",
+      "VIS-014244",
+      "VIS-014311",
+      "VIS-015470",
+      "VIS-015477",
+      "VIS-015823",
+      "VIS-016174",
+      "VIS-017496",
+      "VIS-017580",
+      "VIS-017933",
+      "VIS-018634",
+      "VIS-018714",
+      "VIS-018990",
+      "VIS-018992",
+      "VIS-019291",
+      "VIS-019328",
+      "VIS-019329",
+      "VIS-019389"
+    ],
+    "ordered_sha256": "c8e055cc898976aefb1197b4b04399a109ca00d592581eed778a5bde304d5c31",
+    "sorted_sha256": "53a320ff0ab8b8f5e005bea21dc91dc77ae98883e7ccde75f16136c50c411b87",
+    "source_packet_proof_sha256": "9c7888f895873d74a9a9ce22d999af58209426d93769592a2c4f0857580d0fa5",
+    "independent_review_proof_sha256": "a0f92c684cfc409697c56a2d31bbdb2bdcaf6c38b122402acb5dba7e298b2702",
+    "source_map_sha256": "3d1a622611c7d803e4f9d09c98a41c6982b8072233d1a3fa04888582239af824"
+  },
+  "adjudications": [
+    {
+      "visual_id": "VIS-020392",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1970",
+          "name": "operations.clients.excursions.store",
+          "path": "operations/clients/{client}/excursions",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Operations/ClientLeaveExcursionController.php",
+          "controller_method": "storeExcursion",
+          "owner": "CAP-OPS-CLIENT-EXCURSION"
+        },
+        {
+          "route_id": "ROUTE-1999",
+          "name": "operations.clients.leave.store",
+          "path": "operations/clients/{client}/leave",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Operations/ClientLeaveExcursionController.php",
+          "controller_method": "storeLeave",
+          "owner": "CAP-OPS-CLIENT-LEAVE-BLOCK"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-OPS-CLIENT-EXCURSION",
+        "CAP-OPS-CLIENT-LEAVE-BLOCK"
+      ],
+      "page_id": null,
+      "page_owners": [],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020396",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1971",
+          "name": "operations.clients.excursions.destroy",
+          "path": "operations/clients/{client}/excursions/{excursion}",
+          "method": "DELETE",
+          "controller": "app/Http/Controllers/Operations/ClientLeaveExcursionController.php",
+          "controller_method": "destroyExcursion",
+          "owner": "CAP-OPS-CLIENT-EXCURSION"
+        },
+        {
+          "route_id": "ROUTE-2000",
+          "name": "operations.clients.leave.destroy",
+          "path": "operations/clients/{client}/leave/{leave}",
+          "method": "DELETE",
+          "controller": "app/Http/Controllers/Operations/ClientLeaveExcursionController.php",
+          "controller_method": "destroyLeave",
+          "owner": "CAP-OPS-CLIENT-LEAVE-BLOCK"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-OPS-CLIENT-EXCURSION",
+        "CAP-OPS-CLIENT-LEAVE-BLOCK"
+      ],
+      "page_id": null,
+      "page_owners": [],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-021250",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2840",
+          "name": "sites.meals.checkConflicts",
+          "path": "sites/{site}/meal-planner/check-conflicts",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Sites/SiteMealPlanController.php",
+          "controller_method": "checkConflicts",
+          "owner": "CAP-SITE-MEAL-PLANNING"
+        },
+        {
+          "route_id": "ROUTE-2842",
+          "name": "sites.meals.settings",
+          "path": "sites/{site}/meal-planner/settings",
+          "method": "PUT",
+          "controller": "app/Http/Controllers/Sites/SiteMealPlanController.php",
+          "controller_method": "saveSettings",
+          "owner": "CAP-SITE-MEAL-BUDGET-CONFIG"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SITE-MEAL-BUDGET-CONFIG",
+        "CAP-SITE-MEAL-PLANNING"
+      ],
+      "page_id": null,
+      "page_owners": [],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-021337",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1886",
+          "name": "my-day.alert.snooze",
+          "path": "my-day/alerts/{alert}/snooze",
+          "method": "POST",
+          "controller": "app/Http/Controllers/MyDayActionsController.php",
+          "controller_method": "snoozeAlert",
+          "owner": "CAP-OPS-MY-DAY-ALERT-ACTIONS"
+        },
+        {
+          "route_id": "ROUTE-1895",
+          "name": "my-day.timesheet.ensure-today",
+          "path": "my-tasks/timesheet/ensure-today",
+          "method": "POST",
+          "controller": "app/Http/Controllers/MyDayActionsController.php",
+          "controller_method": "ensureTodayTimesheet",
+          "owner": "CAP-OPS-MY-DAY-TIMESHEET"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-OPS-MY-DAY-ALERT-ACTIONS",
+        "CAP-OPS-MY-DAY-TIMESHEET"
+      ],
+      "page_id": null,
+      "page_owners": [],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-021371",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2849",
+          "name": "sites.meals.shopping.receive",
+          "path": "sites/{site}/meal-shopping-lists/{list}/receive",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Sites/SiteMealShoppingListController.php",
+          "controller_method": "markReceived",
+          "owner": "CAP-SITE-SHOPPING-PROCUREMENT"
+        },
+        {
+          "route_id": "ROUTE-2850",
+          "name": "sites.meals.shopping.generate",
+          "path": "sites/{site}/meal-shopping-lists/generate",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Sites/SiteMealShoppingListController.php",
+          "controller_method": "generate",
+          "owner": "CAP-SITE-SHOPPING-LIST-GENERATE"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SITE-SHOPPING-LIST-GENERATE",
+        "CAP-SITE-SHOPPING-PROCUREMENT"
+      ],
+      "page_id": null,
+      "page_owners": [],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-014175",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1205",
+          "name": "health-safety.restraints.events.attachments.download",
+          "path": "health-safety/restraints/events/{event}/attachments/{attachment}/download",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/RestraintController.php",
+          "controller_method": "downloadAttachment",
+          "owner": "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD"
+        },
+        {
+          "route_id": "ROUTE-1207",
+          "name": "health-safety.restraints.export",
+          "path": "health-safety/restraints/export",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/RestraintController.php",
+          "controller_method": "export",
+          "owner": "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+      ],
+      "page_id": "PAGE-0394",
+      "page_owners": [
+        "CAP-HS-BEHAVIOUR-SUPPORT-PLANS",
+        "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-RESTRAINT-EVENTS",
+        "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-014197",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1133",
+          "name": "health-safety.injuries.attachments.download",
+          "path": "health-safety/injuries/{injury}/attachments/{attachment}/download",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php",
+          "controller_method": "downloadAttachment",
+          "owner": "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD"
+        },
+        {
+          "route_id": "ROUTE-1138",
+          "name": "health-safety.injuries.export",
+          "path": "health-safety/injuries/export",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php",
+          "controller_method": "export",
+          "owner": "CAP-HS-INJURY-REGISTER-EXPORT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-INJURY-REGISTER-EXPORT"
+      ],
+      "page_id": "PAGE-0385",
+      "page_owners": [
+        "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-INJURY-CAPACITY-LIFECYCLE",
+        "CAP-HS-INJURY-REGISTER-EXPORT",
+        "CAP-HS-RETURN-TO-WORK-PLAN-DUTIES"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-014226",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1186",
+          "name": "health-safety.procedures.attachments.download",
+          "path": "health-safety/procedures/{procedure}/attachments/{attachment}/download",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php",
+          "controller_method": "downloadAttachment",
+          "owner": "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD"
+        },
+        {
+          "route_id": "ROUTE-1193",
+          "name": "health-safety.procedures.export",
+          "path": "health-safety/procedures/export",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php",
+          "controller_method": "export",
+          "owner": "CAP-HS-PROCEDURE-REGISTER-EXPORT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-PROCEDURE-REGISTER-EXPORT"
+      ],
+      "page_id": "PAGE-0393",
+      "page_owners": [
+        "CAP-HS-PROCEDURE-ACKNOWLEDGEMENT",
+        "CAP-HS-PROCEDURE-ARCHIVE-RESTORE",
+        "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+        "CAP-HS-PROCEDURE-REGISTER-EXPORT",
+        "CAP-HS-PROCEDURE-REVIEW-APPROVAL"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-014244",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1045",
+          "name": "sites.hazards.show",
+          "path": "hazards/{hazard}",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/Sites/SiteHazardController.php",
+          "controller_method": "show",
+          "owner": "CAP-HS-SITE-HAZARD-LIFECYCLE"
+        },
+        {
+          "route_id": "ROUTE-1051",
+          "name": "sites.hazards.media.show",
+          "path": "hazards/{hazard}/media/{kind}/{index}",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/Sites/SiteHazardController.php",
+          "controller_method": "showMedia",
+          "owner": "CAP-HS-SITE-HAZARD-MEDIA"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-HS-SITE-HAZARD-LIFECYCLE",
+        "CAP-HS-SITE-HAZARD-MEDIA"
+      ],
+      "page_id": "PAGE-0893",
+      "page_owners": [
+        "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+        "CAP-HS-SITE-HAZARD-LIFECYCLE",
+        "CAP-HS-SITE-HAZARD-MEDIA"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-014311",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1841",
+          "name": "incidents.update",
+          "path": "incidents/{incident}",
+          "method": "PUT",
+          "controller": "app/Http/Controllers/IncidentController.php",
+          "controller_method": "update",
+          "owner": "CAP-INC-INCIDENT-AUTHOR"
+        },
+        {
+          "route_id": "ROUTE-1844",
+          "name": "incidents.attachments.update",
+          "path": "incidents/{incident}/attachments/{attachment}",
+          "method": "PATCH",
+          "controller": "app/Http/Controllers/IncidentController.php",
+          "controller_method": "updateAttachment",
+          "owner": "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+      ],
+      "page_id": "PAGE-0526",
+      "page_owners": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+        "CAP-INC-INCIDENT-FOLLOWUP",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015470",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0586",
+          "name": "finance.integrations.index",
+          "path": "finance/integrations",
+          "method": "GET|HEAD",
+          "controller": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+          "controller_method": "index",
+          "owner": "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE"
+        },
+        {
+          "route_id": "ROUTE-0590",
+          "name": "finance.integrations.mapping",
+          "path": "finance/integrations/{integration}/mapping",
+          "method": "GET|HEAD",
+          "controller": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+          "controller_method": "mapping",
+          "owner": "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING",
+        "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE"
+      ],
+      "page_id": "PAGE-0159",
+      "page_owners": [
+        "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE",
+        "CAP-FIN-ACCOUNTING-INTEGRATION-SYNC"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015477",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0589",
+          "name": "finance.integrations.update",
+          "path": "finance/integrations/{integration}",
+          "method": "PUT",
+          "controller": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+          "controller_method": "update",
+          "owner": "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE"
+        },
+        {
+          "route_id": "ROUTE-0591",
+          "name": "finance.integrations.mapping.update",
+          "path": "finance/integrations/{integration}/mapping",
+          "method": "PUT",
+          "controller": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+          "controller_method": "updateMapping",
+          "owner": "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING",
+        "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE"
+      ],
+      "page_id": "PAGE-0159",
+      "page_owners": [
+        "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE",
+        "CAP-FIN-ACCOUNTING-INTEGRATION-SYNC"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015823",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0772",
+          "name": "fleet-assets.checklists.index",
+          "path": "fleet-assets/maintenance/checklists",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/FleetAssets/ChecklistController.php",
+          "controller_method": "index",
+          "owner": "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION"
+        },
+        {
+          "route_id": "ROUTE-0775",
+          "name": "fleet-assets.checklists.run-page",
+          "path": "fleet-assets/maintenance/checklists/run",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/FleetAssets/ChecklistController.php",
+          "controller_method": "runPage",
+          "owner": "CAP-FLEET-CHECKLIST-RUN-EXECUTION"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-FLEET-CHECKLIST-RUN-EXECUTION",
+        "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION"
+      ],
+      "page_id": "PAGE-0231",
+      "page_owners": [
+        "CAP-FLEET-CHECKLIST-RUN-EXECUTION",
+        "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-016174",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1324",
+          "name": "hr.compensation.benefits.enrollments.update",
+          "path": "hr/compensation/benefits/enrollments/{enrollment}",
+          "method": "PUT",
+          "controller": "app/Http/Controllers/Hr/BenefitsController.php",
+          "controller_method": "updateEnrollment",
+          "owner": "CAP-HR-BENEFITS-ENROLLMENT"
+        },
+        {
+          "route_id": "ROUTE-1327",
+          "name": "hr.compensation.benefits.plans.update",
+          "path": "hr/compensation/benefits/plans/{plan}",
+          "method": "PUT",
+          "controller": "app/Http/Controllers/Hr/BenefitsController.php",
+          "controller_method": "updatePlan",
+          "owner": "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-HR-BENEFITS-ENROLLMENT",
+        "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+      ],
+      "page_id": "PAGE-0415",
+      "page_owners": [
+        "CAP-HR-BENEFITS-ENROLLMENT",
+        "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017496",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2619",
+          "name": "settings.api.keys.revoke",
+          "path": "settings/api/keys/{keyId}/revoke",
+          "method": "POST",
+          "controller": "app/Http/Controllers/Settings/ApiSettingsController.php",
+          "controller_method": "revokeKey",
+          "owner": "CAP-SET-API-CREDENTIAL-LIFECYCLE"
+        },
+        {
+          "route_id": "ROUTE-2621",
+          "name": "settings.api.webhooks.destroy",
+          "path": "settings/api/webhooks/{webhookId}",
+          "method": "DELETE",
+          "controller": "app/Http/Controllers/Settings/ApiSettingsController.php",
+          "controller_method": "destroyWebhook",
+          "owner": "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+        "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+      ],
+      "page_id": "PAGE-0838",
+      "page_owners": [
+        "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+        "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017580",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2670",
+          "name": "profile.destroy",
+          "path": "settings/profile",
+          "method": "DELETE",
+          "controller": "app/Http/Controllers/Settings/ProfileController.php",
+          "controller_method": "destroy",
+          "owner": "CAP-SET-SELF-ACCOUNT-DELETION"
+        },
+        {
+          "route_id": "ROUTE-2674",
+          "name": "profile.photo.destroy",
+          "path": "settings/profile/photo",
+          "method": "DELETE",
+          "controller": "app/Http/Controllers/Settings/ProfileController.php",
+          "controller_method": "destroyPhoto",
+          "owner": "CAP-SET-PERSONAL-PROFILE"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SET-PERSONAL-PROFILE",
+        "CAP-SET-SELF-ACCOUNT-DELETION"
+      ],
+      "page_id": "PAGE-0851",
+      "page_owners": [
+        "CAP-SET-PERSONAL-PROFILE",
+        "CAP-SET-SELF-ACCOUNT-DELETION"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017933",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0215",
+          "name": "control-room.alerts.store",
+          "path": "control-room/alerts",
+          "method": "POST",
+          "controller": "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+          "controller_method": "store",
+          "owner": "CAP-CR-ALERT-MANUAL-INTAKE"
+        },
+        {
+          "route_id": "ROUTE-0229",
+          "name": "control-room.alerts.note",
+          "path": "control-room/alerts/{alert}/note",
+          "method": "POST",
+          "controller": "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+          "controller_method": "addNote",
+          "owner": "CAP-CR-ALERT-TRIAGE"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-CR-ALERT-MANUAL-INTAKE",
+        "CAP-CR-ALERT-TRIAGE"
+      ],
+      "page_id": "PAGE-0048",
+      "page_owners": [
+        "CAP-CR-ALERT-COLLABORATION",
+        "CAP-CR-ALERT-MANUAL-INTAKE",
+        "CAP-CR-ALERT-OWNERSHIP",
+        "CAP-CR-ALERT-RESPONSE-CLOSURE",
+        "CAP-CR-ALERT-SENSOR-VALIDATION",
+        "CAP-CR-ALERT-TASKS",
+        "CAP-CR-ALERT-TIME-TRACKING",
+        "CAP-CR-ALERT-TRIAGE",
+        "CAP-CR-ALERT-WATCHERS",
+        "CAP-CR-EVIDENCE-DOWNLOAD",
+        "CAP-CR-EVIDENCE-PACK-ASSEMBLY",
+        "CAP-CR-PLAYBOOK-RUN"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018634",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-1839",
+          "name": "incidents.store",
+          "path": "incidents",
+          "method": "POST",
+          "controller": "app/Http/Controllers/IncidentController.php",
+          "controller_method": "store",
+          "owner": "CAP-INC-INCIDENT-AUTHOR"
+        },
+        {
+          "route_id": "ROUTE-1842",
+          "name": "incidents.attachments.store",
+          "path": "incidents/{incident}/attachments",
+          "method": "POST",
+          "controller": "app/Http/Controllers/IncidentController.php",
+          "controller_method": "uploadAttachment",
+          "owner": "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+      ],
+      "page_id": "PAGE-0526",
+      "page_owners": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+        "CAP-INC-INCIDENT-FOLLOWUP",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018714",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0373",
+          "name": "emar.handovers",
+          "path": "emar/handovers",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/Emar/EmarController.php",
+          "controller_method": "handovers",
+          "owner": "CAP-MED-HANDOVER-AUTHORING-STATUS"
+        },
+        {
+          "route_id": "ROUTE-0381",
+          "name": "emar.handovers.shift_medications",
+          "path": "emar/handovers/shift-medications",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/Emar/EmarController.php",
+          "controller_method": "shiftMedicationSnapshot",
+          "owner": "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-MED-HANDOVER-AUTHORING-STATUS",
+        "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API"
+      ],
+      "page_id": "PAGE-0095",
+      "page_owners": [
+        "CAP-MED-HANDOVER-ACKNOWLEDGEMENT",
+        "CAP-MED-HANDOVER-AUTHORING-STATUS"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018990",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2594",
+          "name": "security-devices.integrations.unifi.defaults",
+          "path": "security-devices/integrations/unifi/defaults",
+          "method": "PUT",
+          "controller": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+          "controller_method": "updateDefaults",
+          "owner": "CAP-SEC-UNIFI-DEFAULTS"
+        },
+        {
+          "route_id": "ROUTE-2595",
+          "name": "security-devices.integrations.unifi.assign-room",
+          "path": "security-devices/integrations/unifi/hardware/{hardware}/room",
+          "method": "PUT",
+          "controller": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+          "controller_method": "assignHardwareRoom",
+          "owner": "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SEC-UNIFI-DEFAULTS",
+        "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+      ],
+      "page_id": "PAGE-0831",
+      "page_owners": [
+        "CAP-SEC-UNIFI-DEFAULTS",
+        "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018992",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-2594",
+          "name": "security-devices.integrations.unifi.defaults",
+          "path": "security-devices/integrations/unifi/defaults",
+          "method": "PUT",
+          "controller": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+          "controller_method": "updateDefaults",
+          "owner": "CAP-SEC-UNIFI-DEFAULTS"
+        },
+        {
+          "route_id": "ROUTE-2595",
+          "name": "security-devices.integrations.unifi.assign-room",
+          "path": "security-devices/integrations/unifi/hardware/{hardware}/room",
+          "method": "PUT",
+          "controller": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+          "controller_method": "assignHardwareRoom",
+          "owner": "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-SEC-UNIFI-DEFAULTS",
+        "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+      ],
+      "page_id": "PAGE-0831",
+      "page_owners": [
+        "CAP-SEC-UNIFI-DEFAULTS",
+        "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019291",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0195",
+          "name": "timeline.client",
+          "path": "clients/{client}/timeline",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/TimelineController.php",
+          "controller_method": "client",
+          "owner": "CAP-CLI-CLIENT-TIMELINE-VIEW"
+        },
+        {
+          "route_id": "ROUTE-2934",
+          "name": "timeline.staff",
+          "path": "staff/{user}/timeline",
+          "method": "GET|HEAD",
+          "controller": "app/Http/Controllers/TimelineController.php",
+          "controller_method": "staff",
+          "owner": "CAP-HR-STAFF-TIMELINE-VIEW"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-CLI-CLIENT-TIMELINE-VIEW",
+        "CAP-HR-STAFF-TIMELINE-VIEW"
+      ],
+      "page_id": "PAGE-0961",
+      "page_owners": [
+        "CAP-CLI-CLIENT-TIMELINE-VIEW",
+        "CAP-DAY-MY-TIMELINE-VIEW",
+        "CAP-HR-STAFF-TIMELINE-VIEW"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019328",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0898",
+          "name": "governance.clinical.indicators.store",
+          "path": "governance/clinical/indicators",
+          "method": "POST",
+          "controller": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php",
+          "controller_method": "storeIndicator",
+          "owner": "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API"
+        },
+        {
+          "route_id": "ROUTE-0899",
+          "name": "governance.clinical.snapshots.store",
+          "path": "governance/clinical/snapshots",
+          "method": "POST",
+          "controller": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php",
+          "controller_method": "recordSnapshot",
+          "owner": "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API",
+        "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+      ],
+      "page_id": "PAGE-0277",
+      "page_owners": [
+        "CAP-GOV-CLINICAL-INDICATOR-OVERSIGHT",
+        "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API",
+        "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019329",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0898",
+          "name": "governance.clinical.indicators.store",
+          "path": "governance/clinical/indicators",
+          "method": "POST",
+          "controller": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php",
+          "controller_method": "storeIndicator",
+          "owner": "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API"
+        },
+        {
+          "route_id": "ROUTE-0899",
+          "name": "governance.clinical.snapshots.store",
+          "path": "governance/clinical/snapshots",
+          "method": "POST",
+          "controller": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php",
+          "controller_method": "recordSnapshot",
+          "owner": "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API",
+        "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+      ],
+      "page_id": "PAGE-0277",
+      "page_owners": [
+        "CAP-GOV-CLINICAL-INDICATOR-OVERSIGHT",
+        "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API",
+        "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API"
+      ],
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019389",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Two exact actions have different singleton final owners; their intersection is empty and no singleton page fallback exists.",
+      "routes": [
+        {
+          "route_id": "ROUTE-0266",
+          "name": "control-room.incidents.create-alert",
+          "path": "control-room/incidents/create-alert",
+          "method": "POST",
+          "controller": "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+          "controller_method": "createAlertFromIncident",
+          "owner": "CAP-CR-INCIDENT-TO-ALERT"
+        },
+        {
+          "route_id": "ROUTE-0267",
+          "name": "control-room.incidents.flag",
+          "path": "control-room/incidents/flag",
+          "method": "POST",
+          "controller": "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+          "controller_method": "flagAsIncident",
+          "owner": "CAP-CR-SIGNAL-TO-INCIDENT"
+        }
+      ],
+      "owner_intersection": [],
+      "owner_union": [
+        "CAP-CR-INCIDENT-TO-ALERT",
+        "CAP-CR-SIGNAL-TO-INCIDENT"
+      ],
+      "page_id": "PAGE-0054",
+      "page_owners": [
+        "CAP-CR-INCIDENT-OVERSIGHT",
+        "CAP-CR-INCIDENT-TO-ALERT",
+        "CAP-CR-SIGNAL-TO-INCIDENT"
+      ],
+      "runtime_credit": 0
+    }
+  ],
+  "count_delta": {
+    "visual_assigned": 0,
+    "visual_unresolved": 0,
+    "material_assigned": 0,
+    "material_unresolved": 0,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "visual_assigned": 8168,
+    "visual_rows": 8753,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_rows": 4312,
+    "material_unresolved": 364,
+    "unique_assigned_targets": 774
+  }
+}

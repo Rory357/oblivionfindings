@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "artifact": "capability-denominator-902-adjudication",
+  "status": "accepted_static_machine_identity_reconciliation_not_runtime_completion",
+  "generated_at": "2026-08-13T12:20:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Audit-artifact-only, read-only source adjudication. No application code, configuration, routes, tests, data, deployment or Git history was changed.",
+  "supersedes_denominator": {
+    "artifact": "working-capability-manifest-901.json",
+    "counts": {"total": 901, "H": 788, "D": 111, "M": 2},
+    "reason": "Final finding-owner reconciliation proved one distinct scheduled machine-processing job omitted from the accepted register."
+  },
+  "accepted_counts": {
+    "total": 902,
+    "H": 788,
+    "D": 111,
+    "M": 3,
+    "delta": {"total": 1, "H": 0, "D": 0, "M": 1}
+  },
+  "accepted_addition": {
+    "working_key": "CAP-CR-SIGNAL-TO-ALERT-PIPELINE",
+    "id": "CAP-CR-SIGNAL-TO-ALERT-PIPELINE",
+    "candidate_id": null,
+    "id_status": "audit_assigned_stable_name",
+    "class": "M",
+    "canonical_module": "CONTROL_ROOM",
+    "source_family_ids": ["CR-ALERT"],
+    "route_ids": [],
+    "page_ids": [],
+    "backend_anchors": [
+      "app/Services/ControlRoom/SignalProcessingService.php",
+      "app/Jobs/ProcessControlRoomSignals.php",
+      "database/migrations/2026_02_04_000100_create_control_room_signal_system.php"
+    ],
+    "origin_files": ["capability-denominator-902-adjudication.json"],
+    "absorbed_occurrences": [],
+    "naming_proof": "Audit-assigned after final source-owner reconciliation; not claimed as a historical source spelling.",
+    "identity_proof": "The scheduled ProcessControlRoomSignals job consumes pending Signal records through SignalProcessingService, applies suppression/rules/deduplication, creates the operator-visible ControlRoomAlert, and persists processed/suppressed/failed state plus alert linkage. It is a machine job with its own input, state and completion boundary, not an alias of integration-alert list/ack/assign/close or signal-rule configuration. CR-ALERT is retained only as literal discovery lineage from CTRL-SIGNAL-002; the split does not transfer benchmark credit."
+  },
+  "proof_anchors": [
+    "app/Services/ControlRoom/SignalProcessingService.php:120-156,191-246",
+    "app/Jobs/ProcessControlRoomSignals.php:13-31",
+    "database/migrations/2026_02_04_000100_create_control_room_signal_system.php:99-132",
+    "routes/console.php:186"
+  ],
+  "rejected_aliases": [
+    {
+      "working_key": "CAP-CR-ALERT-SENSOR-VALIDATION",
+      "reason": "Owns later human integration-alert list/ack/assign/close routes through AlertController, not signal consumption and alert creation."
+    },
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES",
+      "reason": "Owns human configuration CRUD for SignalRule records, not scheduled execution of those rules."
+    }
+  ],
+  "finding_link": {
+    "finding_id": "CTRL-SIGNAL-002",
+    "feature_ids": ["CAP-CR-SIGNAL-TO-ALERT-PIPELINE"]
+  },
+  "completion_boundary": {
+    "denominator_identity_complete_for_this_adjudication": true,
+    "runtime_execution_complete": false,
+    "benchmark_mapping_complete": false,
+    "audit_complete": false
+  }
+}

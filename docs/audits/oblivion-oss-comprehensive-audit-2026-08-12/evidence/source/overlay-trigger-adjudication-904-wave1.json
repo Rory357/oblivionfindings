@@ -1,0 +1,249 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave1",
+  "generated_at": "2026-08-21T18:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Static custom-overlay trigger pairing only. No browser, runtime, focus, keyboard, permission, visibility, usability or completion credit is inferred.",
+  "inputs": {
+    "classifier_before": {
+      "sha256": "38182baa52a521729b876ffae6c59e7c39cf054419cd496d0c835f572b2e4f26",
+      "rows": 659
+    }
+  },
+  "method": {
+    "selection_preimage": "Packet-order file:line:symbol rows joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "59dad82256002c2e580d777347cb90722caac4cfbc3e38a53778d749278c5f9d",
+    "independent_proof_tuple_sha256": "839d4ba74a6626d3baf95598b5e4d55addfabdb2cfda5e52a1c4ac1b96b9396f",
+    "independent_source_map_sha256": "4dfbb9f11568ea62302c1f2b03e9a841afdb187ed135ed169e628bb3fa8b2166",
+    "verdict": "GO_10_exact_same_file_named_state_open_handler_chains"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/components/clinical/shift-observations-due-card.tsx",
+      "line": 152,
+      "symbol": "ObservationRecordSheet",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/clinical/shift-observations-due-card.tsx",
+        "state_identifier": "sheetOpen",
+        "state_line": 33,
+        "handler": "handleRecord",
+        "handler_line": 59,
+        "setter": "setSheetOpen",
+        "setter_line": 62,
+        "trigger": "Button onClick={() => handleRecord(item)}",
+        "trigger_line": 141,
+        "open_contract": "open={sheetOpen}",
+        "open_line": 155,
+        "source_sha256": "afcceba695681b1dec9fb21538fae251777bbacdb0cfdee3ec59803f1a64ae59"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Handovers.tsx",
+      "line": 298,
+      "symbol": "HandoverWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Handovers.tsx",
+        "state_identifier": "wizardOpen",
+        "state_line": 78,
+        "handler": "openNew",
+        "handler_line": 161,
+        "setter": "setWizardOpen",
+        "setter_line": 161,
+        "trigger": "Button invokes openNew",
+        "trigger_line": 212,
+        "open_contract": "open={wizardOpen}",
+        "open_line": 299,
+        "source_sha256": "478c73d86a49b9ba0b494dce80da1bbd904136aeae5b6e5ad8a243e6de31ac8c"
+      }
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/incidents/index.tsx",
+      "line": 516,
+      "symbol": "FleetIncidentReportDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/fleet-assets/incidents/index.tsx",
+        "state_identifier": "reportMode",
+        "state_line": 205,
+        "handler": "openReport",
+        "handler_line": 208,
+        "setter": "setReportMode",
+        "setter_line": 210,
+        "trigger": "menu buttons invoke openReport",
+        "trigger_line": 445,
+        "open_contract": "conditional mount with literal open",
+        "open_line": 517,
+        "source_sha256": "9b3d2d4c4fa399d64950c23a777f8b1b6e8630dfafa2be33a514584bc73e9eda"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/restraints/index.tsx",
+      "line": 392,
+      "symbol": "RestraintEventWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/restraints/index.tsx",
+        "state_identifier": "eventWizard",
+        "state_line": 96,
+        "handler": "openEventWizard",
+        "handler_line": 123,
+        "setter": "setEventWizard",
+        "setter_line": 125,
+        "trigger": "Button invokes openEventWizard",
+        "trigger_line": 343,
+        "open_contract": "open={eventWizard}",
+        "open_line": 393,
+        "source_sha256": "8f5baa0a801a69cea725b3ee8847b820bb31828c9edcdd19866c0784d8d665a9"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/substances/index.tsx",
+      "line": 416,
+      "symbol": "SubstanceWizardDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/substances/index.tsx",
+        "state_identifier": "wizardOpen",
+        "state_line": 170,
+        "handler": "startAdd",
+        "handler_line": 189,
+        "setter": "setWizardOpen",
+        "setter_line": 191,
+        "trigger": "Button invokes startAdd",
+        "trigger_line": 339,
+        "open_contract": "conditional mount with literal open",
+        "open_line": 417,
+        "source_sha256": "0a92b8968395496c3f317edc073c134e49c3b9b6c16ce879db7e287dda1c2a17"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/announcements/index.tsx",
+      "line": 456,
+      "symbol": "AnnouncementWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/announcements/index.tsx",
+        "state_identifier": "wizardOpen",
+        "state_line": 231,
+        "handler": "openComposer",
+        "handler_line": 263,
+        "setter": "setWizardOpen",
+        "setter_line": 265,
+        "trigger": "buttons invoke openComposer",
+        "trigger_line": 357,
+        "open_contract": "open={wizardOpen}",
+        "open_line": 457,
+        "source_sha256": "6a3508d6f2198ce8f0e5439abde7a55cf2af7f440822af51f8947dfd9008f5d1"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/compensation/bands.tsx",
+      "line": 1199,
+      "symbol": "BandWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/compensation/bands.tsx",
+        "state_identifier": "wizardOpen",
+        "state_line": 991,
+        "handler": "openCreate",
+        "handler_line": 1018,
+        "setter": "setWizardOpen",
+        "setter_line": 1021,
+        "trigger": "buttons invoke openCreate",
+        "trigger_line": 1122,
+        "open_contract": "open={wizardOpen}",
+        "open_line": 1201,
+        "source_sha256": "1eed2af4903eb0c431ac29eb8a30696d11863226ac97a704cd237f0d80856df2"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/my/leave.tsx",
+      "line": 383,
+      "symbol": "LeaveRequestDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/my/leave.tsx",
+        "state_identifier": "wizardOpen",
+        "state_line": 176,
+        "handler": "openNew",
+        "handler_line": 188,
+        "setter": "setWizardOpen",
+        "setter_line": 190,
+        "trigger": "Button onClick invokes openNew",
+        "trigger_line": 266,
+        "open_contract": "open={wizardOpen}",
+        "open_line": 385,
+        "source_sha256": "7bf542cdca0e01933297915790853b6e63b653942dd064bd245ebe5730a9dbea"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/service-agreements/Show.tsx",
+      "line": 1292,
+      "symbol": "TransitionDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/service-agreements/Show.tsx",
+        "state_identifier": "dialogOpen",
+        "state_line": 644,
+        "handler": "openTransition",
+        "handler_line": 661,
+        "setter": "setDialogOpen",
+        "setter_line": 663,
+        "trigger": "Button invokes openTransition",
+        "trigger_line": 713,
+        "open_contract": "open={dialogOpen}",
+        "open_line": 1292,
+        "source_sha256": "bcf0d9b7008ebe215313ab5a564639275c9ad4d1dfec4a58000d6b64b971d8a9"
+      }
+    },
+    {
+      "file": "resources/js/pages/sites/calendar/SiteCalendar.tsx",
+      "line": 1624,
+      "symbol": "CreateEventDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/sites/calendar/SiteCalendar.tsx",
+        "state_identifier": "createOpen",
+        "state_line": 547,
+        "handler": "openCreate",
+        "handler_line": 888,
+        "setter": "setCreateOpen",
+        "setter_line": 891,
+        "trigger": "Button invokes openCreate",
+        "trigger_line": 1218,
+        "open_contract": "open={createOpen}",
+        "open_line": 1625,
+        "source_sha256": "e893262769297e15496d2f33d7ec573c98af2d61a6d935153137f99893a992d5"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "unresolved_or_blocked": 0,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 163,
+    "source_inferred_not_exactly_paired": 218,
+    "unresolved_or_blocked": 278,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208
+  }
+}

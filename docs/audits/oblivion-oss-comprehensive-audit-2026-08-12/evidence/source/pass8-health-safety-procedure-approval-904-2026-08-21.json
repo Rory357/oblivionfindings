@@ -1,0 +1,148 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-health-safety-procedure-approval-904-2026-08-21",
+  "generated_at": "2026-08-22T00:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "module_selection": {
+    "module": "HEALTH_SAFETY",
+    "targets": 68,
+    "classes": {
+      "H": 41,
+      "D": 27,
+      "M": 0
+    },
+    "benchmark_decided": 18,
+    "benchmark_unproved": 50,
+    "selection_reason": "Fresh adversarial challenge of a high-risk procedure approval boundary; broader module runtime and task coverage remain zero."
+  },
+  "pass_reconciliation": {
+    "P1": {
+      "static_identity_reviewed": 68,
+      "denominator": 68,
+      "boundary": "Canonical static register only."
+    },
+    "P2": {
+      "representative_persisted_tasks_executed": 0,
+      "denominator": 68
+    },
+    "P3": {
+      "benchmark_or_ncm_decided": 18,
+      "denominator": 68,
+      "unproved": 50
+    },
+    "P4": {
+      "happy_error_recovery_handoff_responsive_a11y_executed": 0,
+      "denominator": 68
+    },
+    "P5": {
+      "static_architecture_reviewed": 68,
+      "runtime_data_effects_verified": 0,
+      "denominator": 68
+    },
+    "P6": {
+      "fresh_exact_source_finding_official_links": 2,
+      "denominator": 68,
+      "boundary": "Official propositions frame risk only."
+    },
+    "P7": {
+      "fresh_source_constraint_failure_links": 2,
+      "tests_executed": 0,
+      "denominator": 68
+    },
+    "P8": {
+      "fresh_module_challenge": 1,
+      "module_completion_credit": 0,
+      "denominator": 68
+    }
+  },
+  "new_finding": {
+    "id": "HS-PROCEDURE-APPROVAL-ASSURANCE-01",
+    "priority": "P1",
+    "feature_ids": [
+      "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+      "CAP-HS-PROCEDURE-REVIEW-APPROVAL"
+    ],
+    "route_ids": [
+      "ROUTE-1178",
+      "ROUTE-1180",
+      "ROUTE-1191",
+      "ROUTE-1182"
+    ],
+    "page_ids": [
+      "PAGE-0393"
+    ],
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "source_chain": [
+    {
+      "path": "routes/health-safety.php",
+      "baseline_sha256": "4b50e8e6fb8b58f22de143c544c9ae9a747ef2f1283d3e15f7f6651374cccf2c",
+      "current_sha256": "1d763248f145410e2dede3213c112d2e78f99b4d48123e9da0474f4eb883dd32",
+      "loci": "procedure routes including store, update, submit-for-review and approve"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php",
+      "baseline_sha256": "ee3b8474ce5dcad6eb7c9b6cb9281c30787318c10f1e5ee4c35e9373045591e1",
+      "current_sha256": "ee3b8474ce5dcad6eb7c9b6cb9281c30787318c10f1e5ee4c35e9373045591e1",
+      "loci": "189-234,766-786"
+    },
+    {
+      "path": "app/Models/SafeWorkProcedure.php",
+      "baseline_sha256": "e3ace2247a1b31af97f6b15817812d5f3d2191203b042ee1ea6029324bd4b3ef",
+      "current_sha256": "e3ace2247a1b31af97f6b15817812d5f3d2191203b042ee1ea6029324bd4b3ef",
+      "loci": "14-55"
+    },
+    {
+      "path": "app/Models/SafeWorkProcedureVersion.php",
+      "baseline_sha256": "32d08f780d19cc86219b4fd63e90c699d2b3f94b7d82beac015898e71cb76cd0",
+      "current_sha256": "32d08f780d19cc86219b4fd63e90c699d2b3f94b7d82beac015898e71cb76cd0",
+      "loci": "version snapshot model"
+    },
+    {
+      "path": "database/migrations/2026_06_20_130003_grant_procedures_permissions.php",
+      "baseline_sha256": "ad7c8c7bee7e68edcc806df2362765365b6d130372531ee8e6a7768f4da62bb5",
+      "current_sha256": "ad7c8c7bee7e68edcc806df2362765365b6d130372531ee8e6a7768f4da62bb5",
+      "loci": "20-64"
+    },
+    {
+      "path": "database/migrations/2026_03_28_300003_create_safe_work_procedures_tables.php",
+      "baseline_sha256": "6dd0e6be15fe67d010f71a8ad7d2328631dc943cbaf3abe6c6167e8ea47a525b",
+      "current_sha256": "6dd0e6be15fe67d010f71a8ad7d2328631dc943cbaf3abe6c6167e8ea47a525b",
+      "loci": "11-58"
+    },
+    {
+      "path": "database/migrations/2026_06_20_130002_add_owner_and_cadence_to_safe_work_procedures.php",
+      "baseline_sha256": "a423a3b81a7b38d0619922817fdb2c5ed6b4ce99d03b8cb16ff0ae38e1c231f7",
+      "current_sha256": "a423a3b81a7b38d0619922817fdb2c5ed6b4ce99d03b8cb16ff0ae38e1c231f7",
+      "loci": "owner and review cadence schema"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "baseline_sha256": "da02e5e9d1970a18e4ef0a027775457e55b0f2a6c0c409f1c23d708adef97fb9",
+      "current_sha256": "ab906f1096ab2dbfad92bac69884334905f315345e23a11c9d1ad170bdda64c7",
+      "loci": "609,674,801,829 at audited source; equivalent procedure grants retained on current main"
+    },
+    {
+      "path": "tests/Feature/HealthSafety/SafeWorkProcedureTest.php",
+      "baseline_sha256": "570652f974597b6952075b5241586b91382be892a414431f7c7bfd217f2516e1",
+      "current_sha256": "570652f974597b6952075b5241586b91382be892a414431f7c7bfd217f2516e1",
+      "loci": "174-195,294-303"
+    },
+    {
+      "path": "resources/js/pages/health-safety/procedures/index.tsx",
+      "baseline_sha256": "cd5f21706cffcde7407bf77714e09ece02d305a99df7393848125b8a7b869d4d",
+      "current_sha256": "a5447c7b1be1a8cd18f3c0acf14b37d6ae2f799c3e39fd8a7084cb60d67efa56",
+      "loci": "216-218 at audited source; under-review presentation gate retained on current main"
+    }
+  ],
+  "duplicate_boundary": "No prior finding owns the exact procedure feature IDs, route IDs or controller transition. HS-ASSURANCE-01, MED-VERIFY-01 and CARE-SIGNOFF-01 remain distinct aggregates.",
+  "wording_corrections": [
+    "Generic AuditableChanges and procedure version snapshots exist; the gap is approval-specific immutable attestation bound to submitted content/version.",
+    "The existing positive approval test creates under_review; draft and archived approval are source-proven but untested."
+  ],
+  "completion_boundary": "No runtime, browser, focus, keyboard, representative-user, remediation, release or overall completion credit."
+}

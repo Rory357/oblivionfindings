@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "artifact": "current-denominator-literal-reconciliation-2026-08-23",
+  "generated_at": "2026-08-23T16:18:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "current_denominator_wording_reconciled_completion_unchanged",
+  "changes": {
+    "native_register_summary": 1,
+    "native_register_footer": 1,
+    "finding_task_denominators": 72,
+    "inventory_p6_denominators": 1482
+  },
+  "current_denominators": {
+    "capabilities": 904,
+    "human_tasks": 790,
+    "benchmark_verified": 411,
+    "documented_no_credible_match": 89,
+    "benchmark_or_ncm": 500,
+    "benchmark_unproved": 404,
+    "official_p6_finding_propositions_reviewed": 58,
+    "official_p6_finding_propositions_denominator": 58
+  },
+  "outputs": [
+    {
+      "path": "12-native-build-and-do-not-copy-register.md",
+      "sha256": "16239858d8c712c06c8e35519a7f20c7ca182d375c5780a418b1ede77e1bb9be",
+      "bytes": 17129
+    },
+    {
+      "path": "findings.json",
+      "sha256": "e71207bac58f02440cab38e4000dcf3b80cdea53f38b249712017b4d6a60124e",
+      "bytes": 1392490
+    },
+    {
+      "path": "inventory-904.json",
+      "sha256": "41a80e3269b73cad5237147f38b8918c55b05c365d9c07dc7a8f775fd0620790",
+      "bytes": 11785743
+    },
+    {
+      "path": "inventory.json",
+      "sha256": "41a80e3269b73cad5237147f38b8918c55b05c365d9c07dc7a8f775fd0620790",
+      "bytes": 11785743
+    }
+  ],
+  "credit_boundary": {
+    "benchmark_credit_delta": 0,
+    "finding_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "runtime_credit_delta": 0,
+    "usability_credit_delta": 0,
+    "remediation_credit_delta": 0
+  }
+}

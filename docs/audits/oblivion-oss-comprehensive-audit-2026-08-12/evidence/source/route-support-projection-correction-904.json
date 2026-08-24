@@ -1,0 +1,149 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "route-support-projection-correction-904",
+  "generated_at": "2026-08-21T23:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "accepted_static_ownership_precision_runtime_unverified",
+  "inputs": {
+    "pre_manifest": {
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f"
+    },
+    "pre_gap": {
+      "sha256": "1a237628080d225cd32cdfa173ea01737b6c9c32e51bbca183a8ec84a0b8d7be"
+    },
+    "pre_inventory": {
+      "sha256": "80f0d84017fadd27a66256e633956cd44591b243591490c6dac4d4b81fa99f4c"
+    }
+  },
+  "decisions": [
+    {
+      "route_id": "ROUTE-0098",
+      "disposition": "shared_supporting_projection_nonexclusive",
+      "target_ids": [
+        "CAP-SITE-DIETARY-TAG-LIFECYCLE",
+        "CAP-SITE-PRODUCT-LIFECYCLE",
+        "CAP-SITE-RECIPE-LIFECYCLE"
+      ],
+      "reason": "Shared read-only aggregate-count projection for recipe, product and dietary-tag libraries. It is nonexclusive support evidence only and awards no independent capability, lifecycle, Site-scope, browser, runtime or completion credit.",
+      "capability_delta": 0,
+      "runtime_credit": 0
+    },
+    {
+      "route_id": "ROUTE-0821",
+      "page_id": "PAGE-0252",
+      "disposition": "reachable_ui_only_nonpersistent_noop",
+      "reason": "Reachable authenticated UI; toggles and Save change transient client state only; no persistence request or backend owner exists.",
+      "capability_credit": 0,
+      "runtime_credit": 0
+    }
+  ],
+  "source_registry": [
+    {
+      "path": "routes/catering.php",
+      "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+      "audited_sha256": "309d11804f86d4a4613344e701cd6c5374b42c924b099d88fb4947dff9ce6001",
+      "audited_bytes": 3635,
+      "audited_loci": [
+        "L25-L27"
+      ],
+      "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "current_main_sha256": "309d11804f86d4a4613344e701cd6c5374b42c924b099d88fb4947dff9ce6001",
+      "current_main_bytes": 3635,
+      "current_main_loci": [
+        "L25-L27"
+      ],
+      "semantic_relation": "byte_identical"
+    },
+    {
+      "path": "app/Http/Controllers/Catering/DashboardController.php",
+      "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+      "audited_sha256": "4113c3023b032e7178748bb9f75086eb8d57a2719746a0aed1020cfbbb2378fd",
+      "audited_bytes": 1491,
+      "audited_loci": [
+        "L18-L24"
+      ],
+      "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "current_main_sha256": "4113c3023b032e7178748bb9f75086eb8d57a2719746a0aed1020cfbbb2378fd",
+      "current_main_bytes": 1491,
+      "current_main_loci": [
+        "L18-L24"
+      ],
+      "semantic_relation": "byte_identical"
+    },
+    {
+      "path": "resources/js/pages/catering/_tabs.tsx",
+      "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+      "audited_sha256": "41af84491d2397199c9461098028322ca5015660b12cce3a5eff8cf71b68c160",
+      "audited_bytes": 4518,
+      "audited_loci": [
+        "L72-L79"
+      ],
+      "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "current_main_sha256": "b10fb92727d438c15308b0d1fe22a69a8c9a6bd0ad4931564429f2a8af5a0d89",
+      "current_main_bytes": 4792,
+      "current_main_loci": [
+        "L87-L100"
+      ],
+      "semantic_relation": "source_drift_reviewed_same_bounded_semantics"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+      "audited_sha256": "fe035d667c199077369bff7a43a875e5e1777933451dbff67f73d78a195080cd",
+      "audited_bytes": 26861,
+      "audited_loci": [
+        "L96-L99"
+      ],
+      "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "current_main_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+      "current_main_bytes": 28318,
+      "current_main_loci": [
+        "L96-L99"
+      ],
+      "semantic_relation": "source_drift_reviewed_same_bounded_semantics"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/notifications.tsx",
+      "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+      "audited_sha256": "bf33b5560f332b5f1ef42cfab3b0ff5c2a3746fd552e40d88302a8ed92e9b806",
+      "audited_bytes": 13486,
+      "audited_loci": [
+        "L168-L172",
+        "L276-L286"
+      ],
+      "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "current_main_sha256": "670941f0ae2b852865a9ae7bd317618f8a309220d9db4e5d71f77e88f449cc85",
+      "current_main_bytes": 17498,
+      "current_main_loci": [
+        "L188-L192",
+        "L360-L371"
+      ],
+      "semantic_relation": "source_drift_reviewed_same_bounded_semantics"
+    }
+  ],
+  "count_delta": {
+    "capabilities": 0,
+    "route_relations": 3,
+    "unique_accepted_routes": 1,
+    "excluded_routes": -1,
+    "shared_route_ids": 1,
+    "pages": 0,
+    "backend_anchors": 0,
+    "benchmark": 0,
+    "runtime": 0,
+    "completion": 0
+  },
+  "post_counts": {
+    "capabilities": 904,
+    "route_relations": 3076,
+    "unique_accepted_routes": 2994,
+    "excluded_routes": 30,
+    "shared_route_ids": 31,
+    "route_inventory": 3024,
+    "route_mapping_percent": 99.01,
+    "accepted_pages": 945,
+    "excluded_pages": 17
+  },
+  "claim_limit": "Static route ownership/disposition precision only. No product, runtime, browser, task, benchmark, release or completion credit."
+}

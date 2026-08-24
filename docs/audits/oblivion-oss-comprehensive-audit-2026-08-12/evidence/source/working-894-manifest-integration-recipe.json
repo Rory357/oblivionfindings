@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "artifact": "working-894-manifest-integration-recipe",
+  "status": "source_reproducible_identity_recipe_historical_pre_static_enrichment_not_current_manifest_summary",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Audit-artifact-only static reconciliation. The 894 target identities and names are stable in the working register, but incomplete route/page enrichment, zero representative-role completion and incomplete eight-pass remapping prohibit a completed-audit claim.",
+  "supersedes": [
+    "working-895-manifest-integration-recipe.json",
+    "working-capability-manifest-895.json"
+  ],
+  "current_authority": {
+    "manifest": "working-capability-manifest-894.json",
+    "manifest_sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+    "static_enrichment_summary": "static-route-enrichment-application-summary.json",
+    "note": "The materialized_working_manifest block below is the pre-static-enrichment identity snapshot retained to reproduce the denominator recipe; it is not a current route/page coverage claim."
+  },
+  "physical_input": {
+    "rows": 916,
+    "H": 805,
+    "D": 109,
+    "M": 2,
+    "sha256": "01428c73ea8d01e045ec70247fed6a42794d81b8e173b48fb65b489162d3f185",
+    "canonical_line": "file|id|class|module|id_status",
+    "source": "working-895-manifest-integration-recipe.json physical_inputs"
+  },
+  "stages": [
+    {
+      "name": "internal_clinical_coalesce",
+      "removed_occurrences": 2,
+      "operations": [
+        "Keep the EMAR occurrence of CAP-MED-MAR-CHART-REVIEW and merge Client route/page lineage into it.",
+        "Keep the Client occurrence of CAP-MED-MAR-CSV-EXPORT; remove EMAR's explicit inbound duplicate occurrence."
+      ],
+      "result": {"total": 914, "H": 804, "D": 108, "M": 2}
+    },
+    {
+      "name": "exact_cross_partition_h_coalesce",
+      "removed_occurrences": 18,
+      "groups": {
+        "catering": {"count": 12, "rule": "Retain SITES canonical rows and absorb FULL Catering occurrences."},
+        "clients_hr_operations": {"count": 6, "rule": "Retain canonical HR/Operations rows and union Client alternate-entry lineage."}
+      },
+      "result": {"total": 896, "H": 786, "D": 108, "M": 2}
+    },
+    {
+      "name": "incident_actor_and_job_reconciliation",
+      "operations": [
+        "Absorb the Client nested Incident author/evidence H occurrence into the normalized AUTHOR and EVIDENCE-MANAGEMENT jobs without adding cardinality.",
+        "Group staff attachment downloads ROUTE-1845/0159/1998 under CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD.",
+        "Retain portal route ROUTE-2260 as source-stable D target CLI-PORTAL-INCIDENT-ATTACHMENT because its actor/disclosure boundary differs.",
+        "Re-home ROUTE-1847 as an alternate entry to existing CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE.",
+        "Record ROUTE-2719 as a semantic AUTHOR alias with URI reachability unresolved and zero count effect."
+      ],
+      "evidence": "incident-human-target-route-allocation.json",
+      "result": {"total": 895, "H": 785, "D": 108, "M": 2}
+    },
+    {
+      "name": "candidate_name_and_split_adjudication",
+      "operations": [
+        "Promote six Client/Incident names after target-specific source adjudication.",
+        "Rename CAP-OPS-PORTAL-VISIT-REQUEST to CLIENTS-owned CAP-CLI-PORTAL-VISIT-REQUEST.",
+        "Promote five Finance API names after exact eight-route/five-job adjudication.",
+        "Correct Client geocode page evidence by removing PAGE-0868 from ROUTE-0201."
+      ],
+      "evidence": ["client-candidate-feature-id-adjudication.json", "finance-api-feature-id-adjudication.json"],
+      "count_effect": 0
+    },
+    {
+      "name": "rag_identity_merge",
+      "removed_working_occurrences": 1,
+      "operation": "Replace CAP-CLI-CLIENT-RAG-STAFF and CAP-CLI-CLIENT-RAG-PORTAL with source-stable CLI-CLIENT-RAG; absorb PLAT-RAG routes ROUTE-2342/2343 as active staff entry/support coverage of the same Client/vector-store/answer job.",
+      "evidence": "rag-capability-identity-adjudication.json",
+      "count_fit_used": false,
+      "result": {"total": 894, "H": 784, "D": 108, "M": 2}
+    }
+  ],
+  "working_counts": {
+    "total": 894,
+    "H": 784,
+    "D": 108,
+    "M": 2,
+    "exact_current_ids": 881,
+    "source_stable_ids": 2,
+    "audit_assigned_stable_names": 11,
+    "candidate_unproved_ids": 0,
+    "unspelled_targets": 0
+  },
+  "expected_module_counts": {
+    "ASSETS":{"H":8,"D":0,"M":0},
+    "AUTH":{"H":6,"D":0,"M":0},
+    "CLIENTS":{"H":23,"D":4,"M":0},
+    "CLINICAL":{"H":19,"D":1,"M":0},
+    "CONTROL_ROOM":{"H":34,"D":3,"M":0},
+    "EMAR":{"H":48,"D":24,"M":0},
+    "FINANCE":{"H":64,"D":7,"M":0},
+    "FLEET":{"H":48,"D":0,"M":0},
+    "FRONTLINE":{"H":7,"D":0,"M":0},
+    "GOVERNANCE":{"H":50,"D":12,"M":0},
+    "HEALTH_SAFETY":{"H":41,"D":27,"M":0},
+    "HR":{"H":135,"D":16,"M":0},
+    "INCIDENTS":{"H":14,"D":5,"M":0},
+    "IT":{"H":2,"D":0,"M":0},
+    "OPERATIONS":{"H":72,"D":2,"M":0},
+    "PLATFORM":{"H":1,"D":0,"M":1},
+    "PORTAL":{"H":4,"D":0,"M":0},
+    "PRIVACY":{"H":17,"D":3,"M":0},
+    "PUBLIC":{"H":4,"D":0,"M":0},
+    "REPORTING":{"H":21,"D":0,"M":0},
+    "RESPITE":{"H":21,"D":1,"M":0},
+    "ROADMAP":{"H":7,"D":1,"M":0},
+    "SECURITY_DEVICES":{"H":36,"D":0,"M":1},
+    "SETTINGS":{"H":34,"D":0,"M":0},
+    "SITES":{"H":68,"D":2,"M":0}
+  },
+  "checksums": {
+    "physical_rows": {"count":916,"sha256":"01428c73ea8d01e045ec70247fed6a42794d81b8e173b48fb65b489162d3f185"},
+    "working_targets": {"count":894,"sha256":"4175a22e5b4713b7fdd171b9a12fc15758ca5c5966e7d0e579e52fadbc7bbff9","canonical_line":"working_key|class|canonical_module|id_status"},
+    "exact_current_target_ids": {"count":881,"sha256":"597060f27c58d9038e36617cd70d056d4c8c37aa20f4ede73af22cee6a9588a2"},
+    "source_stable_target_ids": {"count":2,"sha256":"f6993afc5e9d018bce35eff056f5c20afbafd6f6061ac37fdaa8c6daa965786e"},
+    "audit_assigned_stable_names": {"count":11,"sha256":"d7c4c093d5229d09e8814830b82f06fd58a50ef5253ff06bb7b5296cb995b4cc"},
+    "canonical_stable_target_ids": {"count":894,"sha256":"3eb30b2c1098654e080e1b7087ac5670da8a6d54585482810a651572afd102be"},
+    "candidate_working_keys": {"count":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    "digest_method": "PowerShell 7 Sort-Object; LF join without terminal newline; UTF-8 SHA-256"
+  },
+  "materialized_working_manifest": {
+    "file": "working-capability-manifest-894.json",
+    "sha256": "2307e01fbe7434da395025137cff388c20667662abc623c94bb0e9b0e346e6a9",
+    "bytes": 501123,
+    "rows": 894,
+    "duplicate_working_keys": 0,
+    "duplicate_stable_ids": 0,
+    "targets_with_route_ids": 306,
+    "unique_primary_route_ids_currently_enriched": 819,
+    "targets_with_page_ids": 269,
+    "unique_page_ids_currently_enriched": 260,
+    "boundary": "This is the deterministic working target register, not evidence that every route/page, runtime state, benchmark mapping, task script or eight-pass row is complete. Empty arrays mean enrichment unavailable, not no surface."
+  },
+  "completion_credit": {
+    "stable_working_feature_ids": 894,
+    "final_audit_completed_features": 0,
+    "reason": "Stable identity reconciliation is only one gate; current superseded ledgers and zero representative-role executions do not satisfy the prompt's completion contract."
+  }
+}

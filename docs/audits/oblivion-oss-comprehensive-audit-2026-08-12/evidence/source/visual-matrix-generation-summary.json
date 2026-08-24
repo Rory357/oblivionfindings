@@ -1,0 +1,44 @@
+{
+  "schema_version": "3.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "historical_pre_final_id_linkage_superseded",
+  "superseded_by": "final-902-visual-link-generation-summary.json",
+  "rows": 8753,
+  "component_viewport_rows": 1880,
+  "safe_route_rows": 622,
+  "source_visual_rows": 1939,
+  "material_state_rows": 4312,
+  "classification_counts": {
+    "Observed": 2499,
+    "Observed-light": 4,
+    "Source-inferred": 1386,
+    "Dead/unreachable": 5,
+    "Blocked": 547,
+    "Not safely reproducible": 4312
+  },
+  "feature_link_status": {
+    "old_feature_ids": 708,
+    "working_accepted_capabilities": 894,
+    "working_human_capabilities": 784,
+    "earlier_894_derivation_superseded": true,
+    "working_manifest": "working-capability-manifest-894.json",
+    "working_manifest_sha256": "2307e01fbe7434da395025137cff388c20667662abc623c94bb0e9b0e346e6a9",
+    "working_manifest_unique_stable_ids": 894,
+    "stable_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 2,
+      "audit_assigned": 11
+    },
+    "route_enrichment": {
+      "targets": 306,
+      "unique_routes": 819
+    },
+    "page_enrichment": {
+      "targets": 269,
+      "unique_pages": 260
+    },
+    "final_links_regenerated_at_this_historical_stage": false,
+    "completion_credit": 0
+  },
+  "note": "Historical pre-link snapshot only. Current authority is final-902-visual-link-generation-summary.json: 8,153/8,753 assigned, 600 unresolved, 771 assigned IDs, 834 IDs with lineage; material subset 3,935/4,312 assigned and 377 unresolved."
+}

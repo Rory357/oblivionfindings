@@ -1,0 +1,185 @@
+{
+  "schema_version": "oblivion-current-main-visual-family-resample-v1",
+  "generated_at": "2026-08-14T12:33:49.9495597+12:00",
+  "classification": "supplemental_current_main_browser_evidence_not_audited_baseline_credit",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "rendered_commit": "ad19f994a280835d039d1a31ebdcb05778733c5a",
+  "environment": {
+    "url_origin": "http://127.0.0.1:8147",
+    "server_process_id": 39620,
+    "server_command": "php -S 127.0.0.1:8147 -t public server.php",
+    "server_worktree": "<local-user>/.config/superpowers/worktrees/oblivionfindings/codex-ticketing-main-integration",
+    "role": "Demo Manager",
+    "authentication": "Repository-seeded local demo account; an ordinary local authentication session was created for this read-only browser pass.",
+    "interaction_boundary": "GET navigation, responsive viewport changes, DOM reads, opening and closing local overlays, selecting an incident type in component-local state, and closing/reopening the unsubmitted wizard only. No form or workflow was submitted and no domain record was created, updated, approved, prepared, accepted or deleted."
+  },
+  "denominator": {
+    "retained_material_hero_or_overlay_finding_families": 4,
+    "finding_ids": [
+      "VIS-HERO-DENSITY-01",
+      "VIS-OVERLAY-FOCUS-01",
+      "VIS-MOBILE-NAV-01",
+      "INCIDENT-RECOVERY-01"
+    ],
+    "current_main_families_resampled": 4,
+    "audited_baseline_families_resampled": 0,
+    "audited_baseline_credit_changed": false
+  },
+  "source_drift": {
+    "material": true,
+    "reason": "The sampled current-main build is not the immutable audited build. The mobile navigation, incident wizard, incident page and PageHero source blobs changed after the audited commit. The global-search/dialog/command component blobs are unchanged, but the surrounding shared layout and CSS changed, so the current-main interaction is retained as supplemental evidence rather than baseline runtime credit.",
+    "anchors": [
+      {
+        "path": "resources/js/components/app-sidebar.tsx",
+        "audited_blob": "a94c12e86959bd2f7a79468512970f552a6292c4",
+        "rendered_blob": "b70e0e590806b1faa9f67d8264e6687eb278567c",
+        "changed": true
+      },
+      {
+        "path": "resources/js/components/global-nav-search.tsx",
+        "audited_blob": "a61201f7f6cf29257d6c638749704844c5ff5bfb",
+        "rendered_blob": "a61201f7f6cf29257d6c638749704844c5ff5bfb",
+        "changed": false
+      },
+      {
+        "path": "resources/js/components/ui/command.tsx",
+        "audited_blob": "f5785d94e7211564b57ff30f549231e12ffdc289",
+        "rendered_blob": "f5785d94e7211564b57ff30f549231e12ffdc289",
+        "changed": false
+      },
+      {
+        "path": "resources/js/components/ui/dialog.tsx",
+        "audited_blob": "1b608b21ea6e64956edc1bb52ecf183de219f7e5",
+        "rendered_blob": "1b608b21ea6e64956edc1bb52ecf183de219f7e5",
+        "changed": false
+      },
+      {
+        "path": "resources/js/pages/health-safety/components/report-incident-dialog.tsx",
+        "audited_blob": "990e8f4b89d6f8b701b733838b8ed8ab6d242d07",
+        "rendered_blob": "29e5f63946e43714e91e473ae4fc1f2ebc5ebe4b",
+        "changed": true
+      },
+      {
+        "path": "resources/js/pages/incidents/index.tsx",
+        "audited_blob": "3f437cd2fa878383ce61b993e525897f621ad7c6",
+        "rendered_blob": "0073ed5774d8ea1a5fca3ed45c6e6da7caa82bcc",
+        "changed": true
+      },
+      {
+        "path": "resources/js/components/page/page-hero.tsx",
+        "audited_blob": "48c890d3bac2eba89c01611981e71bc55eb76227",
+        "rendered_blob": "7bb501c9a2c927dc2f5fc05eafdfdf8448514170",
+        "changed": true
+      },
+      {
+        "path": "resources/js/layouts/app/app-sidebar-layout.tsx",
+        "audited_blob": "e745f22ab6176e4c2d4ae15b36065a95ff3e7263",
+        "rendered_blob": "09e6117d892fecdc7696e1a7d9660af1f59fc4a6",
+        "changed": true
+      },
+      {
+        "path": "resources/css/app.css",
+        "audited_blob": "76ce1ecca5f89ba7236a39fc1129e77fa58eb352",
+        "rendered_blob": "16e6f2b49e36394e565ab1ebd2367ed3a54834e5",
+        "changed": true
+      }
+    ]
+  },
+  "observations": [
+    {
+      "finding_id": "VIS-HERO-DENSITY-01",
+      "route": "/incidents",
+      "sample": "Incident register and primary Report action",
+      "desktop": {
+        "viewport": "1440x900",
+        "heading_top": 200,
+        "heading_bottom": 238,
+        "primary_action_top": 172,
+        "primary_action_bottom": 200,
+        "first_register_row_top": 737,
+        "horizontal_overflow": false
+      },
+      "mobile": {
+        "viewport": "390x844",
+        "heading_top": 268,
+        "heading_bottom": 296,
+        "primary_action_top": 385,
+        "primary_action_bottom": 413,
+        "first_register_row_top": 1525,
+        "horizontal_overflow": false
+      },
+      "result": "partially_reproduced_current_main",
+      "finding_boundary": "The mobile page exposes the primary Report action, but the first worklist row begins 681 CSS pixels below the first viewport. This supports a task-first-distance concern on the sampled page; it does not prove every PageHero instance or assign the full distance to the hero alone."
+    },
+    {
+      "finding_id": "VIS-OVERLAY-FOCUS-01",
+      "route": "/control-room/shifts/4/handover",
+      "sample": "Global module search dialog",
+      "viewport": "1440x900",
+      "open_state": {
+        "dialog_visible": true,
+        "focused_element": "input[role=combobox]",
+        "main_inert": false,
+        "main_aria_hidden": null,
+        "dialog_aria_modal": null
+      },
+      "close_state": {
+        "escape_closed_dialog": true,
+        "focused_element_after_close": "body",
+        "focus_restored_to_search_trigger": false
+      },
+      "result": "reproduced_current_main",
+      "finding_boundary": "The sampled shared search dialog accepted focus and closed with Escape, but focus returned to document body instead of the initiating search button. This is one exact interaction sample, not proof for every overlay usage."
+    },
+    {
+      "finding_id": "VIS-MOBILE-NAV-01",
+      "route": "/control-room/shifts/4/handover",
+      "sample": "Global mobile navigation overlay",
+      "viewport": "390x844",
+      "open_state": {
+        "visible_close_button": true,
+        "dialog_role_count": 0,
+        "main_inert": false,
+        "main_aria_hidden": null,
+        "body_overflow": "visible",
+        "focused_element": "Toggle Menu button"
+      },
+      "escape_state": {
+        "escape_closed_menu": false,
+        "main_remained_interactive": true
+      },
+      "explicit_close_state": {
+        "menu_closed": true,
+        "focused_element_after_close": "body",
+        "focus_restored_to_toggle": false
+      },
+      "result": "reproduced_current_main",
+      "finding_boundary": "The sampled mobile menu had no dialog/modal semantics, did not inert the underlying main content, did not close on Escape, and did not restore focus after the explicit Close action."
+    },
+    {
+      "finding_id": "INCIDENT-RECOVERY-01",
+      "route": "/incidents",
+      "sample": "Six-step Report an incident wizard",
+      "viewport": "1440x900",
+      "interaction": {
+        "selected_local_value": "Incident type: Injury",
+        "selected_state_before_close": "aria-pressed=true",
+        "wizard_closed_without_submit": true,
+        "wizard_reopened": true,
+        "selected_state_after_reopen": "aria-pressed=false",
+        "form_submitted": false
+      },
+      "result": "reproduced_current_main",
+      "finding_boundary": "Closing and reopening the unsubmitted wizard discarded the selected incident type. This proves the sampled close/reopen recovery gap; reload, offline, longer-form and server-retry behavior were not exercised."
+    }
+  ],
+  "summary": {
+    "current_main_resample": "4/4 retained families sampled",
+    "current_main_reproduced": 3,
+    "current_main_partially_reproduced": 1,
+    "current_main_not_reproduced": 0,
+    "audited_baseline_resample": "0/4",
+    "audited_baseline_credit_changed": false,
+    "remaining_blocker": "The immutable audited checkout is the designated audit boundary but its Herd origin cannot boot because vendor/autoload.php is absent. The healthy isolated server renders materially changed current-main code. Restoring an immutable-baseline runtime without modifying product state is required before these observations can satisfy the audited-baseline resample gate."
+  }
+}

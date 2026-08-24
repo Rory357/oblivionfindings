@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BVIS-0008",
+  "file": "BVIS-0008-dashboard-mobile-navigation-overlay-390x844-observed-cropped.png",
+  "route_name": "dashboard",
+  "route_path": "dashboard",
+  "viewport": "390x844",
+  "classification": "Observed finding",
+  "state": "mobile navigation open",
+  "pattern": "custom mobile navigation overlay",
+  "notes": "Redacted test/development capture proving the mobile navigation's visible open state. The retained screenshot/JSON does not prove dialog semantics, accessible naming, focus containment, Escape behavior, body scroll lock or trigger-focus restoration; those claims require a retained interaction trace or source-specific classification.",
+  "role": "Demo Administrator",
+  "siteScope": "not visibly selected",
+  "environmentEvidence": "owner-confirmed test/development; no visible UI build marker",
+  "auditedCommit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "deployedCommit": "not independently established"
+}

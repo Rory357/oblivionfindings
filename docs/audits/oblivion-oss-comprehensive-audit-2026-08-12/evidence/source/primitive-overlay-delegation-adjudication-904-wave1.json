@@ -1,0 +1,590 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "primitive-overlay-delegation-adjudication-904-wave1",
+  "generated_at": "2026-08-21T23:50:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_34_static_delegations_runtime_unchanged",
+  "audit_boundary": "Primitive-to-custom-usage static source linkage only. Runtime, browser, focus, keyboard, visibility, permission, usability, representative-task and completion credit remain zero.",
+  "input": {
+    "path": "evidence/source/overlay-trigger-classification.json",
+    "sha256": "42266d989a55ff3c47f9dba6bea9a696d6f81096ffaadd26dfb2e3864bb665cf",
+    "bytes": 1123910
+  },
+  "selection": {
+    "predicate": "Exactly one unresolved primitive root per definition file; at least one custom usage; one exact full implementation anchor; every matching custom usage is reachable and trigger-resolved.",
+    "structural_candidate_count": 35,
+    "structural_identity_sha256": "a4bb9895d7daa5530eb5a97ac9b4aae1e8995c40123daa92d691bf40a7bc39ec",
+    "structural_proof_sha256": "fea0a327bb6b7da4190b21e194485e66adf5a5efa8a15e48a6138e167e7b5f02",
+    "accepted_count": 34,
+    "accepted_identities": [
+      "resources/js/components/clinical/event-record-sheet.tsx|159|Sheet",
+      "resources/js/components/clinical/observation-record-sheet.tsx|167|Sheet",
+      "resources/js/components/control-room/bulk-alert-action-dialog.tsx|95|Dialog",
+      "resources/js/components/control-room/flag-incident-dialog.tsx|77|Dialog",
+      "resources/js/components/eligibility/override-confirmation-dialog.tsx|58|Dialog",
+      "resources/js/components/emar/medication-event-drawer.tsx|235|Dialog",
+      "resources/js/components/health-safety/site-chemical-storage-dialog.tsx|84|Dialog",
+      "resources/js/components/hr/calendar/ical-subscribe-dialog.tsx|61|Dialog",
+      "resources/js/components/hr/department-view-dialog.tsx|96|Dialog",
+      "resources/js/components/hr/people/org-chart-builder-dialog.tsx|214|Dialog",
+      "resources/js/components/hr/people/org-chart-pane.tsx|152|Dialog",
+      "resources/js/components/hr/recruitment/bulk-email-dialog.tsx|99|Dialog",
+      "resources/js/components/hr/recruitment/bulk-reject-dialog.tsx|75|Dialog",
+      "resources/js/components/hr/recruitment/kit-dialog.tsx|86|Dialog",
+      "resources/js/components/hr/recruitment/score-dialog.tsx|82|Dialog",
+      "resources/js/components/hr/recruitment/tag-manager-dialog.tsx|62|Dialog",
+      "resources/js/components/privacy/privacy-action-modal.tsx|219|Dialog",
+      "resources/js/components/respite/modals/referral-intake.tsx|229|Dialog",
+      "resources/js/components/rostering/day-detail-dialog.tsx|498|Dialog",
+      "resources/js/components/rostering/edit-availability-dialog.tsx|148|Dialog",
+      "resources/js/components/sites/add-site-dialog.tsx|603|Dialog",
+      "resources/js/components/timesheets/create-timesheet-dialog.tsx|576|Dialog",
+      "resources/js/components/two-factor-setup-modal.tsx|313|Dialog",
+      "resources/js/pages/Governance/CeoReports/_dialogs.tsx|353|Dialog",
+      "resources/js/pages/Governance/Packs/_dialogs.tsx|83|Dialog",
+      "resources/js/pages/Governance/Resolutions/_dialogs.tsx|266|Dialog",
+      "resources/js/pages/control-room/escalations.tsx|525|Dialog",
+      "resources/js/pages/control-room/sla/index.tsx|335|Dialog",
+      "resources/js/pages/emergency/_review-dialog.tsx|53|Dialog",
+      "resources/js/pages/hr/offboarding/show.tsx|134|Dialog",
+      "resources/js/pages/operations/shift-notes/components/note-wizard.tsx|239|Dialog",
+      "resources/js/pages/sites/_site-geofence-dialog.tsx|222|Dialog",
+      "resources/js/pages/sites/meal-planner/_recipes-panel.tsx|315|Dialog",
+      "resources/js/pages/sites/vendors-credentials/_manage-types-dialog.tsx|167|Dialog"
+    ],
+    "accepted_identity_sha256": "2e7814baa5494acd5e0cee6328850d481c181bf500e6cd1586cbdd23085d6ca9",
+    "accepted_proof_sha256": "cb07fe044f4833a7f2d8e8264bf18a480a3b3ab9dd569e5a0b9cb6d4eeb80858",
+    "excluded_unreachable_identity": "resources/js/components/handover-write-sheet.tsx|63|Sheet",
+    "serialization": "Ordinal-sorted file|line|symbol identities; proof uses identity + US + exact full implementation_anchor + US + ordinal-sorted custom usage tuples joined by RS; LF join, no final LF, UTF-8/no BOM."
+  },
+  "adjudications": [
+    {
+      "identity": "resources/js/components/clinical/event-record-sheet.tsx|159|Sheet",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/clinical/event-record-sheet.tsx:68",
+        "usage_identities": [
+          "resources/js/components/clinical/shift-clinical-event-card.tsx|46|EventRecordSheet"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/clinical/observation-record-sheet.tsx|167|Sheet",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/clinical/observation-record-sheet.tsx:64",
+        "usage_identities": [
+          "resources/js/components/clinical/shift-observations-due-card.tsx|152|ObservationRecordSheet"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/control-room/bulk-alert-action-dialog.tsx|95|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/control-room/bulk-alert-action-dialog.tsx:52",
+        "usage_identities": [
+          "resources/js/pages/control-room/alerts/index.tsx|827|BulkAlertActionDialog",
+          "resources/js/pages/control-room/escalations.tsx|923|BulkAlertActionDialog"
+        ],
+        "usage_count": 2,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/control-room/flag-incident-dialog.tsx|77|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/control-room/flag-incident-dialog.tsx:37",
+        "usage_identities": [
+          "resources/js/pages/control-room/incidents.tsx|771|FlagIncidentDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/eligibility/override-confirmation-dialog.tsx|58|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/eligibility/override-confirmation-dialog.tsx:30",
+        "usage_identities": [
+          "resources/js/pages/operations/shifts/components/create-shift-dialog.tsx|1637|OverrideConfirmationDialog",
+          "resources/js/pages/operations/shifts/show.tsx|2189|OverrideConfirmationDialog"
+        ],
+        "usage_count": 2,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/emar/medication-event-drawer.tsx|235|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/emar/medication-event-drawer.tsx:117",
+        "usage_identities": [
+          "resources/js/pages/emar/AuditLog.tsx|439|MedicationEventDrawer"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/health-safety/site-chemical-storage-dialog.tsx|84|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/health-safety/site-chemical-storage-dialog.tsx:22",
+        "usage_identities": [
+          "resources/js/components/health-safety/site-chemicals-panel.tsx|186|SiteAddStorageDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/calendar/ical-subscribe-dialog.tsx|61|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/calendar/ical-subscribe-dialog.tsx:21",
+        "usage_identities": [
+          "resources/js/pages/hr/calendar/index.tsx|892|ICalSubscribeDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/department-view-dialog.tsx|96|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/department-view-dialog.tsx:55",
+        "usage_identities": [
+          "resources/js/components/hr/departments-pane.tsx|315|DepartmentViewDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/people/org-chart-builder-dialog.tsx|214|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/people/org-chart-builder-dialog.tsx:162",
+        "usage_identities": [
+          "resources/js/components/hr/people/org-chart-pane.tsx|403|OrgChartBuilderDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/people/org-chart-pane.tsx|152|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/people/org-chart-pane.tsx:116",
+        "usage_identities": [
+          "resources/js/components/hr/people/org-chart-pane.tsx|282|ReassignManagerDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/recruitment/bulk-email-dialog.tsx|99|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/recruitment/bulk-email-dialog.tsx:21",
+        "usage_identities": [
+          "resources/js/pages/hr/recruitment/index.tsx|611|BulkEmailDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/recruitment/bulk-reject-dialog.tsx|75|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/recruitment/bulk-reject-dialog.tsx:29",
+        "usage_identities": [
+          "resources/js/pages/hr/recruitment/index.tsx|612|BulkRejectDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/recruitment/kit-dialog.tsx|86|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/recruitment/kit-dialog.tsx:30",
+        "usage_identities": [
+          "resources/js/pages/hr/recruitment/index.tsx|609|KitDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/recruitment/score-dialog.tsx|82|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/recruitment/score-dialog.tsx:34",
+        "usage_identities": [
+          "resources/js/pages/hr/recruitment/index.tsx|610|ScoreDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/hr/recruitment/tag-manager-dialog.tsx|62|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/hr/recruitment/tag-manager-dialog.tsx:16",
+        "usage_identities": [
+          "resources/js/pages/hr/recruitment/index.tsx|613|TagManagerDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/privacy/privacy-action-modal.tsx|219|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/privacy/privacy-action-modal.tsx:180",
+        "usage_identities": [
+          "resources/js/components/privacy/privacy-detail-dialog.tsx|163|PrivacyActionModal",
+          "resources/js/pages/privacy/dashboard.tsx|336|PrivacyActionModal"
+        ],
+        "usage_count": 2,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/respite/modals/referral-intake.tsx|229|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/respite/modals/referral-intake.tsx:117",
+        "usage_identities": [
+          "resources/js/components/respite/workspace.tsx|414|ReferralIntakeModal"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/rostering/day-detail-dialog.tsx|498|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/rostering/day-detail-dialog.tsx:412",
+        "usage_identities": [
+          "resources/js/components/rostering/calendar-pane.tsx|1656|DayDetailDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/rostering/edit-availability-dialog.tsx|148|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/rostering/edit-availability-dialog.tsx:52",
+        "usage_identities": [
+          "resources/js/components/rostering/availability-pane.tsx|222|EditAvailabilityDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/sites/add-site-dialog.tsx|603|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/sites/add-site-dialog.tsx:432",
+        "usage_identities": [
+          "resources/js/pages/sites/index.tsx|1888|AddSiteDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/timesheets/create-timesheet-dialog.tsx|576|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/timesheets/create-timesheet-dialog.tsx:382",
+        "usage_identities": [
+          "resources/js/pages/operations/timesheets/index.tsx|822|CreateTimesheetDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/components/two-factor-setup-modal.tsx|313|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/components/two-factor-setup-modal.tsx:238",
+        "usage_identities": [
+          "resources/js/pages/settings/two-factor.tsx|177|TwoFactorSetupModal"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/Governance/CeoReports/_dialogs.tsx|353|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/Governance/CeoReports/_dialogs.tsx:343",
+        "usage_identities": [
+          "resources/js/pages/Governance/CeoReports/Index.tsx|152|CeoReportDialog",
+          "resources/js/pages/Governance/CeoReports/Show.tsx|503|CeoReportDialog"
+        ],
+        "usage_count": 2,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/Governance/Packs/_dialogs.tsx|83|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/Governance/Packs/_dialogs.tsx:42",
+        "usage_identities": [
+          "resources/js/pages/Governance/Packs/Index.tsx|90|GenerateBoardPackDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/Governance/Resolutions/_dialogs.tsx|266|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/Governance/Resolutions/_dialogs.tsx:257",
+        "usage_identities": [
+          "resources/js/pages/Governance/Meetings/Show.tsx|424|NewResolutionDialog",
+          "resources/js/pages/Governance/Resolutions/Index.tsx|84|NewResolutionDialog"
+        ],
+        "usage_count": 2,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/control-room/escalations.tsx|525|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/control-room/escalations.tsx:492",
+        "usage_identities": [
+          "resources/js/pages/control-room/escalations.tsx|485|MoveQueueDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/control-room/sla/index.tsx|335|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/control-room/sla/index.tsx:298",
+        "usage_identities": [
+          "resources/js/pages/control-room/sla/index.tsx|1127|SlaFormDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/emergency/_review-dialog.tsx|53|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/emergency/_review-dialog.tsx:31",
+        "usage_identities": [
+          "resources/js/pages/emergency/access.tsx|270|ReviewDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/hr/offboarding/show.tsx|134|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/hr/offboarding/show.tsx:77",
+        "usage_identities": [
+          "resources/js/pages/hr/offboarding/show.tsx|518|ExitInterviewDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/operations/shift-notes/components/note-wizard.tsx|239|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/operations/shift-notes/components/note-wizard.tsx:122",
+        "usage_identities": [
+          "resources/js/pages/operations/shift-notes/Index.tsx|301|NoteWizard"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/sites/_site-geofence-dialog.tsx|222|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/sites/_site-geofence-dialog.tsx:138",
+        "usage_identities": [
+          "resources/js/pages/sites/show.tsx|4507|SiteGeofenceDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/sites/meal-planner/_recipes-panel.tsx|315|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/sites/meal-planner/_recipes-panel.tsx:231",
+        "usage_identities": [
+          "resources/js/pages/sites/meal-planner/_recipes-panel.tsx|197|RecipeDetailDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    },
+    {
+      "identity": "resources/js/pages/sites/vendors-credentials/_manage-types-dialog.tsx|167|Dialog",
+      "verdict": "GO_STATIC_DELEGATION",
+      "evidence": {
+        "kind": "delegated_to_all_statically_reachable_resolved_usage_activators",
+        "implementation_anchor": "resources/js/pages/sites/vendors-credentials/_manage-types-dialog.tsx:51",
+        "usage_identities": [
+          "resources/js/pages/sites/vendors-credentials/global.tsx|1281|ManageCredentialTypesDialog"
+        ],
+        "usage_count": 1,
+        "all_usages_reachable": true,
+        "all_usages_trigger_resolved": true,
+        "credit_boundary": "audited-baseline static delegation only"
+      }
+    }
+  ],
+  "count_delta": {
+    "primitive_exact_trigger_resolved": 34,
+    "primitive_unresolved": -34,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 242,
+    "primitive_unresolved": 235,
+    "custom_denominator": 659,
+    "custom_exact_trigger_resolved": 223,
+    "custom_unresolved_or_blocked": 270
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BVIS-0005",
+  "file": "BVIS-0005-dashboard-1280x800-observed-cropped.png",
+  "route_name": "dashboard",
+  "route_path": "dashboard",
+  "viewport": "1280x800",
+  "classification": "Observed",
+  "metrics": {
+    "clientWidth": 1263,
+    "height": 800,
+    "scrollWidth": 1263,
+    "width": 1280
+  },
+  "crop": {
+    "x": 260,
+    "y": 0,
+    "width": 800,
+    "height": 450
+  },
+  "notes": "Cropped to work surface; no personal names or record identifiers visible.",
+  "role": "Demo Administrator",
+  "siteScope": "not visibly selected",
+  "environmentEvidence": "owner-confirmed test/development; no visible UI build marker",
+  "auditedCommit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "deployedCommit": "not independently established"
+}

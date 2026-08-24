@@ -1,0 +1,621 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave7",
+  "generated_at": "2026-08-13T16:25:40+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Seventh bounded target-specific wave: 12 independently researched current unique unproved targets, with no inherited family credit.",
+  "methodology": {
+    "credit_rule": "Only target-specific inspection of official repository-native source pinned to an immutable commit, with exact loci proving a material same-target slice, receives credit.",
+    "licence_rule": "Only GPL-3.0 repository-native Frappe HR source is credited; hosted services, support, proprietary applications, private extensions, and code outside the pinned repository are excluded.",
+    "no_copy_rule": "Evidence is behavioural only. Do not copy source, schema, UI, wording, or distinctive layouts.",
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, queue, deployment, filesystem artifact outside this audit bundle, or Git state was changed."
+  },
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "2dfe20676b9b019bac44141520c55abb6380804ae43b0102c1cdef121f5bf836"
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 12,
+    "documented_ncm_direct_recommended": 0,
+    "completion_credit_recommended": 12
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-HR-BENEFITS-ENROLLMENT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An eligible employee can select benefit components for a payroll period, assign positive amounts within the available maximum, and persist one non-duplicate benefit application.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-BENEFITS"
+        ],
+        "route_ids": [
+          "ROUTE-1322",
+          "ROUTE-1323",
+          "ROUTE-1324"
+        ],
+        "page_ids": [
+          "PAGE-0415"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/BenefitsController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/employee_benefit_application/employee_benefit_application.py :: L43-L95",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/employee_benefit_application/employee_benefit_application.py :: L98-L119"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/payroll/doctype/employee_benefit_application/employee_benefit_application.py:L43-L95",
+          "hrms/payroll/doctype/employee_benefit_application/employee_benefit_application.py:L98-L119"
+        ],
+        "proven_slice": "Validates an active employee, rejects duplicate applications for the same payroll period, requires eligible benefit rows, enforces positive component amounts and a maximum-benefit ceiling, and calculates remaining benefit.",
+        "parity_limits": "Does not prove Oblivion benefit-plan types, employee/employer contribution percentages, KiwiSaver synchronization, notifications, permissions, UI, or runtime persistence.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-BENEFITS-PLAN-ADMINISTRATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An administrator can define a reusable flexible-benefit component with a yearly limit and payout/accrual policy, and the system validates incompatible configuration.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-BENEFITS"
+        ],
+        "route_ids": [
+          "ROUTE-1322",
+          "ROUTE-1325",
+          "ROUTE-1326",
+          "ROUTE-1327"
+        ],
+        "page_ids": [
+          "PAGE-0415",
+          "PAGE-0416"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/BenefitsController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/salary_component/salary_component.json :: L127-L143,L241-L295",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/salary_component/salary_component.py :: L65-L69,L109-L136"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/payroll/doctype/salary_component/salary_component.json:L127-L143,L241-L295",
+          "hrms/payroll/doctype/salary_component/salary_component.py:L65-L69,L109-L136"
+        ],
+        "proven_slice": "Defines flexible-benefit status, yearly maximum, accrual state, three payout policies and final-cycle payout configuration, and rejects incompatible accrual-component combinations.",
+        "parity_limits": "This is a material plan-definition slice, not proof of Oblivion plan names/types, employee and employer rates, activation history, enrolment counts, authorization, or deployed behavior.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-CANDIDATE-OFFERS-HIRE",
+      "prior_status": "unproved_pending",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Recruitment staff can create a job offer linked to an applicant, validate vacancy and duplicate constraints, track the applicant response, and synchronize accepted offer/applicant state when an employee is hired.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-CANDIDATE"
+        ],
+        "route_ids": [
+          "ROUTE-1670",
+          "ROUTE-1706",
+          "ROUTE-1707",
+          "ROUTE-1708",
+          "ROUTE-1709",
+          "ROUTE-1710",
+          "ROUTE-1711",
+          "ROUTE-1712",
+          "ROUTE-1713",
+          "ROUTE-1714"
+        ],
+        "page_ids": [
+          "PAGE-0409"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/CandidateController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/job_offer/job_offer.py :: L40-L82",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/job_offer/job_offer.json :: L30-L95",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/overrides/employee_master.py :: L56-L87"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/job_offer/job_offer.py:L40-L82",
+          "hrms/hr/doctype/job_offer/job_offer.json:L30-L95",
+          "hrms/overrides/employee_master.py:L56-L87"
+        ],
+        "proven_slice": "Defines an applicant-linked offer with response states and terms, prevents duplicate live offers, checks staffing-plan vacancies, updates applicant state as the offer changes, and marks the linked applicant and offer accepted when an employee is created.",
+        "parity_limits": "Does not prove Oblivion offer approval chains, document upload/generation, portal token, countersignature, role/site assignment, notifications, or runtime hire conversion.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-EXPENSE-REVIEW",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised reviewer can inspect a submitted expense claim, approve or reject sanctioned amounts under self-approval controls, and drive explicit reviewed and payment-readiness states.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-EXPENSE"
+        ],
+        "route_ids": [
+          "ROUTE-1331",
+          "ROUTE-1334",
+          "ROUTE-1337",
+          "ROUTE-1339"
+        ],
+        "page_ids": [
+          "PAGE-0419"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/ExpenseController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/expense_claim/expense_claim.py :: L122-L186",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/expense_claim/expense_claim.py :: L196-L223",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/expense_claim/expense_claim.py :: L491-L505,L577-L582"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/expense_claim/expense_claim.py:L122-L186",
+          "hrms/hr/doctype/expense_claim/expense_claim.py:L196-L223",
+          "hrms/hr/doctype/expense_claim/expense_claim.py:L491-L505,L577-L582"
+        ],
+        "proven_slice": "Derives Draft, Submitted, Approved-Unpaid, Paid, Rejected and Cancelled states; blocks configured self-approval; requires an approved or rejected decision before submission; zeros rejected sanction amounts and prevents sanctioned amounts exceeding claims.",
+        "parity_limits": "Does not prove Oblivion approver permissions, bulk review, rejection text, receipt viewing, journal queue execution, NZ accounting rules, UI, or runtime decisions.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-EXIT-INTERVIEW-CASE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can schedule and complete one exit-interview case per departing employee, record interviewers and a summary, distribute a configured questionnaire, and synchronize completion to the employee record.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-EXIT-INTERVIEW"
+        ],
+        "route_ids": [
+          "ROUTE-1427",
+          "ROUTE-1428",
+          "ROUTE-1429",
+          "ROUTE-1430"
+        ],
+        "page_ids": [
+          "PAGE-0450",
+          "PAGE-0451"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/ExitInterviewController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/exit_interview/exit_interview.py :: L44-L91",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/exit_interview/exit_interview.py :: L94-L160",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/exit_interview/exit_interview.json :: L11-L36,L39-L90"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/exit_interview/exit_interview.py:L44-L91",
+          "hrms/hr/doctype/exit_interview/exit_interview.py:L94-L160",
+          "hrms/hr/doctype/exit_interview/exit_interview.json:L11-L36,L39-L90"
+        ],
+        "proven_slice": "Requires a relieving date, prevents duplicate non-cancelled interviews, tracks Pending/Scheduled/Completed/Cancelled state, only submits completed cases, updates the employee interview date, and sends a configured questionnaire once with success/failure accounting.",
+        "parity_limits": "Does not prove Oblivion departure taxonomy, confidential question responses, trend analytics, offboarding-task auto-completion, permissions, retention, or runtime email delivery.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-LEAVE-REPORT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can run a period-bounded leave report by employee and leave type showing opening balance, allocation, leave taken, expiry, encashment and closing balance, with organisational filters.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-LEAVE-REPORT"
+        ],
+        "route_ids": [
+          "ROUTE-1507"
+        ],
+        "page_ids": [
+          "PAGE-0465"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/LeaveReportController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/report/employee_leave_balance/employee_leave_balance.py :: L21-L86",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/report/employee_leave_balance/employee_leave_balance.py :: L87-L136",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/report/employee_leave_balance/employee_leave_balance.py :: L142-L166"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/report/employee_leave_balance/employee_leave_balance.py:L21-L86",
+          "hrms/hr/report/employee_leave_balance/employee_leave_balance.py:L87-L136",
+          "hrms/hr/report/employee_leave_balance/employee_leave_balance.py:L142-L166"
+        ],
+        "proven_slice": "Defines leave-balance report columns, enumerates active employees and leave types, calculates opening, allocation, taken, expired, encashed and closing amounts, and filters by company, department, employee and employee status.",
+        "parity_limits": "Does not prove Oblivion Bradford Factor, absenteeism lens, utilisation rules, PDF/CSV hardening, local permissions, exact date semantics, UI, or runtime values.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-OFFBOARDING-CASE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can start an employee offboarding case from a reusable activity set, generate assigned tasks with dates, track progress from pending through completion, and cancel the linked work safely.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-OFFBOARDING"
+        ],
+        "route_ids": [
+          "ROUTE-1549",
+          "ROUTE-1550",
+          "ROUTE-1551",
+          "ROUTE-1552"
+        ],
+        "page_ids": [
+          "PAGE-0483",
+          "PAGE-0484"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/OffboardingController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/employee_separation/employee_separation.py :: L21-L48",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/controllers/employee_boarding_controller.py :: L14-L101",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/controllers/employee_boarding_controller.py :: L143-L194"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/employee_separation/employee_separation.py:L21-L48",
+          "hrms/controllers/employee_boarding_controller.py:L14-L101",
+          "hrms/controllers/employee_boarding_controller.py:L143-L194"
+        ],
+        "proven_slice": "Represents employee separation with activities and Pending/In Process/Completed status, creates a linked project and dated tasks, assigns tasks to configured users or roles, updates case state from project completion, and removes linked tasks/project on cancellation.",
+        "parity_limits": "Does not prove Oblivion departure reasons, duplicate-active-case rule, task dependencies, asset/access reconciliation, exit-interview coupling, role boundaries, UI, or runtime notification delivery.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-ONBOARDING-TEMPLATES",
+      "prior_status": "unproved_pending",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can define a reusable onboarding template scoped by organisation attributes, containing activities with responsibility and timing metadata that can seed an employee onboarding run.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-ONBOARDING"
+        ],
+        "route_ids": [
+          "ROUTE-1579",
+          "ROUTE-1580",
+          "ROUTE-1581",
+          "ROUTE-1582"
+        ],
+        "page_ids": [],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/OnboardingController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/employee_onboarding_template/employee_onboarding_template.json :: L8-L68",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/employee_onboarding_template/employee_onboarding_template.py :: L14-L26",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/controllers/employee_boarding_controller.py :: L158-L175"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/employee_onboarding_template/employee_onboarding_template.json:L8-L68",
+          "hrms/hr/doctype/employee_onboarding_template/employee_onboarding_template.py:L14-L26",
+          "hrms/controllers/employee_boarding_controller.py:L158-L175"
+        ],
+        "proven_slice": "Defines a persistent onboarding template with title, company, department, designation, employee grade and activity rows; exposes activity name, role, user, employee-creation requirement, description, weight, start offset and duration for downstream runs.",
+        "parity_limits": "Does not prove Oblivion template activation, duplication, ordering UX, email configuration, per-site scoping, task dependencies, permissions, or runtime template application.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-PAYSLIP-ADMIN",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised payroll administrator can select employees for a pay period, prevent duplicate payslips, generate slips synchronously or in a queue, validate calculations, submit valid slips, report partial failures, and optionally distribute them.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-PAYSLIP"
+        ],
+        "route_ids": [
+          "ROUTE-1589",
+          "ROUTE-1590",
+          "ROUTE-1592"
+        ],
+        "page_ids": [
+          "PAGE-0488",
+          "PAGE-0489"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/PayslipController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/payroll_entry/payroll_entry.py :: L108-L147,L264-L343",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/payroll_entry/payroll_entry.py :: L1599-L1647,L1698-L1727",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/salary_slip/salary_slip.py :: L227-L301"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/payroll/doctype/payroll_entry/payroll_entry.py:L108-L147,L264-L343",
+          "hrms/payroll/doctype/payroll_entry/payroll_entry.py:L1599-L1647,L1698-L1727",
+          "hrms/payroll/doctype/salary_slip/salary_slip.py:L227-L301"
+        ],
+        "proven_slice": "Selects employees under payroll filters, prevents duplicate slips for the period, permission-checks generation, queues large batches, creates one slip per remaining employee, records batch failure, validates slip dates/components/net pay, submits non-negative slips, reports failures and triggers accrual/email after successful submission.",
+        "parity_limits": "Does not prove Oblivion payroll-run model, individual-versus-bulk UI, PDF storage, NZ tax correctness, permissions, queue health, email delivery, or runtime generation.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-PAYSLIP-SELF-DOWNLOAD",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An employee can select one of their submitted payslips and download its rendered PDF document.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "D",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-PAYSLIP"
+        ],
+        "route_ids": [
+          "ROUTE-1534"
+        ],
+        "page_ids": [],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/PayslipController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: frontend/src/views/salary_slip/Dashboard.vue :: L97-L113",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: frontend/src/views/salary_slip/Detail.vue :: L127-L162",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/api/__init__.py :: L802-L818",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/payroll/doctype/salary_slip/salary_slip.json :: L771-L800"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "frontend/src/views/salary_slip/Dashboard.vue:L97-L113",
+          "frontend/src/views/salary_slip/Detail.vue:L127-L162",
+          "hrms/api/__init__.py:L802-L818",
+          "hrms/payroll/doctype/salary_slip/salary_slip.json:L771-L800"
+        ],
+        "proven_slice": "Filters the employee dashboard to submitted slips for the current employee, exposes a Download PDF action, calls the repository PDF endpoint for the selected Salary Slip, returns a base64 data URL, and grants Employee read/print metadata.",
+        "parity_limits": "Does not prove Oblivion direct-object denial, private-disk path checks, regenerated-versus-stored PDF rules, filenames, browser download behavior, or runtime authorization.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-SKILLS-CATALOG",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can maintain a reusable catalogue of uniquely named skills with descriptions for assignment to employees, designations, expected skill sets and assessments.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-SKILLS"
+        ],
+        "route_ids": [
+          "ROUTE-1650",
+          "ROUTE-1651"
+        ],
+        "page_ids": [
+          "PAGE-0500"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/SkillsController.php"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/skill/skill.json :: L8-L25",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/designation_skill/designation_skill.json :: L8-L16",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/expected_skill_set/expected_skill_set.json :: L8-L25"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/skill/skill.json:L8-L25",
+          "hrms/hr/doctype/designation_skill/designation_skill.json:L8-L16",
+          "hrms/hr/doctype/expected_skill_set/expected_skill_set.json:L8-L25"
+        ],
+        "proven_slice": "Defines a persistent skill master with a unique name and description and repository-native links from designation and expected-skill records.",
+        "parity_limits": "Does not prove Oblivion categories, active/retired state, destructive-history controls, permissions, UI, or runtime catalogue management.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-HR-SKILLS-ASSESSMENT-MATRIX",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "HR can maintain an employee-by-skill matrix recording skill proficiency and evaluation date, with reusable skill identities and employee context.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR",
+        "source_family_ids": [
+          "HR-ROUTE-TRAINING-MATRIX",
+          "HR-SKILLS"
+        ],
+        "route_ids": [
+          "ROUTE-1652",
+          "ROUTE-1653",
+          "ROUTE-3007"
+        ],
+        "page_ids": [
+          "PAGE-0501"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/SkillsController.php",
+          "routes/*.php closure"
+        ]
+      },
+      "evidence_loci": [
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/employee_skill_map/employee_skill_map.json :: L7-L58",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/employee_skill/employee_skill.json :: L8-L34",
+        "frappe/hrms@4f6ee8504003cf2ea36488cd4876b8b90a8bf68c :: hrms/hr/doctype/skill_assessment/skill_assessment.json :: L8-L25"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "4f6ee8504003cf2ea36488cd4876b8b90a8bf68c",
+        "source_loci": [
+          "hrms/hr/doctype/employee_skill_map/employee_skill_map.json:L7-L58",
+          "hrms/hr/doctype/employee_skill/employee_skill.json:L8-L34",
+          "hrms/hr/doctype/skill_assessment/skill_assessment.json:L8-L25"
+        ],
+        "proven_slice": "Defines one skill map per employee with designation context and employee-skill rows; each row links a catalogued skill to a proficiency rating and evaluation date, with a separate skill-assessment rating record.",
+        "parity_limits": "Does not prove Oblivion cross-employee grid rendering, assessor identity, evidence attachment, target levels, history, sign-off, gap analysis, permissions, or runtime calculations.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned repository-native GPL-3.0 Frappe HR source only; Frappe Cloud, paid hosting, support, third-party apps, private extensions, and unpinned branches are excluded."
+        }
+      }
+    }
+  ],
+  "projected_counts_after_application": {
+    "denominator": 902,
+    "verified_benchmark": {
+      "direct": 244,
+      "strict_one_to_one_rename": 22,
+      "total": 266
+    },
+    "documented_no_credible_match": {
+      "direct": 77,
+      "strict_one_to_one_rename": 7,
+      "total": 84
+    },
+    "eligible_total": 350,
+    "completion_unproved_total": 552,
+    "eligible_percentage": 38.8027
+  },
+  "integrity": {
+    "selected_target_count": 12,
+    "selected_targets_unique": true,
+    "selected_targets_current_in_manifest": true,
+    "selected_targets_were_unproved_at_recheck": true,
+    "all_upstream_repositories_official": true,
+    "all_upstream_refs_immutable_commits": true,
+    "licence_and_edition_screening_complete": true,
+    "family_credit_inherited": false,
+    "paid_only_evidence_used": false,
+    "files_modified_by_research_agent": false
+  }
+}

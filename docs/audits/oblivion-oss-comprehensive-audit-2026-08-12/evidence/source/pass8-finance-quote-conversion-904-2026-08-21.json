@@ -1,0 +1,157 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-finance-quote-conversion-904-2026-08-21",
+  "generated_at": "2026-08-22T00:45:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "module_selection": {
+    "module": "FINANCE",
+    "targets": 71,
+    "classes": {
+      "H": 64,
+      "D": 7,
+      "M": 0
+    },
+    "benchmark_decided": 57,
+    "benchmark_unproved": 14,
+    "selection_reason": "Weighted unresolved source-risk/runtime screen selected Finance; all representative task/runtime gates remain zero."
+  },
+  "pass_reconciliation": {
+    "P1": {
+      "static_identity_reviewed": 71,
+      "denominator": 71
+    },
+    "P2": {
+      "representative_persisted_tasks_executed": 0,
+      "denominator": 64
+    },
+    "P3": {
+      "benchmark_or_ncm_decided": 57,
+      "denominator": 71,
+      "unproved": 14
+    },
+    "P4": {
+      "representative_security_and_visual_tasks_executed": 0,
+      "denominator": 64
+    },
+    "P5": {
+      "static_architecture_reviewed": 71,
+      "runtime_data_effects_verified": 0,
+      "denominator": 71
+    },
+    "P6": {
+      "fresh_exact_source_finding_official_links": 3,
+      "denominator": 71,
+      "boundary": "Official propositions frame risk only."
+    },
+    "P7": {
+      "fresh_source_constraint_failure_links": 3,
+      "tests_executed": 0,
+      "denominator": 71
+    },
+    "P8": {
+      "fresh_module_challenge": 1,
+      "module_completion_credit": 0,
+      "denominator": 71
+    }
+  },
+  "new_finding": {
+    "id": "FIN-QUOTE-CONVERSION-01",
+    "priority": "P1",
+    "feature_ids": [
+      "CAP-FIN-QUOTE-LIFECYCLE",
+      "CAP-FIN-QUOTE-AGREEMENT-CONVERSION",
+      "CAP-FIN-QUOTE-INVOICE-CONVERSION"
+    ],
+    "route_ids": [
+      "ROUTE-0664",
+      "ROUTE-0665",
+      "ROUTE-0666",
+      "ROUTE-0667",
+      "ROUTE-0669"
+    ],
+    "page_ids": [
+      "PAGE-0185",
+      "PAGE-0186"
+    ],
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "source_chain": [
+    {
+      "path": "app/Domain/Finance/Http/Controllers/QuoteController.php",
+      "baseline": "e9056f74fad0468db720890138be29a2f4d2b2e976c29d619db2b927dda1ba9d",
+      "current": "b0f935d2bd5f50c40950f94d647efce6db2db1388ccc2c937aa0e89265a1afbb",
+      "loci": "L240-L300,L303-L333,L341-L412"
+    },
+    {
+      "path": "database/migrations/2026_03_23_000400_create_service_agreements_table.php",
+      "baseline": "28d343b406bd1674bc20c03217abcf3daa8f8c9a2454f5c563ffd3f98f3a4021",
+      "current": "28d343b406bd1674bc20c03217abcf3daa8f8c9a2454f5c563ffd3f98f3a4021",
+      "loci": "L11-L30"
+    },
+    {
+      "path": "database/migrations/2026_03_23_004200_create_quotes_table.php",
+      "baseline": "17de1742845bdf0483a9070537b6e8f78e847af3194f9039cacb9a3465c820fe",
+      "current": "17de1742845bdf0483a9070537b6e8f78e847af3194f9039cacb9a3465c820fe",
+      "loci": "L11-L39"
+    },
+    {
+      "path": "database/migrations/2026_03_28_004100_create_fin_invoices_table.php",
+      "baseline": "c41d8e37e7ca9a450f1eea209f0148829c46a6c5b050204646491b9305f619b5",
+      "current": "c41d8e37e7ca9a450f1eea209f0148829c46a6c5b050204646491b9305f619b5",
+      "loci": "L11-L47"
+    },
+    {
+      "path": "database/migrations/2026_05_02_100000_add_operations_metadata_to_fin_invoices.php",
+      "baseline": "b537b2df53d0307c8eba8464db0d572eb1470232e2d2a03bbef2991818e4a8e8",
+      "current": "b537b2df53d0307c8eba8464db0d572eb1470232e2d2a03bbef2991818e4a8e8",
+      "loci": "L18-L23"
+    },
+    {
+      "path": "database/migrations/2026_06_14_070000_add_converted_to_invoice_id_to_quotes.php",
+      "baseline": "c802d42718dda3ff3e412d87d20a5cc6a1cbd7c1fb09f23e4a696702e602e293",
+      "current": "c802d42718dda3ff3e412d87d20a5cc6a1cbd7c1fb09f23e4a696702e602e293",
+      "loci": "L15-L17"
+    },
+    {
+      "path": "app/Models/ServiceAgreement.php",
+      "baseline": "9e61af697137ab29ae3dee7202fcfea569817995eb503ebaeb2a1f88ed2bca56",
+      "current": "144f234ca522b08e248c1392a4de58778e37bf594aa6bc5021e09bbb5f94f6f7",
+      "loci": "fillable agreement_type and audit actor; no default"
+    },
+    {
+      "path": "app/Models/ServiceAgreementLineItem.php",
+      "baseline": "cabad0ecdf0fa5890851b5f1de551a7d16d7a060acbb774feac22c0aeb0f65c6",
+      "current": "e700bb99ba81f9337903c5b7510008202196cb651cb2aca2efb6920c2a007529",
+      "loci": "budget_allocated mapping"
+    },
+    {
+      "path": "app/Domain/Finance/Models/FinInvoice.php",
+      "baseline": "f958517c82b84db101f17474ed02e0c05eed84fe34a27158d62d189ff424d4f8",
+      "current": "f958517c82b84db101f17474ed02e0c05eed84fe34a27158d62d189ff424d4f8",
+      "loci": "L114-L123"
+    },
+    {
+      "path": "tests/Feature/Finance/QuoteToInvoiceConversionTest.php",
+      "baseline": "ab09a2bb2d8d4689833e9c3a7d36cc3b326ca7887070e77d7b2162a52b31fa72",
+      "current": "ef173509e5b9a9a4bd4de0795ef31f2f7b1452db56512de37802c8bf1e789842",
+      "loci": "current L67-L95,L121-L147"
+    },
+    {
+      "path": "resources/js/pages/finance/quotes/Show.tsx",
+      "baseline": "a15ca5bcddf223c348b3fd7a3dc973bed02bd6454c02eddb4e55ab4da570edc7",
+      "current": "add64ac7301431a1caaee5ad8c726e9c90d5ffa2c172341e48254b5f1e77837a",
+      "loci": "current L97-L139"
+    }
+  ],
+  "duplicate_boundary": "No current finding owns the exact quote lifecycle/conversion IDs, routes or schema/locking root; payment, settlement and spend findings are distinct aggregates.",
+  "wording_corrections": [
+    "Invoice writes are transactionally grouped; the defect is stale pre-transaction replay/state on an unlocked quote without unique source identity.",
+    "Agreement failure/partial/duplicate impacts are schema-based or conditional, not runtime-observed.",
+    "Current Site scope and actor audit are present and outside the root; destination exclusivity remains owner-defined."
+  ],
+  "completion_boundary": "No runtime, browser, representative-user, remediation, release or overall completion credit."
+}

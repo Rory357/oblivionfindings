@@ -1,0 +1,508 @@
+{
+  "schema_version": "1.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "inspected_date": "2026-08-12",
+  "reviewer": "safety_privacy fresh specialist cross-review",
+  "denominator": 58,
+  "reviewed": 58,
+  "coverage_percent": 100.0,
+  "owner_boundary_rows": 32,
+  "method_limit": "Official propositions frame product/code risk. They are kept separate from Oblivion source observation, audit inference and accountable owner decisions. This is not legal advice, clinical/security certification or regulatory attestation.",
+  "source_definitions": {
+    "HISF-ACCESS": "HISF authorised, need-to-know, least-privilege access and access lifecycle.",
+    "HISF-APPSEC": "HISF documented/approved application-security requirements, risk assessment, secure coding and testing.",
+    "HISF-WEB": "HISF authorised web access and secure-by-design/default web controls.",
+    "HISF-TLS": "HISF current TLS and protected communications guidance.",
+    "HISF-LIFECYCLE": "HISF protection of copies plus governed retention, disposal, backup and recovery.",
+    "HISF-LOG": "HISF protected, role-limited and alteration-resistant logging.",
+    "HISF-SOD": "HISF segregation-of-duties control frame; exact business separation remains owner-defined.",
+    "HISF-BCDR": "HISF incident management, evidence protection and continuity/recovery.",
+    "HISF-SCOPE": "HISF system/security scope context; it does not establish privacy-law rights.",
+    "MMH-BOLA": "Current Ministry Manage My Health review identifies authenticated cross-record access as broken object-level authorisation under HISF Protect.",
+    "HIPC-R3A": "HIPC Rule 3A qualifying indirect-collection notice from 1 May 2026, subject to scope and exceptions.",
+    "HIPC-R5": "HIPC Rule 5 health-information storage/security and minimum-access context.",
+    "HIPC-R6": "HIPC Rule 6 access-request context.",
+    "HIPC-R9": "HIPC Rule 9 retention context; record class, schedule and hold decisions remain owner-defined.",
+    "HIPC-R11": "HIPC disclosure/representative context; it does not establish an individual's authority.",
+    "HIPC-REP": "HIPC representative/requester context; actual entitlement requires verification.",
+    "PA-IPP3A": "Privacy Act IPP3A qualifying indirect-collection notice, subject to scope and exceptions.",
+    "PA-IPP5": "Privacy Act Principle 5 storage/security context for personal information not proven to be health information.",
+    "PA-IPP6-7": "Privacy Act access/correction rights; not a general erasure/portability right.",
+    "HDC-R4": "Code of Rights service-quality/safety context; exact application mechanism remains clinical/product-defined.",
+    "HDC-R7": "Code of Rights informed choice/consent and presumed-competence context.",
+    "WS-NOTIFY": "WorkSafe notifiable-event, preservation and record guidance; it does not prescribe Oblivion lifecycle/RBAC design.",
+    "WS-NOTIFY(scope-only)": "WorkSafe notification context only; no site-RBAC requirement is inferred.",
+    "WS-RISK": "WorkSafe risk-management context; exact application approval mechanics remain H&S-owner-defined.",
+    "NZS-SCOPE": "Ngā Paerewa modular service/certification scope; it does not mandate the exact Oblivion control.",
+    "NZS-CERT": "Ngā Paerewa/HealthCERT certificate evidence and modular scope; unsupported UI assertion is proven, provider non-certification is not.",
+    "OWNER-*": "The source frames the issue but does not mandate the exact Oblivion control; named specialist owns applicability and design."
+  },
+  "supplemental_sources": [
+    {
+      "id": "MMH-BOLA",
+      "url": "https://www.health.govt.nz/system/files/2026-05/11-manage-my-health-cybersecurity-breach-review-final-report.pdf",
+      "authority": "New Zealand Ministry of Health"
+    },
+    {
+      "id": "HISF-CURRENT-PAGE",
+      "url": "https://www.healthnz.govt.nz/health-professionals/guidance-standards/topic/data-and-standards/health-information-standards/approved-health-information-standards/information-governance",
+      "authority": "Health New Zealand"
+    },
+    {
+      "id": "HISF-SUPPLIER-2025",
+      "url": "https://static.info.content.health.nz/docs/HISO/HISO-10029-4-Health-Information-Security-Framework-Guidance-for-Suppliers.pdf",
+      "authority": "Health New Zealand / HISO"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "ARCH-P0-A",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "ARCH-P0-B",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5"
+      ]
+    },
+    {
+      "finding_id": "ARCH-P0-C",
+      "proposition_keys": [
+        "HISF-BCDR",
+        "HISF-APPSEC",
+        "OWNER-ATOMICITY"
+      ]
+    },
+    {
+      "finding_id": "ASSET-RBAC-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "CARE-SIGNOFF-01",
+      "proposition_keys": [
+        "HDC-R7",
+        "NZS-SCOPE",
+        "OWNER-CONSENT"
+      ]
+    },
+    {
+      "finding_id": "CATER-SCOPE-003",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "CLIN-PROTOCOL-SCHEDULING-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "CLIN-SCHEDULE-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "CLIN-SITE-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "CONSENT-AUTH-01",
+      "proposition_keys": [
+        "HDC-R7",
+        "HIPC-R11",
+        "HIPC-REP",
+        "OWNER-AUTHORITY"
+      ]
+    },
+    {
+      "finding_id": "CONSENT-CAPACITY-01",
+      "proposition_keys": [
+        "HDC-R7",
+        "HIPC-R11",
+        "OWNER-CAPACITY"
+      ]
+    },
+    {
+      "finding_id": "CONSENT-FILE-01",
+      "proposition_keys": [
+        "HIPC-R5",
+        "HISF-WEB",
+        "HISF-ACCESS",
+        "HISF-LIFECYCLE"
+      ]
+    },
+    {
+      "finding_id": "CTRL-RBAC-001",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "FIN-BANK-RECON-01",
+      "proposition_keys": [
+        "HISF-APPSEC",
+        "HISF-LOG",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "FIN-CLIENT-FUNDS-01",
+      "proposition_keys": [
+        "HISF-SOD",
+        "PA-IPP5",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "FIN-CONSOLIDATION-01",
+      "proposition_keys": [
+        "HISF-APPSEC",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "FIN-PAYMENT-MATCH-01",
+      "proposition_keys": [
+        "HISF-SOD",
+        "HISF-LOG",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "FIN-QUOTE-CONVERSION-01",
+      "proposition_keys": [
+        "HISF-SOD",
+        "HISF-LOG",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "FLEET-BOOKING-SITE-PRIVACY-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA",
+        "OWNER-FLEET-PRIVACY"
+      ]
+    },
+    {
+      "finding_id": "FLEET-MED-WITNESS-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-LOG",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "FLEET-TRANSPORT-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "HDC-R4"
+      ]
+    },
+    {
+      "finding_id": "FUND-BIND-01",
+      "proposition_keys": [
+        "HISF-APPSEC",
+        "HISF-ACCESS",
+        "PA-IPP5",
+        "OWNER-ACCOUNTING"
+      ]
+    },
+    {
+      "finding_id": "GOV-NESTED-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "MMH-BOLA",
+        "OWNER-GOVERNANCE"
+      ]
+    },
+    {
+      "finding_id": "GOV-SPEND-AUTHORITY-01",
+      "proposition_keys": [
+        "HISF-SOD",
+        "HISF-LOG",
+        "OWNER-GOVERNANCE"
+      ]
+    },
+    {
+      "finding_id": "HR-WEBHOOK-OUTBOUND-SSRF-01",
+      "proposition_keys": [
+        "HISF-APPSEC",
+        "HISF-WEB"
+      ]
+    },
+    {
+      "finding_id": "HS-ASSURANCE-01",
+      "proposition_keys": [
+        "HISF-SOD",
+        "NZS-SCOPE",
+        "WS-RISK",
+        "OWNER-HS"
+      ]
+    },
+    {
+      "finding_id": "HS-CLOSE-01",
+      "proposition_keys": [
+        "WS-NOTIFY",
+        "OWNER-LIFECYCLE"
+      ]
+    },
+    {
+      "finding_id": "HS-NOTIFIABLE-01",
+      "proposition_keys": [
+        "WS-NOTIFY"
+      ]
+    },
+    {
+      "finding_id": "HS-PROCEDURE-APPROVAL-ASSURANCE-01",
+      "proposition_keys": [
+        "WS-RISK",
+        "OWNER-HS"
+      ]
+    },
+    {
+      "finding_id": "HS-SITE-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "WS-NOTIFY(scope-only)"
+      ]
+    },
+    {
+      "finding_id": "INTEG-WEBHOOK-001",
+      "proposition_keys": [
+        "HISF-WEB",
+        "HISF-APPSEC",
+        "HISF-LOG",
+        "OWNER-API"
+      ]
+    },
+    {
+      "finding_id": "MED-COMP-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "MED-OVERRIDE-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "MED-RBAC-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-ACCESS",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "MED-READER-SITE-CONCEALMENT-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "MED-SCOPE-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-ACCESS",
+        "HIPC-R5"
+      ]
+    },
+    {
+      "finding_id": "MED-VERIFY-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-SOD",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "NZS-ASSURANCE-01",
+      "proposition_keys": [
+        "NZS-CERT"
+      ]
+    },
+    {
+      "finding_id": "OPS-DASHBOARD-ACTIVITY-SITE-PRIVACY-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "PRIV-DSR-01",
+      "proposition_keys": [
+        "HIPC-R6",
+        "HIPC-REP",
+        "HIPC-R5",
+        "HISF-LIFECYCLE"
+      ]
+    },
+    {
+      "finding_id": "PRIV-STATEMENT-01",
+      "proposition_keys": [
+        "HIPC-R3A",
+        "PA-IPP3A",
+        "PA-IPP6-7",
+        "HISF-SCOPE",
+        "OWNER-LEGAL-SECURITY"
+      ]
+    },
+    {
+      "finding_id": "RESP-SCOPE-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "RESP-STATE-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "RETENTION-EXEC-01",
+      "proposition_keys": [
+        "HIPC-R9",
+        "HISF-LIFECYCLE",
+        "OWNER-SCHEDULE"
+      ]
+    },
+    {
+      "finding_id": "SAFE-NESTED-01",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "SAFE-SENSITIVITY-01",
+      "proposition_keys": [
+        "HIPC-R5",
+        "HISF-ACCESS"
+      ]
+    },
+    {
+      "finding_id": "SEC-UNIFI-TLS-01",
+      "proposition_keys": [
+        "HISF-TLS",
+        "HISF-WEB"
+      ]
+    },
+    {
+      "finding_id": "SITE-CHECK-002",
+      "proposition_keys": [
+        "HISF-LOG",
+        "OWNER-ACCOUNTABILITY"
+      ]
+    },
+    {
+      "finding_id": "SITE-CHECK-003",
+      "proposition_keys": [
+        "WS-RISK"
+      ]
+    },
+    {
+      "finding_id": "SITE-MEAL-CLIN-01",
+      "proposition_keys": [
+        "HDC-R4",
+        "NZS-SCOPE",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "SITE-RBAC-001",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "TASK-RBAC-001",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "MMH-BOLA"
+      ]
+    },
+    {
+      "finding_id": "TASK-WATCH-002",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5"
+      ]
+    },
+    {
+      "finding_id": "WF-ATTENDANCE-FORCED-END-SITE",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "PA-IPP5",
+        "OWNER-PAYROLL"
+      ]
+    },
+    {
+      "finding_id": "WF-ELIG-FAIL-OPEN",
+      "proposition_keys": [
+        "HDC-R4",
+        "HISF-APPSEC",
+        "OWNER-CLINICAL"
+      ]
+    },
+    {
+      "finding_id": "WF-EMAIL-IDENTITY-CONVERGENCE",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HISF-APPSEC"
+      ]
+    },
+    {
+      "finding_id": "WF-HR-PROFILE-SITE-PRIVACY",
+      "proposition_keys": [
+        "PA-IPP5",
+        "HISF-ACCESS"
+      ]
+    },
+    {
+      "finding_id": "WF-TIMESHEET-CLIENT-REASSIGN",
+      "proposition_keys": [
+        "HISF-ACCESS",
+        "HIPC-R5",
+        "OWNER-ACCOUNTING"
+      ]
+    }
+  ]
+}

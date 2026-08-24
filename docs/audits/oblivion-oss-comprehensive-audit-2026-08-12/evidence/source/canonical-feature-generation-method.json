@@ -1,0 +1,39 @@
+{
+  "current_generation_rule": "One routed controller class, one named closure, or one module-scoped redirect family generated one current register row. Unrouted concrete controllers and orphan frontend families remain explicit non-user-facing evidence-gap rows.",
+  "semantic_adjudication": "Rejected as a proof of the prompt's distinct-user-capability denominator. Controller ownership is not equivalent to one coherent user job: 70 user-facing rows identify themselves as broad umbrellas and 42 omit additional resource groups from the concise task path.",
+  "required_reconciliation_rule": "Split or explicitly justify each umbrella using user goal, navigation/page ownership, route resource group, state-machine boundary, actor/permission boundary and completion evidence. Re-map routes/pages/scripts/scores/benchmarks only after every distinct capability is represented exactly once.",
+  "page_graph": {
+    "roots": 702,
+    "support": 187,
+    "orphans": 28,
+    "resolver_total": 917
+  },
+  "counts": {
+    "features": 595,
+    "user_facing": 543,
+    "routes": 3024,
+    "pages": 962,
+    "matrix_rows": 595,
+    "task_scripts": 543,
+    "ledger_rows": 595
+  },
+  "assertions": {
+    "route_mapping_complete": true,
+    "resolver_mapping_complete": true,
+    "page_tree_mapping_complete": true,
+    "model_count": true,
+    "policy_count": true,
+    "service_count": true,
+    "job_count": true,
+    "event_count": true,
+    "listener_count": true,
+    "matrix_feature_count": true,
+    "score_script_count": true,
+    "distinct_user_capability_denominator_established": false
+  },
+  "semantic_gap_counts": {
+    "broad_umbrella_user_facing_families": 70,
+    "umbrella_families_with_omitted_resource_groups": 42,
+    "distinct_user_capability_denominator": null
+  }
+}

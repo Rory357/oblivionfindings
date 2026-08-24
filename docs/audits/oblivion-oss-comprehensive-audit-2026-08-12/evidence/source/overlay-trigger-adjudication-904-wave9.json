@@ -1,0 +1,292 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave9",
+  "generated_at": "2026-08-22T00:55:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Audited-baseline static source pairing only; current-main, runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "identity_rule": "Canonical identity is file:line:symbol using resources/js/pages/emar paths.",
+    "selection_sha256": "f4cab344b6b29225233603539a4ff5e2cf278339456f2a28a378165b57383520",
+    "exclusion_count": 80,
+    "exclusion_sha256": "f463ee57f0b8daf1e619426b2a9498c88f7abd68f0956edf04b82d0086dac331",
+    "proof_jsonl_sha256": "91248506ab55d875f3ac357f5ac6bc0b8e362fa5b52f124fe5487c6fe644d6a2",
+    "source_map_jsonl_sha256": "9c0cd385146e8439afc2dca912487b64a295c2da8f5cd741dd502d0d2c72e4f2",
+    "serialization": "Packet-order objects, sorted JSON keys, compact separators, UTF-8/no BOM, LF join without terminal LF.",
+    "independent_review_verdict": "GO_after_correcting_emar_colon_identities_and_recomputing_explicit_proofs"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1383,
+      "symbol": "MedicationReviewModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal union and modal/setModal L404-L414; helper L421-L424",
+      "trigger_loci": "medication-review trigger L1189",
+      "render_open_close_locus": "component/open/close L1383-L1385",
+      "static_chain": "modal state -> helper/setModal -> medication-review trigger -> rendered open contract -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1388,
+      "symbol": "CdRegisterModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal union and modal/setModal L404-L414; helper L421-L424",
+      "trigger_loci": "controlled-register trigger L887",
+      "render_open_close_locus": "component/open/close L1388-L1390",
+      "static_chain": "modal state -> helper/setModal -> controlled-register trigger -> rendered open contract -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1397,
+      "symbol": "StockMovementModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal union and modal/setModal L404-L414; helper L421-L424",
+      "trigger_loci": "stock-movement trigger L1238",
+      "render_open_close_locus": "component/open/close L1397-L1399",
+      "static_chain": "modal state -> helper/setModal -> stock-movement trigger -> rendered open contract -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1404,
+      "symbol": "ReportsModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal union and modal/setModal L404-L414; helper L421-L424",
+      "trigger_loci": "reports trigger L686",
+      "render_open_close_locus": "component/open/close L1404-L1406",
+      "static_chain": "modal state -> helper/setModal -> reports trigger -> rendered open contract -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1410,
+      "symbol": "AuditLogModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal union and modal/setModal L404-L414; helper L421-L424",
+      "trigger_loci": "audit-log trigger L921",
+      "render_open_close_locus": "component/open/close L1410-L1412",
+      "static_chain": "modal state -> helper/setModal -> audit-log trigger -> rendered open contract -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/MedicationErrors.tsx",
+      "line": 327,
+      "symbol": "ReportErrorModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal discriminated union L39; modal/setModal L76",
+      "trigger_loci": "report trigger L202",
+      "render_open_close_locus": "conditional render/open/close L327",
+      "static_chain": "modal state -> setModal report trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/MedicationErrors.tsx",
+      "line": 328,
+      "symbol": "TriageDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal discriminated union L39; modal/setModal L76",
+      "trigger_loci": "triage handlers/triggers L128,L301,L311",
+      "render_open_close_locus": "conditional render/open/close L328",
+      "static_chain": "modal state -> triage handler/setModal -> action trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/MedicationErrors.tsx",
+      "line": 329,
+      "symbol": "ReviewErrorDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal discriminated union L39; modal/setModal L76",
+      "trigger_loci": "review handler/trigger L129,L312",
+      "render_open_close_locus": "conditional render/open/close L329",
+      "static_chain": "modal state -> review handler/setModal -> action trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/MedicationErrors.tsx",
+      "line": 330,
+      "symbol": "ResolveErrorDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal discriminated union L39; modal/setModal L76",
+      "trigger_loci": "resolve handler/trigger L130,L313",
+      "render_open_close_locus": "conditional render/open/close L330",
+      "static_chain": "modal state -> resolve handler/setModal -> action trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/MedicationErrors.tsx",
+      "line": 331,
+      "symbol": "CloseErrorDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "modal discriminated union L39; modal/setModal L76",
+      "trigger_loci": "close handler/trigger L131,L314",
+      "render_open_close_locus": "conditional render/open/close L331",
+      "static_chain": "modal state -> close handler/setModal -> action trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    }
+  ],
+  "source_map": [
+    {
+      "identity": "resources/js/pages/emar/Index.tsx:1383:MedicationReviewModal",
+      "source_path": "resources/js/pages/emar/Index.tsx",
+      "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+      "loci": [
+        "modal union and modal/setModal L404-L414; helper L421-L424",
+        "medication-review trigger L1189",
+        "component/open/close L1383-L1385"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Index.tsx:1388:CdRegisterModal",
+      "source_path": "resources/js/pages/emar/Index.tsx",
+      "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+      "loci": [
+        "modal union and modal/setModal L404-L414; helper L421-L424",
+        "controlled-register trigger L887",
+        "component/open/close L1388-L1390"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Index.tsx:1397:StockMovementModal",
+      "source_path": "resources/js/pages/emar/Index.tsx",
+      "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+      "loci": [
+        "modal union and modal/setModal L404-L414; helper L421-L424",
+        "stock-movement trigger L1238",
+        "component/open/close L1397-L1399"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Index.tsx:1404:ReportsModal",
+      "source_path": "resources/js/pages/emar/Index.tsx",
+      "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+      "loci": [
+        "modal union and modal/setModal L404-L414; helper L421-L424",
+        "reports trigger L686",
+        "component/open/close L1404-L1406"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Index.tsx:1410:AuditLogModal",
+      "source_path": "resources/js/pages/emar/Index.tsx",
+      "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+      "loci": [
+        "modal union and modal/setModal L404-L414; helper L421-L424",
+        "audit-log trigger L921",
+        "component/open/close L1410-L1412"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/MedicationErrors.tsx:327:ReportErrorModal",
+      "source_path": "resources/js/pages/emar/MedicationErrors.tsx",
+      "source_sha256": "65b4c078bbd9421ed4bead50a9f66bb4a3b59f8c6da3b68d25f1e3d73ced0d03",
+      "loci": [
+        "modal discriminated union L39; modal/setModal L76",
+        "report trigger L202",
+        "conditional render/open/close L327"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/MedicationErrors.tsx:328:TriageDialog",
+      "source_path": "resources/js/pages/emar/MedicationErrors.tsx",
+      "source_sha256": "65b4c078bbd9421ed4bead50a9f66bb4a3b59f8c6da3b68d25f1e3d73ced0d03",
+      "loci": [
+        "modal discriminated union L39; modal/setModal L76",
+        "triage handlers/triggers L128,L301,L311",
+        "conditional render/open/close L328"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/MedicationErrors.tsx:329:ReviewErrorDialog",
+      "source_path": "resources/js/pages/emar/MedicationErrors.tsx",
+      "source_sha256": "65b4c078bbd9421ed4bead50a9f66bb4a3b59f8c6da3b68d25f1e3d73ced0d03",
+      "loci": [
+        "modal discriminated union L39; modal/setModal L76",
+        "review handler/trigger L129,L312",
+        "conditional render/open/close L329"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/MedicationErrors.tsx:330:ResolveErrorDialog",
+      "source_path": "resources/js/pages/emar/MedicationErrors.tsx",
+      "source_sha256": "65b4c078bbd9421ed4bead50a9f66bb4a3b59f8c6da3b68d25f1e3d73ced0d03",
+      "loci": [
+        "modal discriminated union L39; modal/setModal L76",
+        "resolve handler/trigger L130,L313",
+        "conditional render/open/close L330"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/MedicationErrors.tsx:331:CloseErrorDialog",
+      "source_path": "resources/js/pages/emar/MedicationErrors.tsx",
+      "source_sha256": "65b4c078bbd9421ed4bead50a9f66bb4a3b59f8c6da3b68d25f1e3d73ced0d03",
+      "loci": [
+        "modal discriminated union L39; modal/setModal L76",
+        "close handler/trigger L131,L314",
+        "conditional render/open/close L331"
+      ]
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 243,
+    "source_inferred_not_exactly_paired": 149,
+    "unresolved_or_blocked": 267,
+    "same_scope_state_handler": 224,
+    "internal_state_trigger_candidate": 149,
+    "controlled_without_resolved_activator": 250,
+    "generic_unresolved": 265,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 242,
+    "primitive_unresolved": 235
+  }
+}

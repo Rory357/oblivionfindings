@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-visual-wave09-overlay8-generation-summary",
+  "generated_at": "2026-08-22T00:25:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "outputs": {
+    "visual_wave09": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave09.json",
+      "sha256": "c4c84e5e27f0eeb472075ee3295236628541f5aab6b9c1644575eef528223ff9",
+      "bytes": 8831
+    },
+    "overlay_wave8": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave8.json",
+      "sha256": "1bbac405622088bcfe5b35e8ca8f923fec55e3bb39e77dd90357188f688f3b27",
+      "bytes": 9301
+    },
+    "overlay_classifier": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "5c105d68a9a25723a1c2d94da4582bcff5c035a08cceeb6477bc602c165cc0b8",
+      "bytes": 1146292
+    }
+  },
+  "counts": {
+    "visual_assigned": 8168,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "overlay_exact_resolved": 233,
+    "overlay_unresolved_or_blocked": 267,
+    "primitive_exact_resolved": 242,
+    "primitive_unresolved": 235
+  },
+  "credit_boundary": {
+    "visual_final_id_promotions": 0,
+    "overlay_static_pairings": 10,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

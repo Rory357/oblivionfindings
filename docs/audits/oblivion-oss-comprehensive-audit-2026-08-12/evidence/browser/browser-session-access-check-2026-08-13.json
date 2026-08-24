@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "artifact": "browser-session-access-check",
+  "status": "historical_signed_out_checkpoint_superseded_by_later_authorised_signed_in_role_pass",
+  "superseded_by": "../source/browser-representative-role-pass-901.json",
+  "checked_at": "2026-08-13T06:58:45.4322936+12:00",
+  "audited_source_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "environment_status": "owner-confirmed test/development application; deployed commit SHA not exposed or independently verified",
+  "browser_surface": "Chrome extension session",
+  "requested_url": "https://oblivionfindings.com/dashboard",
+  "final_url": "https://oblivionfindings.com/login",
+  "page_title": "Oblivion Findings",
+  "visible_state": {
+    "heading": "Log in to your account",
+    "email_field_present": true,
+    "password_field_present": true,
+    "login_button_present": true
+  },
+  "mutation_boundary": {
+    "credentials_entered": false,
+    "form_submitted": false,
+    "record_or_workflow_mutation": false
+  },
+  "decision": "A fresh safe GET to /dashboard redirected to /login and the DOM exposed the login form. The browser session available to this audit is not authenticated. Representative-role task execution, viewport journey execution and any new signed-in visual claims remain blocked until the owner exposes a signed-in test/development tab to the browser-control session.",
+  "minimum_input": "Open and sign in to the test/development application in a Chrome tab connected to Codex, leave that tab open, and confirm it is ready. Do not provide the password, MFA code, token or other secret in the chat."
+}

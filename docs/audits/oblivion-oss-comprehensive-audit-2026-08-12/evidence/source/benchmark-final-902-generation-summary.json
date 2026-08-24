@@ -1,0 +1,346 @@
+{
+  "schema_version": "1.0",
+  "artifact": "benchmark-final-902-generation-summary",
+  "generated_at": "2026-08-21T15:29:41+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "inputs": {
+    "working_manifest": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+      "canonical_stable_target_ids_sha256": "dbf32e2b9058996878ed25de132d0f65f284d769e234d993adef86fa0647f05d"
+    },
+    "prior_901_mapping": {
+      "path": "evidence/source/benchmark-final-901-mapping.json",
+      "file_sha256": "e3b650ab6303424e925acdcf6a4c9d0077de9d472bd71d8cb362290aa9294cc5",
+      "full_mapping_sha256": "1aedd86bab9e4bbca1d172690cdf7ecae7a35753b9b22186e0f74bee9f698e09",
+      "eligible_subset_sha256": "9c034eff0ae7cb7e5f1794e7f434695a370f7ddfee4a76d58c32f1ac7181964b"
+    },
+    "target_specific_wave4": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave4.json",
+      "file_sha256": "6eba8e290637fcdb5045ad80cb5ac0579b3843a1bfe348a4ff2728d62fefbe04",
+      "accepted_direct_keys_sha256": "d0f397605babbfad606b973ae119e40abdf763ad7e2a321969d2bfe7c220286f",
+      "pending_ncm_keys_sha256": "8fca2624fb75991a5bb10fe76d113eb5b4d6f3ec7090c1386d07067ccf9c40f4"
+    },
+    "target_specific_wave5": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave5.json",
+      "file_sha256": "3ba4abf748ce30f8ac84746e817ecc839e9698ac951613c720677f561de799d3",
+      "accepted_direct_count": 12
+    },
+    "target_specific_wave6": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave6.json",
+      "file_sha256": "7fe743d46ec1351b9655da564baf7ebbf506af9e5e125ee28541b9c913e34ebb",
+      "accepted_direct_count": 12
+    },
+    "target_specific_wave7": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave7.json",
+      "file_sha256": "5f3674bf651cfa63ff74d4862e3b2b49d03c659985addb788c26281c42fd0dcb",
+      "accepted_direct_count": 12
+    },
+    "target_specific_wave8": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave8.json",
+      "file_sha256": "ba191214a4f2e7d453aa3867d267e8f1cd72eb6354d0e1fea459f69f3b185b8c",
+      "accepted_direct_count": 10,
+      "historical_documented_ncm_count": 2,
+      "accepted_documented_ncm_count_after_withdrawal": 0
+    },
+    "wave8_ncm_withdrawal": {
+      "path": "evidence/source/benchmark-wave8-ncm-withdrawal-adjudication.json",
+      "file_sha256": "17ba2e52588e06a2329b3ae849b815e9906506f91b13685fdaba4b3df8d40c64",
+      "withdrawn_key_count": 2,
+      "withdrawn_keys_sha256": "6919e112b459516d4c0075633cdef2f1c18e49a48959cec5b4607fe78e1ac538",
+      "replacement_tuple_sha256": "e2a8bd5b704427318ab8dcd8f1fd23ab9dec7049cab2b452058682dd3cf2bf60"
+    },
+    "target_specific_wave9": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave9.json",
+      "file_sha256": "e8a5550011168155c7fcfc7f84e8a3e541a4725c8fbbeded9516a77a6caf8a08",
+      "accepted_direct_count": 12,
+      "selected_keys_sha256": "f269ad458ac5434605621dbe5b3ebb5c0801ad09375446319df1c809ee1ab367",
+      "selected_lineage_tuple_sha256": "1c9d96cd458673c6a56e16b8db0fee9b648029543d95de5ba196dcec81b59a99"
+    },
+    "target_specific_wave10": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave10.json",
+      "file_sha256": "5dfa91dc364b1546cdbbb49df371a24406205110974606a38696838ff7380db2",
+      "accepted_direct_count": 12,
+      "selected_keys_sha256": "86484e9b3e464feb1d9269c219692ac5e4bc27f39a20f60d0a9b8da998707c73",
+      "selected_lineage_tuple_sha256": "06f7beab9c13df8423a775d03c45a487bfb571558abf66cb35619d5b9134912b"
+    },
+    "target_specific_wave11": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave11.json",
+      "file_sha256": "2a9a605130be69fb350b9bec7954dcc670050c006ca655e68edd5befd84f1832",
+      "accepted_direct_count": 12,
+      "selected_keys_sha256": "660e1e589b2ae14a501a6b43eb210e8fe8b7bfd7d3ff710bc99f236465bb6f8e",
+      "selected_lineage_tuple_sha256": "f0ff1bfaf9dbc1eea1cdcd4c87edd80ec308d081f397bbc389ecbeb210cc9bdc",
+      "source_slice_reuse_disclosure": [
+        "No Wave-11 target key appears in Waves 4-10; there is no prior target-key reuse or inherited source-family credit.",
+        "The same Frappe private-file slice intentionally informs four distinct download targets in Wave 11. Each row limits credit to generic private attached-file authorization, access logging and serving behavior and does not inherit domain-specific policy.",
+        "CAP-DAY-NOTIFICATION-CENTRE reuses the pinned Mastodon notification and marker slice used by Wave-10 CAP-PORT-NOTIFICATION-CENTRE, with independent current-target lineage and explicit Frontline parity limits.",
+        "CAP-PUB-CONTACT-LEAD-SUBMISSION reuses part of the pinned Frappe Web Form submission slice used by Wave-10 CAP-OPS-CUSTOM-FORM-SUBMISSION, with a narrower public-contact parity boundary.",
+        "CAP-SET-PERSONAL-NOTIFICATION-PREFERENCES reuses Mastodon preference controller and base loci used by Wave-10 CAP-PORT-PREFERENCES and adds target-specific UserSettings notification and value-validation loci.",
+        "CAP-PORT-EXTERNAL-IDENTITY-ADMISSION overlaps Wave-4 CAP-AUTH-STAFF-EXTERNAL-IDENTITY at broker login and callback loci but adds distinct first-broker-flow dispatch and post-success link, import and update loci.",
+        "Keycloak UserResource appeared in Wave 6 at unrelated session-management lines; Wave 11 uses the distinct impersonation method at L369-L430.",
+        "This reuse is disclosed because the audit prompt expressly allows one benchmark to inform several features; it does not confer mechanical completion credit."
+      ]
+    },
+    "target_specific_wave12": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave12.json",
+      "file_sha256": "7796987c90ee4ac0ca1406d48c0a840f75ab7d358158a822ea4e4e2cee5f7416",
+      "accepted_direct_count": 8,
+      "accepted_documented_ncm_count": 4,
+      "selected_keys_sha256": "c583554302f8bce2e00ae5d8f7a5a4d93c0bb134eec6862347f5d0a61cfdf0bf",
+      "selected_lineage_tuple_sha256": "58bb2e9868a46191fa7c5046607b2b6133ce1c370d2b3ba9129d1e9da215955b",
+      "source_slice_reuse_disclosure": [
+        "No target-key reuse. CARE booking is intentionally shared by three distinct rows; Sahana incident material is shared by three incident rows; OpenMRS/OpenProject slices appeared against other keys in earlier waves. Every row uses independent current manifest lineage and receives no source-family inheritance."
+      ]
+    },
+    "target_specific_wave13": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave13.json",
+      "file_sha256": "63a3768ef3aaeada1c75bf2b10b79f0c5cd53605de1a88ec8e00f2dd3294a3c3",
+      "accepted_direct_count": 11,
+      "accepted_documented_ncm_count": 1,
+      "selected_keys_sha256": "47106ee802d46e1521b35b4d723a856c5ac28be07d5bf576bc3b20dcf05726ad",
+      "selected_lineage_tuple_sha256": "04db739d77600492a094ef66a3b0eace667af096ed39f9d6214c125dc69d96a3",
+      "review_decision_reference_sha256": "5c2efcffd7660c9ddc2485f03dcf33c8b3e9fc30a4dd96769be4a32a3035e613",
+      "source_slice_reuse_disclosure": [
+        "No target-key reuse. Sales Invoice ranges are disjoint by target; prior quotation and File waves used different commits or ranges; the risk NCM reuses OpenProject only as bounded rejection evidence."
+      ]
+    },
+    "target_specific_wave14": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave14.json",
+      "file_sha256": "cd1501484a8b7b53f1628a0df1daeb96ad45ef80e590a5544459d2d31bba183b",
+      "accepted_direct_count": 4,
+      "retained_unproved_count": 8,
+      "source_slice_reuse_disclosure": [
+        "FIN-BANK-TRANSACTION is limited to ERPNext bank-transaction validation/status lines 13-116. ERPNext allocation/reconciliation lines 174-304 and the previously credited BigCapital MatchTransactions slice are explicitly excluded to avoid collision with FIN-BANK-RECONCILIATION and FIN-PAYMENT-MATCH.",
+        "The two Fides credits use disjoint source loci: the DSR package builder for export generation and the privacy-request endpoints for fulfilment decisions. No other target receives inherited Fides credit."
+      ]
+    },
+    "target_specific_wave16": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave16.json",
+      "file_sha256": "0fd33aca3396c54f142900484b06a73f8645884598eab19aff033742cb81e49c",
+      "accepted_direct_count": 4,
+      "retained_unproved_count": 3,
+      "selection_sha256": "62a72879e9c701bd63f552a4e2398717a43b0dbaa8697b4317bbae80272a973b"
+    },
+    "target_specific_wave17": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave17.json",
+      "file_sha256": "07860807a51ce1e52c59c3dc520671a89672c0bdca2b95948a6fc13f8fdf5c7a",
+      "accepted_direct_count": 2,
+      "retained_unproved_count": 6,
+      "selection_sha256": "a7d1470c4625670a42f834b9392788ce2e3a20b72099c3cd010f8393b3806a78"
+    },
+    "target_specific_wave18": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave18.json",
+      "file_sha256": "9e8f63fab776c065fe026f74832182dff71f381b5ef239b74ce888c66c41b693",
+      "accepted_direct_count": 1,
+      "retained_unproved_count": 7,
+      "selection_sha256": "b29212c2a7e2d73aa54ad5ba2d556900f1bd41b278a875f9ef344398610f21bc"
+    },
+    "target_specific_wave19": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave19.json",
+      "file_sha256": "e1ba0aa31a964e4baa2b1a6b1b8d24e879eced71d11b3a525f87c5273e7939ba",
+      "accepted_direct_count": 2,
+      "retained_unproved_count": 6,
+      "selection_sha256": "884b429ad41c36807fd53462f4bd5f1be6d38f1898e0271f44bcb5b7faa80c89"
+    },
+    "target_specific_wave20": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave20.json",
+      "file_sha256": "e084378b467aca63b473e4717b2dd0c8604acdc76d53f0e61c233a021394cd9f",
+      "accepted_direct_count": 1,
+      "retained_unproved_count": 7,
+      "selection_sha256": "3e47fd9d476465ba464e62242af92e51a187774dc22b767e565d47a6174b43a5"
+    },
+    "target_specific_wave21": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave21.json",
+      "file_sha256": "9474a59f10a3aad16ec1dfaeb7e976b9e5f7386a5655c564834e197e092cd2fb",
+      "accepted_direct_count": 3,
+      "retained_unproved_count": 5,
+      "selection_sha256": "39db9d65319aaf060646a7dc036ba3c2ce8c8744b09517a14b3cee2409c2f380"
+    },
+    "target_specific_wave22": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave22.json",
+      "file_sha256": "e9b28de8e44d46cab9e824e0d9ab362300b53714ab6abb34ce3bafe395c66b98",
+      "accepted_direct_count": 4,
+      "retained_unproved_count": 4,
+      "selection_sha256": "d718f3e323ea599c714b7022b15665fa5f719dda9fcd77d48dc4b94a335c8173"
+    },
+    "target_specific_wave23": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave23.json",
+      "file_sha256": "16b0c90fa8d2cca7b6c9e64670953b47612d0f0cfaac08eb6ccbe28e3a8cfd3e",
+      "accepted_direct_count": 3,
+      "retained_unproved_count": 5,
+      "selection_sha256": "b485700df164e40645fb1c8883d2d8237a9b13db667b1fd1ca2fa86a30c52654"
+    },
+    "target_specific_wave24": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave24.json",
+      "file_sha256": "c96e62aae6964ee6f1fe8633b6ec07c553dccd42cf1ed352544ca7b234f47c38",
+      "accepted_direct_count": 1,
+      "retained_unproved_count": 7,
+      "selection_sha256": "29bee80caa6973b7fdd945f53be1d130ff52841fbafc7baf9e1447fce90c7bba"
+    },
+    "target_specific_wave27": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave27.json",
+      "file_sha256": "405e89ae05e02dbebce8cf1cd484010a603714baff1cf6dab0b0879214e2226e",
+      "accepted_direct_count": 2,
+      "retained_unproved_count": 6,
+      "selection_sha256": "97b24351bd622ae479f28afbd4092972d620a1fe4c1f5436f0130dbc52f825d8"
+    },
+    "target_specific_wave28": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave28.json",
+      "file_sha256": "d68aa992bef7c76b2f91e04a284c3f55174fae618c27785a482429f747a17084",
+      "accepted_direct_count": 3,
+      "retained_unproved_count": 5,
+      "selection_sha256": "b2eb9d13831052470efe6c951b08d59fc8ff7e57ef9470bee8e8afe68cb84de3"
+    },
+    "target_specific_wave30": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave30.json",
+      "file_sha256": "5fd6e15f7796915c1d4ca2b97cecdc77d0732d030ea4b3c0fc4b1fd78cbc23a7",
+      "accepted_direct_count": 1,
+      "retained_unproved_count": 7,
+      "selection_sha256": "ff8f2cf36a60b9086045173bca9524399fc9287b7ba24528d901e9450a46e343"
+    },
+    "inherited_adjudication_provenance": {
+      "working_manifest": {
+        "path": "evidence/source/working-capability-manifest-901.json",
+        "file_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900",
+        "canonical_stable_target_ids_sha256": "170c06d9d7a3cc57d9046d37b56c37d9a35fab834112095bc7826102b09f4985"
+      },
+      "base_894_mapping": {
+        "path": "evidence/source/benchmark-final-894-mapping.json",
+        "file_sha256": "b411dc410273fb7a18623af45b2be6f691a716accea1161d4d0e3238cd8e9131"
+      },
+      "fresh_target_specific_adjudication": {
+        "path": "evidence/source/benchmark-target-specific-adjudication-901.json",
+        "file_sha256": "dd09aec14bb1cfd7016fbfea6150c97a969cc470d6ba2ca73b229a3601cf6054"
+      },
+      "fresh_target_specific_adjudication_wave2": {
+        "path": "evidence/source/benchmark-target-specific-adjudication-901-wave2.json",
+        "file_sha256": "0df1ca60ec838542a1d323a079b98a2b39ec0e3797a3ae174613483cfe98d7bc"
+      },
+      "fresh_target_specific_adjudication_wave3": {
+        "path": "evidence/source/benchmark-target-specific-adjudication-901-wave3.json",
+        "file_sha256": "6934bf243f9db549f9be8230b1f9133a333634ab5b21dc5fc6de0e8f7d5c009c"
+      },
+      "selected_benchmark_adjudication": {
+        "path": "evidence/source/selected-benchmark-adjudication.json",
+        "file_sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3"
+      },
+      "no_credible_match_adjudication": {
+        "path": "evidence/source/no-credible-match-adjudication.json",
+        "file_sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71"
+      }
+    },
+    "target_specific_wave15_zero_delta": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave15.json",
+      "file_sha256": "c0a57c0ee8e248d6ddded383e09c378ed43fd38430c5b21218f6ea6398ad551b",
+      "retained_unproved_count": 12,
+      "completion_credit_delta": 0
+    }
+  },
+  "output": {
+    "file": "benchmark-final-902-mapping.json",
+    "sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c"
+  },
+  "counts": {
+    "verified_benchmark": {
+      "direct": 340,
+      "strict_one_to_one_rename": 22,
+      "total": 362
+    },
+    "documented_no_credible_match": {
+      "direct": 82,
+      "strict_one_to_one_rename": 7,
+      "total": 89
+    },
+    "eligible_total": 451,
+    "completion_unproved": {
+      "ordinary": 413,
+      "audit_assigned_stable_name": 10,
+      "prior_pending": 24,
+      "prior_reject": 3,
+      "source_stable_semantic_merge": 1,
+      "total": 451
+    },
+    "status_counts": {
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "unproved": 413,
+      "unproved_audit_assigned_id": 10,
+      "unproved_pending": 24,
+      "unproved_reject": 3,
+      "unproved_source_stable": 1,
+      "verified_benchmark_direct": 340,
+      "verified_benchmark_rename": 22
+    }
+  },
+  "checksums": {
+    "tuple_schema": "working_key|status|source_units|evidence_loci",
+    "array_encoding": "Ordinal-sort and deduplicate source_units and evidence_loci independently; join each array with semicolon.",
+    "record_encoding": "Ordinal-sort complete tuple lines; join with LF and no terminal LF; UTF-8 without BOM; SHA-256 lowercase hexadecimal.",
+    "eligible_subset": "Rows where completion_credit is true.",
+    "full_mapping_sha256": "ba3d7b6705667c5b7d1c16baefab6c4ed0f8533830a7aae3ccf262e345899d7d",
+    "eligible_subset_sha256": "8b29940543fe57a24544b362681939209a305d973c5bbac466820f785adc1394"
+  },
+  "validation": {
+    "manifest_sha256_matches_pin": true,
+    "exact_manifest_key_set": true,
+    "unique_target_keys": true,
+    "manifest_class_partition": {
+      "H": 788,
+      "D": 111,
+      "M": 3
+    },
+    "only_expected_target_added": true,
+    "prior_901_non_wave_rows_preserved_exactly": true,
+    "wave4_direct_rows_verified": true,
+    "wave4_pending_ncm_rows_uncredited": true,
+    "wave5_direct_rows_verified": true,
+    "wave6_direct_rows_verified": true,
+    "wave7_direct_rows_verified": true,
+    "wave8_direct_rows_verified": true,
+    "wave8_historical_documented_ncm_rows_withdrawn": true,
+    "wave9_direct_rows_verified": true,
+    "wave10_direct_rows_verified": true,
+    "wave11_direct_rows_verified": true,
+    "wave12_direct_rows_verified": true,
+    "wave12_documented_ncm_rows_verified": true,
+    "wave13_direct_rows_verified": true,
+    "wave13_documented_ncm_rows_verified": true,
+    "wave14_direct_rows_verified": true,
+    "wave14_retained_unproved_rows_unchanged": true,
+    "wave15_zero_delta_rows_remain_unproved": true,
+    "wave16_direct_rows_verified": true,
+    "wave16_retained_unproved_rows_unchanged": true,
+    "wave17_direct_rows_verified": true,
+    "wave17_retained_unproved_rows_unchanged": true,
+    "wave18_direct_rows_verified": true,
+    "wave18_retained_unproved_rows_unchanged": true,
+    "wave19_direct_rows_verified": true,
+    "wave19_retained_unproved_rows_unchanged": true,
+    "wave20_direct_rows_verified": true,
+    "wave20_retained_unproved_rows_unchanged": true,
+    "wave21_direct_rows_verified": true,
+    "wave21_retained_unproved_rows_unchanged": true,
+    "wave22_direct_rows_verified": true,
+    "wave22_retained_unproved_rows_unchanged": true,
+    "wave23_direct_rows_verified": true,
+    "wave23_retained_unproved_rows_unchanged": true,
+    "wave24_direct_rows_verified": true,
+    "wave24_retained_unproved_rows_unchanged": true,
+    "wave27_direct_rows_verified": true,
+    "wave27_retained_unproved_rows_unchanged": true,
+    "wave28_direct_rows_verified": true,
+    "wave28_retained_unproved_rows_unchanged": true,
+    "wave30_direct_rows_verified": true,
+    "wave30_retained_unproved_rows_unchanged": true,
+    "new_target_status": "unproved_audit_assigned_id",
+    "new_target_has_no_inherited_credit": true,
+    "eligible_target_set_is_prior_plus_wave4_through_wave30_outcomes": true,
+    "eligible_rows_have_one_source_unit": true,
+    "eligible_rows_have_evidence_loci": true,
+    "lineage_snapshots_match_manifest": true
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "451/902 targets still require completed target-specific benchmark or bounded No Credible Match adjudication."
+  }
+}

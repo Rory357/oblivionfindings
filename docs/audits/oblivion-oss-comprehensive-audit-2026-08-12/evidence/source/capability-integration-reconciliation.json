@@ -1,0 +1,1094 @@
+{
+  "schema_version": "2.0",
+  "artifact": "capability-integration-reconciliation",
+  "generated_at": "2026-08-12T04:06:38.989Z",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "historical_superseded_projection_evidence_only",
+  "superseded_by": [
+    "working-capability-manifest-894.json",
+    "final-capability-denominator-reconciliation.json",
+    "final-894-ledger-generation-summary.json",
+    "final-894-visual-link-generation-summary.json"
+  ],
+  "current_authority_summary": {
+    "status": "canonical_902_register_current",
+    "manifest": "working-capability-manifest-902.json",
+    "manifest_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "counts": {
+      "total": 902,
+      "H": 788,
+      "D": 111,
+      "M": 3
+    },
+    "benchmark_completion_credit": 451,
+    "benchmark_completion_unproved": 451,
+    "note": "All other projection counts in this artifact are frozen historical lineage evidence."
+  },
+  "historical_counts": {
+    "canonical_capabilities": 740,
+    "human_capabilities": 686,
+    "non_human_capabilities": 54,
+    "selected_broad_families_replaced": 70,
+    "replacement_capabilities": 215,
+    "routes_total": 3024,
+    "routes_assigned_exactly_once": 3024,
+    "pages_total": 962,
+    "pages_with_primary_mapping": 962,
+    "task_scripts": 686,
+    "score_rows": 686,
+    "ledger_rows": 740,
+    "matrix_rows": 740,
+    "material_state_rows": 4738,
+    "material_states_executed": 0
+  },
+  "machine_ingress_reclassified": [
+    "PLAT-WEBHOOK-RECEIVER",
+    "SEC-ASSET-TELEMETRY-INGEST"
+  ],
+  "corrected_page_assignments": {
+    "PAGE-0472": "CAP-HR-MY-HR-HOME-DIRECTORY-BENEFITS",
+    "PAGE-0474": "CAP-HR-MY-HR-ONE-REVIEWS"
+  },
+  "material_state_class_counts": {
+    "updated/revised": 357,
+    "cancelled/removed/archived": 201,
+    "validation/error gap": 527,
+    "destructive/irreversible confirmation gap": 214,
+    "permission/direct-object denial gap": 663,
+    "not-found/direct-object gap": 511,
+    "create/recorded": 404,
+    "approved/acknowledged/verified": 126,
+    "completed/closed/released": 76,
+    "downloaded/exported/printed": 113,
+    "read/list/detail": 453,
+    "loading/empty/error presentation gap": 506,
+    "responsive/keyboard presentation gap": 506,
+    "escalated/flagged": 28,
+    "retried/replayed/reconciled": 16,
+    "rejected/returned": 34,
+    "state applicability unresolved": 3
+  },
+  "finding_link_method": "Exact finding route-name/path or page-file intersection; one-to-one unchanged families retained; unresolved split-family links are not blanket-expanded.",
+  "historical_projection_finding_links": [
+    {
+      "finding_id": "ARCH-P0-A",
+      "legacy_feature_ids": [
+        "CR-CONTROL-ROOM-TASK",
+        "CR-CONTROL-ROOM-DISCUSSION",
+        "CR-CONTROL-ROOM-EVIDENCE",
+        "CR-CONTROL-ROOM-ESCALATION",
+        "CR-CONTROL-ROOM-PLAYBOOK",
+        "CR-CONTROL-ROOM-TIME-ENTRY",
+        "CR-CONTROL-ROOM-WATCHER"
+      ],
+      "canonical_capability_ids": [
+        "CR-CONTROL-ROOM-DISCUSSION",
+        "CR-CONTROL-ROOM-ESCALATION",
+        "CR-CONTROL-ROOM-EVIDENCE",
+        "CR-CONTROL-ROOM-PLAYBOOK",
+        "CR-CONTROL-ROOM-TASK",
+        "CR-CONTROL-ROOM-TIME-ENTRY",
+        "CR-CONTROL-ROOM-WATCHER"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "ARCH-P0-B",
+      "legacy_feature_ids": [
+        "CR-CONTROL-ROOM-DEVICE",
+        "SEC-DEVICE",
+        "SEC-DEVICE-ASSIGNMENT",
+        "FLEET-RESIDENT-TRACKING"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SEC-DEVICE-IDENTITY-ATTRIBUTES",
+        "CAP-SEC-DEVICE-LINKAGE",
+        "CR-CONTROL-ROOM-DEVICE",
+        "FLEET-RESIDENT-TRACKING",
+        "SEC-DEVICE-ASSIGNMENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "ARCH-P0-C",
+      "legacy_feature_ids": [
+        "CR-ALERT",
+        "FLEET-ALERT",
+        "PLAT-WEBHOOK-RECEIVER",
+        "SEC-ALERTS-EVENTS"
+      ],
+      "canonical_capability_ids": [
+        "CR-ALERT",
+        "FLEET-ALERT",
+        "PLAT-WEBHOOK-RECEIVER",
+        "SEC-ALERTS-EVENTS"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "ASSET-RBAC-01",
+      "legacy_feature_ids": [
+        "FLEET-ASSET",
+        "ASSET-ASSET"
+      ],
+      "canonical_capability_ids": [
+        "ASSET-ASSET",
+        "FLEET-ASSET"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CLIN-SCHEDULE-01",
+      "legacy_feature_ids": [
+        "CLIN-HEALTH-CLINICAL-PROTOCOL",
+        "CLIN-SHIFT-CLINICAL"
+      ],
+      "canonical_capability_ids": [
+        "CLIN-HEALTH-CLINICAL-PROTOCOL",
+        "CLIN-SHIFT-CLINICAL"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CLIN-SITE-01",
+      "legacy_feature_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD",
+        "CLIN-HEALTH-CLINICAL"
+      ],
+      "canonical_capability_ids": [
+        "CLIN-HEALTH-CLINICAL",
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FLEET-TRANSPORT-01",
+      "legacy_feature_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "canonical_capability_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "HS-SITE-01",
+      "legacy_feature_ids": [
+        "HS-HS-EVENT",
+        "HS-HEALTH-SAFETY-DASHBOARD",
+        "HS-RETURN-TO-WORK",
+        "HS-RESTRAINT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HS-RESTRAINT-EVENTS-OVERSIGHT",
+        "CAP-HS-RESTRAINT-PLANS",
+        "CAP-HS-RETURN-TO-WORK-INJURY-CAPACITY",
+        "CAP-HS-RETURN-TO-WORK-RTW-PLANS-DUTIES",
+        "HS-HEALTH-SAFETY-DASHBOARD",
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "MED-COMP-01",
+      "legacy_feature_ids": [
+        "MED-EMAR",
+        "HR-COMPETENCY"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "HR-COMPETENCY"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "MED-OVERRIDE-01",
+      "legacy_feature_ids": [
+        "MED-MEDICATIONS-API",
+        "MED-EMAR"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "MED-MEDICATIONS-API"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "MED-SCOPE-01",
+      "legacy_feature_ids": [
+        "MED-GUIDED-ROUND",
+        "MED-WORKER-MEDS",
+        "MED-EMAR",
+        "MED-MEDICATIONS-API"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "MED-GUIDED-ROUND",
+        "MED-MEDICATIONS-API",
+        "MED-WORKER-MEDS"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "RESP-SCOPE-01",
+      "legacy_feature_ids": [
+        "RESP-RESPITE-DAILY-NOTE",
+        "RESP-RESPITE-STAY",
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "canonical_capability_ids": [
+        "CAP-RESP-RESPITE-STAY-ADMISSION-DISCHARGE",
+        "CAP-RESP-RESPITE-STAY-BED-HOLD-EXTENSION",
+        "CAP-RESP-RESPITE-STAY-CLINICAL-RECONCILIATION",
+        "CAP-RESP-RESPITE-STAY-INCIDENTS-COMPLAINTS",
+        "RESP-RESPITE-DAILY-NOTE",
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "RETENTION-EXEC-01",
+      "legacy_feature_ids": [
+        "PRIV-DATA-RETENTION-POLICY",
+        "PRIV-DATA-DELETION-LOG"
+      ],
+      "canonical_capability_ids": [
+        "PRIV-DATA-DELETION-LOG",
+        "PRIV-DATA-RETENTION-POLICY"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SAFE-NESTED-01",
+      "legacy_feature_ids": [
+        "INC-SAFEGUARDING-INVESTIGATION",
+        "INC-SAFEGUARDING-EXTERNAL-REPORT",
+        "INC-SAFEGUARDING-ACTION-PLAN"
+      ],
+      "canonical_capability_ids": [
+        "INC-SAFEGUARDING-ACTION-PLAN",
+        "INC-SAFEGUARDING-EXTERNAL-REPORT",
+        "INC-SAFEGUARDING-INVESTIGATION"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SITE-MEAL-CLIN-01",
+      "legacy_feature_ids": [
+        "SITE-SITE-MEAL-PLAN",
+        "CLI-CLIENT-MEAL-PREFERENCES",
+        "SITE-DIETARY-TAG"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SITE-SITE-MEAL-PLAN-RESIDENT-SUITABILITY",
+        "CAP-SITE-SITE-MEAL-PLAN-SERVICE-VENDORS",
+        "CAP-SITE-SITE-MEAL-PLAN-WEEKLY-PLANNING",
+        "CLI-CLIENT-MEAL-PREFERENCES",
+        "SITE-DIETARY-TAG"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-ELIG-FAIL-OPEN",
+      "legacy_feature_ids": [
+        "OPS-ROSTER",
+        "OPS-JOB-BOARD"
+      ],
+      "canonical_capability_ids": [
+        "OPS-JOB-BOARD",
+        "OPS-ROSTER"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-HR-PROFILE-SITE-PRIVACY",
+      "legacy_feature_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-HR-API"
+      ],
+      "canonical_capability_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-HR-API"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CARE-SIGNOFF-01",
+      "legacy_feature_ids": [
+        "OPS-CARE-PLAN"
+      ],
+      "canonical_capability_ids": [
+        "CAP-OPS-CARE-PLAN-AUTHORING",
+        "CAP-OPS-CARE-PLAN-REVIEW-CYCLE",
+        "CAP-OPS-CARE-PLAN-SIGNOFF"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CATER-SCOPE-003",
+      "legacy_feature_ids": [
+        "SITE-SITE-MEAL-PLAN",
+        "SITE-RECIPE"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SITE-SITE-MEAL-PLAN-RESIDENT-SUITABILITY",
+        "CAP-SITE-SITE-MEAL-PLAN-SERVICE-VENDORS",
+        "CAP-SITE-SITE-MEAL-PLAN-WEEKLY-PLANNING",
+        "SITE-RECIPE"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CATER-STOCK-002",
+      "legacy_feature_ids": [
+        "SITE-SITE-MEAL-PLAN",
+        "SITE-SITE-MEAL-INVENTORY"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SITE-SITE-MEAL-PLAN-RESIDENT-SUITABILITY",
+        "CAP-SITE-SITE-MEAL-PLAN-SERVICE-VENDORS",
+        "CAP-SITE-SITE-MEAL-PLAN-WEEKLY-PLANNING",
+        "SITE-SITE-MEAL-INVENTORY"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CONSENT-AUTH-01",
+      "legacy_feature_ids": [
+        "OPS-CONSENT-REQUEST",
+        "CLI-CONSENT-REQUEST-PORTAL",
+        "OPS-CLIENT-CONSENT"
+      ],
+      "canonical_capability_ids": [
+        "CLI-CONSENT-REQUEST-PORTAL",
+        "OPS-CLIENT-CONSENT",
+        "OPS-CONSENT-REQUEST"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CONSENT-CAPACITY-01",
+      "legacy_feature_ids": [
+        "OPS-CONSENT-REQUEST",
+        "OPS-CLIENT-CONSENT"
+      ],
+      "canonical_capability_ids": [
+        "OPS-CLIENT-CONSENT",
+        "OPS-CONSENT-REQUEST"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CTRL-RBAC-001",
+      "legacy_feature_ids": [
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-CR-CONTROL-ROOM-ALERT-INTAKE-TRIAGE",
+        "CAP-CR-CONTROL-ROOM-ALERT-OWNERSHIP",
+        "CAP-CR-CONTROL-ROOM-ALERT-RESPONSE-CLOSURE"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CTRL-SIGNAL-002",
+      "legacy_feature_ids": [
+        "CR-ALERT"
+      ],
+      "canonical_capability_ids": [
+        "CR-ALERT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-BANK-RECON-01",
+      "legacy_feature_ids": [
+        "FIN-BANK-RECONCILIATION",
+        "FIN-BANK-TRANSACTION"
+      ],
+      "canonical_capability_ids": [
+        "FIN-BANK-RECONCILIATION",
+        "FIN-BANK-TRANSACTION"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-CLIENT-FUNDS-01",
+      "legacy_feature_ids": [
+        "OPS-CLIENT-FUND"
+      ],
+      "canonical_capability_ids": [
+        "OPS-CLIENT-FUND"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-CONSOLIDATION-01",
+      "legacy_feature_ids": [
+        "FIN-CONSOLIDATION",
+        "FIN-INTERCOMPANY"
+      ],
+      "canonical_capability_ids": [
+        "FIN-CONSOLIDATION",
+        "FIN-INTERCOMPANY"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-DONOR-FUND-01",
+      "legacy_feature_ids": [
+        "FIN-DONOR-FUND"
+      ],
+      "canonical_capability_ids": [
+        "FIN-DONOR-FUND"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-GL-RECURRING-01",
+      "legacy_feature_ids": [
+        "FIN-JOURNAL"
+      ],
+      "canonical_capability_ids": [
+        "FIN-JOURNAL"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-GL-REVERSAL-01",
+      "legacy_feature_ids": [
+        "FIN-JOURNAL"
+      ],
+      "canonical_capability_ids": [
+        "FIN-JOURNAL"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-GST-01",
+      "legacy_feature_ids": [
+        "FIN-GST-RETURN",
+        "FIN-INVOICE",
+        "FIN-BILL",
+        "FIN-CREDIT-NOTE"
+      ],
+      "canonical_capability_ids": [
+        "FIN-BILL",
+        "FIN-CREDIT-NOTE",
+        "FIN-GST-RETURN",
+        "FIN-INVOICE"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-PAYMENT-MATCH-01",
+      "legacy_feature_ids": [
+        "FIN-PAYMENT-MATCH",
+        "FIN-MATCH-RULE"
+      ],
+      "canonical_capability_ids": [
+        "FIN-MATCH-RULE",
+        "FIN-PAYMENT-MATCH"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FIN-SETTLEMENT-01",
+      "legacy_feature_ids": [
+        "FIN-PAYMENT-RUN",
+        "HR-PAYROLL-EXPORT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HR-PAYROLL-EXPORT-EXPORT-PROFILES",
+        "CAP-HR-PAYROLL-EXPORT-RUNS-PAYMENT",
+        "FIN-PAYMENT-RUN"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FLEET-MED-WITNESS-01",
+      "legacy_feature_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "canonical_capability_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "FUND-BIND-01",
+      "legacy_feature_ids": [
+        "OPS-FUNDING-CLAIM",
+        "OPS-FUNDING"
+      ],
+      "canonical_capability_ids": [
+        "OPS-FUNDING",
+        "OPS-FUNDING-CLAIM"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "GOV-NESTED-01",
+      "legacy_feature_ids": [
+        "GOV-GOVERNANCE-MEETING",
+        "FIN-CONTROLLERS-BUDGET"
+      ],
+      "canonical_capability_ids": [
+        "CAP-FIN-CONTROLLERS-BUDGET-ACTUALS-OVERSIGHT",
+        "CAP-FIN-CONTROLLERS-BUDGET-APPROVAL-ADJUSTMENT",
+        "CAP-FIN-CONTROLLERS-BUDGET-DESIGN",
+        "CAP-GOV-GOVERNANCE-MEETING-ATTENDANCE-RSVP",
+        "CAP-GOV-GOVERNANCE-MEETING-MINUTES-SIGNOFF",
+        "CAP-GOV-GOVERNANCE-MEETING-SCHEDULING-AGENDA",
+        "CAP-GOV-GOVERNANCE-MEETING-STATUS-LOCK"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "HS-ASSURANCE-01",
+      "legacy_feature_ids": [
+        "HS-HS-INVESTIGATION",
+        "HS-HS-CORRECTIVE-ACTION"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HS-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+        "CAP-HS-HS-CORRECTIVE-ACTION-VERIFICATION-REWORK",
+        "HS-HS-INVESTIGATION"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "HS-CLOSE-01",
+      "legacy_feature_ids": [
+        "HS-HS-EVENT"
+      ],
+      "canonical_capability_ids": [
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "HS-NOTIFIABLE-01",
+      "legacy_feature_ids": [
+        "HS-HS-EVENT",
+        "INC-INCIDENT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-INC-INCIDENT-CORRECTIVE-HANDOFF",
+        "CAP-INC-INCIDENT-REPORT-EVIDENCE",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "INCIDENT-ALERT-LIFECYCLE-01",
+      "legacy_feature_ids": [
+        "INC-INCIDENT",
+        "CR-CONTROL-ROOM-INCIDENT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-INC-INCIDENT-CORRECTIVE-HANDOFF",
+        "CAP-INC-INCIDENT-REPORT-EVIDENCE",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "CR-CONTROL-ROOM-INCIDENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "INTEG-WEBHOOK-001",
+      "legacy_feature_ids": [
+        "PLAT-WEBHOOK-RECEIVER"
+      ],
+      "canonical_capability_ids": [
+        "PLAT-WEBHOOK-RECEIVER"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "MED-RBAC-01",
+      "legacy_feature_ids": [
+        "MED-EMAR",
+        "MED-CDLOSS-REPORT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "MED-CDLOSS-REPORT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "MED-VERIFY-01",
+      "legacy_feature_ids": [
+        "MED-MEDICATIONS",
+        "MED-EMAR"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "MED-MEDICATIONS"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "NZS-ASSURANCE-01",
+      "legacy_feature_ids": [
+        "HS-HEALTH-SAFETY-DASHBOARD",
+        "HS-HAZARDOUS-SUBSTANCE",
+        "HS-HS-RISK-ASSESSMENT",
+        "HS-RESTRAINT",
+        "HS-EMERGENCY-DRILL",
+        "HS-FIRST-AID",
+        "CLIN-HEALTH-CLINICAL-DASHBOARD",
+        "PRIV-COMPLIANCE-DASHBOARD"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HS-EMERGENCY-DRILL-DRILL-LIFECYCLE",
+        "CAP-HS-EMERGENCY-DRILL-FINDINGS",
+        "CAP-HS-FIRST-AID-FOLLOWUP",
+        "CAP-HS-FIRST-AID-RECORD-EVIDENCE",
+        "CAP-HS-HAZARDOUS-SUBSTANCE-EXPOSURE",
+        "CAP-HS-HAZARDOUS-SUBSTANCE-REGISTER-SDS-STORAGE",
+        "CAP-HS-HAZARDOUS-SUBSTANCE-STATUS-GOVERNANCE",
+        "CAP-HS-HS-RISK-ASSESSMENT-DRAFT-EVIDENCE",
+        "CAP-HS-HS-RISK-ASSESSMENT-LIFECYCLE-REVIEW",
+        "CAP-HS-RESTRAINT-EVENTS-OVERSIGHT",
+        "CAP-HS-RESTRAINT-PLANS",
+        "CLIN-HEALTH-CLINICAL-DASHBOARD",
+        "HS-HEALTH-SAFETY-DASHBOARD",
+        "PRIV-COMPLIANCE-DASHBOARD"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "PAY-LEAVE-REPLAY",
+      "legacy_feature_ids": [
+        "HR-PAYROLL-EXPORT",
+        "HR-LEAVE"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HR-LEAVE-BALANCES",
+        "CAP-HR-LEAVE-BULK-ESCALATION",
+        "CAP-HR-LEAVE-REQUEST-DECISION",
+        "CAP-HR-PAYROLL-EXPORT-EXPORT-PROFILES",
+        "CAP-HR-PAYROLL-EXPORT-RUNS-PAYMENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "RESP-EVIDENCE-01",
+      "legacy_feature_ids": [
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "canonical_capability_ids": [
+        "RESP-RESPITE-EVIDENCE-PACK"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "RESP-STATE-01",
+      "legacy_feature_ids": [
+        "RESP-RESPITE-BOOKING-REQUEST",
+        "RESP-RESPITE-BOOKING",
+        "RESP-RESPITE-STAY"
+      ],
+      "canonical_capability_ids": [
+        "CAP-RESP-RESPITE-STAY-ADMISSION-DISCHARGE",
+        "CAP-RESP-RESPITE-STAY-BED-HOLD-EXTENSION",
+        "CAP-RESP-RESPITE-STAY-CLINICAL-RECONCILIATION",
+        "CAP-RESP-RESPITE-STAY-INCIDENTS-COMPLAINTS",
+        "RESP-RESPITE-BOOKING",
+        "RESP-RESPITE-BOOKING-REQUEST"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SAFE-SENSITIVITY-01",
+      "legacy_feature_ids": [
+        "INC-SAFEGUARDING-CONCERN"
+      ],
+      "canonical_capability_ids": [
+        "CAP-INC-SAFEGUARDING-CONCERN-REPORT-TRIAGE",
+        "CAP-INC-SAFEGUARDING-CONCERN-STATUS-CLOSURE"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SAFE-TERMINAL-SYNC-01",
+      "legacy_feature_ids": [
+        "INC-SAFEGUARDING-CONCERN",
+        "HS-HS-EVENT",
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-CR-CONTROL-ROOM-ALERT-INTAKE-TRIAGE",
+        "CAP-CR-CONTROL-ROOM-ALERT-OWNERSHIP",
+        "CAP-CR-CONTROL-ROOM-ALERT-RESPONSE-CLOSURE",
+        "CAP-INC-SAFEGUARDING-CONCERN-REPORT-TRIAGE",
+        "CAP-INC-SAFEGUARDING-CONCERN-STATUS-CLOSURE",
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SEC-HEALTH-004",
+      "legacy_feature_ids": [
+        "SEC-UNIFI",
+        "SEC-MAINTENANCE-HEALTH"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SEC-UNIFI-CREDENTIALS",
+        "CAP-SEC-UNIFI-DEFAULTS-HARDWARE",
+        "CAP-SEC-UNIFI-DISCOVERY-SYNC",
+        "CAP-SEC-UNIFI-SITE-MAPPING",
+        "SEC-MAINTENANCE-HEALTH"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SEC-PROV-003",
+      "legacy_feature_ids": [
+        "SEC-DEVICE",
+        "SEC-UNIFI"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SEC-DEVICE-IDENTITY-ATTRIBUTES",
+        "CAP-SEC-DEVICE-LINKAGE",
+        "CAP-SEC-UNIFI-CREDENTIALS",
+        "CAP-SEC-UNIFI-DEFAULTS-HARDWARE",
+        "CAP-SEC-UNIFI-DISCOVERY-SYNC",
+        "CAP-SEC-UNIFI-SITE-MAPPING"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SEC-UNIFI-TLS-01",
+      "legacy_feature_ids": [
+        "SEC-UNIFI",
+        "PLAT-FRONTEND-INTEGRATIONS-UNIFI"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SEC-UNIFI-CREDENTIALS",
+        "CAP-SEC-UNIFI-DEFAULTS-HARDWARE",
+        "CAP-SEC-UNIFI-DISCOVERY-SYNC",
+        "CAP-SEC-UNIFI-SITE-MAPPING",
+        "PLAT-FRONTEND-INTEGRATIONS-UNIFI"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SITE-CHECK-002",
+      "legacy_feature_ids": [
+        "SITE-SITE-CHECKLIST"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SITE-SITE-CHECKLIST-ASSIGNMENT-RUN-CREATION",
+        "CAP-SITE-SITE-CHECKLIST-RUN-EXECUTION"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SITE-CHECK-003",
+      "legacy_feature_ids": [
+        "SITE-SITE-CHECKLIST",
+        "HS-SITE-HAZARD",
+        "SITE-SITE-DAMAGE"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+        "CAP-HS-SITE-HAZARD-HAZARD-ASSESSMENT",
+        "CAP-HS-SITE-HAZARD-REGISTER",
+        "CAP-SITE-SITE-CHECKLIST-ASSIGNMENT-RUN-CREATION",
+        "CAP-SITE-SITE-CHECKLIST-RUN-EXECUTION",
+        "SITE-SITE-DAMAGE"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "SITE-RBAC-001",
+      "legacy_feature_ids": [
+        "SITE-SITE"
+      ],
+      "canonical_capability_ids": [
+        "CAP-SITE-SITE-ACTIVATION-ARCHIVE",
+        "CAP-SITE-SITE-PROFILE-ONBOARDING"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "TASK-RBAC-001",
+      "legacy_feature_ids": [
+        "DAY-ALL-TASKS"
+      ],
+      "canonical_capability_ids": [
+        "DAY-ALL-TASKS"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "TASK-WATCH-002",
+      "legacy_feature_ids": [
+        "DAY-ALL-TASKS"
+      ],
+      "canonical_capability_ids": [
+        "DAY-ALL-TASKS"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-ATTENDANCE-FORCED-END-SITE",
+      "legacy_feature_ids": [
+        "OPS-ATTENDANCE"
+      ],
+      "canonical_capability_ids": [
+        "CAP-OPS-ATTENDANCE-BREAKS",
+        "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+        "CAP-OPS-ATTENDANCE-HANDOVER"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-AVAILABILITY-LIFECYCLE",
+      "legacy_feature_ids": [
+        "HR-LEAVE",
+        "HR-OFFBOARDING",
+        "OPS-ROSTER"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HR-LEAVE-BALANCES",
+        "CAP-HR-LEAVE-BULK-ESCALATION",
+        "CAP-HR-LEAVE-REQUEST-DECISION",
+        "HR-OFFBOARDING",
+        "OPS-ROSTER"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-EMAIL-IDENTITY-CONVERGENCE",
+      "legacy_feature_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-RECRUITMENT"
+      ],
+      "canonical_capability_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-RECRUITMENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-FATIGUE-TIMEZONE",
+      "legacy_feature_ids": [
+        "OPS-ROSTER",
+        "OPS-ROSTERING"
+      ],
+      "canonical_capability_ids": [
+        "OPS-ROSTER",
+        "OPS-ROSTERING"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "WF-TIMESHEET-CLIENT-REASSIGN",
+      "legacy_feature_ids": [
+        "OPS-TIMESHEET"
+      ],
+      "canonical_capability_ids": [
+        "CAP-OPS-TIMESHEET-ARCHIVE-PAYROLL",
+        "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+        "CAP-OPS-TIMESHEET-MANAGER-REVIEW"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "CONSENT-FILE-01",
+      "legacy_feature_ids": [
+        "OPS-CLIENT-CONSENT"
+      ],
+      "canonical_capability_ids": [
+        "OPS-CLIENT-CONSENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "INCIDENT-RECOVERY-01",
+      "legacy_feature_ids": [
+        "HS-HS-EVENT"
+      ],
+      "canonical_capability_ids": [
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "PRIV-DSR-01",
+      "legacy_feature_ids": [
+        "PRIV-DATA-SUBJECT-REQUEST"
+      ],
+      "canonical_capability_ids": [
+        "PRIV-DATA-SUBJECT-REQUEST"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "PRIV-STATEMENT-01",
+      "legacy_feature_ids": [
+        "PRIV-ROUTE-PRIVACY",
+        "PRIV-ROUTE-PRIVACY-POLICY"
+      ],
+      "canonical_capability_ids": [
+        "PRIV-ROUTE-PRIVACY",
+        "PRIV-ROUTE-PRIVACY-POLICY"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-CR-SETTINGS-NAMES-01",
+      "legacy_feature_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "canonical_capability_ids": [
+        "CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-DEPLOYED-DRIFT-01",
+      "legacy_feature_ids": [
+        "CR-ALERT",
+        "CR-CONTROL-ROOM-ALERT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-CR-CONTROL-ROOM-ALERT-INTAKE-TRIAGE",
+        "CAP-CR-CONTROL-ROOM-ALERT-OWNERSHIP",
+        "CAP-CR-CONTROL-ROOM-ALERT-RESPONSE-CLOSURE",
+        "CR-ALERT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-HERO-DENSITY-01",
+      "legacy_feature_ids": [
+        "HS-HEALTH-SAFETY-DASHBOARD",
+        "CLIN-HEALTH-CLINICAL-DASHBOARD",
+        "MED-EMAR",
+        "FIN-FINANCE-DASHBOARD"
+      ],
+      "canonical_capability_ids": [
+        "CAP-MED-EMAR-ALERTS-ATTENTION",
+        "CAP-MED-EMAR-CLINICAL-MONITORING",
+        "CAP-MED-EMAR-COMPETENCY",
+        "CAP-MED-EMAR-CONTROLLED-DRUGS",
+        "CAP-MED-EMAR-HANDOVERS",
+        "CAP-MED-EMAR-MEDICATION-ORDERS",
+        "CAP-MED-EMAR-PRESCRIPTIONS-COVERT",
+        "CAP-MED-EMAR-PRN-EFFECTIVENESS",
+        "CAP-MED-EMAR-REVIEWS",
+        "CAP-MED-EMAR-ROUNDS",
+        "CAP-MED-EMAR-SELF-ADMINISTRATION",
+        "CAP-MED-EMAR-STOCK-PHARMACY",
+        "CLIN-HEALTH-CLINICAL-DASHBOARD",
+        "FIN-FINANCE-DASHBOARD",
+        "HS-HEALTH-SAFETY-DASHBOARD"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-MOBILE-NAV-01",
+      "legacy_feature_ids": [
+        "PLAT-DASHBOARD"
+      ],
+      "canonical_capability_ids": [
+        "PLAT-DASHBOARD"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-OVERLAY-FOCUS-01",
+      "legacy_feature_ids": [
+        "CR-CONTROL-ROOM-SETTINGS",
+        "HS-HS-EVENT",
+        "HR-IMPORT-EXPORT"
+      ],
+      "canonical_capability_ids": [
+        "CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES",
+        "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES",
+        "HR-IMPORT-EXPORT",
+        "HS-HS-EVENT"
+      ],
+      "uncertainties": []
+    },
+    {
+      "finding_id": "VIS-RESPONSIVE-OVERFLOW-01",
+      "legacy_feature_ids": [
+        "HS-HS-CORRECTIVE-ACTION"
+      ],
+      "canonical_capability_ids": [
+        "CAP-HS-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+        "CAP-HS-HS-CORRECTIVE-ACTION-VERIFICATION-REWORK"
+      ],
+      "uncertainties": []
+    }
+  ],
+  "validation_status": "Historical projection retained for lineage only. It must not be read as the current denominator, final finding-link map, or runtime completion evidence."
+}

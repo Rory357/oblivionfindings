@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave4",
+  "generated_at": "2026-08-21T21:30:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Static source trigger pairing only. Runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "selection_sha256": "effb162addc169f574859d312f4742a286d7787b975817141891df136ba2b966",
+    "exclusion_sha256": "e84ad29c18059147eba71f5f3f6d8b49c30c89d200fc731635acf61b1881185e",
+    "independent_proof_tuple_sha256": "bff1a4f641a49a1f28f0ba608341464444cb9abae74cef8b5870c529eca98d51",
+    "independent_source_map_sha256": "5b7cd9684e4a0d963a81fda4fbbdc875c4dadda5e81a3df4d8370b88896bcaca",
+    "verdict": "GO_10_exact_static_trigger_pairings"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/hr/calendar/index.tsx",
+      "line": 944,
+      "symbol": "QuickAddPopover",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/calendar/index.tsx",
+        "source_sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+        "state_identifier": "quickAdd",
+        "setter": "setQuickAdd",
+        "static_chain": "state 229; onAdd/setter 843; month-grid trigger 355; bind 943",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/recruitment/index.tsx",
+      "line": 609,
+      "symbol": "KitDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/recruitment/index.tsx",
+        "source_sha256": "835851c86852e419a28d9da07c3a7df5f5f769384f01a395f4b7639cbc4e89ee",
+        "state_identifier": "kitDialog",
+        "setter": "setKitDialog",
+        "static_chain": "state 204; onNew/setter 559; intrinsic trigger 1449; bind/open 609",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/recruitment/index.tsx",
+      "line": 610,
+      "symbol": "ScoreDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/recruitment/index.tsx",
+        "source_sha256": "835851c86852e419a28d9da07c3a7df5f5f769384f01a395f4b7639cbc4e89ee",
+        "state_identifier": "scoreTarget",
+        "setter": "setScoreTarget",
+        "static_chain": "state 205; onScore/setter 539; intrinsic trigger 1182; bind/open 610",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/recruitment/index.tsx",
+      "line": 611,
+      "symbol": "BulkEmailDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/recruitment/index.tsx",
+        "source_sha256": "835851c86852e419a28d9da07c3a7df5f5f769384f01a395f4b7639cbc4e89ee",
+        "state_identifier": "bulkEmailOpen",
+        "setter": "setBulkEmailOpen",
+        "static_chain": "state 197; callback/setter 490; intrinsic trigger 828; open 611",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/recruitment/index.tsx",
+      "line": 612,
+      "symbol": "BulkRejectDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/recruitment/index.tsx",
+        "source_sha256": "835851c86852e419a28d9da07c3a7df5f5f769384f01a395f4b7639cbc4e89ee",
+        "state_identifier": "bulkRejectOpen",
+        "setter": "setBulkRejectOpen",
+        "static_chain": "state 198; callback/setter 488; intrinsic trigger 837; open 612",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/recruitment/index.tsx",
+      "line": 613,
+      "symbol": "TagManagerDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/recruitment/index.tsx",
+        "source_sha256": "835851c86852e419a28d9da07c3a7df5f5f769384f01a395f4b7639cbc4e89ee",
+        "state_identifier": "manageTagsOpen",
+        "setter": "setManageTagsOpen",
+        "static_chain": "state 199; callback/setter 484; intrinsic trigger 806; open 613",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/my-day/_dialogs.tsx",
+      "line": 1063,
+      "symbol": "MealLogRecordDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/my-day/_dialogs.tsx",
+        "source_sha256": "0734412c3590bab7a4e408b86aa4f2d27e193485f980a6e5cf0a90bcddd29697",
+        "state_identifier": "selected",
+        "setter": "setSelected",
+        "static_chain": "state 1004; onPick=setSelected 1045; resident tile 227; bind/open 1062/1067",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/my-day/index.tsx",
+      "line": 739,
+      "symbol": "DatePopover",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/my-day/index.tsx",
+        "source_sha256": "b357700c0214a27d5aa79ff90e52e7db704476e1ce14c9900d0855558ccc6b8b",
+        "state_identifier": "dateOpen",
+        "setter": "setDateOpen",
+        "static_chain": "state 138; callback/setter 736; StaffHeader button 138; bind 738",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/clients/index.tsx",
+      "line": 1690,
+      "symbol": "DailyNoteWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/clients/index.tsx",
+        "source_sha256": "50d94c614cbd2b00266dbc8a94a5cca7e3d1e951c3c35b3bb19165d380c9555d",
+        "state_identifier": "noteClient",
+        "setter": "setNoteClient",
+        "static_chain": "state 1133; context-menu action/setter 1319-1320; bind/open 1689/1692",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/handovers/Index.tsx",
+      "line": 275,
+      "symbol": "HandoverWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/handovers/Index.tsx",
+        "source_sha256": "9f52afb22328c1c5f3541b259593cdb0b759d6a045fec78783b1b56d57797da9",
+        "state_identifier": "wizardOpen",
+        "setter": "setWizardOpen",
+        "static_chain": "state 54; openNew/setter 149-152; hero Button 250; bind/open 274/276",
+        "credit_boundary": "static pairing only"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 193,
+    "source_inferred_not_exactly_paired": 193,
+    "unresolved_or_blocked": 273,
+    "same_scope_state_handler": 174,
+    "internal_state_trigger_candidate": 193,
+    "controlled_without_resolved_activator": 256,
+    "generic_unresolved": 271,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208,
+    "primitive_unresolved": 269
+  }
+}

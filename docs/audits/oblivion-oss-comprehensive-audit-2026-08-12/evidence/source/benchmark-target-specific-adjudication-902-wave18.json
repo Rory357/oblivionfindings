@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave18",
+  "generated_at": "2026-08-21T15:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eighteenth bounded target-specific wave: eight current completion-unproved Privacy and Finance targets; one direct Documenso deletion-audit recommendation and seven conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "b29212c2a7e2d73aa54ad5ba2d556900f1bd41b278a875f9ef344398610f21bc",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Generic fields, adjacent feed controls or family-level source remain unproved.",
+    "reuse_rule": "The Documenso query helper inspected during Wave 17 granted no system-wide audit credit. Wave 18 credits only the distinct record-scoped deletion transaction and deletion-event evidence; all shared Privacy and Finance candidates remain explicitly unproved."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "2cfbddf865d01cc9d42baa5b9091ac7e3a67e51a06d749fcbdcce40128dae305"
+    }
+  },
+  "repository_snapshots": {
+    "DOCUMENSO": {
+      "repo": "documenso/documenso",
+      "official_repository_url": "https://github.com/documenso/documenso",
+      "commit_sha": "962cffc9f546be68860be3489247f67255c83a66",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE:L1-L16",
+      "license_sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/lib/server-only/document/delete-document.ts",
+          "lines": "L56-L99,L145-L193",
+          "sha256": "d9d2869266cf234c9742177cadfc234bff9a664e2debfff15209f30c5afa5b53"
+        },
+        {
+          "path": "packages/lib/utils/document-audit-logs.ts",
+          "lines": "L24-L71",
+          "sha256": "5480b802410bdd3debb7bb5b503778868f81d8f48053a07ff4bbabb1e0075967"
+        },
+        {
+          "path": "packages/lib/server-only/document/find-document-audit-logs.ts",
+          "lines": "L37-L117",
+          "sha256": "43b6678f0b9841801d086a8ae467b33420d38214757985fe2c7bda3da971b407"
+        }
+      ]
+    },
+    "CISO_ASSISTANT_COMMUNITY": {
+      "repo": "intuitem/ciso-assistant-community",
+      "official_repository_url": "https://github.com/intuitem/ciso-assistant-community",
+      "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE.md:L1-L9",
+      "license_sha256": "5d880897167f748de8e9750feebd8331c04b06daba8f829ace3cbfc13866d13a",
+      "edition_boundary": "Pinned official community source only. The enterprise directory and commercially licensed edition are excluded.",
+      "files": [
+        {
+          "path": "backend/privacy/models.py",
+          "lines": "L177-L212",
+          "sha256": "da4b89b07ca205e50d2349dbbf167c5fc5031032220907748eb76810f9f51ecc"
+        }
+      ]
+    },
+    "BIGCAPITAL": {
+      "repo": "bigcapitalhq/bigcapital",
+      "official_repository_url": "https://github.com/bigcapitalhq/bigcapital",
+      "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE:L1-L15",
+      "license_sha256": "6222fdf64728d91bef797fae1c610f97737df67fd07026b7a83d661252fdade6",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration, commercial offerings and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/server/src/modules/BankingPlaid/command/PlaidSyncDB.ts",
+          "lines": "L57-L93,L96-L150",
+          "sha256": "41a63136fea127cda35886ef064da3738844b00549a19cd55ad26064848e5a8d"
+        },
+        {
+          "path": "packages/server/src/modules/BankingAccounts/commands/PauseBankAccountFeeds.service.ts",
+          "lines": "L21-L48",
+          "sha256": "73ab12c10d9a549a785754356fa608544efb9f95f55afdf8d0dc8208f95f95a5"
+        },
+        {
+          "path": "packages/server/src/modules/BankingAccounts/commands/ResumeBankAccountFeeds.service.ts",
+          "lines": "L22-L48",
+          "sha256": "8922fbed4e3f72ab9f29f68f94b3c1834de50d17ff2e4524328008ad98676018"
+        },
+        {
+          "path": "packages/server/src/modules/BankingAccounts/commands/DisconnectBankAccount.service.ts",
+          "lines": "L38-L79",
+          "sha256": "13475b0d89e84992db9365e026518efacb1d5327f26642d8ee5f37d7c199da0f"
+        },
+        {
+          "path": "packages/server/src/modules/BankingAccounts/commands/RefreshBankAccount.service.ts",
+          "lines": "L17-L36",
+          "sha256": "4980f5985ec640f584e6500883872a8810ecfae73bc76f5e1ac5cf7e3010a4d0"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "verified_benchmark_direct_recommended": 1,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 7,
+    "completion_credit_recommended": 1
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-PRIV-DELETION-AUDIT-LOG",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record deletion as an authorized, attributable audit event within the deletion transaction and permit bounded review of that event.",
+      "research_candidate": "documenso/documenso deletion transaction and document audit-log evidence at pinned loci",
+      "evidence_loci": "documenso/documenso@962cffc9f546be68860be3489247f67255c83a66 :: packages/lib/server-only/document/delete-document.ts :: L56-L99,L145-L193; packages/lib/utils/document-audit-logs.ts :: L24-L71; packages/lib/server-only/document/find-document-audit-logs.ts :: L37-L117",
+      "reason": "Visibility-aware deletion records DOCUMENT_DELETED in the owning transaction with event type, actor identity, IP and user agent, and authorized record-scoped retrieval exposes the event. This is bounded deletion-audit evidence only, not a system-wide log claim."
+    },
+    {
+      "working_key": "CAP-PRIV-LEGAL-HOLD-LIFECYCLE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Own a legal-hold record through creation, scope, activation, preservation and accountable lifecycle changes.",
+      "research_candidate": "intuitem/ciso-assistant-community privacy model legal/regulatory hold fields at pinned loci",
+      "reason": "A legal/regulatory-hold policy choice and retention string do not establish an owned hold aggregate, lifecycle state, scoped preservation or provenance."
+    },
+    {
+      "working_key": "CAP-PRIV-LEGAL-HOLD-RELEASE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Authorize and record legal-hold release with accountable reason, history and failure/retry semantics.",
+      "research_candidate": "intuitem/ciso-assistant-community privacy model legal/regulatory hold fields at pinned loci",
+      "reason": "The candidate contains no authorized release command, release history, reason, retry or preserved post-release evidence."
+    },
+    {
+      "working_key": "CAP-PRIV-RETENTION-POLICY-REGISTER",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Manage a scoped, versioned and accountable retention-policy register with governed changes.",
+      "research_candidate": "intuitem/ciso-assistant-community retention fields at pinned loci",
+      "reason": "A retention string is not a separately owned, scoped, versioned or audited policy register."
+    },
+    {
+      "working_key": "CAP-PRIV-RETENTION-REVIEW-WORKLIST",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Select due retention reviews into an accountable worklist with assignment, completion and escalation semantics.",
+      "research_candidate": "intuitem/ciso-assistant-community retention fields at pinned loci",
+      "reason": "The model does not prove due-item selection, queue ownership, assignment, completion or escalation workflow."
+    },
+    {
+      "working_key": "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern external-to-canonical accounting account mappings through explicit create, update, validation and audit semantics.",
+      "research_candidate": "bigcapitalhq/bigcapital Plaid synchronization mapping at pinned loci",
+      "reason": "Automatic Plaid-to-bank-account mapping is a bank-feed primitive, not an authorized accounting-integration mapping register with CRUD and audit ownership."
+    },
+    {
+      "working_key": "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Own an accounting integration connection through create, test, pause/resume, failure recovery and disconnect.",
+      "research_candidate": "bigcapitalhq/bigcapital Plaid feed pause, resume and disconnect commands at pinned loci",
+      "reason": "Plaid feed controls do not establish a complete accounting-connection creation, testing, failure and recovery lifecycle."
+    },
+    {
+      "working_key": "CAP-FIN-ACCOUNTING-INTEGRATION-SYNC",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Run and observe an owned accounting-connection synchronization with bounded state, failures, retry and provenance.",
+      "research_candidate": "bigcapitalhq/bigcapital Plaid refresh and transaction-ingestion source at pinned loci",
+      "reason": "Bank-feed transaction ingestion is not a separately owned accounting-connection synchronization action with state, failure and recovery evidence."
+    }
+  ],
+  "count_delta": {
+    "verified_benchmark_direct": 1,
+    "documented_ncm_direct": 0,
+    "eligible_total": 1,
+    "completion_unproved": -1
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 342,
+    "documented_ncm": 89,
+    "eligible": 431,
+    "completion_unproved": 471
+  }
+}

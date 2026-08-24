@@ -1,0 +1,132 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave6",
+  "generated_at": "2026-08-13T15:49:25+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Sixth bounded target-specific wave: 12 independently researched direct material matches with no inherited family credit.",
+  "methodology": {
+    "credit_rule": "Only target-specific official repositories pinned to immutable commits and exact source loci proving a material same-target slice receive credit.",
+    "licence_rule": "Only repository-native MIT, Apache-2.0 and GPL-3.0 community source is credited; hosted services, paid products and private extensions are excluded.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layout.",
+    "runtime_boundary": "No application, browser, database, queue, deployment or Git state was changed."
+  },
+  "input_pins": {
+    "working_capability_manifest_902": {"path": "evidence/source/working-capability-manifest-902.json", "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"},
+    "benchmark_final_902_before_wave": {"path": "evidence/source/benchmark-final-902-mapping.json", "file_sha256": "d4c73bc3be5a491cf67161f7bf1dd7f88037ab41c2b4dc1f62d7bf8b8f4f00c2"}
+  },
+  "counts": {"evaluated": 12, "verified_benchmark_recommended": 12, "documented_ncm_recommended": 0, "completion_credit_recommended": 12},
+  "evaluations": [
+    {
+      "working_key": "CAP-AUTH-PASSWORD-RECOVERY-REQUEST",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "A signed-out user can open password recovery, submit the account email, cause the configured password broker to attempt delivery of a reset link, and receive an explicit result.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "AUTH", "source_family_ids": ["AUTH-PASSWORD-RESET-LINK"], "route_ids": ["ROUTE-0852", "ROUTE-0853"], "page_ids": ["PAGE-0009"], "backend_anchors": []},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/PasswordResetLinkController.php :: L22-L55"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/fortify", "commit_sha": "bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b", "source_loci": ["src/Http/Controllers/PasswordResetLinkController.php:L22-L55"], "proven_slice": "Provides the recovery view, normalises the username, invokes the password broker with the email, and returns successful or failed reset-link responses.", "parity_limits": "Does not prove Oblivion mail transport, anti-enumeration copy, throttling, branded email, delivery or browser acceptance.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Fortify source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-AUTH-PASSWORD-RESET",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "A user possessing a reset token can submit the token, email and confirmed replacement password; the broker validates and persists the reset, completes authentication state and returns an explicit result.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "AUTH", "source_family_ids": ["AUTH-NEW-PASSWORD"], "route_ids": ["ROUTE-2358", "ROUTE-2359"], "page_ids": ["PAGE-0012"], "backend_anchors": []},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/NewPasswordController.php :: L45-L97"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/fortify", "commit_sha": "bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b", "source_loci": ["src/Http/Controllers/NewPasswordController.php:L45-L97"], "proven_slice": "Renders reset, requires token, email and password, invokes the broker with confirmation, runs the reset action, completes reset state and distinguishes success from failure.", "parity_limits": "Does not prove Oblivion password rules, token lifetime or storage, email ownership, session policy, UX or runtime persistence.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Fortify source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-AUTH-PASSWORD-SESSION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "A signed-out user can open login, submit credentials through throttling and authentication controls, establish a session, and later log out with session invalidation and CSRF regeneration.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "AUTH", "source_family_ids": ["AUTH-AUTHENTICATED-SESSION"], "route_ids": ["ROUTE-1869", "ROUTE-1870", "ROUTE-1871"], "page_ids": ["PAGE-0010"], "backend_anchors": []},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/AuthenticatedSessionController.php :: L47-L109"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/fortify", "commit_sha": "bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b", "source_loci": ["src/Http/Controllers/AuthenticatedSessionController.php:L47-L109"], "proven_slice": "Provides login view and pipeline, optional username normalisation, throttling, two-factor redirection, authentication, session preparation, logout, invalidation and CSRF regeneration.", "parity_limits": "Does not prove Oblivion approval checks, role landing, remember-me behavior, cookie policy, lockout policy or browser results.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Fortify source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-AUTH-SENSITIVE-ACTION-REAUTH",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authenticated user can re-enter the current password before a sensitive action; successful confirmation is timestamped and remains valid only for the configured timeout.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-CONFIRMABLE-PASSWORD", "SET-CONFIRMED-PASSWORD-STATUS"], "route_ids": ["ROUTE-3011", "ROUTE-3012", "ROUTE-3013"], "page_ids": ["PAGE-0008"], "backend_anchors": ["Laravel/Fortify/Http/Controllers/ConfirmablePasswordController", "Laravel/Fortify/Http/Controllers/ConfirmedPasswordStatusController"]},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/ConfirmablePasswordController.php :: L40-L64", "laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/ConfirmedPasswordStatusController.php :: L17-L34"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/fortify", "commit_sha": "bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b", "source_loci": ["src/Http/Controllers/ConfirmablePasswordController.php:L40-L64", "src/Http/Controllers/ConfirmedPasswordStatusController.php:L17-L34"], "proven_slice": "Checks the password against the authenticated user, stores successful confirmation time, returns explicit success or failure, and evaluates freshness against a timeout.", "parity_limits": "Does not prove which Oblivion actions are protected, policy overrides, audit events, WebAuthn equivalence or deployed middleware wiring.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Fortify source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-SET-ACCOUNT-PASSWORD-CHANGE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authenticated user can change their own password only after supplying the current password and a valid confirmed replacement; the replacement is hashed and persisted and stale reset material is invalidated.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-PASSWORD"], "route_ids": ["ROUTE-2668", "ROUTE-2669"], "page_ids": ["PAGE-0850"], "backend_anchors": ["app/Http/Controllers/Settings/PasswordController.php"]},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: stubs/UpdateUserPassword.php :: L11-L34", "laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/PasswordController.php :: L22-L40"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/fortify", "commit_sha": "bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b", "source_loci": ["stubs/UpdateUserPassword.php:L11-L34", "src/Http/Controllers/PasswordController.php:L22-L40"], "proven_slice": "Validates current password and replacement rules, hashes and saves the replacement, deletes a reset token, emits an update event and returns a typed response.", "parity_limits": "Does not prove Oblivion strength rules, history, forced session revocation, audit presentation or runtime behavior.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Fortify source and supplied stub only; downstream customisations excluded."}}
+    },
+    {
+      "working_key": "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised settings user can list API credentials, create a named credential with bounded permissions and one-time plaintext disclosure, change permissions, and revoke or delete it.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-API-SETTINGS"], "route_ids": ["ROUTE-2617", "ROUTE-2618", "ROUTE-2619"], "page_ids": ["PAGE-0838"], "backend_anchors": ["app/Http/Controllers/Settings/ApiSettingsController.php"]},
+      "evidence_loci": ["laravel/jetstream@26041ffa67f20cb0905bad2d820cf96f8c3fb7d8 :: src/Http/Controllers/Inertia/ApiTokenController.php :: L17-L86", "laravel/sanctum@7fb0d860302f9dd45c8d0de363d860e1666a5771 :: src/HasApiTokens.php :: L25-L71"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/jetstream", "commit_sha": "26041ffa67f20cb0905bad2d820cf96f8c3fb7d8", "source_loci": ["src/Http/Controllers/Inertia/ApiTokenController.php:L17-L86", "laravel/sanctum@7fb0d860302f9dd45c8d0de363d860e1666a5771:src/HasApiTokens.php:L25-L71"], "proven_slice": "Lists tokens and last use, creates a named token with validated abilities and one-time plaintext return, updates abilities and deletes a token; Sanctum stores a hash with abilities and optional expiry.", "parity_limits": "Does not prove Oblivion organisation scope, key formatting, webhook credentials, revoked-state retention, audit events or runtime authorization.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned Jetstream and Sanctum repository-native source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-SET-PERSONAL-PROFILE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authenticated user can update their own profile identity fields and manage a profile photo, with previous photo storage cleaned up when replaced or removed.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-LEGACY-REDIRECTS", "SET-PROFILE"], "route_ids": ["ROUTE-2613", "ROUTE-2671", "ROUTE-2672", "ROUTE-2673", "ROUTE-2674", "ROUTE-2675"], "page_ids": ["PAGE-0851"], "backend_anchors": ["Illuminate/Routing/RedirectController", "app/Http/Controllers/Settings/ProfileController.php"]},
+      "evidence_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b :: src/Http/Controllers/ProfileInformationController.php :: L21-L32", "laravel/jetstream@26041ffa67f20cb0905bad2d820cf96f8c3fb7d8 :: src/HasProfilePhoto.php :: L18-L65"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/jetstream", "commit_sha": "26041ffa67f20cb0905bad2d820cf96f8c3fb7d8", "source_loci": ["laravel/fortify@bfa20e20cb5d204b639a1f6a0ab7335d9e3f810b:src/Http/Controllers/ProfileInformationController.php:L21-L32", "src/HasProfilePhoto.php:L18-L65"], "proven_slice": "Updates authenticated-user profile information and supports photo upload, replacement cleanup, deletion and resolved photo URL.", "parity_limits": "Does not prove Oblivion phone, job title, landing preference, crop, email reverification, permissions or runtime storage.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned Fortify and Jetstream repository-native source only; downstream customisations excluded."}}
+    },
+    {
+      "working_key": "CAP-SET-SELF-ACCOUNT-DELETION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authenticated user can delete their own account only after password confirmation, with owned authentication artifacts cleaned up and the active session logged out and invalidated.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-PROFILE"], "route_ids": ["ROUTE-2670"], "page_ids": ["PAGE-0851"], "backend_anchors": ["app/Http/Controllers/Settings/ProfileController.php"]},
+      "evidence_loci": ["laravel/jetstream@26041ffa67f20cb0905bad2d820cf96f8c3fb7d8 :: src/Http/Controllers/Inertia/CurrentUserController.php :: L22-L41", "laravel/jetstream@26041ffa67f20cb0905bad2d820cf96f8c3fb7d8 :: stubs/app/Actions/Jetstream/DeleteUser.php :: L8-L18"],
+      "benchmark": {"official_repository_url": "https://github.com/laravel/jetstream", "commit_sha": "26041ffa67f20cb0905bad2d820cf96f8c3fb7d8", "source_loci": ["src/Http/Controllers/Inertia/CurrentUserController.php:L22-L41", "stubs/app/Actions/Jetstream/DeleteUser.php:L8-L18"], "proven_slice": "Confirms the password, invokes self-deletion, deletes profile photo and tokens, deletes the user, logs out, invalidates the session and regenerates CSRF.", "parity_limits": "Does not prove Oblivion deletion retention, privacy approval, audit export, warnings or referential integrity.", "licence": {"spdx": "MIT", "edition_boundary": "Pinned repository-native Jetstream source and supplied deletion stub only; downstream customisations excluded."}}
+    },
+    {
+      "working_key": "CAP-SET-USER-SESSION-TERMINATION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised administrator can inspect sessions belonging to a selected user and invalidate that user's active sessions, with permission checks, client logout propagation and an administrative event.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "SETTINGS", "source_family_ids": ["SET-USERS"], "route_ids": ["ROUTE-2705", "ROUTE-2706", "ROUTE-2966", "ROUTE-2967"], "page_ids": ["PAGE-0863"], "backend_anchors": ["app/Http/Controllers/System/UsersController.php"]},
+      "evidence_loci": ["keycloak/keycloak@b515f41a5c56936a4aa9a86e70f8479359aeccc4 :: services/src/main/java/org/keycloak/services/resources/admin/UserResource.java :: L433-L451,L673-L699"],
+      "benchmark": {"official_repository_url": "https://github.com/keycloak/keycloak", "commit_sha": "b515f41a5c56936a4aa9a86e70f8479359aeccc4", "source_loci": ["services/src/main/java/org/keycloak/services/resources/admin/UserResource.java:L433-L451,L673-L699"], "proven_slice": "Requires user-view permission to list selected-user sessions and user-manage permission to mark credentials not-before, perform backchannel logout for every session and record an admin event.", "parity_limits": "Does not prove Oblivion single-session termination, database-session schema, keep-current rule, audit payload, role matrix or runtime behavior.", "licence": {"spdx": "Apache-2.0", "edition_boundary": "Pinned community Keycloak server source only; hosted identity services and proprietary providers excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-ACCOUNTS-RECEIVABLE-ALLOCATION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised receivables user can select unreconciled customer payments and outstanding invoices, allocate an amount without exceeding either remaining balance, persist reconciliation and receive an explicit result.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "FINANCE", "source_family_ids": ["FIN-ACCOUNTS-RECEIVABLE"], "route_ids": ["ROUTE-0673"], "page_ids": ["PAGE-0188"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/AccountsReceivableController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/doctype/payment_reconciliation/payment_reconciliation.py :: L373-L418,L482-L611,L748-L779"],
+      "benchmark": {"official_repository_url": "https://github.com/frappe/erpnext", "commit_sha": "c6d08979d3ffab119d1523ee2bdea2c8115a8bca", "source_loci": ["erpnext/accounts/doctype/payment_reconciliation/payment_reconciliation.py:L373-L418,L482-L611,L748-L779"], "proven_slice": "Loads outstanding invoices, allocates available payment amounts, calculates exchange differences, rejects over-allocation, reconciles documents and returns success.", "parity_limits": "Does not prove Oblivion organisation/client scope, payment-source model, currency policy, permissions, idempotency, UI or ledger results.", "licence": {"spdx": "GPL-3.0", "edition_boundary": "Pinned ERPNext community source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-ACCOUNTS-RECEIVABLE-STATEMENTS",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised receivables user can select a customer and reporting date or period, generate a statement from receivable or ledger activity, render it and produce downloadable or dispatchable output.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "FINANCE", "source_family_ids": ["FIN-ACCOUNTS-RECEIVABLE"], "route_ids": ["ROUTE-0674"], "page_ids": ["PAGE-0189"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/AccountsReceivableController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/doctype/process_statement_of_accounts/process_statement_of_accounts.py :: L87-L134,L172-L226,L229-L340,L510-L558"],
+      "benchmark": {"official_repository_url": "https://github.com/frappe/erpnext", "commit_sha": "c6d08979d3ffab119d1523ee2bdea2c8115a8bca", "source_loci": ["erpnext/accounts/doctype/process_statement_of_accounts/process_statement_of_accounts.py:L87-L134,L172-L226,L229-L340,L510-L558"], "proven_slice": "Validates customers and format, builds customer-specific receivable or ledger filters, derives statement and ageing data, renders HTML/PDF, downloads and dispatches statements.", "parity_limits": "Does not prove Oblivion fields, as-of semantics, branding, email authorization, privacy, balance accuracy or delivery.", "licence": {"spdx": "GPL-3.0", "edition_boundary": "Pinned ERPNext community source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "FIN-BANK-ACCOUNT",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can create, inspect, update and disable a bank-account record with bank identity, account number, linked ledger or party ownership, default-state validation and statement-balance support.",
+      "current_source_lineage": {"id_status": "exact", "class": "H", "canonical_module": "FINANCE", "source_family_ids": ["FIN-BANK-ACCOUNT"], "route_ids": ["ROUTE-0475", "ROUTE-0476", "ROUTE-0477", "ROUTE-0478", "ROUTE-0479", "ROUTE-0480", "ROUTE-0497"], "page_ids": ["PAGE-0118", "PAGE-0119"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/BankAccountController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/doctype/bank_account/bank_account.py :: L17-L100,L102-L178,L182-L217", "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/doctype/bank_account/bank_account.json :: L43-L219"],
+      "benchmark": {"official_repository_url": "https://github.com/frappe/erpnext", "commit_sha": "c6d08979d3ffab119d1523ee2bdea2c8115a8bca", "source_loci": ["erpnext/accounts/doctype/bank_account/bank_account.py:L17-L100,L102-L178,L182-L217", "erpnext/accounts/doctype/bank_account/bank_account.json:L43-L219"], "proven_slice": "Defines bank identity, bank, ledger or party ownership, account number, IBAN, integration identifier, defaults and disabled state; validates linkage, lists active accounts and stores statement balances.", "parity_limits": "Does not prove Oblivion NZ fields, opening balance, organisation authorization, reconciliation counts, deletion, UI or persistence.", "licence": {"spdx": "GPL-3.0", "edition_boundary": "Pinned ERPNext community source only; hosted services and private extensions excluded."}}
+    }
+  ],
+  "projected_counts_after_application": {"denominator": 902, "verified_benchmark": {"direct": 232, "strict_one_to_one_rename": 22, "total": 254}, "documented_no_credible_match": {"direct": 77, "strict_one_to_one_rename": 7, "total": 84}, "eligible_total": 338, "completion_unproved_total": 564, "eligible_percentage": 37.4723},
+  "integrity": {"selected_target_count": 12, "selected_targets_unique": true, "selected_targets_were_unproved_at_recheck": true, "selected_targets_absent_from_waves_1_to_5": true, "all_current_ids_exact": true, "all_have_current_route_and_page_lineage": true, "all_upstream_repositories_official": true, "all_upstream_refs_immutable_commits": true, "licence_and_edition_screening_complete": true, "weak_analogies_rejected": true, "family_credit_inherited": false, "paid_only_evidence_used": false, "files_modified_by_research_agent": false}
+}

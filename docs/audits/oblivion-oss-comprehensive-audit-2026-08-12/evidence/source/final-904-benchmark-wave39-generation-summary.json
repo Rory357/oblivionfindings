@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-benchmark-wave39-generation-summary",
+  "generated_at": "2026-08-22T00:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "inputs": {
+    "wave39": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave39.json",
+      "sha256": "c20dabb25e037985cae6b0aef3c93345f0c2d1e16ae37489d0d8a7db0ac86bda",
+      "bytes": 14419
+    }
+  },
+  "outputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "9a5aa8790a3d681d3f24ad5cf485da02f14db538eed5e65c8308a9d15f9bcf96",
+      "bytes": 670252
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "ac693df595d4d350263eea039a1775c78d06088aba3a2bea8867a1d0e883c99f",
+      "bytes": 11781638
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "d0bdc422cbed8b40a2e7c19bcd5ed8ba1032602848945d1161f5774e8e458549",
+      "bytes": 1959400
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "5667b5484e126b591c70cf33e7008d513d92a7cc57facbfbfd9ef374bf408052",
+      "bytes": 3306718
+    }
+  },
+  "mapping_tuple_hashes": {
+    "full": "04987bd274b5013ae3bd7a8011f4f38aafb811738771d773ea2a1751dcdd1eb1",
+    "eligible": "65d0d7d421281f0a5731556c496b3a7abdd55edc265021782f7c2826b64554bf"
+  },
+  "proof_hashes": {
+    "selection": "3a74c7297f38ca56b6fa75f2ac89692d3804b016ac57bacb52e6402ebdd3da99",
+    "evaluations": "90c0cb1dc68ed205a6f0422799690e77eafa0333221837e97f73f4765286982b",
+    "source_registry": "e2c31ae6741532db334de2c48aa8073506e36f43023b9ec054ea4312ad4a5e69",
+    "prior_unique_ids": "9877e8ccd82a27fe53bf5c32d9cc2ef72bb10aec6545956151a14bba5bce54aa"
+  },
+  "counts": {
+    "denominator": 904,
+    "direct": 380,
+    "rename": 22,
+    "verified": 402,
+    "ncm": 89,
+    "eligible": 491,
+    "completion_unproved": 413
+  },
+  "validation": {
+    "selected": 8,
+    "direct": 7,
+    "retained": 1,
+    "benchmark_p3_completion_credit_delta": 7,
+    "product_runtime_representative_task_overall_completion_delta": 0,
+    "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE"
+  }
+}

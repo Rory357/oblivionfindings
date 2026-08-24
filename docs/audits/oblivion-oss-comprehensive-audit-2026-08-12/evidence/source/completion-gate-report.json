@@ -1,0 +1,374 @@
+{
+  "schema_version": "2.1",
+  "audit_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "structural_validation": "PASS",
+  "audit_boundary": "Audit artifacts only for filesystem writes. No application code, configuration, routes, domain data, tests, deployment or Git history was changed. A task-created Composer dependency tree was quarantined inside evidence by an earlier failed preflight and is removed by the 23 August reconciliation; its small provenance record is retained.",
+  "canonical_register": {
+    "total": 904,
+    "H": 790,
+    "D": 111,
+    "M": 3,
+    "manifest": "working-capability-manifest-904.json",
+    "manifest_sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10"
+  },
+  "gates": {
+    "routes_classified": {
+      "completed": 3024,
+      "denominator": 3024,
+      "percent": 100,
+      "status": "complete-source-classification"
+    },
+    "pages_classified": {
+      "completed": 727,
+      "denominator": 727,
+      "percent": 100.0,
+      "status": "complete-source-classification",
+      "detail": "727/727 true Inertia pages are classified: 702 exact render roots plus 25 page-shaped resolver orphans. All 962 tracked resources/js/pages files remain source-classified, including 190 support/components, 28 TS helpers and 17 tests/specs outside this page denominator."
+    },
+    "canonical_features_registered": {
+      "completed": 904,
+      "denominator": 904,
+      "percent": 100.0,
+      "status": "complete-static-identity-only"
+    },
+    "feature_benchmark_or_documented_no_match": {
+      "completed": 500,
+      "denominator": 904,
+      "percent": 55.31,
+      "status": "blocked",
+      "detail": "411 verified benchmark mappings (389 direct, 22 rename) and 89 target-specific NCM decisions (82 direct, 7 rename); 404 unproved."
+    },
+    "final_id_task_scripts_structural": {
+      "completed": 790,
+      "denominator": 790,
+      "percent": 100.0,
+      "status": "complete-structural-only",
+      "detail": "790 Markdown files and scorecard rows; current scores blank and runtime unexecuted."
+    },
+    "ten_dimension_ease_scores_measured_and_independently_validated": {
+      "completed": 0,
+      "denominator": 790,
+      "percent": 0.0,
+      "status": "blocked"
+    },
+    "representative_role_tasks_executed": {
+      "completed": 0,
+      "denominator": 790,
+      "percent": 0.0,
+      "status": "blocked"
+    },
+    "journeys_independently_source_reviewed": {
+      "completed": 8,
+      "denominator": 8,
+      "percent": 100,
+      "status": "complete-source-only"
+    },
+    "journeys_executed_all_viewports": {
+      "completed": 0,
+      "denominator": 8,
+      "percent": 0,
+      "status": "blocked"
+    },
+    "safe_routes_one_admin_set": {
+      "completed": 622,
+      "denominator": 622,
+      "percent": 100,
+      "status": "complete-narrow-observation-set"
+    },
+    "safe_routes_against_all_user_facing_gets": {
+      "completed": 622,
+      "denominator": 1211,
+      "percent": 51.36,
+      "status": "blocked"
+    },
+    "fully_measured_component_viewport_rows": {
+      "completed": 1876,
+      "denominator": 1880,
+      "percent": 99.79,
+      "status": "blocked",
+      "detail": "Four immutable-baseline Control Room handover rows lack full geometry; 469/470 families are fully measured. A separate current-main pass measured the materially changed handover component at all four viewports without horizontal overflow, so it does not retroactively change baseline credit."
+    },
+    "browser_claims_use_allowed_labels": {
+      "completed": 8753,
+      "denominator": 8753,
+      "percent": 100,
+      "status": "complete-structural",
+      "detail": "The four former Observed-light rows are now Observed with the lightweight-evidence limitation retained."
+    },
+    "visual_rows_linked_to_exact_final_feature_id": {
+      "completed": 8168,
+      "denominator": 8753,
+      "percent": 93.32,
+      "status": "blocked",
+      "detail": "585 unresolved; 774 final IDs assigned and 837 have some visual lineage."
+    },
+    "hero_source_census": {
+      "completed": 606,
+      "denominator": 606,
+      "percent": 100,
+      "status": "complete-source-only",
+      "detail": "Per-instance browser proof remains incomplete; proxy association is not an observed render."
+    },
+    "custom_overlay_static_trigger_classification": {
+      "completed": 253,
+      "denominator": 659,
+      "percent": 38.39,
+      "status": "blocked",
+      "detail": "144 are source-inferred candidates and 262 unresolved or blocked; runtime interaction coverage is 0/659."
+    },
+    "primitive_overlay_static_trigger_classification": {
+      "completed": 242,
+      "denominator": 477,
+      "percent": 50.73,
+      "status": "blocked",
+      "detail": "235 primitive roots remain without an exact statically reachable resolved activator; runtime interaction coverage is 0/477."
+    },
+    "material_required_states_classified": {
+      "completed": 4312,
+      "denominator": 4312,
+      "percent": 100,
+      "status": "complete-static-applicability-only"
+    },
+    "material_required_states_linked_to_exact_final_feature_id": {
+      "completed": 3948,
+      "denominator": 4312,
+      "percent": 91.56,
+      "status": "blocked",
+      "detail": "364 unresolved; 715 final IDs represented; runtime execution 0/4,312."
+    },
+    "representative_actor_classes": {
+      "completed": 12,
+      "denominator": 12,
+      "percent": 100.0,
+      "status": "complete-bounded-browser-entry",
+      "detail": "The original signed-in pass sampled 11 actor classes; a current-main direct-login pass sampled the synthetic Clinical/Medication Lead on Health & Clinical and eMAR at all four required viewports. This proves actor entry only; task-level completion remains 0/790."
+    },
+    "tests_executed": {
+      "completed": 0,
+      "denominator": 867,
+      "percent": 0.0,
+      "status": "blocked-not-audit-wide-executed",
+      "detail": "The full 867-test audit denominator has not been executed as one controlled audit gate. Focused remediation suites used disposable MySQL databases, but they are not credited as audit-wide execution."
+    },
+    "benchmark_project_identity": {
+      "completed": 97,
+      "denominator": 97,
+      "percent": 100,
+      "status": "complete-identity-only"
+    },
+    "benchmark_project_specific_triage": {
+      "completed": 97,
+      "denominator": 97,
+      "percent": 100.0,
+      "status": "complete-primary-source-triage",
+      "detail": "All 97 prompt-listed projects have project-specific behavior, immutable primary-source loci, licence/edition boundaries and an explicit Native, Reject or Separate future decision. Catalogue relations do not automatically grant target completion credit."
+    },
+    "mandatory_nz_source_identities": {
+      "completed": 6,
+      "denominator": 6,
+      "percent": 100,
+      "status": "complete-source-review"
+    },
+    "p6_finding_propositions_reviewed": {
+      "completed": 58,
+      "denominator": 58,
+      "percent": 100.0,
+      "status": "complete-structural",
+      "detail": "Source links and statement-type separation do not establish legal, clinical or security assurance."
+    },
+    "models_classified": {
+      "completed": 666,
+      "denominator": 666,
+      "percent": 100,
+      "status": "complete-static"
+    },
+    "policies_classified": {
+      "completed": 67,
+      "denominator": 67,
+      "percent": 100,
+      "status": "complete-static"
+    },
+    "services_classified": {
+      "completed": 237,
+      "denominator": 237,
+      "percent": 100,
+      "status": "complete-static"
+    },
+    "critical_async_artifacts_classified": {
+      "completed": 124,
+      "denominator": 124,
+      "percent": 100,
+      "status": "complete-static",
+      "detail": "96 queued jobs, 14 events, 10 listeners and 4 outbox artifacts."
+    },
+    "p0_p1_required_evidence_fields": {
+      "completed": 88,
+      "denominator": 88,
+      "percent": 100.0,
+      "status": "complete-structural"
+    },
+    "p0_p1_exact_final_feature_link": {
+      "completed": 88,
+      "denominator": 88,
+      "percent": 100.0,
+      "status": "complete-static-linkage",
+      "detail": "88/88 P0/P1 findings contain a literal current ID; 0 do not. Literal equality is not runtime validation."
+    },
+    "findings_with_neutral_requirements_and_no_copy_boundary": {
+      "completed": 100,
+      "denominator": 100,
+      "percent": 100.0,
+      "status": "complete-structural"
+    },
+    "modules_with_all_eight_passes_complete": {
+      "completed": 0,
+      "denominator": 25,
+      "percent": 0,
+      "status": "blocked"
+    },
+    "agent_assignments_reconciled_and_none_running": {
+      "completed": 105,
+      "denominator": 105,
+      "percent": 100.0,
+      "status": "blocked-historical-register-only-current-universe-unestablished",
+      "historical_snapshot": true,
+      "detail": "The historical register contains 105/105 returned records. It does not enumerate the complete later task universe, so the prompt's final all-agent reconciliation gate remains blocked even though the three 23 August independent replay agents have now returned and no audit subagent is running."
+    },
+    "pass8_fresh_reconciliation": {
+      "completed": 0,
+      "denominator": 1,
+      "percent": 0,
+      "status": "blocked",
+      "detail": "Structural revalidation is current, but substantive route/page, benchmark, role, runtime, recovery, visual and finding-link gates remain incomplete."
+    },
+    "routes_with_stable_static_disposition_id": {
+      "completed": 3024,
+      "denominator": 3024,
+      "percent": 100.0,
+      "status": "complete-static-disposition",
+      "detail": "2,994 routes map to accepted targets; 30 retain excluded non-denominator SURFACE dispositions."
+    },
+    "pages_with_stable_static_disposition_id": {
+      "completed": 727,
+      "denominator": 727,
+      "percent": 100.0,
+      "status": "complete-static-disposition",
+      "detail": "714 true pages map to accepted targets; 13 retain excluded or unmapped dispositions."
+    },
+    "combined_route_page_static_disposition": {
+      "completed": 3751,
+      "denominator": 3751,
+      "percent": 100.0,
+      "status": "complete-static-disposition"
+    },
+    "p0_p1_exact_owner_or_explicit_no_owner_disposition": {
+      "completed": 88,
+      "denominator": 88,
+      "percent": 100.0,
+      "status": "complete-static-accountability",
+      "detail": "All 88 P0/P1 findings have literal current-target links. This is not runtime validation."
+    },
+    "routes_mapped_to_accepted_canonical_feature_id": {
+      "completed": 2994,
+      "denominator": 3024,
+      "percent": 99.01,
+      "status": "blocked",
+      "detail": "30 routes are classified under excluded non-denominator SURFACE dispositions, not accepted canonical capability IDs. Static disposition is complete, but the prompt's literal FEATURE-ID mapping gate is not."
+    },
+    "pages_mapped_to_accepted_canonical_feature_id": {
+      "completed": 714,
+      "denominator": 727,
+      "percent": 98.21,
+      "status": "blocked",
+      "detail": "13 true Inertia pages lack an accepted canonical FEATURE-ID. Support/components, TS helpers and tests/specs remain classified source artifacts but do not inflate the page denominator."
+    },
+    "combined_route_page_accepted_feature_id_mapping": {
+      "completed": 3708,
+      "denominator": 3751,
+      "percent": 98.85,
+      "status": "blocked",
+      "detail": "30 routes and 13 true Inertia pages remain outside accepted canonical FEATURE-ID ownership; source classification is complete but mapping is not."
+    },
+    "visual_findings_independently_resampled": {
+      "completed": 0,
+      "denominator": 4,
+      "percent": 0.0,
+      "status": "blocked-no-independent-runtime-resample",
+      "detail": "Four retained material hero/overlay finding families are in scope: VIS-HERO-DENSITY-01, VIS-OVERLAY-FOCUS-01, VIS-MOBILE-NAV-01 and INCIDENT-RECOVERY-01. The frozen audited baseline still has 0/4 independent runtime resamples. A supplemental read-only current-main pass sampled all 4/4 and reproduced or partially reproduced every family, but source/build drift means it cannot be credited retroactively to the baseline denominator; see evidence/browser/current-main-visual-family-resample-2026-08-14.json."
+    },
+    "all_findings_with_literal_current_feature_id": {
+      "completed": 100,
+      "denominator": 100,
+      "percent": 100.0,
+      "status": "complete-static-linkage",
+      "detail": "All retained findings have at least one literal current target ID; this does not prove runtime reproduction or remediation."
+    },
+    "orchestrator_only_wrote_audit_artifacts": {
+      "completed": 0,
+      "denominator": 1,
+      "percent": 0.0,
+      "status": "blocked-process-deviation",
+      "detail": "Delegated agents wrote dated audit artifacts during earlier and closing waves. No product files were changed, but the prompt's orchestrator-only-writer rule was not met."
+    },
+    "evidence_directory_content_boundary": {
+      "completed": 1,
+      "denominator": 1,
+      "percent": 100.0,
+      "status": "complete-structural",
+      "detail": "Executable reproducibility helpers are isolated in audit-root generators/; evidence/ contains only redacted/structured safe evidence logs, comparison metadata, browser sidecars, benchmark metadata and small derived records as classified by evidence/README.md."
+    },
+    "agent_assignment_required_fields": {
+      "completed": 105,
+      "denominator": 105,
+      "percent": 100.0,
+      "status": "complete-process",
+      "detail": "Every reconciled assignment explicitly records role/ID, scope, pass, evidence_count and unresolved_gaps."
+    },
+    "benchmark_project_catalogue_metadata": {
+      "completed": 97,
+      "denominator": 97,
+      "percent": 100.0,
+      "status": "complete-metadata",
+      "detail": "Every prompt-listed project has a pinned identity, licence/edition boundary and explicit catalogue disposition. This is metadata coverage, not substantive Pass-3 review."
+    },
+    "required_component_viewport_rows_present": {
+      "completed": 1880,
+      "denominator": 1880,
+      "percent": 100.0,
+      "status": "complete-structural-observation-set",
+      "detail": "All 470 selected page/component families retain all four required viewport rows; the pinned raw System Users 1280x800 observation is restored while the later 1280x720 remediation screenshot remains separate finding evidence."
+    }
+  },
+  "completion_blockers": [
+    "routes_mapped_to_accepted_canonical_feature_id",
+    "pages_mapped_to_accepted_canonical_feature_id",
+    "combined_route_page_accepted_feature_id_mapping",
+    "visual_findings_independently_resampled",
+    "feature_benchmark_or_documented_no_match",
+    "ten_dimension_ease_scores_measured_and_independently_validated",
+    "representative_role_tasks_executed",
+    "journeys_executed_all_viewports",
+    "safe_routes_against_all_user_facing_gets",
+    "fully_measured_component_viewport_rows",
+    "visual_rows_linked_to_exact_final_feature_id",
+    "custom_overlay_static_trigger_classification",
+    "primitive_overlay_static_trigger_classification",
+    "material_required_states_linked_to_exact_final_feature_id",
+    "tests_executed",
+    "modules_with_all_eight_passes_complete",
+    "pass8_fresh_reconciliation",
+    "agent_assignments_reconciled_and_none_running",
+    "orchestrator_only_wrote_audit_artifacts"
+  ],
+  "genuine_external_runtime_blockers": [
+    "Fresh browser sessions and resettable fixtures for all 12 representative actor classes and required site scopes; the supported Clinical/Medication Lead creation path was sampled only on historical browser-evidence pin ad19f99 and cannot establish current origin/main state",
+    "Resettable synthetic mutation, denial, recovery and fault fixtures for complete canonical task and journey execution",
+    "A deployed build SHA or non-sensitive release marker"
+  ],
+  "remaining_static_work_not_requiring_user_input": [
+    "Target-specific benchmark/NCM research for 404 targets.",
+    "Resolve 585 visual rows and 364 material-state rows without family-level inheritance.",
+    "Retain target-specific finding validation and runtime reproduction boundaries despite complete literal current-ID linkage."
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave23",
+  "generated_at": "2026-08-21T14:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-third bounded target-specific wave: eight current completion-unproved HR targets; three independently accepted direct recommendations and five conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "The eight target IDs in ordinal order joined by LF with no terminal LF.",
+    "selection_sha256": "b485700df164e40645fb1c8883d2d8237a9b13db667b1fd1ca2fa86a30c52654",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Repository, family and adjacent-record behavior do not inherit credit.",
+    "reuse_rule": "Wave-7 and Wave-9 overlap at repository or bounded source-slice level is disclosed. Each direct outcome is restricted to its target-specific fields and no earlier or adjacent target inherits credit."
+  },
+  "selected_target_ids": [
+    "CAP-HR-CANDIDATE-COMMUNICATIONS",
+    "CAP-HR-CANDIDATE-REFERENCES",
+    "CAP-HR-COMPETENCY-ASSESSMENT",
+    "CAP-HR-COMPETENCY-DEFINITIONS",
+    "CAP-HR-RECRUITMENT-JOB-APPROVAL",
+    "CAP-HR-STAFF-OPERATIONAL-PROFILE",
+    "CAP-HR-STAFF-TIMELINE-VIEW",
+    "CAP-HR-VETTING-CHECK-LIFECYCLE"
+  ],
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "5170cb9f26fa6bfd28b1ddaf01b439df8a8cc6939f25fa011251ac8dd9a6ae6c"
+    }
+  },
+  "repository_snapshots": {
+    "HRMS": {
+      "repo": "frappe/hrms",
+      "official_repository_url": "https://github.com/frappe/hrms",
+      "commit_sha": "51c2d3bde2d2797ad929eaeef27311c64d5a1b33",
+      "spdx": "GPL-3.0-only",
+      "license_locus": "license.txt",
+      "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "hrms/hr/doctype/skill/skill.json", "lines": "L3-L60", "sha256": "b14846224047c84192630ccec51527c0a62666b81a315a206bef8ee62db823a5"},
+        {"path": "hrms/hr/doctype/designation_skill/designation_skill.json", "lines": "L8-L16", "sha256": "854bee46aa5d81c480b9648a6512a1fdcf98c2fbd07f98975fa008506a5e4dcd"},
+        {"path": "hrms/hr/doctype/expected_skill_set/expected_skill_set.json", "lines": "L8-L25", "sha256": "d55139a9e354f7a75093dda6830eaecfa04992f89ae7d3f256a4982551be5cd4"},
+        {"path": "hrms/hr/doctype/employee_skill_map/employee_skill_map.json", "lines": "L7-L105", "sha256": "333971590f04346514fa97d411291fe9cb3421155a3973142ca1ad9eda848b8a"},
+        {"path": "hrms/hr/doctype/employee_skill/employee_skill.json", "lines": "L8-L34", "sha256": "ee7f4c67de737355c3e28bdcda837dd731c3fe9b80da8aafbaaacd2c2f35d9c4"},
+        {"path": "hrms/hr/doctype/skill_assessment/skill_assessment.json", "lines": "L8-L25", "sha256": "9323a12c27345147256387c1f9974f853647ee6740e8bb7465a21a13b49b957b"},
+        {"path": "hrms/hr/doctype/job_requisition/job_requisition.py", "lines": "L20-L70", "sha256": "f47108814e68749c2d3e72223591acfd459ef9e46612da4ce737fd0f2bd91178"},
+        {"path": "hrms/hr/doctype/job_requisition/job_requisition.json", "lines": "L36-L108", "sha256": "3cab5d64f135ad4cbc564ee84b5826a6352db7c608634660e0f1bffead020438"}
+      ]
+    },
+    "ORANGEHRM": {
+      "repo": "orangehrm/orangehrm",
+      "official_repository_url": "https://github.com/orangehrm/orangehrm",
+      "commit_sha": "56e23b3b09e7af29317a0943523b825843fff527",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "LICENSE",
+      "license_sha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+      "edition_boundary": "Pinned public Starter source only; proprietary editions, hosted behavior, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "src/plugins/orangehrmRecruitmentPlugin/entity/CandidateHistory.php", "lines": "L31-L99", "sha256": "e181a23c6dfe0e7627f705dd8f0fea91e96e7b427c12bbe33c27dbb4bbd06a1b"},
+        {"path": "src/plugins/orangehrmRecruitmentPlugin/Api/CandidateHistoryAPI.php", "lines": "L60-L138", "sha256": "2ab449859f1a9db3441877f5f0328a0ddede6af9d9b05c286a810c8a267105b9"},
+        {"path": "src/plugins/orangehrmRecruitmentPlugin/entity/Candidate.php", "lines": "L31-L155", "sha256": "cd9ba34ae5ce3a86094f1f40f6c48d5d24cbe8979253fb8032b5e3ea4971dcc4"},
+        {"path": "src/plugins/orangehrmPimPlugin/Api/EmployeePersonalDetailAPI.php", "lines": "L76-L117,L124-L249,L255-L392", "sha256": "683d01e8f07a94c9f549fe37702d3971d4435323a317861443ff2ffda8141928"},
+        {"path": "src/plugins/orangehrmPimPlugin/entity/Employee.php", "lines": "L57-L215,L1053-L1135,L1363-L1485", "sha256": "0ed73e13f9711c89960feeefdf1a6e7a140e8ded3c13236ff33d54ec68b706f9"},
+        {"path": "src/plugins/orangehrmPimPlugin/entity/EmployeeLicense.php", "lines": "L30-L74", "sha256": "6c337c458412af0bd10ed3cd288b1e31ea8589693e3e2a1eea1e93724c8114f1"}
+      ]
+    },
+    "ERPNEXT": {
+      "repo": "frappe/erpnext",
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "275844d49654688b2323bd6b5273f13546a154a6",
+      "spdx": "GPL-3.0-only",
+      "license_locus": "license.txt",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "erpnext/setup/doctype/employee/employee.json", "lines": "L588-L604", "sha256": "238e600228dd3d0b842d2fd3915d64f0edea708fdc2cd9ee2edf8966fb2671c7"},
+        {"path": "erpnext/setup/doctype/employee/employee.py", "lines": "L120-L145", "sha256": "5e2823056a5df0b75123bdc00cfb5300028cf9767495f264338d957b72ff3d67"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 3, "documented_ncm_direct_recommended": 0, "retained_unproved": 5, "completion_credit_recommended": 3},
+  "evaluations": [
+    {
+      "working_key": "CAP-HR-CANDIDATE-COMMUNICATIONS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Manage candidate communications through governed recipients, templates, rendering and delivery provenance.",
+      "research_candidate": "orangehrm/orangehrm candidate history and API at pinned loci",
+      "reason": "Generic candidate history and note records do not provide recipient selection, template CRUD/rendering or delivery state and provenance."
+    },
+    {
+      "working_key": "CAP-HR-CANDIDATE-REFERENCES",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Manage candidate referees, reference evidence, review and provenance through an owned lifecycle.",
+      "research_candidate": "orangehrm/orangehrm candidate record at pinned locus",
+      "reason": "Candidate fields and attachments do not establish referee records, reference review, update lifecycle or provenance."
+    },
+    {
+      "working_key": "CAP-HR-COMPETENCY-DEFINITIONS",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Define reusable named competencies and link expected skills to roles or designations.",
+      "research_candidate": "frappe/hrms skill, designation-skill and expected-skill-set records at pinned loci",
+      "evidence_loci": "frappe/hrms@51c2d3bde2d2797ad929eaeef27311c64d5a1b33 :: hrms/hr/doctype/skill/skill.json :: L3-L60; hrms/hr/doctype/designation_skill/designation_skill.json :: L8-L16; hrms/hr/doctype/expected_skill_set/expected_skill_set.json :: L8-L25",
+      "reason": "The pinned records define a named competency catalogue and reusable expected-skill links for designations. The claim does not inherit assessment, authorization, Site or Oblivion runtime behavior."
+    },
+    {
+      "working_key": "CAP-HR-COMPETENCY-ASSESSMENT",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist employee competency ratings and evaluation evidence against defined skills.",
+      "research_candidate": "frappe/hrms employee skill-map, employee-skill and skill-assessment records at pinned loci",
+      "evidence_loci": "frappe/hrms@51c2d3bde2d2797ad929eaeef27311c64d5a1b33 :: hrms/hr/doctype/employee_skill_map/employee_skill_map.json :: L7-L105; hrms/hr/doctype/employee_skill/employee_skill.json :: L8-L34; hrms/hr/doctype/skill_assessment/skill_assessment.json :: L8-L25",
+      "reason": "The pinned records persist an employee skill map with ratings and evaluation evidence. The bounded assessment claim does not inherit competency-definition, expiry, Site, approval or runtime behavior."
+    },
+    {
+      "working_key": "CAP-HR-RECRUITMENT-JOB-APPROVAL",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern job approval decisions with authorized transition owner, time, reason, replay and history.",
+      "research_candidate": "frappe/hrms job requisition record at pinned loci",
+      "reason": "Pending, Open & Approved and Rejected enum values do not establish an authorized decision transition with owner, time, reason, replay and history."
+    },
+    {
+      "working_key": "CAP-HR-STAFF-OPERATIONAL-PROFILE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Retrieve and update an access-scoped operational employee personal and employment profile.",
+      "research_candidate": "orangehrm/orangehrm personal-detail API and employee entity at pinned loci",
+      "evidence_loci": "orangehrm/orangehrm@56e23b3b09e7af29317a0943523b825843fff527 :: src/plugins/orangehrmPimPlugin/Api/EmployeePersonalDetailAPI.php :: L76-L117,L124-L249,L255-L392; src/plugins/orangehrmPimPlugin/entity/Employee.php :: L57-L215,L1053-L1135,L1363-L1485",
+      "reason": "The accessible-employee personal-detail API retrieves and updates personal profile fields, while the cited entity spans expose bounded employment status, job-title and organizational-unit context. This does not infer company or manager relationships and does not inherit account or position lifecycle, Site privacy, timeline aggregation or Oblivion runtime behavior."
+    },
+    {
+      "working_key": "CAP-HR-STAFF-TIMELINE-VIEW",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Provide an authorized actor- and time-attributed staff timeline aggregating governed events.",
+      "research_candidate": "frappe/erpnext employee work-history fields at pinned loci",
+      "reason": "Work-history fields and validation are not an authorized actor- and time-attributed timeline aggregation surface."
+    },
+    {
+      "working_key": "CAP-HR-VETTING-CHECK-LIFECYCLE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern vetting checks through consent, evidence, verification, expiry/review and reviewer provenance.",
+      "research_candidate": "orangehrm/orangehrm employee licence entity at pinned locus",
+      "reason": "An employee licence record does not establish a vetting-check lifecycle, consent, evidence, verification, review or reviewer provenance."
+    }
+  ],
+  "collision_disclosure": {
+    "target_keys": "All eight targets were completion-unproved with zero credit before Wave 23; exact target-key collision with materialized Waves 4-22 is zero.",
+    "hrms": "Wave 7 cited skill and employee-skill records for different catalog and assessment-matrix targets. Wave 23 uses bounded target-specific slices only; no source-family inheritance is allowed.",
+    "erpnext": "Wave 9 cited ERPNext Employee blobs for employee-account and position targets. Wave 23 staff-profile credit is limited to separately pinned operational profile fields and does not inherit those credits.",
+    "orangehrm": "No materialized OrangeHRM source collision was found; public Starter source is the only edition in scope.",
+    "wave22": "Wave 22 CiviCRM, ERPNext finance and OpenEMR loci are target-disjoint; no no-match decision is recommended in Wave 23."
+  },
+  "count_delta": {"verified_benchmark_direct": 3, "documented_ncm_direct": 0, "eligible_total": 3, "completion_unproved": -3},
+  "post_wave_totals": {"verified_benchmark": 355, "documented_ncm": 89, "eligible": 444, "completion_unproved": 458}
+}

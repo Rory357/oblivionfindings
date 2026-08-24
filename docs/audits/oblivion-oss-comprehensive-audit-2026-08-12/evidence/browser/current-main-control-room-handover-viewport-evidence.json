@@ -1,0 +1,137 @@
+{
+  "schema_version": "oblivion-current-main-browser-evidence-v1",
+  "generated_at": "2026-08-14T10:32:33.6986490+12:00",
+  "classification": "supplemental_current_main_browser_evidence_not_audited_baseline_credit",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "rendered_commit": "ad19f994a280835d039d1a31ebdcb05778733c5a",
+  "environment": {
+    "url_origin": "http://127.0.0.1:8147",
+    "server_process_id": 39620,
+    "server_command": "php -S 127.0.0.1:8147 -t public server.php",
+    "server_worktree": "<local-user>/.config/superpowers/worktrees/oblivionfindings/codex-ticketing-main-integration",
+    "role": "Demo Manager",
+    "site_scope": "not visibly selected",
+    "record_scope": "synthetic Playwright Control Room shift id 4",
+    "route_name": "control-room.shifts.handover-page",
+    "route_template": "control-room/shifts/{shift}/handover",
+    "observed_path": "/control-room/shifts/4/handover",
+    "frontend_component": "control-room/shifts/handover",
+    "interaction_boundary": "GET navigation, viewport changes, DOM reads and screenshots only; no checkbox, field, continue, prepare, override, accept or other mutation control was used"
+  },
+  "source_drift": {
+    "material": true,
+    "reason": "The handover page, application sidebar and application CSS blobs differ between the immutable audited commit and current main, so these observations cannot retroactively fill the audited-baseline geometry gate.",
+    "anchors": [
+      {
+        "path": "resources/js/pages/control-room/shifts/handover.tsx",
+        "audited_blob": "2e91bd45724f35d018107ace4b9fe7a2994b394b",
+        "rendered_blob": "f03a010dde2b1a7143ab542150362e378f0de287"
+      },
+      {
+        "path": "resources/js/components/app-sidebar.tsx",
+        "audited_blob": "a94c12e86959bd2f7a79468512970f552a6292c4",
+        "rendered_blob": "b70e0e590806b1faa9f67d8264e6687eb278567c"
+      },
+      {
+        "path": "resources/css/app.css",
+        "audited_blob": "76ce1ecca5f89ba7236a39fc1129e77fa58eb352",
+        "rendered_blob": "16e6f2b49e36394e565ab1ebd2367ed3a54834e5"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "viewport": "1024x768",
+      "client_width": 1024,
+      "client_height": 768,
+      "scroll_width": 1024,
+      "scroll_height": 1788,
+      "horizontal_overflow": false,
+      "page_scrollable": true,
+      "h1_count": 1,
+      "main_count": 1,
+      "nav_count": 3,
+      "dialog_count": 0,
+      "form_count": 0,
+      "visible_control_count": 56,
+      "control_missing_accessible_name": 0,
+      "small_control_heuristic_count": 55,
+      "visible_image_count": 1,
+      "visible_images_missing_alt": 0,
+      "screenshot": "evidence/browser/control-room-shift-handover-1024x768.png",
+      "screenshot_sha256": "ba7ada8851b1f0ea5b3d639a254118d62e1476fc371e1b7b3d6543e8a2d101e8"
+    },
+    {
+      "viewport": "1280x800",
+      "client_width": 1280,
+      "client_height": 800,
+      "scroll_width": 1280,
+      "scroll_height": 1727,
+      "horizontal_overflow": false,
+      "page_scrollable": true,
+      "h1_count": 1,
+      "main_count": 1,
+      "nav_count": 3,
+      "dialog_count": 0,
+      "form_count": 0,
+      "visible_control_count": 56,
+      "control_missing_accessible_name": 0,
+      "small_control_heuristic_count": 55,
+      "visible_image_count": 1,
+      "visible_images_missing_alt": 0,
+      "screenshot": "evidence/browser/control-room-shift-handover-1280x800.png",
+      "screenshot_sha256": "0e946f56f9512685785a3176159fc6fbf6606b71b94cee93dd1121b7bdc3138d"
+    },
+    {
+      "viewport": "1440x900",
+      "client_width": 1440,
+      "client_height": 900,
+      "scroll_width": 1440,
+      "scroll_height": 1709,
+      "horizontal_overflow": false,
+      "page_scrollable": true,
+      "h1_count": 1,
+      "main_count": 1,
+      "nav_count": 3,
+      "dialog_count": 0,
+      "form_count": 0,
+      "visible_control_count": 56,
+      "control_missing_accessible_name": 0,
+      "small_control_heuristic_count": 55,
+      "visible_image_count": 1,
+      "visible_images_missing_alt": 0,
+      "screenshot": "evidence/browser/control-room-shift-handover-1440x900.png",
+      "screenshot_sha256": "f02477629148b34d6a732251252647ac40355ab51a66098016bafe7b20aa921e"
+    },
+    {
+      "viewport": "390x844",
+      "client_width": 390,
+      "client_height": 844,
+      "scroll_width": 390,
+      "scroll_height": 3290,
+      "horizontal_overflow": false,
+      "page_scrollable": true,
+      "h1_count": 1,
+      "main_count": 1,
+      "nav_count": 3,
+      "dialog_count": 0,
+      "form_count": 0,
+      "visible_control_count": 25,
+      "control_missing_accessible_name": 0,
+      "small_control_heuristic_count": 21,
+      "visible_image_count": 0,
+      "visible_images_missing_alt": 0,
+      "screenshot": "evidence/browser/control-room-shift-handover-390x844.png",
+      "screenshot_sha256": "f6dc5026e0e4dee90c3ff6c589536c6d321e069b839f80509fd9e93bbc7fcfb4"
+    }
+  ],
+  "summary": {
+    "required_viewports_observed": 4,
+    "required_viewports_total": 4,
+    "horizontal_overflow_observations": 0,
+    "missing_accessible_name_signals": 0,
+    "current_main_result": "The rendered current-main handover page was measurable at all four required responsive-web viewports and had no document-level horizontal overflow.",
+    "audited_baseline_credit_changed": false,
+    "audited_baseline_remaining_gap": "The four immutable-baseline handover observations retain incomplete DOM/accessibility geometry because the current-main component and shared layout are materially different from the audited source."
+  }
+}

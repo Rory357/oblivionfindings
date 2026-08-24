@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "artifact": "rag-capability-identity-adjudication",
+  "decision_id": "RAG-IDENTITY-ADJUDICATION-001",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_identity_adjudication_runtime_unverified",
+  "audit_boundary": {"mode": "read_only_static_audit", "writes_outside_audit_artifacts": 0, "tests_run": 0, "browser_journeys_run": 0},
+  "verdict": {
+    "distinct_human_capabilities": 1,
+    "canonical_feature_id": "CLI-CLIENT-RAG",
+    "id_status": "source_stable_existing_feature_id",
+    "canonical_module": "CLIENTS",
+    "class": "H",
+    "name": "Ask about an authorised client record",
+    "confidence": "high_static_identity_runtime_unverified"
+  },
+  "absorbed_source_families": ["CLI-CLIENT-RAG", "PLAT-RAG"],
+  "rejected_candidate_ids": ["CAP-CLI-CLIENT-RAG-STAFF", "CAP-CLI-CLIENT-RAG-PORTAL"],
+  "route_mapping": [
+    {"route_id": "ROUTE-0189", "name": "clients.rag.ask", "actor_surface": "compatibility endpoint for any, assigned or self-authorised access", "frontend_activation": "none_found_in_current_frontend", "identity": "alternate_entry"},
+    {"route_id": "ROUTE-2040", "name": "operations.clients.rag.ask", "actor_surface": "nested staff client route", "frontend_activation": "none_found_in_current_frontend; static authorization test uses it", "identity": "alternate_entry"},
+    {"route_id": "ROUTE-2275", "name": "portal.clients.rag.ask", "actor_surface": "client-self portal profile widget", "frontend_activation": "resources/js/pages/portal/client.tsx", "identity": "active_self_scoped_entry"},
+    {"route_id": "ROUTE-2342", "name": "rag.ask", "actor_surface": "non-portal global staff query dialog", "frontend_activation": "resources/js/components/global-query-bar.tsx", "identity": "active_staff_entry"},
+    {"route_id": "ROUTE-2343", "name": "rag.clients", "actor_surface": "authorised client picker supporting the global staff query dialog", "frontend_activation": "resources/js/components/global-query-bar.tsx", "identity": "supporting_step_of_same_job"}
+  ],
+  "page_mapping": {
+    "exclusive_primary_page_ids": [],
+    "shared_host_page_ids": ["PAGE-0713"],
+    "shared_host_note": "PAGE-0713 hosts the client-self widget but is primarily owned by CLI-PORTAL-CLIENT.",
+    "global_surface": "GlobalQueryBar is embedded in shared AppHeader and AppSidebarHeader and has no exclusive resolver page."
+  },
+  "identity_lenses": {
+    "user_job": "An authorised person selects or arrives at an authorised Client, asks a question about that record, and receives an answer with sources.",
+    "actors": "Staff any-client, staff assigned-client and client-self are permission scopes of the same job; next-of-kin is expressly excluded from the unredacted store.",
+    "aggregate": "All five routes operate on Client and its per-client openai_vector_store_id.",
+    "state": "Client selected or bound, question validated, provider enabled or disabled, vector store absent or available, snapshot built and attached, answer or error returned.",
+    "completion": "The same file-search answer and sources are returned. Redirect/flash versus JSON/dialog transport does not change the user outcome.",
+    "side_effects": "Both controllers create the same per-client vector store when absent, build the same rolling snapshot, write/upload it and attach it to the same store.",
+    "handoff": "Neither implementation defines a distinct persisted workflow handoff or downstream owner."
+  },
+  "identity_reasoning": [
+    "The portal widget omits selection because the Client is already bound; the global dialog adds a picker because staff may access multiple authorised clients.",
+    "Both controllers use the same ClientRagIndexer, OpenAiVectorStoreClient, model, system instruction, vector store and answer/source contract.",
+    "Role and direct-object checks change eligible records, not the aggregate, state machine or completion outcome.",
+    "ROUTE-0189 is explicitly compatibility-only and no current frontend consumer was found for ROUTE-2040."
+  ],
+  "denominator_effect": {
+    "working_before": {"total": 895, "H": 785, "D": 108, "M": 2, "CLIENTS_H": 24, "PLATFORM_H": 1},
+    "operation": "Collapse two working RAG H rows into CLI-CLIENT-RAG and enrich it with the previously excluded PLAT-RAG route family.",
+    "working_after": {"total": 894, "H": 784, "D": 108, "M": 2, "CLIENTS_H": 23, "PLATFORM_H": 1},
+    "net": {"total": -1, "H": -1, "D": 0, "M": 0},
+    "count_fit_used": false
+  },
+  "benchmark_boundary": {
+    "old_units": ["CLI-CLIENT-RAG", "PLAT-RAG"],
+    "inheritance": "prohibited",
+    "reason": "The final target merges two prior adjudication units; target-specific benchmark/NCM research must be rerun."
+  },
+  "proof_citations": [
+    "routes/clients.php:55-68", "routes/operations.php:109-113", "routes/operations.php:200-204", "routes/portal.php:54-64", "routes/portal.php:227-231",
+    "app/Http/Controllers/ClientRagController.php:14-74", "app/Http/Controllers/ClientRagController.php:77-107", "app/Http/Controllers/RagController.php:13-52", "app/Http/Controllers/RagController.php:55-125",
+    "resources/js/components/global-query-bar.tsx:37-92", "resources/js/components/global-query-bar.tsx:99-151", "resources/js/pages/portal/client.tsx:57-71", "resources/js/pages/portal/client.tsx:468-519",
+    "tests/Feature/Operations/ClientRagAuthorizationTest.php:40-140", "tests/Feature/Security/SummaryRagTimelineAuthorizationTest.php:210-265"
+  ],
+  "proof_caveats": [
+    "No representative-role runtime or browser journey was executed.",
+    "Static tests were inspected but not run.",
+    "No current frontend caller was found for ROUTE-0189 or ROUTE-2040; direct-request reachability remains.",
+    "Answer persistence, audit history, remote vector-store lifecycle and degraded-provider behaviour remain runtime-unverified."
+  ]
+}

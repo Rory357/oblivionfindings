@@ -1,0 +1,107 @@
+{
+  "schema_version": "4.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "generated_at": "2026-08-21T05:40:51.553712+00:00",
+  "denominator_status": "canonical_902_register_materialized_material_links_partial_runtime_unexecuted",
+  "working_human_capabilities": 788,
+  "earlier_894_derivation_superseded": true,
+  "working_manifest": {
+    "path": "working-capability-manifest-902.json",
+    "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "rows": 902,
+    "unique_stable_ids": 902,
+    "classes": {
+      "H": 788,
+      "D": 111,
+      "M": 3
+    },
+    "stable_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 5,
+      "audit_assigned": 16
+    },
+    "route_enrichment": {
+      "targets": 901,
+      "relations": 3065,
+      "unique_routes": 2985,
+      "inventory_routes": 3024,
+      "accepted_percent": 98.71,
+      "excluded_surface_relations": 39,
+      "static_disposition_total": 3024
+    },
+    "page_enrichment": {
+      "targets": 756,
+      "relations": 1526,
+      "unique_pages": 945,
+      "inventory_pages": 962,
+      "accepted_percent": 98.23,
+      "excluded_surface_relations": 17,
+      "static_disposition_total": 962
+    },
+    "backend_enrichment": {
+      "targets": 729,
+      "relations": 828,
+      "unique_anchors": 469
+    },
+    "benchmark_mapping": {
+      "eligible": 451,
+      "verified_benchmark": 362,
+      "verified_direct": 340,
+      "verified_rename": 22,
+      "documented_no_credible_match": 89,
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "completion_unproved": 451
+    },
+    "derivation_note": "The 902 register supersedes the 894 stage after source adjudication added four reachable human jobs, three parameter-distinct exports and one scheduled signal-to-alert machine job. Excluded surfaces remain outside H/D/M counts."
+  },
+  "linked_superseded_human_rows": 677,
+  "applicability_rows": 4312,
+  "executed": 0,
+  "final_feature_linkage": {
+    "assigned_rows": 3935,
+    "unresolved_rows": 377,
+    "assigned_unique_final_feature_ids": 713,
+    "percent": 91.26,
+    "proof_boundary": "Static identity linkage only; it does not establish rendered, recovery or completion behavior."
+  },
+  "class_counts": {
+    "approved/acknowledged/verified": 71,
+    "assigned": 14,
+    "cancelled/removed/archived": 195,
+    "completed/closed/released": 74,
+    "created/recorded": 384,
+    "destructive confirmation applicability gap": 172,
+    "destructive confirmation state": 42,
+    "downloaded/exported/printed": 96,
+    "empty/no-results presentation state": 224,
+    "error presentation state": 127,
+    "escalated/flagged": 10,
+    "loading presentation state": 15,
+    "mutation outcome applicability gap": 231,
+    "not-found/direct-object applicability": 487,
+    "permission/direct-object denial applicability": 654,
+    "presentation-state applicability gap": 130,
+    "read/list/detail": 520,
+    "rejected/returned": 32,
+    "retried/replayed/reconciled": 14,
+    "unassigned": 3,
+    "updated/revised": 282,
+    "validation/error applicability gap": 36,
+    "validation/error source state": 499
+  },
+  "id_stability": {
+    "retained": 4312,
+    "removed_old": 0,
+    "new_ids": 0
+  },
+  "classification_label": "Not safely reproducible",
+  "final_feature_link_completion_credit": 3935,
+  "runtime_state_completion_credit": 0,
+  "rules": {
+    "action_token_only": true,
+    "route_name_resource_noun_matching": false,
+    "page_presence_implies_loading_empty_error": false,
+    "presentation_gap_single_when_no_exact_signal": true
+  }
+}

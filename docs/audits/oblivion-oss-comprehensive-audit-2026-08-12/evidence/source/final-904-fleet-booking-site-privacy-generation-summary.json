@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-fleet-booking-site-privacy-generation-summary",
+  "generated_at": "2026-08-21T22:20:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "FLEET-BOOKING-SITE-PRIVACY-01",
+  "status": "generated_open_p0_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "0923c6681011fe90c1e9e71bbea6c1ac5dbed33b4773c884fae2958fe1df869b",
+      "bytes": 662257
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "598d76cd63b23a7ea49164ad43e12cb10afdb9fed8437807d8b50d20b090cb9b",
+      "bytes": 11775291
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "cafa63fdc38baf9db33a6deb759e51b400b96156abdb5652337e3f50d7e4a5d4",
+      "bytes": 1322597
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "e3f3a1d5791e1b93653ce5f4b7d14f77e5cd62a36b8a9ead55bacc4e15fc024b",
+      "bytes": 245041
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "7981a2bc31ca0919969645881803af5946323caa888dc2308bbddab18e5a06b2",
+      "bytes": 12337
+    }
+  },
+  "source_chain": [
+    {
+      "path": "routes/fleet-assets.php",
+      "baseline_blob": "b93cd9e4e5de55b3807c5aec389d52724749eec2",
+      "baseline_loci": "L108-L126",
+      "current_blob": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+      "current_loci": "L108-L126"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+      "baseline_blob": "666253e172538c55438fb4a78a074446262fd8d5",
+      "baseline_loci": "L23-L100,L202-L375,L391-L511",
+      "current_blob": "25a32a6f4061652045f5f1874573fae8eee6882b",
+      "current_loci": "L23-L100,L202-L375,L391-L511"
+    },
+    {
+      "path": "app/Models/FleetVehicleBooking.php",
+      "baseline_blob": "b505a9089db79f9e395b41a3720bea281ef50a94",
+      "baseline_loci": "model",
+      "current_blob": "4ce4836c453172d187a090bb84951c2d1962c0a3",
+      "current_loci": "model"
+    },
+    {
+      "path": "app/Policies/AssetPolicy.php",
+      "baseline_blob": "d5841ed53e076a6fae71a7cefb512db771f0ec66",
+      "baseline_loci": "L17-L21",
+      "current_blob": "ef4931d4c88542a85f7de7bf343da8d668e49f57",
+      "current_loci": "L17-L21"
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "baseline_blob": "fed7affe854534221417be93dc2b2d8445488c8d",
+      "baseline_loci": "L53-L83,L825-L833",
+      "current_blob": "41d3ed5c671c1774b4865b62e88e053e8aea55a8",
+      "current_loci": "L53-L83,L825-L833"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "baseline_blob": "4859ab64c19b8a35ba0656ef2f9e40b18943cc98",
+      "baseline_loci": "Fleet permissions",
+      "current_blob": "317c399b138d42edcb2d001323f2edb085ab4e41",
+      "current_loci": "L732-L759"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/bookings/book-vehicle-wizard.tsx",
+      "baseline_blob": "d2f638e26a7ce787ff2b8ffc5c51eb23be139c5f",
+      "baseline_loci": "L345-L373,L628-L661",
+      "current_blob": "378ea55793f55b7cc1d7d115a591b2f8ed15f6fd",
+      "current_loci": "L345-L373,L628-L661"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/bookings/show.tsx",
+      "baseline_blob": "73caafda66153e4b443a1522dd4de83811321a0e",
+      "baseline_loci": "L194-L228",
+      "current_blob": "a8be925713d46869e5b60dc02611623f08bcb703",
+      "current_loci": "L194-L228"
+    }
+  ],
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "9b558790b30636fc4f7d2f7f6b0ccb7b79e4a595bf2f8ff5abfdc3dbdd8faf1c",
+      "bytes": 1322597
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "4d9e5581fee9015c85c1c6d56395e14310373cf11a84ba006c0c2ea86ff8131c",
+      "bytes": 245041
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "a35aa48109023cb73bff0f37d945406740ded64eb92f22f1f340b0aae9172a46",
+      "bytes": 12337
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-fleet-904-2026-08-21.json",
+      "sha256": "149ae1bde10819d0982a8c6f81920b864e3d0d804472a46a4aa98f574181ef4b",
+      "bytes": 5451
+    }
+  },
+  "counts": {
+    "denominator": {
+      "total": 904,
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "benchmark": {
+      "eligible": 472,
+      "verified": 383,
+      "ncm": 89,
+      "unproved": 432
+    },
+    "findings": {
+      "total": 96,
+      "P0": 20,
+      "P1": 64,
+      "P2": 12
+    },
+    "finding_links": {
+      "total": 271,
+      "literal": 172,
+      "literal_targets": 140,
+      "p0_p1_literal": 84
+    },
+    "official_map": {
+      "denominator": 54,
+      "reviewed": 54,
+      "owner_boundary_rows": 29
+    }
+  },
+  "credit_boundary": {
+    "static_finding_added": 1,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "remediation_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "idempotence": "A second run validates hashes and pointer entries and performs no write."
+}

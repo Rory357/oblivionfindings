@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-visual-wave11-overlay10-generation-summary",
+  "generated_at": "2026-08-22T01:40:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "outputs": {
+    "visual_wave11": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave11.json",
+      "sha256": "21f4719cbcdfc46b2b9638b5e04f0220e98f06dc21eb00cb412699b002544116",
+      "bytes": 116514
+    },
+    "overlay_wave10": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave10.json",
+      "sha256": "eeec4d1fa003ffeb6ab86305049603d9dff62302cacbaac71cfb23e3c719ba2f",
+      "bytes": 15003
+    },
+    "overlay_classifier": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "60b02298132846b6d27db9fc08d981f925fbe4d72890553551b4d915a033fa9b",
+      "bytes": 1156860
+    }
+  },
+  "proof_hashes": {
+    "visual": "2d9d43e80c826773ff6f1acefd521a3e3a6b79f4736c223744cf6424ff6dd742",
+    "visual_source_map": "a4de45c76c6ce83b297fb757507943ae08595da3f3a1d1f5f4a51368ab779bf1",
+    "visual_candidate_rank": "27dc9576e165338e08066cd4852ce365d34e3f4e0d392444d6a4279a6e76253a",
+    "overlay": "86504ddb08410a9b0ba210d34363079959fc40da59df8645292be62022f64f42",
+    "overlay_source_map": "3e5a04b31ae9b7ea43a41e2f5d597b2e1b839a7405ae7d7934e982a62fafc11c"
+  },
+  "counts": {
+    "visual_assigned": 8168,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "overlay_exact_resolved": 253,
+    "overlay_source_inferred": 144,
+    "overlay_unresolved_or_blocked": 262,
+    "primitive_exact_resolved": 242,
+    "primitive_unresolved": 235
+  },
+  "downstream_refresh": {
+    "required_order": [
+      "generators/refresh-current-904-summaries.py",
+      "generators/refresh-audit-dashboard-data.py",
+      "generators/finalize-current-904-validation.py"
+    ]
+  },
+  "credit_boundary": {
+    "visual_final_id_promotions": 0,
+    "overlay_static_pairings": 10,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

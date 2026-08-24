@@ -1,0 +1,35 @@
+{
+  "visual_id": "BVIS-0009",
+  "captured_at": "2026-08-12T20:18:00+12:00",
+  "url": "https://oblivionfindings.com/tasks",
+  "environment_status": "owner-confirmed test/development application; deployed commit SHA not exposed or independently verified",
+  "role": "Demo Admin",
+  "site_scope": "not displayed in captured state",
+  "viewport": {
+    "inner_width": 1600,
+    "inner_height": 1000,
+    "document_client_width": 1583,
+    "document_scroll_width": 1583,
+    "horizontal_overflow": false
+  },
+  "capture": {
+    "kind": "cropped viewport screenshot",
+    "clip": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 620
+    },
+    "file": "BVIS-0009-all-tasks-1600x1000-observed-cropped.png",
+    "redaction_boundary": "crop excludes task rows and client/site names; demo account label and aggregate synthetic queue counts remain visible"
+  },
+  "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+  "state": "Observed",
+  "observations": [
+    "All Tasks renders one cross-module work queue with ownership, urgency and due-state summaries.",
+    "Primary queue views expose All, Mine, Following, Overdue, Unassigned, Due this week, High priority and Done.",
+    "The hero claims deep links back to the owning record; this capture proves the claim is rendered, not that every deep link or completion handoff works.",
+    "No horizontal document overflow was present at the actual 1600 by 1000 viewport."
+  ],
+  "proof_boundary": "Read-only browser observation under one Demo Admin session. No controls were clicked, no filters were changed, no task was opened, and no state-changing request was made. Representative worker/manager roles, parameterized row destinations, mobile viewports and deployed SHA remain unverified."
+}

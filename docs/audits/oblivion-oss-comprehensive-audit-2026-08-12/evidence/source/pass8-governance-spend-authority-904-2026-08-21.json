@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-governance-spend-authority-904-2026-08-21",
+  "generated_at": "2026-08-22T00:15:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "module_selection": {
+    "module": "GOVERNANCE",
+    "targets": 62,
+    "classes": {
+      "H": 50,
+      "D": 12,
+      "M": 0
+    },
+    "benchmark_decided": 23,
+    "benchmark_unproved": 39,
+    "selection_reason": "Weighted unresolved surface/risk/runtime screen selected Governance; all representative task/runtime gates remain zero."
+  },
+  "pass_reconciliation": {
+    "P1": {
+      "static_identity_reviewed": 62,
+      "denominator": 62
+    },
+    "P2": {
+      "representative_persisted_tasks_executed": 0,
+      "denominator": 50
+    },
+    "P3": {
+      "benchmark_or_ncm_decided": 23,
+      "denominator": 62,
+      "unproved": 39
+    },
+    "P4": {
+      "representative_security_and_visual_tasks_executed": 0,
+      "denominator": 50
+    },
+    "P5": {
+      "static_architecture_reviewed": 62,
+      "runtime_data_effects_verified": 0,
+      "denominator": 62
+    },
+    "P6": {
+      "fresh_exact_source_finding_official_links": 3,
+      "denominator": 62,
+      "boundary": "Official propositions frame risk only."
+    },
+    "P7": {
+      "fresh_source_constraint_failure_links": 3,
+      "tests_executed": 0,
+      "denominator": 62
+    },
+    "P8": {
+      "fresh_module_challenge": 1,
+      "module_completion_credit": 0,
+      "denominator": 62
+    }
+  },
+  "new_finding": {
+    "id": "GOV-SPEND-AUTHORITY-01",
+    "priority": "P1",
+    "feature_ids": [
+      "CAP-GOV-SPEND-REQUEST-AUTHORING",
+      "CAP-GOV-SPEND-ATTACHMENT-DOWNLOAD",
+      "CAP-GOV-SPEND-APPROVAL-DECISION"
+    ],
+    "route_ids": [
+      "ROUTE-1019",
+      "ROUTE-1020",
+      "ROUTE-1021",
+      "ROUTE-1022",
+      "ROUTE-1023",
+      "ROUTE-1024",
+      "ROUTE-1025",
+      "ROUTE-1026",
+      "ROUTE-1027",
+      "ROUTE-1028",
+      "ROUTE-1029",
+      "ROUTE-1030"
+    ],
+    "page_ids": [
+      "PAGE-0328",
+      "PAGE-0329",
+      "PAGE-0330",
+      "PAGE-0331"
+    ],
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "source_chain": [
+    {
+      "path": "routes/governance.php",
+      "baseline_sha256": "d51b57d4fa8ed8343447aa6771f22014fad5153b02380738ccff976ba4f7ce29",
+      "current_sha256": "d51b57d4fa8ed8343447aa6771f22014fad5153b02380738ccff976ba4f7ce29",
+      "loci": "22,372-392"
+    },
+    {
+      "path": "app/Http/Middleware/EnsurePermission.php",
+      "baseline_sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+      "current_sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+      "loci": "11-27"
+    },
+    {
+      "path": "database/seeders/GovernancePermissionsSeeder.php",
+      "baseline_sha256": "124bef53898fb07a561d33b235ac2f3813a3ceca8522529749def99ec722badb",
+      "current_sha256": "124bef53898fb07a561d33b235ac2f3813a3ceca8522529749def99ec722badb",
+      "loci": "91-94,108-179,217-245"
+    },
+    {
+      "path": "app/Domain/Governance/Http/Controllers/SpendApprovalController.php",
+      "baseline_sha256": "189546b2730f71d798def6605d6d0a6e6c019ac75afb13fc7eb5885faa6edb70",
+      "current_sha256": "189546b2730f71d798def6605d6d0a6e6c019ac75afb13fc7eb5885faa6edb70",
+      "loci": "18-46,86-117,140-229,245-351"
+    },
+    {
+      "path": "app/Domain/Governance/Models/SpendApproval.php",
+      "baseline_sha256": "4e1e69c5cde10178c3ff812d1b92b0e2ca46d8a7dd9308fc5c2932dd6abaa8d3",
+      "current_sha256": "4e1e69c5cde10178c3ff812d1b92b0e2ca46d8a7dd9308fc5c2932dd6abaa8d3",
+      "loci": "13-20,33-82"
+    },
+    {
+      "path": "database/migrations/2026_05_20_100100_create_spend_approvals_and_budget_allocations.php",
+      "baseline_sha256": "2e50c1c0cf95440de6a65a51ffe195018258fe18c04715544a27086ec6667fc0",
+      "current_sha256": "2e50c1c0cf95440de6a65a51ffe195018258fe18c04715544a27086ec6667fc0",
+      "loci": "17-57"
+    },
+    {
+      "path": "tests/Feature/Governance/GovernanceSpendApprovalsTest.php",
+      "baseline_sha256": "52107a6067d1fbf4c666d9dfd9e04b71c7b871acce419c0eeace06d6612c12f7",
+      "current_sha256": "52107a6067d1fbf4c666d9dfd9e04b71c7b871acce419c0eeace06d6612c12f7",
+      "loci": "78-194"
+    },
+    {
+      "path": "app/Models/User.php",
+      "baseline_sha256": "2d5aa8b65854c23b286951f00ee81c893ba9985adc12743caae5fddd372d9deb",
+      "current_sha256": "1bcee6a3fc05e04ec75ef32c1a782d84ecda3ec6e9f191c4ac99775b8adb0519",
+      "loci": "permission fast path; no record authority"
+    },
+    {
+      "path": "resources/js/pages/Governance/SpendApprovals/Index.tsx",
+      "baseline_sha256": "a9ca31ce1c2fab5d1776cb7e2ea209ea9cfebe4781892b28fbd0dc1dd7e678b6",
+      "current_sha256": "1d84f315eadcd4d40b4f20cf0930dace6883dde24d180f3a6c84f26776a0cd5b",
+      "loci": "128-134,169-184 audited; action reachability retained"
+    },
+    {
+      "path": "resources/js/pages/Governance/SpendApprovals/Show.tsx",
+      "baseline_sha256": "e024979baf607504c46a3823b1dba36f493fbe7fa8f2251806ba253c6e0da076",
+      "current_sha256": "fb64a52fc1430989b52e0bb8bbe2139f5cc06462a9a92287a1f904bf2812e998",
+      "loci": "47-87,100-175,181-240 audited; direct actions retained"
+    }
+  ],
+  "duplicate_boundary": "No current finding owns the exact spend feature IDs, route IDs, controller or spend-approval semantics; GOV-NESTED-01 and GOV-RESOLUTION-QUORUM-01 are distinct aggregates.",
+  "wording_corrections": [
+    "No source-proven foreign-Site privacy claim; global Governance visibility requires an explicit owner decision.",
+    "Do not claim source_type/source_id injection because validatePayload does not accept them."
+  ],
+  "completion_boundary": "No runtime, browser, focus, keyboard, representative-user, remediation, release or overall completion credit."
+}

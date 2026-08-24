@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave8",
+  "generated_at": "2026-08-22T00:25:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Audited-baseline static source trigger pairing only. Current-main, runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "selection_sha256": "536468783e4225ef97b70ba2c4358b641fba9392a657151d69af96ae3c119c23",
+    "exclusion_count": 70,
+    "exclusion_sha256": "f9e1af56a2e7adf09490eeb4bf244932a04049ca6df8aab006d54f5e639597f9",
+    "proof_jsonl_sha256": "7f6426a8cfcd431e6c71ee6df489dd6c2471f35b611b828613ecc25c8ba907d7",
+    "source_map_jsonl_sha256": "67e0dde6d7fd0500d2ae32955f7a320f5427cf014dd5c62a0392519440b00a3f",
+    "independent_review_verdict": "GO_after_correcting_and_preserving_primitive_242_235"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+      "line": 554,
+      "symbol": "RecordDestructionDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+        "source_sha256": "087cda89a8c7060607783d6af56e80386e6a8ff913ded04eeb49811ca332b449",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 92; record-destruction triggers 230/282; render and close 554",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+      "line": 555,
+      "symbol": "ResolveDiscrepancyDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+        "source_sha256": "087cda89a8c7060607783d6af56e80386e6a8ff913ded04eeb49811ca332b449",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 92; resolve-discrepancy triggers 224/469; render and close 555",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+      "line": 556,
+      "symbol": "LossActionDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+        "source_sha256": "087cda89a8c7060607783d6af56e80386e6a8ff913ded04eeb49811ca332b449",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 92; loss-action triggers 236/237/526/527; render and close 556",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+      "line": 558,
+      "symbol": "CdDetailDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/ControlledDrugs.tsx",
+        "source_sha256": "087cda89a8c7060607783d6af56e80386e6a8ff913ded04eeb49811ca332b449",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 92; detail triggers 174/188/252; guard/render 557-558 and close 560",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Destructions.tsx",
+      "line": 321,
+      "symbol": "RecordDestructionDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Destructions.tsx",
+        "source_sha256": "b0476ed0a27eb5e4fe1702c77d44a2902d722c171cf0b3e5ad2b3f2155a89b77",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 94; record triggers 210/267; render and close 321",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Destructions.tsx",
+      "line": 322,
+      "symbol": "VoidDestructionDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Destructions.tsx",
+        "source_sha256": "b0476ed0a27eb5e4fe1702c77d44a2902d722c171cf0b3e5ad2b3f2155a89b77",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 94; void triggers 154/267/288; render and close 322",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Destructions.tsx",
+      "line": 324,
+      "symbol": "DestructionDetailDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Destructions.tsx",
+        "source_sha256": "b0476ed0a27eb5e4fe1702c77d44a2902d722c171cf0b3e5ad2b3f2155a89b77",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 94; detail triggers 136/148/163/165; guard/render 323-324 and close 326",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1368,
+      "symbol": "GenerateRoundsModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Index.tsx",
+        "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 404; trigger 677; component/open 1368-1369 and close 1370",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1373,
+      "symbol": "ReportErrorModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Index.tsx",
+        "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 404; trigger 828; component/open 1373-1374 and close 1375",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/Index.tsx",
+      "line": 1378,
+      "symbol": "AddMedicationModal",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/Index.tsx",
+        "source_sha256": "7f2b2a717f6b09b1e593648951449ac8ccb42ba5a1d68334a1ae1d5b6c610af8",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 404; trigger 1046; component/open 1378-1379 and close 1380",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -7,
+    "generic_unresolved": -3,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -7,
+    "controlled_without_resolved_activator": -3,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 233,
+    "source_inferred_not_exactly_paired": 159,
+    "unresolved_or_blocked": 267,
+    "same_scope_state_handler": 214,
+    "internal_state_trigger_candidate": 159,
+    "controlled_without_resolved_activator": 250,
+    "generic_unresolved": 265,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 242,
+    "primitive_unresolved": 235
+  }
+}

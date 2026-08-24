@@ -1,0 +1,30 @@
+{
+  "schema_version": "browser-visual-evidence.v1",
+  "visual_id": "BVIS-0011",
+  "generated_at": "2026-08-13T15:42:29+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "url": "/system/users/create",
+  "route_id": "ROUTE-2969",
+  "feature_id": "CAP-SET-USER-ACCOUNT-LIFECYCLE",
+  "role": "Demo Administrator",
+  "site_scope": "System-wide account administration; no site selector is present on this route",
+  "viewport": {
+    "inner_width": 1280,
+    "inner_height": 720,
+    "document_client_width": 1265,
+    "document_client_height": 720
+  },
+  "classification": "Observed",
+  "state": "Signed-in Create User page before any form entry or submission",
+  "observation": "The deployed account-creation page says staff must be created through HR People and exposes only Client and Next of Kin types. It therefore provides no supported alternative when the HR People employee wizard has an empty required Primary site picker.",
+  "supporting_source": [
+    "routes/system.php:64-73",
+    "app/Http/Controllers/System/UsersController.php:create|store",
+    "resources/js/pages/system/users/Create.tsx:57-98,124-209,272-290",
+    "evidence/source/browser-clinical-lead-account-creation-attempt.json"
+  ],
+  "screenshot": "evidence/browser/BVIS-0011-system-users-staff-path-blocked.png",
+  "redaction": "The capture contains synthetic/demo administration content only. No credentials, entered values, cookies, tokens or browser storage were inspected or retained.",
+  "mutation_boundary": "Read-only browser observation. No field was filled, no form was submitted, and no user, staff profile or other domain record was created.",
+  "claim_limit": "This proves the deployed System Users route did not expose Staff creation to Demo Administrator at the captured time. It does not prove why the deployed UI differs from the audited local Create.tsx source or whether a direct handcrafted request would succeed."
+}

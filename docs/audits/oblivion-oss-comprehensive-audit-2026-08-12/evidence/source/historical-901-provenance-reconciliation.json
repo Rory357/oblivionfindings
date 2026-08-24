@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-08-21T05:51:40.688216+00:00",
+  "status": "historic_non_dereferenceable",
+  "historical_artifact": "working-capability-manifest-901.json",
+  "historical_expected_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900",
+  "live_path_sha256": "210b446c71a9ec1e1aeadbe32164d9b69e34c383da17257de1247c8bf9174ee2",
+  "current_authority": {
+    "artifact": "working-capability-manifest-902.json",
+    "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "targets": 902
+  },
+  "boundary": "The live 901 path does not contain the bytes pinned by historical 901/902 derivations. Preserve their recorded expected hash as lineage evidence; do not treat the current file at that path as a valid historical input or substitute its hash into frozen artifacts."
+}

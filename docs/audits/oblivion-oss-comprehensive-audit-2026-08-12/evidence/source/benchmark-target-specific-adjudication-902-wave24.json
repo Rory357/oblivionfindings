@@ -1,0 +1,132 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave24",
+  "generated_at": "2026-08-21T14:45:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-fourth bounded target-specific wave: eight current completion-unproved Governance targets; one independently accepted direct OpenSlides recommendation and seven conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "The eight target IDs in packet order joined by LF with no terminal LF.",
+    "selection_sha256": "29bee80caa6973b7fdd945f53be1d130ff52841fbafc7baf9e1447fce90c7bba",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Motion, vote, meeting and media-file families do not inherit each other's credit.",
+    "reuse_rule": "Every direct claim is bounded to the cited motion-authoring loci. Retained candidates remain uncredited and repository-level similarity is not evidence."
+  },
+  "selected_target_ids": [
+    "CAP-GOV-RESOLUTION-AUTHORING-EVIDENCE",
+    "CAP-GOV-RESOLUTION-VOTING-CONFLICTS",
+    "CAP-GOV-RESOLUTION-ATTACHMENT-DOWNLOAD",
+    "CAP-GOV-MEETING-ATTENDANCE-RSVP",
+    "CAP-GOV-MEETING-MINUTES-SIGNOFF",
+    "CAP-GOV-MEETING-STATUS-LOCK",
+    "CAP-GOV-BOARD-PACK-ASSEMBLY",
+    "CAP-GOV-BOARD-PACK-DISTRIBUTION-READ"
+  ],
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "7abb8fcebead1a083dd0089c27773b88abe20063ef1cf120358acefa073605d9"
+    }
+  },
+  "repository_snapshots": {
+    "OPENSLIDES": {
+      "repo": "OpenSlides/openslides-backend",
+      "official_repository_url": "https://github.com/OpenSlides/openslides-backend",
+      "commit_sha": "755f68b3a9132ee08228dd191eea930cf1d273d7",
+      "spdx": "MIT",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "61b0d768945a60baab145e4720478a596e221f0aef8f4927503667174959a623",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "openslides_backend/action/actions/motion/create.py", "lines": "L29-L66,L141-L243", "sha256": "146b78d0db0c2bfa903d50f6dacb6ef68b9d70197f796aff11be328280dd1035"},
+        {"path": "openslides_backend/action/actions/motion/create_base.py", "lines": "L33-L93", "sha256": "3ac8cbd56446ee0e85f202a74ea1872c8f696d6df91f257d7387f1fc50a4bab3"},
+        {"path": "docs/actions/motion.create.md", "lines": "L1-L68,L125-L141", "sha256": "d0a7327794a29fff22af19271ecf262c44495eb2347896c936b94491e3db4456"},
+        {"path": "openslides_backend/action/actions/vote/create.py", "lines": "L15-L77", "sha256": "1df5baf55af57d679ec032d98f7ed9539d48900e023cb480ed6ec9e1324c2ac5"},
+        {"path": "openslides_backend/action/actions/meeting_user/set_data.py", "lines": "L16-L76", "sha256": "d4b3cc1a904ab3977ba182024cd1d898de1f264fa4b65b209558bb1c35ee2a7a"},
+        {"path": "openslides_backend/action/actions/meeting/archive.py", "lines": "L18-L75", "sha256": "6b33346cd0b4871089d20f03d86e52c16fb488b00cabfefae619eedc8b6b4745"},
+        {"path": "openslides_backend/action/actions/meeting/unarchive.py", "lines": "L15-L42", "sha256": "6a1b0faebd29ae0134e47d6ee0609bd725ae9b235ba859bc3a75a107e60187f5"},
+        {"path": "openslides_backend/action/actions/mediafile/upload.py", "lines": "L34-L49,L88-L169", "sha256": "ba41e77bedfacf0bb48e75edda1c7b8638fb1b3d46ef721c916a1a71bb50de33"},
+        {"path": "openslides_backend/action/actions/mediafile/publish.py", "lines": "L17-L102", "sha256": "e5c43d037001366278591a17f94b458988eed98d9e0bfa34dfdc9639ddb396f8"},
+        {"path": "openslides_backend/action/actions/mediafile/update.py", "lines": "L22-L111", "sha256": "c4dea3bef2a68fd39d363ecb03cf52197ae5de6429434f35ae0f8df32a9c7310"},
+        {"path": "openslides_backend/action/actions/mediafile/mixins.py", "lines": "L81-L153", "sha256": "57d12f8687a6960a5379e81cfec4ab58e6f7a90406e0efbcd9f88c835584a518"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 1, "documented_ncm_direct_recommended": 0, "retained_unproved": 7, "completion_credit_recommended": 1},
+  "evaluations": [
+    {
+      "working_key": "CAP-GOV-RESOLUTION-AUTHORING-EVIDENCE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Author a permission-checked resolution or motion in meeting scope with validated content, optional linked evidence, initial workflow state and history provenance.",
+      "research_candidate": "OpenSlides/openslides-backend motion create action, base action and action contract at pinned loci",
+      "evidence_loci": "OpenSlides/openslides-backend@755f68b3a9132ee08228dd191eea930cf1d273d7 :: openslides_backend/action/actions/motion/create.py :: L29-L66,L141-L243; openslides_backend/action/actions/motion/create_base.py :: L33-L93; docs/actions/motion.create.md :: L1-L68,L125-L141",
+      "reason": "Permission-checked motion authoring in meeting scope validates title, text and reason, accepts optional attachment mediafile IDs and submitters, enters the first workflow state and records history and timestamps. The claim does not include voting, signoff, attachment download/read audit or Oblivion runtime behavior."
+    },
+    {
+      "working_key": "CAP-GOV-RESOLUTION-VOTING-CONFLICTS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern resolution voting conflicts and disclosures with bounded authority and provenance.",
+      "research_candidate": "OpenSlides vote create action at pinned locus",
+      "reason": "Internal weighted vote creation does not establish a voting-conflict or disclosure control."
+    },
+    {
+      "working_key": "CAP-GOV-RESOLUTION-ATTACHMENT-DOWNLOAD",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Authorize and audit resolution attachment download and read behavior.",
+      "research_candidate": "OpenSlides motion attachment linkage at pinned locus",
+      "reason": "Motion attachment linkage and visibility do not establish authorized attachment download or read-audit evidence."
+    },
+    {
+      "working_key": "CAP-GOV-MEETING-ATTENDANCE-RSVP",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Capture governed meeting attendance RSVP response and provenance.",
+      "research_candidate": "OpenSlides meeting-user data action at pinned locus",
+      "reason": "Meeting-member data updates do not establish an RSVP response, state or provenance workflow."
+    },
+    {
+      "working_key": "CAP-GOV-MEETING-MINUTES-SIGNOFF",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Approve and sign off meeting minutes with distinct authority and history.",
+      "research_candidate": "OpenSlides meeting archive action at pinned locus",
+      "reason": "Meeting archive preconditions and permission do not establish minutes approval or signoff."
+    },
+    {
+      "working_key": "CAP-GOV-MEETING-STATUS-LOCK",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern meeting status lock and unlock through an owned lifecycle with provenance.",
+      "research_candidate": "OpenSlides meeting archive and unarchive actions at pinned loci",
+      "reason": "Archive and unarchive state do not establish the target-specific status-lock lifecycle."
+    },
+    {
+      "working_key": "CAP-GOV-BOARD-PACK-ASSEMBLY",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Assemble an immutable versioned board pack with manifest and approval provenance.",
+      "research_candidate": "OpenSlides media-file upload and publish actions at pinned loci",
+      "reason": "Managed upload and publish do not provide an immutable assembled-pack manifest, version or approval lifecycle."
+    },
+    {
+      "working_key": "CAP-GOV-BOARD-PACK-DISTRIBUTION-READ",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Distribute a board pack and retain individual read acknowledgement and audit provenance.",
+      "research_candidate": "OpenSlides media-file update and access mixins at pinned loci",
+      "reason": "Access-group and owner access controls do not establish individual distribution-read acknowledgement or audit provenance."
+    }
+  ],
+  "collision_disclosure": {
+    "target_keys": "All eight targets were completion-unproved with zero credit before Wave 24; target-key collision with materialized Waves 4-23 is zero.",
+    "source_paths": "The pinned OpenSlides source paths have zero collision with materialized Waves 4-23. No source-family inheritance is allowed.",
+    "prior_waves": "Wave 22 CiviCRM, ERPNext and OpenEMR sources and Wave 23 HRMS, OrangeHRM and ERPNext HR sources are disjoint from this packet."
+  },
+  "count_delta": {"verified_benchmark_direct": 1, "documented_ncm_direct": 0, "eligible_total": 1, "completion_unproved": -1},
+  "post_wave_totals": {"verified_benchmark": 356, "documented_ncm": 89, "eligible": 445, "completion_unproved": 457}
+}

@@ -1,0 +1,28 @@
+{
+  "partition":"GOV_HS_PRIV_SOURCE_UNION",
+  "chunk":"HS_1_of_3",
+  "targets":[
+    {"id":"CAP-HS-SITE-HAZARD-REGISTER","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SITE-HAZARD"],"route_ids":["ROUTE-0209","ROUTE-2800","ROUTE-2801","ROUTE-2802"],"page_ids":["PAGE-0041","PAGE-0363","PAGE-0364","PAGE-0373","PAGE-0616","PAGE-0892"]},
+    {"id":"CAP-HS-SITE-HAZARD-LIFECYCLE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SITE-HAZARD"],"route_ids":["ROUTE-1045","ROUTE-1046","ROUTE-1048","ROUTE-1049","ROUTE-1052","ROUTE-1053"],"page_ids":["PAGE-0893"]},
+    {"id":"CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SITE-HAZARD"],"route_ids":["ROUTE-1044","ROUTE-1047"],"page_ids":["PAGE-0893"]},
+    {"id":"CAP-HS-SITE-HAZARD-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SITE-HAZARD"],"route_ids":["ROUTE-0210"],"page_ids":["PAGE-0041"]},
+    {"id":"CAP-HS-SITE-HAZARD-MEDIA","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-SITE-HAZARD"],"route_ids":["ROUTE-1050","ROUTE-1051"],"page_ids":["PAGE-0893"]},
+    {"id":"CAP-HS-COMMAND-CENTRE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HEALTH-SAFETY-DASHBOARD"],"route_ids":["ROUTE-1078"],"page_ids":["PAGE-0364","PAGE-0366","PAGE-0368","PAGE-0369","PAGE-0372","PAGE-0374","PAGE-0377"]},
+    {"id":"CAP-HS-ANALYTICS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HEALTH-SAFETY-DASHBOARD"],"route_ids":["ROUTE-1079","ROUTE-1081"],"page_ids":["PAGE-0360","PAGE-0361","PAGE-0362"]},
+    {"id":"CAP-HS-ANALYTICS-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HEALTH-SAFETY-DASHBOARD"],"route_ids":["ROUTE-1080"],"page_ids":["PAGE-0362"]},
+    {"id":"CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-CORRECTIVE-ACTION","HS-HS-EVENT"],"route_ids":["ROUTE-1082","ROUTE-1099","ROUTE-1100","ROUTE-1101","ROUTE-1103","ROUTE-1109"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0374","PAGE-0375","PAGE-0376","PAGE-0382"]},
+    {"id":"CAP-HS-CORRECTIVE-ACTION-VERIFICATION-REWORK","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-CORRECTIVE-ACTION"],"route_ids":["ROUTE-1102","ROUTE-1104"],"page_ids":["PAGE-0376","PAGE-0382"]},
+    {"id":"CAP-HS-EVENT-LIFECYCLE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-EVENT"],"route_ids":["ROUTE-1098","ROUTE-1111","ROUTE-1112"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0374","PAGE-0375","PAGE-0381","PAGE-0382"]},
+    {"id":"CAP-HS-EVENT-WORKSAFE-NOTIFICATION","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-EVENT"],"route_ids":["ROUTE-1113","ROUTE-1114"],"page_ids":["PAGE-0382"]},
+    {"id":"CAP-HS-EMERGENCY-DRILL-LIFECYCLE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-EMERGENCY-DRILL"],"route_ids":["ROUTE-1083","ROUTE-1084","ROUTE-1085","ROUTE-1086","ROUTE-1087","ROUTE-1088","ROUTE-1090","ROUTE-1091","ROUTE-1094","ROUTE-1095","ROUTE-1096"],"page_ids":["PAGE-0373","PAGE-0374","PAGE-0378","PAGE-0379","PAGE-0380"]},
+    {"id":"CAP-HS-EMERGENCY-DRILL-FINDINGS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-EMERGENCY-DRILL"],"route_ids":["ROUTE-1092","ROUTE-1093","ROUTE-1097"],"page_ids":["PAGE-0380"]},
+    {"id":"CAP-HS-EMERGENCY-DRILL-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-EMERGENCY-DRILL"],"route_ids":["ROUTE-1089"],"page_ids":["PAGE-0380"]},
+    {"id":"CAP-HS-INVESTIGATION-CONDUCT-SUBMIT","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-INVESTIGATION"],"route_ids":["ROUTE-1105","ROUTE-1107","ROUTE-1110"],"page_ids":["PAGE-0382"]},
+    {"id":"CAP-HS-INVESTIGATION-REVIEW-COMPLETION","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-INVESTIGATION"],"route_ids":["ROUTE-1106","ROUTE-1108"],"page_ids":["PAGE-0382"]},
+    {"id":"CAP-HS-FIRST-AID-RECORD-EVIDENCE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-FIRST-AID"],"route_ids":["ROUTE-1115","ROUTE-1116","ROUTE-1117","ROUTE-1118","ROUTE-1119","ROUTE-1120","ROUTE-1121","ROUTE-1125"],"page_ids":["PAGE-0383","PAGE-0384","PAGE-0605"]},
+    {"id":"CAP-HS-FIRST-AID-FOLLOWUP","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-FIRST-AID"],"route_ids":["ROUTE-1123","ROUTE-1124"],"page_ids":["PAGE-0383","PAGE-0605"]},
+    {"id":"CAP-HS-FIRST-AID-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-FIRST-AID"],"route_ids":["ROUTE-1122"],"page_ids":["PAGE-0383","PAGE-0605"]},
+    {"id":"CAP-HS-FIRST-AID-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-FIRST-AID"],"route_ids":["ROUTE-1126"],"page_ids":["PAGE-0383"]}
+  ],
+  "proof_boundary":"Exact static IDs/classes/routes/pages. Runtime actor, state, recovery, and completion are unproved."
+}

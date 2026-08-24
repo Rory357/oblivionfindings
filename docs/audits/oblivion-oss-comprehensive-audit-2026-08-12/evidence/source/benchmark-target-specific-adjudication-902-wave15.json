@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave15",
+  "generated_at": "2026-08-21T08:45:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Fifteenth bounded target-specific wave: 12 current completion-unproved Control Room targets; all 12 conservatively retained unproved after immutable OSS source review.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "8d121cf484ede106db7b6761589929ae11259159d63b0ef4edfa312ca314b574"
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "2c4c70238c7f7dfb1861808237be8e9b44deb44858c14c82ce9c461e5b7dbf5d"
+    }
+  },
+  "repository_snapshots": {
+    "ONEUPTIME": {
+      "repo": "OneUptime/oneuptime",
+      "official_repository_url": "https://github.com/OneUptime/oneuptime",
+      "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+      "edition_boundary": "Pinned official community repository source only; cloud, commercial, paid, private, hosted and unpinned behavior is excluded.",
+      "files": [
+        {"path": "Common/Models/DatabaseModels/Alert.ts", "lines": "L124-L214", "sha256": "eafb2acb041e680d0eace9800ffb9d42e3890941270dc2c02ce8589642d9f4e2"},
+        {"path": "Common/Models/DatabaseModels/AlertOwnerUser.ts", "lines": "L77-L215", "sha256": "a43fb59462e21435d49777787a2dc0ffae6289ba84359457d4bbd1074a8343e8"},
+        {"path": "Common/Models/DatabaseModels/Incident.ts", "lines": "L128-L206", "sha256": "a12d5431f3753ddd9985e69ec2e4f0ee69d4ccd3f7ed1bb0403b43cc45284fb2"},
+        {"path": "Common/Models/DatabaseModels/IncidentSla.ts", "lines": "L321-L406,L571-L579", "sha256": "83e8a6f3f88045b7b0e3ce94ef22dea700574e3e306802bb3754f0ee750d2251"},
+        {"path": "Common/Models/DatabaseModels/IncidentSlaRule.ts", "lines": "L79-L150,L401-L413", "sha256": "d172ae7b41efe74a760b2955bb6c8ea8807f596ad8f7b306adad7713ff0afb17"}
+      ]
+    },
+    "ZULIP": {
+      "repo": "zulip/zulip",
+      "official_repository_url": "https://github.com/zulip/zulip",
+      "commit_sha": "996a116a575e8c878a74afcd607f5596ee15b50b",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "edition_boundary": "Pinned official community repository source only; hosted realm configuration, private deployments and unpinned behavior are excluded.",
+      "files": [
+        {"path": "zerver/views/message_send.py", "lines": "L140-L254", "sha256": "c9684aed0c1882b30c32abd151bd89f2e963f6f8198dae261d129dab61651c1c"},
+        {"path": "zerver/actions/message_send.py", "lines": "L794-L832,L835-L900", "sha256": "4d8ce3e269d5c11c2b127f405bebdf31e4b1b46ee44e7ac5f67e3ac0f7120aa2"}
+      ]
+    },
+    "FRIGATE": {
+      "repo": "blakeblackshear/frigate",
+      "official_repository_url": "https://github.com/blakeblackshear/frigate",
+      "commit_sha": "c75611b4dfc2da6e3acaf68410f3d32a75917626",
+      "spdx": "MIT",
+      "license_locus": "LICENSE",
+      "license_sha256": "490bc07296c07845f0c5d0db6760da37e4c21258d0e6e1cfa500ce04bebf1983",
+      "edition_boundary": "Pinned public community repository source only; Frigate+, hosted services, external models, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "frigate/api/review.py", "lines": "L45-L157,L675-L703", "sha256": "a70c94e3ae65741a1d2c16306f0b5572bba22213f146342541502b80a8314f43"},
+        {"path": "frigate/api/export.py", "lines": "L296-L376,L461-L505,L538-L567", "sha256": "4d87fce7166186cd285d40360ab0e01d75e801eff5440a8431cdeb1b88f7bea2"}
+      ]
+    },
+    "AWX": {
+      "repo": "ansible/awx",
+      "official_repository_url": "https://github.com/ansible/awx",
+      "commit_sha": "7242fe89ae247ef874f187d245b5925e570ae46f",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE.md",
+      "license_sha256": "3e3f8281fb9edb7500ebed9d9f6fb008a3fce50220a4d318cf94dc9eccfb128a",
+      "edition_boundary": "Pinned official AWX community repository source only; Automation Controller, hosted, commercial, private and unpinned behavior is excluded.",
+      "files": [
+        {"path": "awx/main/models/workflow.py", "lines": "L463-L576", "sha256": "a0a7b9b1c348c25b2040821ccba7ff5cd168f676cde7a1f34c9f8b2d634546c2"}
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 0,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 12,
+    "completion_credit_recommended": 0
+  },
+  "evaluations": [
+    {"working_key": "CAP-CR-ALERT-MANUAL-INTAKE", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime Alert.ts L124-L214", "reason": "Generic project-scoped alert persistence does not prove manual intake authorization, Site/direct-object concealment, immutable source provenance, accountable handoff or target completion."},
+    {"working_key": "CAP-CR-ALERT-OWNERSHIP", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime AlertOwnerUser.ts L77-L215", "reason": "An owner relation does not prove an authorised Control Room ownership claim or release lifecycle with actor, Site, audit and conflict behavior."},
+    {"working_key": "CAP-CR-BROADCAST-COMPOSE-SEND", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "Zulip message_send.py L140-L254", "reason": "Generic realm and stream message send does not prove a governed broadcast audience, approval, delivery/retry or operational publication record."},
+    {"working_key": "CAP-CR-BROADCAST-OVERSIGHT", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "Zulip actions/message_send.py L794-L900", "reason": "Per-recipient message and notification mechanics do not prove broadcast delivery oversight, acknowledgement, failure review, correction or replay governance."},
+    {"working_key": "CAP-CR-EVIDENCE-PACK-ASSEMBLY", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "Frigate review.py and export.py pinned loci", "reason": "Camera-case ZIP export does not prove alert binding, immutable selected versions, manifest hashes/provenance, redaction decisions, retry state, authorised download or download audit. The prior Wave-8 NCM credit remains withdrawn."},
+    {"working_key": "CAP-CR-INCIDENT-TO-ALERT", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime Alert.ts and Incident.ts pinned loci", "reason": "Adjacent generic models do not prove a causal incident-to-alert transaction, durable outbox, deduplication, provenance, alert ownership or recovery contract."},
+    {"working_key": "CAP-CR-MESSAGING", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "Zulip message_send.py L140-L254", "reason": "Generic realm messaging does not prove Control Room alert or incident binding, Site/privacy scope, immutable operational audit, correction or delivery recovery."},
+    {"working_key": "CAP-CR-PLAYBOOK-DEFINITION", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "AWX workflow.py L463-L576", "reason": "Automation workflow templates and roles do not establish a governed human safety playbook definition, revision, independent review, Site scope or operational completion boundary."},
+    {"working_key": "CAP-CR-SIGNAL-TO-ALERT-PIPELINE", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime Alert.ts L124-L214", "reason": "No inspected candidate proves canonical external signal identity, durable outbox, deduplication, replay, ordering, authorised alert creation or failed-delivery recovery."},
+    {"working_key": "CAP-CR-SIGNAL-TO-INCIDENT", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime Incident.ts L128-L206", "reason": "Generic incident persistence does not prove signal consumption, deduplication, causal provenance, authorised transition, replay or recovery."},
+    {"working_key": "CAP-CR-SLA-BREACH-REVIEW", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime IncidentSla.ts pinned loci", "reason": "IT incident deadline fields and status do not prove an independently authorised breach-review, decision, corrective-action or evidence lifecycle."},
+    {"working_key": "CAP-CR-SLA-CONFIG", "candidate_status": "retained_unproved", "completion_credit_recommended": false, "research_candidate": "OneUptime IncidentSlaRule.ts pinned loci", "reason": "Generic project-level IT SLA rules do not prove scoped Control Room configuration, change provenance, governed alert/incident applicability or target completion."}
+  ],
+  "count_delta": {
+    "verified_benchmark_direct": 0,
+    "documented_ncm_direct": 0,
+    "eligible_total": 0,
+    "completion_unproved": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 335,
+    "documented_ncm": 89,
+    "eligible": 424,
+    "completion_unproved": 478
+  }
+}

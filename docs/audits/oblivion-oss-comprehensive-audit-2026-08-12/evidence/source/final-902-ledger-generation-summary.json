@@ -1,0 +1,526 @@
+{
+  "schema_version": "1.0",
+  "artifact": "final-902-ledger-generation-summary",
+  "generator": "generators/rebuild-final-902-ledgers.py",
+  "generator_run_at": "2026-08-21T03:48:41.039642+00:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "generated_902_rows_validation_passed_audit_completion_not_claimed",
+  "audit_boundary": "Audit-artifact-only deterministic CSV generation. No application source, routes, configuration, tests, data, deployment, Git history, or external system was changed.",
+  "denominator": {
+    "total": 902,
+    "class_counts": {
+      "H": 788,
+      "D": 111,
+      "M": 3
+    },
+    "module_counts": {
+      "ASSETS": {
+        "total": 8,
+        "H": 8,
+        "D": 0,
+        "M": 0
+      },
+      "AUTH": {
+        "total": 7,
+        "H": 7,
+        "D": 0,
+        "M": 0
+      },
+      "CLIENTS": {
+        "total": 27,
+        "H": 23,
+        "D": 4,
+        "M": 0
+      },
+      "CLINICAL": {
+        "total": 20,
+        "H": 19,
+        "D": 1,
+        "M": 0
+      },
+      "CONTROL_ROOM": {
+        "total": 38,
+        "H": 34,
+        "D": 3,
+        "M": 1
+      },
+      "EMAR": {
+        "total": 72,
+        "H": 48,
+        "D": 24,
+        "M": 0
+      },
+      "FINANCE": {
+        "total": 71,
+        "H": 64,
+        "D": 7,
+        "M": 0
+      },
+      "FLEET": {
+        "total": 49,
+        "H": 48,
+        "D": 1,
+        "M": 0
+      },
+      "FRONTLINE": {
+        "total": 7,
+        "H": 7,
+        "D": 0,
+        "M": 0
+      },
+      "GOVERNANCE": {
+        "total": 62,
+        "H": 50,
+        "D": 12,
+        "M": 0
+      },
+      "HEALTH_SAFETY": {
+        "total": 68,
+        "H": 41,
+        "D": 27,
+        "M": 0
+      },
+      "HR": {
+        "total": 154,
+        "H": 136,
+        "D": 18,
+        "M": 0
+      },
+      "INCIDENTS": {
+        "total": 19,
+        "H": 14,
+        "D": 5,
+        "M": 0
+      },
+      "IT": {
+        "total": 2,
+        "H": 2,
+        "D": 0,
+        "M": 0
+      },
+      "OPERATIONS": {
+        "total": 76,
+        "H": 74,
+        "D": 2,
+        "M": 0
+      },
+      "PLATFORM": {
+        "total": 2,
+        "H": 1,
+        "D": 0,
+        "M": 1
+      },
+      "PORTAL": {
+        "total": 4,
+        "H": 4,
+        "D": 0,
+        "M": 0
+      },
+      "PRIVACY": {
+        "total": 20,
+        "H": 17,
+        "D": 3,
+        "M": 0
+      },
+      "PUBLIC": {
+        "total": 4,
+        "H": 4,
+        "D": 0,
+        "M": 0
+      },
+      "REPORTING": {
+        "total": 21,
+        "H": 21,
+        "D": 0,
+        "M": 0
+      },
+      "RESPITE": {
+        "total": 22,
+        "H": 21,
+        "D": 1,
+        "M": 0
+      },
+      "ROADMAP": {
+        "total": 8,
+        "H": 7,
+        "D": 1,
+        "M": 0
+      },
+      "SECURITY_DEVICES": {
+        "total": 37,
+        "H": 36,
+        "D": 0,
+        "M": 1
+      },
+      "SETTINGS": {
+        "total": 34,
+        "H": 34,
+        "D": 0,
+        "M": 0
+      },
+      "SITES": {
+        "total": 70,
+        "H": 68,
+        "D": 2,
+        "M": 0
+      }
+    },
+    "working_key_equals_feature_id": true
+  },
+  "inputs": [
+    {
+      "path": "generators/rebuild-final-902-ledgers.py",
+      "sha256": "fd459d5e758a774a670d2d4f1f98bdcc17907d75ab11c798f9568cd2c57e8cd0",
+      "bytes": 102732
+    },
+    {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+      "bytes": 706424
+    },
+    {
+      "path": "inventory.json",
+      "sha256": "076015a57c9368cdc737d0e8139589ba5708d0fa6bcee1d6654c2e72b4b9889a",
+      "bytes": 11766778
+    },
+    {
+      "path": "findings.json",
+      "sha256": "4aacd5e5e7587578d7f242f1ed789ede6fcdcb05892eee0ab2ad5a07f8bf5ec7",
+      "bytes": 1277879
+    },
+    {
+      "path": "evidence/source/agent-reconciliation-register.json",
+      "sha256": "27776c1894fa255c597879da75ff833b94f11b494adec9bb129af886da616ff0",
+      "bytes": 85673
+    },
+    {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c",
+      "bytes": 667824
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901.json",
+      "sha256": "dd09aec14bb1cfd7016fbfea6150c97a969cc470d6ba2ca73b229a3601cf6054",
+      "bytes": 51098
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901-wave2.json",
+      "sha256": "0df1ca60ec838542a1d323a079b98a2b39ec0e3797a3ae174613483cfe98d7bc",
+      "bytes": 23202
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901-wave3.json",
+      "sha256": "6934bf243f9db549f9be8230b1f9133a333634ab5b21dc5fc6de0e8f7d5c009c",
+      "bytes": 40310
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave4.json",
+      "sha256": "6eba8e290637fcdb5045ad80cb5ac0579b3843a1bfe348a4ff2728d62fefbe04",
+      "bytes": 99607
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave5.json",
+      "sha256": "3ba4abf748ce30f8ac84746e817ecc839e9698ac951613c720677f561de799d3",
+      "bytes": 21897
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave6.json",
+      "sha256": "7fe743d46ec1351b9655da564baf7ebbf506af9e5e125ee28541b9c913e34ebb",
+      "bytes": 22642
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave7.json",
+      "sha256": "5f3674bf651cfa63ff74d4862e3b2b49d03c659985addb788c26281c42fd0dcb",
+      "bytes": 32758
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave8.json",
+      "sha256": "ba191214a4f2e7d453aa3867d267e8f1cd72eb6354d0e1fea459f69f3b185b8c",
+      "bytes": 35024
+    },
+    {
+      "path": "evidence/source/benchmark-wave8-ncm-withdrawal-adjudication.json",
+      "sha256": "17ba2e52588e06a2329b3ae849b815e9906506f91b13685fdaba4b3df8d40c64",
+      "bytes": 6082
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave9.json",
+      "sha256": "e8a5550011168155c7fcfc7f84e8a3e541a4725c8fbbeded9516a77a6caf8a08",
+      "bytes": 45219
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave10.json",
+      "sha256": "5dfa91dc364b1546cdbbb49df371a24406205110974606a38696838ff7380db2",
+      "bytes": 48751
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave11.json",
+      "sha256": "2a9a605130be69fb350b9bec7954dcc670050c006ca655e68edd5befd84f1832",
+      "bytes": 50205
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave12.json",
+      "sha256": "7796987c90ee4ac0ca1406d48c0a840f75ab7d358158a822ea4e4e2cee5f7416",
+      "bytes": 44874
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave13.json",
+      "sha256": "63a3768ef3aaeada1c75bf2b10b79f0c5cd53605de1a88ec8e00f2dd3294a3c3",
+      "bytes": 39111
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave14.json",
+      "sha256": "cd1501484a8b7b53f1628a0df1daeb96ad45ef80e590a5544459d2d31bba183b",
+      "bytes": 19641
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave15.json",
+      "sha256": "c0a57c0ee8e248d6ddded383e09c378ed43fd38430c5b21218f6ea6398ad551b",
+      "bytes": 9743
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave16.json",
+      "sha256": "0fd33aca3396c54f142900484b06a73f8645884598eab19aff033742cb81e49c",
+      "bytes": 13965
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave17.json",
+      "sha256": "07860807a51ce1e52c59c3dc520671a89672c0bdca2b95948a6fc13f8fdf5c7a",
+      "bytes": 12122
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave18.json",
+      "sha256": "9e8f63fab776c065fe026f74832182dff71f381b5ef239b74ce888c66c41b693",
+      "bytes": 10781
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave19.json",
+      "sha256": "e1ba0aa31a964e4baa2b1a6b1b8d24e879eced71d11b3a525f87c5273e7939ba",
+      "bytes": 8860
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave20.json",
+      "sha256": "e084378b467aca63b473e4717b2dd0c8604acdc76d53f0e61c233a021394cd9f",
+      "bytes": 9994
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave21.json",
+      "sha256": "9474a59f10a3aad16ec1dfaeb7e976b9e5f7386a5655c564834e197e092cd2fb",
+      "bytes": 9810
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave22.json",
+      "sha256": "e9b28de8e44d46cab9e824e0d9ab362300b53714ab6abb34ce3bafe395c66b98",
+      "bytes": 11433
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave23.json",
+      "sha256": "16b0c90fa8d2cca7b6c9e64670953b47612d0f0cfaac08eb6ccbe28e3a8cfd3e",
+      "bytes": 13147
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave24.json",
+      "sha256": "c96e62aae6964ee6f1fe8633b6ec07c553dccd42cf1ed352544ca7b234f47c38",
+      "bytes": 9815
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave27.json",
+      "sha256": "405e89ae05e02dbebce8cf1cd484010a603714baff1cf6dab0b0879214e2226e",
+      "bytes": 11390
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave28.json",
+      "sha256": "d68aa992bef7c76b2f91e04a284c3f55174fae618c27785a482429f747a17084",
+      "bytes": 11379
+    },
+    {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave30.json",
+      "sha256": "5fd6e15f7796915c1d4ca2b97cecdc77d0732d030ea4b3c0fc4b1fd78cbc23a7",
+      "bytes": 12928
+    },
+    {
+      "path": "evidence/source/selected-benchmark-adjudication.json",
+      "sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3",
+      "bytes": 888935
+    },
+    {
+      "path": "evidence/source/no-credible-match-adjudication.json",
+      "sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71",
+      "bytes": 3137820
+    }
+  ],
+  "outputs": {
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "b1082f6ebd02715b3a88123927b0189df87c70b356bf8928837eddf915ac79bf",
+      "bytes": 1957055,
+      "data_rows": 902,
+      "headers": [
+        "feature_id",
+        "working_key",
+        "class",
+        "module",
+        "submodule",
+        "source_family_inventory_envelope",
+        "P1_status",
+        "P2_status",
+        "P3_status",
+        "P4_status",
+        "P5_status",
+        "P6_status",
+        "P7_status",
+        "P8_status",
+        "agent_assignments",
+        "evidence_count",
+        "gaps",
+        "reconciliation_status"
+      ],
+      "canonical_row_sha256": "671d43b550d3610be0ae32e38c95f68b8ec03636bff5f88b95c1fa50dd552955"
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "f16d04ab2d25f30caca370bcbbb2ba504f0dd2d211b7b552018dd3bf7ec3d608",
+      "bytes": 3279256,
+      "data_rows": 902,
+      "headers": [
+        "feature_id",
+        "module",
+        "submodule",
+        "owning_actor",
+        "secondary_actors",
+        "user_job",
+        "criticality",
+        "navigation_entry",
+        "route_names",
+        "route_paths",
+        "page_files",
+        "backend_anchors",
+        "current_states",
+        "current_workflow_summary",
+        "benchmark_candidates",
+        "selected_open_source_benchmark",
+        "benchmark_url_and_sha",
+        "verified_behaviour",
+        "neutral_requirements_extracted",
+        "no_match_evidence",
+        "current_ease_score",
+        "target_ease_score",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "P8",
+        "finding_ids",
+        "confidence"
+      ],
+      "canonical_row_sha256": "d783e5709496f20e4a33f2edb43153b62bd15f6f78f6076c229411ddac67f04f"
+    }
+  },
+  "deterministic_key_checksums": {
+    "ordering": "ascending ordinal working_key; working_key == feature_id",
+    "working_key_lf_sha256": "2171f0b7b389d459aa447cd36b9a3e6bcdc2ab674942e3a58053c80a4c9e201c",
+    "feature_id_lf_sha256": "2171f0b7b389d459aa447cd36b9a3e6bcdc2ab674942e3a58053c80a4c9e201c",
+    "working_key_unique_count": 902,
+    "feature_id_unique_count": 902
+  },
+  "exact_target_enrichment": {
+    "targets_with_route_ids": 901,
+    "unique_route_ids": 2985,
+    "targets_with_page_ids": 756,
+    "unique_page_ids": 945,
+    "targets_with_manifest_backend_anchors": 729,
+    "missing_route_inventory_lookups": [],
+    "missing_page_inventory_lookups": [],
+    "source_family_envelope_route_or_page_ids_used_as_exact": 0
+  },
+  "source_family_inventory_envelope": {
+    "purpose": "Discovery context only; never exclusive target route/page/backend ownership.",
+    "inventory_feature_source": "superseded_feature_projection.features",
+    "inventory_feature_rows": 740,
+    "targets_with_at_least_one_matching_legacy_inventory_row": 902,
+    "targets_without_matching_legacy_inventory_row": 0
+  },
+  "benchmark_integration": {
+    "artifact_present": true,
+    "mapped_completion_credit": 451,
+    "completion_unproved": 451,
+    "status_counts": {
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "unproved": 413,
+      "unproved_audit_assigned_id": 10,
+      "unproved_pending": 24,
+      "unproved_reject": 3,
+      "unproved_source_stable": 1,
+      "verified_benchmark_direct": 340,
+      "verified_benchmark_rename": 22
+    },
+    "resolution_counts": {
+      "documented_ncm": 75,
+      "fresh_target_specific_documented_ncm": 14,
+      "fresh_target_specific_verified": 172,
+      "ncm_candidate_found": 131,
+      "selected_direct": 39,
+      "selected_projected_supported": 20,
+      "unproved": 451
+    },
+    "field_validation": {
+      "verified_rows": 362,
+      "verified_rows_with_complete_required_fields": 362,
+      "documented_ncm_rows": 89,
+      "documented_ncm_rows_with_target_explicit_evidence": 89,
+      "completion_unproved_rows_with_no_accidental_completion_fields": 451
+    },
+    "proof_rule": "Only completion_credit=true final-target rows are marked P3 Mapped; prior family, pending, reject, split, regroup, and merge evidence grants no mechanical credit."
+  },
+  "exact_finding_integration": {
+    "targets_with_exact_feature_id_links": 131,
+    "exact_finding_links": 159,
+    "official_source_finding_targets": 95,
+    "inheritance_rule": "Only finding.feature_ids exact equality with final feature_id; no family inheritance."
+  },
+  "pass_status_summary": {
+    "P1_static_identity_envelope_reviewed": 902,
+    "P2_runtime_task_blocked": 902,
+    "P3_mapped": 451,
+    "P3_blocked": 451,
+    "P4_runtime_visual_task_blocked": 902,
+    "P5_static_target_anchors_reviewed": 902,
+    "P5_target_trace_blocked": 0,
+    "P6_official_source_link_reviewed_runtime_blocked": 95,
+    "P6_target_specific_source_and_runtime_blocked": 807,
+    "P7_exact_finding_source_reviewed_tests_not_run": 131,
+    "P7_target_specific_test_failure_trace_blocked": 771,
+    "P8_corrected_static_identity_challenge_reviewed": 902
+  },
+  "validation": {
+    "status": "passed",
+    "assertions": [
+      "Corrected manifest contains exactly 902 unique working keys and feature IDs.",
+      "working_key equals feature_id for all generated rows.",
+      "Manifest class totals are 788 H, 111 D, and 3 M.",
+      "Both CSVs re-parse with exactly 902 data rows and declared headers.",
+      "Both CSVs have 902 unique feature IDs in deterministic key order.",
+      "Every manifest route/page ID used in exact fields resolves in inventory.json.",
+      "No source-family inventory-envelope route/page ID is promoted into an exact target field.",
+      "Source-family discovery envelopes use superseded_feature_projection.features when present; otherwise they fall back to inventory.features.",
+      "Only exact final feature-ID finding links are included.",
+      "All 362 verified-benchmark rows resolve through 39 selected direct, 20 selected projected-supported, 131 NCM candidate-found and 172 fresh target-specific records, with nonblank benchmark, URL/SHA, behaviour and neutral-requirement fields.",
+      "All 89 documented-NCM rows identify both the final target and source adjudication unit and retain nonblank candidate, URL/SHA, neutral-requirement and no-match evidence.",
+      "All 451 completion-unproved rows remain P3 Blocked and receive no selected benchmark, verified behaviour, neutral requirement or no-match completion field.",
+      "Final benchmark mapping target set exactly equals the 902-target manifest and exactly 451 rows receive P3 completion credit."
+    ]
+  },
+  "limitations": [
+    "This generation does not establish 902 representative user jobs, actors, navigation entries, workflow states, or ease scores.",
+    "Empty exact route/page/backend cells mean target enrichment is unavailable; they never prove absence.",
+    "Source-family inventory envelopes are discovery context only and do not prove exclusive ownership.",
+    "Only 451 final targets have P3 completion credit (362 verified benchmark, 89 bounded documented no-match); 451 remain unproved.",
+    "P2/P4 runtime task and visual proof remain blocked; P6 role/site/direct-object runtime remains blocked.",
+    "The complete audit-wide test denominator was not executed as one controlled gate; later focused remediation suites are tracked separately.",
+    "No audit-wide completion claim follows from row generation or structural validation."
+  ]
+}

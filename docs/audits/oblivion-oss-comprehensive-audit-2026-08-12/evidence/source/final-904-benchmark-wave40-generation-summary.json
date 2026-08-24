@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-benchmark-wave40-generation-summary",
+  "generated_at": "2026-08-22T00:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "inputs": {
+    "wave40": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave40.json",
+      "sha256": "9af1e4e17f8de0c4677808d3aacb0840e52d05cc59eabf613a1c24702dd6064f",
+      "bytes": 14913
+    }
+  },
+  "outputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "dad3d1d194c83e2556bb3fa7b2c6d86ca8a1fe9a21bbae58e73a9eda6769c37b",
+      "bytes": 672357
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "80f0d84017fadd27a66256e633956cd44591b243591490c6dac4d4b81fa99f4c",
+      "bytes": 11783182
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "8bf2c90d0fba9c79a10f14aab773dcba17139e549d06732897a68d4d959df9d8",
+      "bytes": 1959190
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "9eb665837cd9f0a23018b2a78b765392e123d6d36fc5db05af3089c0e615e0db",
+      "bytes": 3308993
+    }
+  },
+  "mapping_tuple_hashes": {
+    "full": "0e57c6891150de8a268ebae7aec691f9cf325aee1cd6eefbf28b586a9abf1fd1",
+    "eligible": "1dd44af1c5bdb736fd005ec03eff1b34fcfead23207a2fee5e4b1e29e9edf0d6"
+  },
+  "proof_hashes": {
+    "selection": "3728bb0bc65631f8a7324978da245a503b37666709e4ea74a0f934749344b48b",
+    "evaluations": "6af26c59b460e7839ad88081d92fcc4f6dd0a42155565596f99b11d7140c4825",
+    "source_registry": "e5499fb8ddf734946ea7ee106e8f94ec89c9ee6745e11bc2c349b3b355ce4be5",
+    "source_paths": "8a66ea307a7b52cf36f19bfdbe7bfe63208caaa4678a9659e3dc15ddc7df3a82",
+    "prior_unique_ids": "5e291f7c39a2fd5ce9703bf549a301d20887aa880c0fbf6b624b0ca5fd67d211"
+  },
+  "counts": {
+    "denominator": 904,
+    "direct": 385,
+    "rename": 22,
+    "verified": 407,
+    "ncm": 89,
+    "eligible": 496,
+    "completion_unproved": 408
+  },
+  "validation": {
+    "selected": 8,
+    "direct": 5,
+    "retained": 3,
+    "benchmark_p3_completion_credit_delta": 5,
+    "product_runtime_representative_task_overall_completion_delta": 0,
+    "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE"
+  }
+}

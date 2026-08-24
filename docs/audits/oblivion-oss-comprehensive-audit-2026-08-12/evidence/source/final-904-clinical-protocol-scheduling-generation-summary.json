@@ -1,0 +1,195 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-clinical-protocol-scheduling-generation-summary",
+  "generated_at": "2026-08-21T21:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "CLIN-PROTOCOL-SCHEDULING-01",
+  "status": "generated_open_p1_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "84f73bd34c2ff0e59551196a8a1886b4790de6eebc8f2be34b6e5978ea008491",
+      "bytes": 658762
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "579d2bde9e5f0d28ff1e912da354ec0244f6abe9eebaaf2eabf3c7ad3af2144e",
+      "bytes": 11772132
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "787ab9f0d52549d12be6f7c8e48f588b5fe028a71301adbacc04a662df134dd4",
+      "bytes": 1306651
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "4183f9e1b31f3b0d787e31986f27c5bfc24992163eab9589c0d1852e5ac6ccb1",
+      "bytes": 241326
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "34e5453b4fb0a773b5ec762e862f104187090c440e5ed1ac5b596eedafecc3eb",
+      "bytes": 12143
+    }
+  },
+  "source_chain": [
+    {
+      "path": "routes/health-clinical.php",
+      "baseline_blob": "c40268f9bab43ff2db6811ca08421b6e42fcfe1d",
+      "baseline_loci": "L69-L86",
+      "current_blob": "c40268f9bab43ff2db6811ca08421b6e42fcfe1d",
+      "current_loci": "L69-L86",
+      "baseline_sha256": "4a1cc60c820235565bd2551e252d15b737a84bede26eba6e929d28dbbccf39fd",
+      "current_sha256": "4a1cc60c820235565bd2551e252d15b737a84bede26eba6e929d28dbbccf39fd"
+    },
+    {
+      "path": "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php",
+      "baseline_blob": "271195101f16ff31ae3d71e4d4faa3bd7226976d",
+      "baseline_loci": "L22-L132",
+      "current_blob": "eb8af63c9d12c3f2d710096b7710c8160addbcf0",
+      "current_loci": "L22-L132",
+      "baseline_sha256": "52c0b09545c599c86325e7fcb28cc6d043d887c47204a667f231e8b6aede95d5",
+      "current_sha256": "3e26c5155a59781d1c4ef700e911a198acd007309af165b7c620c830aedb7d0d"
+    },
+    {
+      "path": "app/Domain/Clinical/Policies/ClinicalProtocolPolicy.php",
+      "baseline_blob": "adb8f199a6eecfb0198d45344f867adc38ba2ae8",
+      "baseline_loci": "L15-L42",
+      "current_blob": "f6d57c0b9f480a198d652885903c284bc48cb7b8",
+      "current_loci": "L15-L42",
+      "baseline_sha256": "a8206f61756c35d9ab341b14b6b727464a0d20db6aad036afac8a6a770f31983",
+      "current_sha256": "032cd0f2d391e46f53dd3c51637d2c38e7d6f12338ea4479c6a5db9f6ace4244"
+    },
+    {
+      "path": "app/Domain/Clinical/Services/ClinicalProtocolService.php",
+      "baseline_blob": "c7d754121247ee5e9bab748c6f225aa9bd9d73ee",
+      "baseline_loci": "L25-L65,L68-L126",
+      "current_blob": "c7d754121247ee5e9bab748c6f225aa9bd9d73ee",
+      "current_loci": "L25-L65,L68-L126",
+      "baseline_sha256": "542434dd2e48d4eacfcdc810a8345b6bc2629d1dd1737788bfad1d1ee4a437d9",
+      "current_sha256": "542434dd2e48d4eacfcdc810a8345b6bc2629d1dd1737788bfad1d1ee4a437d9"
+    },
+    {
+      "path": "app/Domain/Clinical/Enums/ProtocolFrequency.php",
+      "baseline_blob": "76ede33b3a9e3bab594786ade2b2e84647baa51c",
+      "baseline_loci": "L7-L13,L28-L41",
+      "current_blob": "76ede33b3a9e3bab594786ade2b2e84647baa51c",
+      "current_loci": "L7-L13,L28-L41",
+      "baseline_sha256": "51cfaeb4cb7f2a11d086b66bbee3bf796287cb75e1cfcc609c81508997c5b76a",
+      "current_sha256": "51cfaeb4cb7f2a11d086b66bbee3bf796287cb75e1cfcc609c81508997c5b76a"
+    },
+    {
+      "path": "app/Http/Controllers/Clinical/ShiftClinicalController.php",
+      "baseline_blob": "d16b5257f117a3f4b95ad3d4591771bd09732510",
+      "baseline_loci": "L32-L49",
+      "current_blob": "18cfe17a7b979001de3335d903ccc821e4975a4e",
+      "current_loci": "L32-L49",
+      "baseline_sha256": "bcaad29d770528863a906a9678dbd396b6b54feb30932d197e3a22f090cb02a2",
+      "current_sha256": "b469941a5fe0e4e6bb18d55a1312c921a2e4d995d68aa4a9df629d508f302dba"
+    },
+    {
+      "path": "app/Domain/Clinical/Services/ClinicalDashboardService.php",
+      "baseline_blob": "98bd7681a1c83011bee2a42c92276dedea876bd8",
+      "baseline_loci": "L60-L74,L240-L264,L922-L952",
+      "current_blob": "631175337be83313f3c9dbd577bf0e993b42ed60",
+      "current_loci": "L60-L74,L240-L264,L922-L952",
+      "baseline_sha256": "f7c52fb7e45766ccd6c70d5adfe704e7fd068a1a7bc0ecdee13e2ef48e996384",
+      "current_sha256": "148367bcf7a7300da177a91ac7573031a780073407ed310d4715f53489da533a"
+    },
+    {
+      "path": "routes/console.php",
+      "baseline_blob": "13801c8af7e71149bf4c882157264dd3db855615",
+      "baseline_loci": "full file",
+      "current_blob": "26cb23a8880ba5c67413dd3adf2b829fe2dcc642",
+      "current_loci": "full file",
+      "baseline_sha256": "d59a6437b3c8327e5ae82f77cb0f2422fd3b9dc62e846b8716c60b2ffa305957",
+      "current_sha256": "3cfaca3274d2f5fd1b00824403060bfb7009f6c88b5162d893b9715f2ca67776"
+    },
+    {
+      "path": "tests/Feature/Domain/Clinical/ClinicalProtocolServiceTest.php",
+      "baseline_blob": "37e467ba0de54e88ba133cf5133b24b7a68a3766",
+      "baseline_loci": "L33-L127",
+      "current_blob": "37e467ba0de54e88ba133cf5133b24b7a68a3766",
+      "current_loci": "L33-L127",
+      "baseline_sha256": "10cbd24c00907cf56a4621cd6936e712197348d7bc4bd6399b3125c9e3927cda",
+      "current_sha256": "10cbd24c00907cf56a4621cd6936e712197348d7bc4bd6399b3125c9e3927cda"
+    },
+    {
+      "path": "tests/Feature/Domain/Clinical/ClinicalProtocolManagementControllerTest.php",
+      "baseline_blob": "85113096949b2933f31999ee5a1b8314e6f4421c",
+      "baseline_loci": "L133-L160",
+      "current_blob": "b16958c48c18a1801427a33fbf44911d2af2c4da",
+      "current_loci": "L133-L160",
+      "baseline_sha256": "dcc9c051c1c75f7e9ba0dcf31b8bd080bf76c0bd141dc1a53067b37bc6ca178a",
+      "current_sha256": "5403bef061aa5f11169974961d83c125772164395edd05be95e4354b34d0707f"
+    }
+  ],
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "cafa63fdc38baf9db33a6deb759e51b400b96156abdb5652337e3f50d7e4a5d4",
+      "bytes": 1306651
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "e3f3a1d5791e1b93653ce5f4b7d14f77e5cd62a36b8a9ead55bacc4e15fc024b",
+      "bytes": 241326
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "7981a2bc31ca0919969645881803af5946323caa888dc2308bbddab18e5a06b2",
+      "bytes": 12143
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-health-and-clinical-904-2026-08-21.json",
+      "sha256": "107e2cdf42766fa7f1aa18e45d66d341245f66574ede4997d7d395d790417e6e",
+      "bytes": 8131
+    }
+  },
+  "counts": {
+    "denominator": {
+      "total": 904,
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "benchmark": {
+      "eligible": 464,
+      "verified": 375,
+      "ncm": 89,
+      "unproved": 440
+    },
+    "findings": {
+      "total": 95,
+      "P0": 19,
+      "P1": 64,
+      "P2": 12
+    },
+    "finding_links": {
+      "total": 268,
+      "literal": 169,
+      "literal_targets": 137,
+      "p0_p1_literal": 83
+    },
+    "official_map": {
+      "denominator": 53,
+      "reviewed": 53,
+      "owner_boundary_rows": 28
+    }
+  },
+  "credit_boundary": {
+    "static_finding_added": 1,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "remediation_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "idempotence": "A second run validates hashes and pointer entries and performs no write."
+}

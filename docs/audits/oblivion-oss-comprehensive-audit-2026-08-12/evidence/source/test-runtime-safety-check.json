@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "checked_at": "2026-08-12T15:33:50+12:00",
+  "status": "blocked-not-run",
+  "safe_observations": {
+    "phpunit_app_env_is_testing": true,
+    "test_database_name_is_test-labelled": true,
+    "test_host_is_local": true,
+    "test_cache_is_array": true,
+    "test_queue_is_sync": true,
+    "testing_database_differs_from_default_environment_database": false
+  },
+  "decision": "No test was executed. The configured testing database is the same database named by the checkout's default environment, so destructive refresh/migration behavior is not independently isolated from the checkout's ordinary runtime. Database names, usernames and passwords are deliberately omitted from this artefact.",
+  "minimum_input": "Provide or confirm a disposable database distinct from the default checkout database, with authorization for migrations/RefreshDatabase and assurance that no shared dev data depends on it."
+}

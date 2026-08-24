@@ -1,0 +1,3159 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "visual-final-id-adjudication-904-wave11",
+  "generated_at": "2026-08-22T01:40:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_zero_promotion",
+  "audit_boundary": "Audited-baseline static final-ID ownership only; current-main, browser, runtime, screenshot, usability, finding, benchmark and completion credit remain zero.",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+      "bytes": 683490
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "e193306f8b748485ae0e4d7e1cb9d5da9f8c6f652b8ea9911b9a87b9d954b5d8",
+      "bytes": 11785664
+    },
+    "visual_matrix": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "0345bf86094320e154e76c01153c2242b097fcdeeab3d4661033fa2ae4bb94ef",
+      "bytes": 8377606
+    },
+    "pointer_preimage": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "230f32dc9df1d0d3c972ea755b3eb6acb3d4d938079140e7efddbc735e3a917c",
+      "bytes": 20946
+    }
+  },
+  "selection": {
+    "rule": "Reconstruct Wave1 and the derived Wave2 first-25 exclusion, union exact Wave03-10 artifacts, then exhaust Tier A sorted by (route_count, visual_id) and take the first 18 Tier B rows sorted by (route_owner_union_cardinality, max_per_route_owner_cardinality, route_count, visual_id); no singleton page fallback.",
+    "exclusion_count": 257,
+    "exclusion_sha256": "49b560ad3abdaa2b4962985fce7381d1d6fec8e340672eca1c942bfb4e76a3d1",
+    "exclusion_reconstruction": {
+      "wave1": {
+        "path": "evidence/source/visual-final-id-ownership-904-wave1.json",
+        "count": 32,
+        "sha256": "bbec2abef290aaaccce4960da49c9dac2bd0fde12be0d02590c73dbfb6140b41"
+      },
+      "wave2": {
+        "eligible_count": 30,
+        "selected_count": 25,
+        "selected_ids": [
+          "VIS-014391",
+          "VIS-014823",
+          "VIS-014921",
+          "VIS-014923",
+          "VIS-015007",
+          "VIS-016264",
+          "VIS-016790",
+          "VIS-016792",
+          "VIS-017782",
+          "VIS-018669",
+          "VIS-018670",
+          "VIS-018958",
+          "VIS-019016",
+          "VIS-019017",
+          "VIS-019076",
+          "VIS-019080",
+          "VIS-019141",
+          "VIS-019152",
+          "VIS-019153",
+          "VIS-019309",
+          "VIS-019310",
+          "VIS-019351",
+          "VIS-019352",
+          "VIS-020028",
+          "VIS-020293"
+        ],
+        "sha256": "3000af48cd790aebd2c33d7df5ea61e8edd151d2c5e7cfb2e1540b4522dea171"
+      },
+      "waves03_10": [
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave03.json",
+          "count": 25,
+          "sha256": "53a320ff0ab8b8f5e005bea21dc91dc77ae98883e7ccde75f16136c50c411b87"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave04.json",
+          "count": 25,
+          "sha256": "dd01093828f7feac69559fc05248023bab3e6962dbaf07b26a3b96c6e3c727cb"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave05.json",
+          "count": 25,
+          "sha256": "dceb6b3ed3d6ebd1fe0603db0ec8d2eaa7a131f37384c6ca5d3823ba8f11126e"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave06.json",
+          "count": 25,
+          "sha256": "75f4886251dcf45f8926c6ca778e3c6c9a0199cec8596e21259ad8df9d6804f6"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave07.json",
+          "count": 25,
+          "sha256": "bf63274bfa428ec9f0cb6638094bd865fa517c575818463ed8fb5d71df2d23a4"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave08.json",
+          "count": 25,
+          "sha256": "3f2b51b5ff2015725d3f7f2f738195b167259ef1be97354b0505043d0ba63195"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave09.json",
+          "count": 25,
+          "sha256": "8b7b87c90dbd0ebd9821b79726fd6a34cf143b2d9f967b91118dd93f39d7ec0d"
+        },
+        {
+          "path": "evidence/source/visual-final-id-adjudication-904-wave10.json",
+          "count": 25,
+          "sha256": "0be547f2be3ced8362bf8ae3f105c7b868d2b1743fe4ee1f5de0732e6c552602"
+        }
+      ]
+    },
+    "candidate_pool": {
+      "tier_a_count": 7,
+      "tier_b_count": 24,
+      "rank_proof": [
+        {
+          "visual_id": "VIS-018558",
+          "tier": "A",
+          "rank": 1,
+          "route_count": 9,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018605",
+          "tier": "A",
+          "rank": 2,
+          "route_count": 9,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018606",
+          "tier": "A",
+          "rank": 3,
+          "route_count": 9,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018719",
+          "tier": "A",
+          "rank": 4,
+          "route_count": 9,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018587",
+          "tier": "A",
+          "rank": 5,
+          "route_count": 10,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-020673",
+          "tier": "A",
+          "rank": 6,
+          "route_count": 10,
+          "route_owner_union_cardinality": 4,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018572",
+          "tier": "A",
+          "rank": 7,
+          "route_count": 11,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 1,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-019966",
+          "tier": "B",
+          "rank": 1,
+          "route_count": 6,
+          "route_owner_union_cardinality": 2,
+          "max_per_route_owner_cardinality": 2,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-020895",
+          "tier": "B",
+          "rank": 2,
+          "route_count": 6,
+          "route_owner_union_cardinality": 2,
+          "max_per_route_owner_cardinality": 2,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-016187",
+          "tier": "B",
+          "rank": 3,
+          "route_count": 2,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 2,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-019977",
+          "tier": "B",
+          "rank": 4,
+          "route_count": 9,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 2,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-015518",
+          "tier": "B",
+          "rank": 5,
+          "route_count": 1,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-017246",
+          "tier": "B",
+          "rank": 6,
+          "route_count": 1,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-017247",
+          "tier": "B",
+          "rank": 7,
+          "route_count": 1,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-017474",
+          "tier": "B",
+          "rank": 8,
+          "route_count": 1,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-019505",
+          "tier": "B",
+          "rank": 9,
+          "route_count": 1,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-020718",
+          "tier": "B",
+          "rank": 10,
+          "route_count": 2,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-020104",
+          "tier": "B",
+          "rank": 11,
+          "route_count": 4,
+          "route_owner_union_cardinality": 3,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-015706",
+          "tier": "B",
+          "rank": 12,
+          "route_count": 1,
+          "route_owner_union_cardinality": 4,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-015794",
+          "tier": "B",
+          "rank": 13,
+          "route_count": 1,
+          "route_owner_union_cardinality": 4,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-019644",
+          "tier": "B",
+          "rank": 14,
+          "route_count": 1,
+          "route_owner_union_cardinality": 4,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-019708",
+          "tier": "B",
+          "rank": 15,
+          "route_count": 1,
+          "route_owner_union_cardinality": 4,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-020879",
+          "tier": "B",
+          "rank": 16,
+          "route_count": 5,
+          "route_owner_union_cardinality": 5,
+          "max_per_route_owner_cardinality": 3,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018637",
+          "tier": "B",
+          "rank": 17,
+          "route_count": 7,
+          "route_owner_union_cardinality": 5,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-018636",
+          "tier": "B",
+          "rank": 18,
+          "route_count": 9,
+          "route_owner_union_cardinality": 5,
+          "max_per_route_owner_cardinality": 4,
+          "selected": true
+        },
+        {
+          "visual_id": "VIS-014326",
+          "tier": "B",
+          "rank": 19,
+          "route_count": 4,
+          "route_owner_union_cardinality": 9,
+          "max_per_route_owner_cardinality": 8,
+          "selected": false
+        },
+        {
+          "visual_id": "VIS-018651",
+          "tier": "B",
+          "rank": 20,
+          "route_count": 10,
+          "route_owner_union_cardinality": 9,
+          "max_per_route_owner_cardinality": 8,
+          "selected": false
+        },
+        {
+          "visual_id": "VIS-017252",
+          "tier": "B",
+          "rank": 21,
+          "route_count": 1,
+          "route_owner_union_cardinality": 14,
+          "max_per_route_owner_cardinality": 14,
+          "selected": false
+        },
+        {
+          "visual_id": "VIS-017253",
+          "tier": "B",
+          "rank": 22,
+          "route_count": 1,
+          "route_owner_union_cardinality": 14,
+          "max_per_route_owner_cardinality": 14,
+          "selected": false
+        },
+        {
+          "visual_id": "VIS-020720",
+          "tier": "B",
+          "rank": 23,
+          "route_count": 2,
+          "route_owner_union_cardinality": 14,
+          "max_per_route_owner_cardinality": 14,
+          "selected": false
+        },
+        {
+          "visual_id": "VIS-020721",
+          "tier": "B",
+          "rank": 24,
+          "route_count": 2,
+          "route_owner_union_cardinality": 14,
+          "max_per_route_owner_cardinality": 14,
+          "selected": false
+        }
+      ],
+      "rank_proof_jsonl_sha256": "27dc9576e165338e08066cd4852ce365d34e3f4e0d392444d6a4279a6e76253a",
+      "tier_b_omitted_ids": [
+        "VIS-014326",
+        "VIS-018651",
+        "VIS-017252",
+        "VIS-017253",
+        "VIS-020720",
+        "VIS-020721"
+      ],
+      "tier_b_omitted_sha256": "5083aae4bca78cb6db1a8098b21f5a954fa63111c2fcfd74d2b143eb5f4f168b"
+    },
+    "ordered_ids": [
+      "VIS-018558",
+      "VIS-018605",
+      "VIS-018606",
+      "VIS-018719",
+      "VIS-018587",
+      "VIS-020673",
+      "VIS-018572",
+      "VIS-019966",
+      "VIS-020895",
+      "VIS-016187",
+      "VIS-019977",
+      "VIS-015518",
+      "VIS-017246",
+      "VIS-017247",
+      "VIS-017474",
+      "VIS-019505",
+      "VIS-020718",
+      "VIS-020104",
+      "VIS-015706",
+      "VIS-015794",
+      "VIS-019644",
+      "VIS-019708",
+      "VIS-020879",
+      "VIS-018637",
+      "VIS-018636"
+    ],
+    "ordered_sha256": "80e32ed08db43cda77a27aac509626f93494d8302f867fc460bb6205fcee73e2",
+    "sorted_sha256": "8545c5cf544dbca63549250caa434c10c61daa3b461f6ba9ddfde89922d8438f",
+    "proof_jsonl_sha256": "2d9d43e80c826773ff6f1acefd521a3e3a6b79f4736c223744cf6424ff6dd742",
+    "source_map_jsonl_sha256": "a4de45c76c6ce83b297fb757507943ae08595da3f3a1d1f5f4a51368ab779bf1",
+    "serialization": "Packet-order objects, sorted JSON keys, compact separators, UTF-8/no BOM, LF join without terminal LF.",
+    "independent_review": "Exact exclusions, candidate pools, ranking boundary, ownership ambiguity, page fallbacks and audited controller methods independently reviewed."
+  },
+  "adjudications": [
+    {
+      "visual_id": "VIS-018558",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/health-safety/restraints/index.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1199",
+          "method": "GET|HEAD",
+          "name": "health-safety.restraints.index",
+          "path": "health-safety/restraints",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@index",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@index",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1200",
+          "method": "GET|HEAD",
+          "name": "health-safety.restraints.clients.summary",
+          "path": "health-safety/restraints/clients/{client}/summary",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@clientSummary",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@clientSummary",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1201",
+          "method": "POST",
+          "name": "health-safety.restraints.events.store",
+          "path": "health-safety/restraints/events",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@storeEvent",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@storeEvent",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1202",
+          "method": "PUT",
+          "name": "health-safety.restraints.events.update",
+          "path": "health-safety/restraints/events/{event}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@updateEvent",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@updateEvent",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1203",
+          "method": "POST",
+          "name": "health-safety.restraints.events.attachments.store",
+          "path": "health-safety/restraints/events/{event}/attachments",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@storeAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@storeAttachment",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1204",
+          "method": "DELETE",
+          "name": "health-safety.restraints.events.attachments.destroy",
+          "path": "health-safety/restraints/events/{event}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@destroyAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@destroyAttachment",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1205",
+          "method": "GET|HEAD",
+          "name": "health-safety.restraints.events.attachments.download",
+          "path": "health-safety/restraints/events/{event}/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@downloadAttachment",
+          "owners": [
+            "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1206",
+          "method": "POST",
+          "name": "health-safety.restraints.events.link-incident",
+          "path": "health-safety/restraints/events/{event}/link-incident",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@linkIncident",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@linkIncident",
+          "owners": [
+            "CAP-HS-RESTRAINT-EVENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1207",
+          "method": "GET|HEAD",
+          "name": "health-safety.restraints.export",
+          "path": "health-safety/restraints/export",
+          "action": "App\\Http\\Controllers\\HealthSafety\\RestraintController@export",
+          "controller_locus": "app/Http/Controllers/HealthSafety/RestraintController.php@export",
+          "owners": [
+            "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-RESTRAINT-EVENTS",
+        "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0394",
+        "file": "resources/js/pages/health-safety/restraints/index.tsx",
+        "owners": [
+          "CAP-HS-BEHAVIOUR-SUPPORT-PLANS",
+          "CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD",
+          "CAP-HS-RESTRAINT-EVENTS",
+          "CAP-HS-RESTRAINT-REGISTER-EXPORT"
+        ],
+        "source_sha256": "8f5baa0a801a69cea725b3ee8847b820bb31828c9edcdd19866c0784d8d665a9"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018605",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/sites/hazards/show.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1045",
+          "method": "GET|HEAD",
+          "name": "sites.hazards.show",
+          "path": "hazards/{hazard}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@show",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@show",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1046",
+          "method": "PUT",
+          "name": "sites.hazards.update",
+          "path": "hazards/{hazard}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@update",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@update",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1047",
+          "method": "POST",
+          "name": "sites.hazards.actions.store",
+          "path": "hazards/{hazard}/actions",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@storeAction",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@storeAction",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1048",
+          "method": "POST",
+          "name": "sites.hazards.assign",
+          "path": "hazards/{hazard}/assign",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@assign",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@assign",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1049",
+          "method": "POST",
+          "name": "sites.hazards.close",
+          "path": "hazards/{hazard}/close",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@close",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@close",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1050",
+          "method": "POST",
+          "name": "sites.hazards.media",
+          "path": "hazards/{hazard}/media",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@media",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@media",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-MEDIA"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1051",
+          "method": "GET|HEAD",
+          "name": "sites.hazards.media.show",
+          "path": "hazards/{hazard}/media/{kind}/{index}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@showMedia",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@showMedia",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-MEDIA"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1052",
+          "method": "POST",
+          "name": "sites.hazards.review",
+          "path": "hazards/{hazard}/review",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@review",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@review",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1053",
+          "method": "POST",
+          "name": "sites.hazards.status",
+          "path": "hazards/{hazard}/status",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@transition",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@transition",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+        "CAP-HS-SITE-HAZARD-LIFECYCLE",
+        "CAP-HS-SITE-HAZARD-MEDIA"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0893",
+        "file": "resources/js/pages/sites/hazards/show.tsx",
+        "owners": [
+          "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+          "CAP-HS-SITE-HAZARD-LIFECYCLE",
+          "CAP-HS-SITE-HAZARD-MEDIA"
+        ],
+        "source_sha256": "c616719bcbd8288a7f6f331ca4fd908ca3b404b9953966e6822435b8c6cc3364"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018606",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "not-found/direct-object applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/sites/hazards/show.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1045",
+          "method": "GET|HEAD",
+          "name": "sites.hazards.show",
+          "path": "hazards/{hazard}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@show",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@show",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1046",
+          "method": "PUT",
+          "name": "sites.hazards.update",
+          "path": "hazards/{hazard}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@update",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@update",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1047",
+          "method": "POST",
+          "name": "sites.hazards.actions.store",
+          "path": "hazards/{hazard}/actions",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@storeAction",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@storeAction",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1048",
+          "method": "POST",
+          "name": "sites.hazards.assign",
+          "path": "hazards/{hazard}/assign",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@assign",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@assign",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1049",
+          "method": "POST",
+          "name": "sites.hazards.close",
+          "path": "hazards/{hazard}/close",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@close",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@close",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1050",
+          "method": "POST",
+          "name": "sites.hazards.media",
+          "path": "hazards/{hazard}/media",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@media",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@media",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-MEDIA"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1051",
+          "method": "GET|HEAD",
+          "name": "sites.hazards.media.show",
+          "path": "hazards/{hazard}/media/{kind}/{index}",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@showMedia",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@showMedia",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-MEDIA"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1052",
+          "method": "POST",
+          "name": "sites.hazards.review",
+          "path": "hazards/{hazard}/review",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@review",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@review",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1053",
+          "method": "POST",
+          "name": "sites.hazards.status",
+          "path": "hazards/{hazard}/status",
+          "action": "App\\Http\\Controllers\\Sites\\SiteHazardController@transition",
+          "controller_locus": "app/Http/Controllers/Sites/SiteHazardController.php@transition",
+          "owners": [
+            "CAP-HS-SITE-HAZARD-LIFECYCLE"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+        "CAP-HS-SITE-HAZARD-LIFECYCLE",
+        "CAP-HS-SITE-HAZARD-MEDIA"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0893",
+        "file": "resources/js/pages/sites/hazards/show.tsx",
+        "owners": [
+          "CAP-HS-SITE-HAZARD-CORRECTIVE-ACTIONS",
+          "CAP-HS-SITE-HAZARD-LIFECYCLE",
+          "CAP-HS-SITE-HAZARD-MEDIA"
+        ],
+        "source_sha256": "c616719bcbd8288a7f6f331ca4fd908ca3b404b9953966e6822435b8c6cc3364"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018719",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/emar/Handovers.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0373",
+          "method": "GET|HEAD",
+          "name": "emar.handovers",
+          "path": "emar/handovers",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@handovers",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@handovers",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0374",
+          "method": "POST",
+          "name": "emar.handovers.store",
+          "path": "emar/handovers",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@storeHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@storeHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0375",
+          "method": "DELETE",
+          "name": "emar.handovers.destroy",
+          "path": "emar/handovers/{handover}",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@destroyHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@destroyHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0376",
+          "method": "PUT",
+          "name": "emar.handovers.update",
+          "path": "emar/handovers/{handover}",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@updateHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@updateHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0377",
+          "method": "POST",
+          "name": "emar.handovers.acknowledge",
+          "path": "emar/handovers/{handover}/acknowledge",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@acknowledgeHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@acknowledgeHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-ACKNOWLEDGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0378",
+          "method": "POST",
+          "name": "emar.handovers.lock",
+          "path": "emar/handovers/{handover}/lock",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@lockHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@lockHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0379",
+          "method": "POST",
+          "name": "emar.handovers.submit",
+          "path": "emar/handovers/{handover}/submit",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@submitHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@submitHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0380",
+          "method": "POST",
+          "name": "emar.handovers.unlock",
+          "path": "emar/handovers/{handover}/unlock",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@unlockHandover",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@unlockHandover",
+          "owners": [
+            "CAP-MED-HANDOVER-AUTHORING-STATUS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-0381",
+          "method": "GET|HEAD",
+          "name": "emar.handovers.shift_medications",
+          "path": "emar/handovers/shift-medications",
+          "action": "App\\Http\\Controllers\\Emar\\EmarController@shiftMedicationSnapshot",
+          "controller_locus": "app/Http/Controllers/Emar/EmarController.php@shiftMedicationSnapshot",
+          "owners": [
+            "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-MED-HANDOVER-ACKNOWLEDGEMENT",
+        "CAP-MED-HANDOVER-AUTHORING-STATUS",
+        "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0095",
+        "file": "resources/js/pages/emar/Handovers.tsx",
+        "owners": [
+          "CAP-MED-HANDOVER-ACKNOWLEDGEMENT",
+          "CAP-MED-HANDOVER-AUTHORING-STATUS"
+        ],
+        "source_sha256": "478c73d86a49b9ba0b494dce80da1bbd904136aeae5b6e5ad8a243e6de31ac8c"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018587",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/health-safety/procedures/index.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1177",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.index",
+          "path": "health-safety/procedures",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@index",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@index",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1178",
+          "method": "POST",
+          "name": "health-safety.procedures.store",
+          "path": "health-safety/procedures",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@store",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@store",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1179",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.show",
+          "path": "health-safety/procedures/{procedure}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@show",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@show",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1180",
+          "method": "PUT",
+          "name": "health-safety.procedures.update",
+          "path": "health-safety/procedures/{procedure}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@update",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@update",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1184",
+          "method": "POST",
+          "name": "health-safety.procedures.attachments.store",
+          "path": "health-safety/procedures/{procedure}/attachments",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@uploadAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@uploadAttachment",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1185",
+          "method": "DELETE",
+          "name": "health-safety.procedures.attachments.destroy",
+          "path": "health-safety/procedures/{procedure}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@destroyAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@destroyAttachment",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1186",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.attachments.download",
+          "path": "health-safety/procedures/{procedure}/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@downloadAttachment",
+          "owners": [
+            "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1187",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.edit",
+          "path": "health-safety/procedures/{procedure}/edit",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@edit",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@edit",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1192",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.create",
+          "path": "health-safety/procedures/create",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@create",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@create",
+          "owners": [
+            "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1193",
+          "method": "GET|HEAD",
+          "name": "health-safety.procedures.export",
+          "path": "health-safety/procedures/export",
+          "action": "App\\Http\\Controllers\\HealthSafety\\SafeWorkProcedureController@export",
+          "controller_locus": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php@export",
+          "owners": [
+            "CAP-HS-PROCEDURE-REGISTER-EXPORT"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+        "CAP-HS-PROCEDURE-REGISTER-EXPORT"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0393",
+        "file": "resources/js/pages/health-safety/procedures/index.tsx",
+        "owners": [
+          "CAP-HS-PROCEDURE-ACKNOWLEDGEMENT",
+          "CAP-HS-PROCEDURE-ARCHIVE-RESTORE",
+          "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+          "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+          "CAP-HS-PROCEDURE-REGISTER-EXPORT",
+          "CAP-HS-PROCEDURE-REVIEW-APPROVAL"
+        ],
+        "source_sha256": "cd5f21706cffcde7407bf77714e09ece02d305a99df7393848125b8a7b869d4d"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020673",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/privacy/requests/show.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2325",
+          "method": "GET|HEAD",
+          "name": "privacy.requests.index",
+          "path": "privacy/requests",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@index",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@index",
+          "owners": [
+            "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2326",
+          "method": "POST",
+          "name": "privacy.requests.store",
+          "path": "privacy/requests",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@store",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@store",
+          "owners": [
+            "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2327",
+          "method": "GET|HEAD",
+          "name": "privacy.requests.show",
+          "path": "privacy/requests/{dsRequest}",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@show",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@show",
+          "owners": [
+            "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2328",
+          "method": "PUT",
+          "name": "privacy.requests.update",
+          "path": "privacy/requests/{dsRequest}",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@update",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@update",
+          "owners": [
+            "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2329",
+          "method": "POST",
+          "name": "privacy.requests.complete",
+          "path": "privacy/requests/{dsRequest}/complete",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@complete",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@complete",
+          "owners": [
+            "CAP-PRIV-DSR-FULFILLMENT-DECISION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2330",
+          "method": "GET|HEAD",
+          "name": "privacy.requests.export",
+          "path": "privacy/requests/{dsRequest}/export",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@export",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@export",
+          "owners": [
+            "CAP-PRIV-DSR-EXPORT-PACKAGE-GENERATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2331",
+          "method": "POST",
+          "name": "privacy.requests.extend",
+          "path": "privacy/requests/{dsRequest}/extend",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@extend",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@extend",
+          "owners": [
+            "CAP-PRIV-DSR-IDENTITY-DEADLINE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2332",
+          "method": "POST",
+          "name": "privacy.requests.refuse",
+          "path": "privacy/requests/{dsRequest}/refuse",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@refuse",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@refuse",
+          "owners": [
+            "CAP-PRIV-DSR-FULFILLMENT-DECISION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2333",
+          "method": "POST",
+          "name": "privacy.requests.verify-identity",
+          "path": "privacy/requests/{dsRequest}/verify-identity",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@verifyIdentity",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@verifyIdentity",
+          "owners": [
+            "CAP-PRIV-DSR-IDENTITY-DEADLINE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2334",
+          "method": "GET|HEAD",
+          "name": "privacy.requests.create",
+          "path": "privacy/requests/create",
+          "action": "App\\Http\\Controllers\\DataSubjectRequestController@create",
+          "controller_locus": "app/Http/Controllers/DataSubjectRequestController.php@create",
+          "owners": [
+            "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-PRIV-DSR-EXPORT-PACKAGE-GENERATION",
+        "CAP-PRIV-DSR-FULFILLMENT-DECISION",
+        "CAP-PRIV-DSR-IDENTITY-DEADLINE",
+        "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0741",
+        "file": "resources/js/pages/privacy/requests/show.tsx",
+        "owners": [
+          "CAP-PRIV-DSR-EXPORT-PACKAGE-GENERATION",
+          "CAP-PRIV-DSR-FULFILLMENT-DECISION",
+          "CAP-PRIV-DSR-IDENTITY-DEADLINE",
+          "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT"
+        ],
+        "source_sha256": "32b592caed83195bfdc89fc02881ef0e3002be02ee08d764c881e829b092f35c"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018572",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/health-safety/injuries/index.tsx",
+      "selection_tier": "A_singleton_route_owners_empty_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1127",
+          "method": "GET|HEAD",
+          "name": "health-safety.injuries.index",
+          "path": "health-safety/injuries",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@index",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@index",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1128",
+          "method": "POST",
+          "name": "health-safety.injuries.store",
+          "path": "health-safety/injuries",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@store",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@store",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1129",
+          "method": "GET|HEAD",
+          "name": "health-safety.injuries.show",
+          "path": "health-safety/injuries/{injury}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@show",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@show",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1130",
+          "method": "PUT",
+          "name": "health-safety.injuries.update",
+          "path": "health-safety/injuries/{injury}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@update",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@update",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1131",
+          "method": "POST",
+          "name": "health-safety.injuries.attachments.store",
+          "path": "health-safety/injuries/{injury}/attachments",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@uploadAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@uploadAttachment",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1132",
+          "method": "DELETE",
+          "name": "health-safety.injuries.attachments.destroy",
+          "path": "health-safety/injuries/{injury}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@destroyAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@destroyAttachment",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1133",
+          "method": "GET|HEAD",
+          "name": "health-safety.injuries.attachments.download",
+          "path": "health-safety/injuries/{injury}/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@downloadAttachment",
+          "owners": [
+            "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1134",
+          "method": "POST",
+          "name": "health-safety.injuries.capacity-assessments.store",
+          "path": "health-safety/injuries/{injury}/capacity-assessments",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@storeCapacityAssessment",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@storeCapacityAssessment",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1136",
+          "method": "POST",
+          "name": "health-safety.injuries.status",
+          "path": "health-safety/injuries/{injury}/status",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@transitionStatus",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@transitionStatus",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1137",
+          "method": "GET|HEAD",
+          "name": "health-safety.injuries.create",
+          "path": "health-safety/injuries/create",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@create",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@create",
+          "owners": [
+            "CAP-HS-INJURY-CAPACITY-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1138",
+          "method": "GET|HEAD",
+          "name": "health-safety.injuries.export",
+          "path": "health-safety/injuries/export",
+          "action": "App\\Http\\Controllers\\HealthSafety\\ReturnToWorkController@export",
+          "controller_locus": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php@export",
+          "owners": [
+            "CAP-HS-INJURY-REGISTER-EXPORT"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD",
+        "CAP-HS-INJURY-CAPACITY-LIFECYCLE",
+        "CAP-HS-INJURY-REGISTER-EXPORT"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0385",
+        "file": "resources/js/pages/health-safety/injuries/index.tsx",
+        "owners": [
+          "CAP-HS-INJURY-ATTACHMENT-DOWNLOAD",
+          "CAP-HS-INJURY-CAPACITY-LIFECYCLE",
+          "CAP-HS-INJURY-REGISTER-EXPORT",
+          "CAP-HS-RETURN-TO-WORK-PLAN-DUTIES"
+        ],
+        "source_sha256": "710f9122b22722122dbf327d7712e17f95cd394be7373f19693fe04588d94801"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019966",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/hr/compensation/benefits/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1322",
+          "method": "GET|HEAD",
+          "name": "hr.compensation.benefits.index",
+          "path": "hr/compensation/benefits",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@index",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@index",
+          "owners": [
+            "CAP-HR-BENEFITS-ENROLLMENT",
+            "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1323",
+          "method": "POST",
+          "name": "hr.compensation.benefits.enroll",
+          "path": "hr/compensation/benefits/enroll",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@enroll",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@enroll",
+          "owners": [
+            "CAP-HR-BENEFITS-ENROLLMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1324",
+          "method": "PUT",
+          "name": "hr.compensation.benefits.enrollments.update",
+          "path": "hr/compensation/benefits/enrollments/{enrollment}",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@updateEnrollment",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@updateEnrollment",
+          "owners": [
+            "CAP-HR-BENEFITS-ENROLLMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1325",
+          "method": "GET|HEAD",
+          "name": "hr.compensation.benefits.plans",
+          "path": "hr/compensation/benefits/plans",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@plans",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@plans",
+          "owners": [
+            "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1326",
+          "method": "POST",
+          "name": "hr.compensation.benefits.plans.store",
+          "path": "hr/compensation/benefits/plans",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@storePlan",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@storePlan",
+          "owners": [
+            "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1327",
+          "method": "PUT",
+          "name": "hr.compensation.benefits.plans.update",
+          "path": "hr/compensation/benefits/plans/{plan}",
+          "action": "App\\Http\\Controllers\\Hr\\BenefitsController@updatePlan",
+          "controller_locus": "app/Http/Controllers/Hr/BenefitsController.php@updatePlan",
+          "owners": [
+            "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HR-BENEFITS-ENROLLMENT",
+        "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0415",
+        "file": "resources/js/pages/hr/compensation/benefits/index.tsx",
+        "owners": [
+          "CAP-HR-BENEFITS-ENROLLMENT",
+          "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+        ],
+        "source_sha256": "c2b4abeebef3aeb93a9ae7c6ccd96829522ac7bc8c14d5d9af3d55303b7b44f3"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020895",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/settings/api.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2617",
+          "method": "GET|HEAD",
+          "name": "settings.api",
+          "path": "settings/api",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@index",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@index",
+          "owners": [
+            "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+            "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2618",
+          "method": "POST",
+          "name": "settings.api.keys.store",
+          "path": "settings/api/keys",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@storeKey",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@storeKey",
+          "owners": [
+            "CAP-SET-API-CREDENTIAL-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2619",
+          "method": "POST",
+          "name": "settings.api.keys.revoke",
+          "path": "settings/api/keys/{keyId}/revoke",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@revokeKey",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@revokeKey",
+          "owners": [
+            "CAP-SET-API-CREDENTIAL-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2620",
+          "method": "POST",
+          "name": "settings.api.webhooks.store",
+          "path": "settings/api/webhooks",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@storeWebhook",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@storeWebhook",
+          "owners": [
+            "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2621",
+          "method": "DELETE",
+          "name": "settings.api.webhooks.destroy",
+          "path": "settings/api/webhooks/{webhookId}",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@destroyWebhook",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@destroyWebhook",
+          "owners": [
+            "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2622",
+          "method": "POST",
+          "name": "settings.api.webhooks.test",
+          "path": "settings/api/webhooks/{webhookId}/test",
+          "action": "App\\Http\\Controllers\\Settings\\ApiSettingsController@testWebhook",
+          "controller_locus": "app/Http/Controllers/Settings/ApiSettingsController.php@testWebhook",
+          "owners": [
+            "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+        "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0838",
+        "file": "resources/js/pages/settings/api.tsx",
+        "owners": [
+          "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+          "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+        ],
+        "source_sha256": "8b7f11ef8c964e149c18eb2a0614213ba7dd5713562076dc5cd1728f2e97ee2d"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-016187",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "read/list/detail",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/hr/calendar/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1296",
+          "method": "GET|HEAD",
+          "name": "hr.calendar.index",
+          "path": "hr/calendar",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@index",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@index",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+            "CAP-HR-CALENDAR-PARTICIPATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1304",
+          "method": "GET|HEAD",
+          "name": "hr.calendar.feed",
+          "path": "hr/calendar/feed",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@feed",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@feed",
+          "owners": [
+            "CAP-HR-CALENDAR-FEED"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+        "CAP-HR-CALENDAR-FEED",
+        "CAP-HR-CALENDAR-PARTICIPATION"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0408",
+        "file": "resources/js/pages/hr/calendar/index.tsx",
+        "owners": [
+          "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+          "CAP-HR-CALENDAR-PARTICIPATION"
+        ],
+        "source_sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019977",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/hr/calendar/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1296",
+          "method": "GET|HEAD",
+          "name": "hr.calendar.index",
+          "path": "hr/calendar",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@index",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@index",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+            "CAP-HR-CALENDAR-PARTICIPATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1297",
+          "method": "DELETE",
+          "name": "hr.calendar.attachments.destroy",
+          "path": "hr/calendar/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@destroyAttachment",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@destroyAttachment",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1298",
+          "method": "GET|HEAD",
+          "name": "hr.calendar.attachments.download",
+          "path": "hr/calendar/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@downloadAttachment",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1299",
+          "method": "POST",
+          "name": "hr.calendar.events.store",
+          "path": "hr/calendar/events",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@store",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@store",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1300",
+          "method": "DELETE",
+          "name": "hr.calendar.events.destroy",
+          "path": "hr/calendar/events/{event}",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@destroy",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@destroy",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1301",
+          "method": "PUT",
+          "name": "hr.calendar.events.update",
+          "path": "hr/calendar/events/{event}",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@update",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@update",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1302",
+          "method": "POST",
+          "name": "hr.calendar.events.attachments.store",
+          "path": "hr/calendar/events/{event}/attachments",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@storeAttachment",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@storeAttachment",
+          "owners": [
+            "CAP-HR-CALENDAR-EVENT-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1303",
+          "method": "POST",
+          "name": "hr.calendar.events.rsvp",
+          "path": "hr/calendar/events/{event}/rsvp",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@rsvp",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@rsvp",
+          "owners": [
+            "CAP-HR-CALENDAR-PARTICIPATION"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1304",
+          "method": "GET|HEAD",
+          "name": "hr.calendar.feed",
+          "path": "hr/calendar/feed",
+          "action": "App\\Http\\Controllers\\Hr\\CalendarController@feed",
+          "controller_locus": "app/Http/Controllers/Hr/CalendarController.php@feed",
+          "owners": [
+            "CAP-HR-CALENDAR-FEED"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+        "CAP-HR-CALENDAR-FEED",
+        "CAP-HR-CALENDAR-PARTICIPATION"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0408",
+        "file": "resources/js/pages/hr/calendar/index.tsx",
+        "owners": [
+          "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+          "CAP-HR-CALENDAR-PARTICIPATION"
+        ],
+        "source_sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015518",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "read/list/detail",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/BankingController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0497",
+          "method": "GET|HEAD",
+          "name": "finance.banking.index",
+          "path": "finance/banking",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\BankingController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/BankingController.php@index",
+          "owners": [
+            "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+            "FIN-BANK-ACCOUNT",
+            "FIN-PETTY-CASH"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+        "FIN-BANK-ACCOUNT",
+        "FIN-PETTY-CASH"
+      ],
+      "route_owner_union": [
+        "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+        "FIN-BANK-ACCOUNT",
+        "FIN-PETTY-CASH"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017246",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "downloaded/exported/printed",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/reports/combined.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2349",
+          "method": "GET|HEAD",
+          "name": "reports.combined.export",
+          "path": "reports/combined/{report}/export",
+          "action": "App\\Http\\Controllers\\CombinedReportController@export",
+          "controller_locus": "app/Http/Controllers/CombinedReportController.php@export",
+          "owners": [
+            "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+            "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+            "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "route_owner_union": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0749",
+        "file": "resources/js/pages/reports/combined.tsx",
+        "owners": [
+          "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+          "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+          "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+        ],
+        "source_sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017247",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "read/list/detail",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/reports/combined.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2348",
+          "method": "GET|HEAD",
+          "name": "reports.combined.show",
+          "path": "reports/combined/{report}",
+          "action": "App\\Http\\Controllers\\CombinedReportController@show",
+          "controller_locus": "app/Http/Controllers/CombinedReportController.php@show",
+          "owners": [
+            "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+            "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+            "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "route_owner_union": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0749",
+        "file": "resources/js/pages/reports/combined.tsx",
+        "owners": [
+          "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+          "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+          "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+        ],
+        "source_sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017474",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "approved/acknowledged/verified",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/settings/access.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2616",
+          "method": "POST",
+          "name": "settings.access.approve",
+          "path": "settings/access/{target}/approve",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@approve",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@approve",
+          "owners": [
+            "CAP-SET-PERMISSION-OVERRIDES",
+            "CAP-SET-ROLE-ASSIGNMENTS",
+            "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS",
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+      ],
+      "route_owner_union": [
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS",
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0837",
+        "file": "resources/js/pages/settings/access.tsx",
+        "owners": [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ACCESS-OVERVIEW",
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        "source_sha256": "8e14ea58194d48fe8e9307393768aba1a1c45634164f8afc00147f479d08d5fe"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019505",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/BankingController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0497",
+          "method": "GET|HEAD",
+          "name": "finance.banking.index",
+          "path": "finance/banking",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\BankingController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/BankingController.php@index",
+          "owners": [
+            "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+            "FIN-BANK-ACCOUNT",
+            "FIN-PETTY-CASH"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+        "FIN-BANK-ACCOUNT",
+        "FIN-PETTY-CASH"
+      ],
+      "route_owner_union": [
+        "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+        "FIN-BANK-ACCOUNT",
+        "FIN-PETTY-CASH"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020718",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/reports/combined.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2348",
+          "method": "GET|HEAD",
+          "name": "reports.combined.show",
+          "path": "reports/combined/{report}",
+          "action": "App\\Http\\Controllers\\CombinedReportController@show",
+          "controller_locus": "app/Http/Controllers/CombinedReportController.php@show",
+          "owners": [
+            "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+            "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+            "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2349",
+          "method": "GET|HEAD",
+          "name": "reports.combined.export",
+          "path": "reports/combined/{report}/export",
+          "action": "App\\Http\\Controllers\\CombinedReportController@export",
+          "controller_locus": "app/Http/Controllers/CombinedReportController.php@export",
+          "owners": [
+            "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+            "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+            "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "route_owner_union": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0749",
+        "file": "resources/js/pages/reports/combined.tsx",
+        "owners": [
+          "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+          "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+          "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+        ],
+        "source_sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020104",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/hr/import-export/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1482",
+          "method": "GET|HEAD",
+          "name": "hr.import-export.index",
+          "path": "hr/import-export",
+          "action": "App\\Http\\Controllers\\Hr\\ImportExportController@index",
+          "controller_locus": "app/Http/Controllers/Hr/ImportExportController.php@index",
+          "owners": [
+            "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+            "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+            "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1483",
+          "method": "POST",
+          "name": "hr.import-export.export",
+          "path": "hr/import-export/export",
+          "action": "App\\Http\\Controllers\\Hr\\ImportExportController@export",
+          "controller_locus": "app/Http/Controllers/Hr/ImportExportController.php@export",
+          "owners": [
+            "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1484",
+          "method": "POST",
+          "name": "hr.import-export.import",
+          "path": "hr/import-export/import",
+          "action": "App\\Http\\Controllers\\Hr\\ImportExportController@import",
+          "controller_locus": "app/Http/Controllers/Hr/ImportExportController.php@import",
+          "owners": [
+            "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1485",
+          "method": "GET|HEAD",
+          "name": "hr.import-export.template",
+          "path": "hr/import-export/template",
+          "action": "App\\Http\\Controllers\\Hr\\ImportExportController@template",
+          "controller_locus": "app/Http/Controllers/Hr/ImportExportController.php@template",
+          "owners": [
+            "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+        "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+        "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0461",
+        "file": "resources/js/pages/hr/import-export/index.tsx",
+        "owners": [
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+          "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+        ],
+        "source_sha256": "3f06240e2cfae6658a7b189fdac6b50080ceccb2ce6616a96870283257d89f58"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015706",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "read/list/detail",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/LedgerController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0619",
+          "method": "GET|HEAD",
+          "name": "finance.ledger.index",
+          "path": "finance/ledger",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\LedgerController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/LedgerController.php@index",
+          "owners": [
+            "CAP-ASSET-FIXED-ASSET-REGISTER",
+            "FIN-CHART-OF-ACCOUNTS",
+            "FIN-COST-CENTRE",
+            "FIN-FX-REVALUATION"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-ASSET-FIXED-ASSET-REGISTER",
+        "FIN-CHART-OF-ACCOUNTS",
+        "FIN-COST-CENTRE",
+        "FIN-FX-REVALUATION"
+      ],
+      "route_owner_union": [
+        "CAP-ASSET-FIXED-ASSET-REGISTER",
+        "FIN-CHART-OF-ACCOUNTS",
+        "FIN-COST-CENTRE",
+        "FIN-FX-REVALUATION"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-015794",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "read/list/detail",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/TaxController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0694",
+          "method": "GET|HEAD",
+          "name": "finance.tax.index",
+          "path": "finance/tax",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\TaxController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/TaxController.php@index",
+          "owners": [
+            "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+            "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+            "FIN-GST-RETURN",
+            "FIN-IRD-FILING"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+        "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+        "FIN-GST-RETURN",
+        "FIN-IRD-FILING"
+      ],
+      "route_owner_union": [
+        "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+        "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+        "FIN-GST-RETURN",
+        "FIN-IRD-FILING"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019644",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/LedgerController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0619",
+          "method": "GET|HEAD",
+          "name": "finance.ledger.index",
+          "path": "finance/ledger",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\LedgerController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/LedgerController.php@index",
+          "owners": [
+            "CAP-ASSET-FIXED-ASSET-REGISTER",
+            "FIN-CHART-OF-ACCOUNTS",
+            "FIN-COST-CENTRE",
+            "FIN-FX-REVALUATION"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-ASSET-FIXED-ASSET-REGISTER",
+        "FIN-CHART-OF-ACCOUNTS",
+        "FIN-COST-CENTRE",
+        "FIN-FX-REVALUATION"
+      ],
+      "route_owner_union": [
+        "CAP-ASSET-FIXED-ASSET-REGISTER",
+        "FIN-CHART-OF-ACCOUNTS",
+        "FIN-COST-CENTRE",
+        "FIN-FX-REVALUATION"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019708",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "app/Domain/Finance/Http/Controllers/TaxController.php",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-0694",
+          "method": "GET|HEAD",
+          "name": "finance.tax.index",
+          "path": "finance/tax",
+          "action": "App\\Domain\\Finance\\Http\\Controllers\\TaxController@index",
+          "controller_locus": "app/Domain/Finance/Http/Controllers/TaxController.php@index",
+          "owners": [
+            "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+            "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+            "FIN-GST-RETURN",
+            "FIN-IRD-FILING"
+          ]
+        }
+      ],
+      "route_owner_intersection": [
+        "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+        "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+        "FIN-GST-RETURN",
+        "FIN-IRD-FILING"
+      ],
+      "route_owner_union": [
+        "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+        "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+        "FIN-GST-RETURN",
+        "FIN-IRD-FILING"
+      ],
+      "page_context": null,
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020879",
+      "feature_link_status": "unresolved_split_family_page_ambiguous",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/settings/access.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-2614",
+          "method": "GET|HEAD",
+          "name": "settings.access",
+          "path": "settings/access",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@index",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@index",
+          "owners": [
+            "CAP-SET-ACCESS-OVERVIEW"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2615",
+          "method": "PUT",
+          "name": "settings.access.update",
+          "path": "settings/access/{target}",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@update",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@update",
+          "owners": [
+            "CAP-SET-PERMISSION-OVERRIDES",
+            "CAP-SET-ROLE-ASSIGNMENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2616",
+          "method": "POST",
+          "name": "settings.access.approve",
+          "path": "settings/access/{target}/approve",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@approve",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@approve",
+          "owners": [
+            "CAP-SET-PERMISSION-OVERRIDES",
+            "CAP-SET-ROLE-ASSIGNMENTS",
+            "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2628",
+          "method": "POST",
+          "name": "settings.board-members.store",
+          "path": "settings/board-members",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@storeBoardMember",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@storeBoardMember",
+          "owners": [
+            "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+            "CAP-SET-ROLE-ASSIGNMENTS"
+          ]
+        },
+        {
+          "route_id": "ROUTE-2629",
+          "method": "DELETE",
+          "name": "settings.board-members.destroy",
+          "path": "settings/board-members/{boardMember}",
+          "action": "App\\Http\\Controllers\\Settings\\AccessController@destroyBoardMember",
+          "controller_locus": "app/Http/Controllers/Settings/AccessController.php@destroyBoardMember",
+          "owners": [
+            "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+            "CAP-SET-ROLE-ASSIGNMENTS"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+        "CAP-SET-ACCESS-OVERVIEW",
+        "CAP-SET-PERMISSION-OVERRIDES",
+        "CAP-SET-ROLE-ASSIGNMENTS",
+        "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0837",
+        "file": "resources/js/pages/settings/access.tsx",
+        "owners": [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ACCESS-OVERVIEW",
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        "source_sha256": "8e14ea58194d48fe8e9307393768aba1a1c45634164f8afc00147f479d08d5fe"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018637",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "not-found/direct-object applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/incidents/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1839",
+          "method": "POST",
+          "name": "incidents.store",
+          "path": "incidents",
+          "action": "App\\Http\\Controllers\\IncidentController@store",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@store",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1840",
+          "method": "GET|HEAD",
+          "name": "incidents.show",
+          "path": "incidents/{incident}",
+          "action": "App\\Http\\Controllers\\IncidentController@show",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@show",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR",
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+            "CAP-INC-INCIDENT-FOLLOWUP",
+            "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1841",
+          "method": "PUT",
+          "name": "incidents.update",
+          "path": "incidents/{incident}",
+          "action": "App\\Http\\Controllers\\IncidentController@update",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@update",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1842",
+          "method": "POST",
+          "name": "incidents.attachments.store",
+          "path": "incidents/{incident}/attachments",
+          "action": "App\\Http\\Controllers\\IncidentController@uploadAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@uploadAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1843",
+          "method": "DELETE",
+          "name": "incidents.attachments.destroy",
+          "path": "incidents/{incident}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\IncidentController@removeAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@removeAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1844",
+          "method": "PATCH",
+          "name": "incidents.attachments.update",
+          "path": "incidents/{incident}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\IncidentController@updateAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@updateAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1845",
+          "method": "GET|HEAD",
+          "name": "incidents.attachments.download",
+          "path": "incidents/{incident}/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\IncidentController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@downloadAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+        "CAP-INC-INCIDENT-FOLLOWUP",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0526",
+        "file": "resources/js/pages/incidents/index.tsx",
+        "owners": [
+          "CAP-INC-INCIDENT-AUTHOR",
+          "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+          "CAP-INC-INCIDENT-FOLLOWUP",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+        ],
+        "source_sha256": "20cbbaffa49118c393622758632ba6183f760296486df0fd458a38eb73f730ef"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018636",
+      "feature_link_status": "unresolved_no_manifest_lineage",
+      "state": "permission/direct-object denial applicability",
+      "pattern_type": "material-state-applicability",
+      "component_anchor": "resources/js/pages/incidents/index.tsx",
+      "selection_tier": "B_nonempty_route_owner_sets_nonunique_intersection",
+      "routes": [
+        {
+          "route_id": "ROUTE-1838",
+          "method": "GET|HEAD",
+          "name": "incidents.index",
+          "path": "incidents",
+          "action": "App\\Http\\Controllers\\IncidentController@index",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@index",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR",
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+            "CAP-INC-INCIDENT-FOLLOWUP",
+            "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1839",
+          "method": "POST",
+          "name": "incidents.store",
+          "path": "incidents",
+          "action": "App\\Http\\Controllers\\IncidentController@store",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@store",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1840",
+          "method": "GET|HEAD",
+          "name": "incidents.show",
+          "path": "incidents/{incident}",
+          "action": "App\\Http\\Controllers\\IncidentController@show",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@show",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR",
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+            "CAP-INC-INCIDENT-FOLLOWUP",
+            "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1841",
+          "method": "PUT",
+          "name": "incidents.update",
+          "path": "incidents/{incident}",
+          "action": "App\\Http\\Controllers\\IncidentController@update",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@update",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1842",
+          "method": "POST",
+          "name": "incidents.attachments.store",
+          "path": "incidents/{incident}/attachments",
+          "action": "App\\Http\\Controllers\\IncidentController@uploadAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@uploadAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1843",
+          "method": "DELETE",
+          "name": "incidents.attachments.destroy",
+          "path": "incidents/{incident}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\IncidentController@removeAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@removeAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1844",
+          "method": "PATCH",
+          "name": "incidents.attachments.update",
+          "path": "incidents/{incident}/attachments/{attachment}",
+          "action": "App\\Http\\Controllers\\IncidentController@updateAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@updateAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1845",
+          "method": "GET|HEAD",
+          "name": "incidents.attachments.download",
+          "path": "incidents/{incident}/attachments/{attachment}/download",
+          "action": "App\\Http\\Controllers\\IncidentController@downloadAttachment",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@downloadAttachment",
+          "owners": [
+            "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD"
+          ]
+        },
+        {
+          "route_id": "ROUTE-1854",
+          "method": "GET|HEAD",
+          "name": "incidents.create",
+          "path": "incidents/create",
+          "action": "App\\Http\\Controllers\\IncidentController@create",
+          "controller_locus": "app/Http/Controllers/IncidentController.php@create",
+          "owners": [
+            "CAP-INC-INCIDENT-AUTHOR"
+          ]
+        }
+      ],
+      "route_owner_intersection": [],
+      "route_owner_union": [
+        "CAP-INC-INCIDENT-AUTHOR",
+        "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+        "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+        "CAP-INC-INCIDENT-FOLLOWUP",
+        "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+      ],
+      "page_context": {
+        "page_id": "PAGE-0526",
+        "file": "resources/js/pages/incidents/index.tsx",
+        "owners": [
+          "CAP-INC-INCIDENT-AUTHOR",
+          "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+          "CAP-INC-INCIDENT-FOLLOWUP",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+        ],
+        "source_sha256": "20cbbaffa49118c393622758632ba6183f760296486df0fd458a38eb73f730ef"
+      },
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners do not yield one common final ID and no singleton exact page fallback exists.",
+      "runtime_credit": 0
+    }
+  ],
+  "source_map": [
+    {
+      "visual_id": "VIS-018558",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/HealthSafety/RestraintController.php",
+          "sha256": "65fba23bb43eac78dadbf62e279630ad588fc220f1ed35f7eb259b769a3466d2",
+          "loci": [
+            "clientSummary",
+            "destroyAttachment",
+            "downloadAttachment",
+            "export",
+            "index",
+            "linkIncident",
+            "storeAttachment",
+            "storeEvent",
+            "updateEvent"
+          ]
+        },
+        {
+          "path": "resources/js/pages/health-safety/restraints/index.tsx",
+          "sha256": "8f5baa0a801a69cea725b3ee8847b820bb31828c9edcdd19866c0784d8d665a9",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018605",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Sites/SiteHazardController.php",
+          "sha256": "1d32bbb40f72818019ca538078a4d115ff9c00abf43290b2651ed6d56270e958",
+          "loci": [
+            "assign",
+            "close",
+            "media",
+            "review",
+            "show",
+            "showMedia",
+            "storeAction",
+            "transition",
+            "update"
+          ]
+        },
+        {
+          "path": "resources/js/pages/sites/hazards/show.tsx",
+          "sha256": "c616719bcbd8288a7f6f331ca4fd908ca3b404b9953966e6822435b8c6cc3364",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018606",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Sites/SiteHazardController.php",
+          "sha256": "1d32bbb40f72818019ca538078a4d115ff9c00abf43290b2651ed6d56270e958",
+          "loci": [
+            "assign",
+            "close",
+            "media",
+            "review",
+            "show",
+            "showMedia",
+            "storeAction",
+            "transition",
+            "update"
+          ]
+        },
+        {
+          "path": "resources/js/pages/sites/hazards/show.tsx",
+          "sha256": "c616719bcbd8288a7f6f331ca4fd908ca3b404b9953966e6822435b8c6cc3364",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018719",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Emar/EmarController.php",
+          "sha256": "905d76fe97f9b57ed3b180e0bc213c6370f715f84aa851974a3c2f8fc6095cd7",
+          "loci": [
+            "acknowledgeHandover",
+            "destroyHandover",
+            "handovers",
+            "lockHandover",
+            "shiftMedicationSnapshot",
+            "storeHandover",
+            "submitHandover",
+            "unlockHandover",
+            "updateHandover"
+          ]
+        },
+        {
+          "path": "resources/js/pages/emar/Handovers.tsx",
+          "sha256": "478c73d86a49b9ba0b494dce80da1bbd904136aeae5b6e5ad8a243e6de31ac8c",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018587",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/HealthSafety/SafeWorkProcedureController.php",
+          "sha256": "ee3b8474ce5dcad6eb7c9b6cb9281c30787318c10f1e5ee4c35e9373045591e1",
+          "loci": [
+            "create",
+            "destroyAttachment",
+            "downloadAttachment",
+            "edit",
+            "export",
+            "index",
+            "show",
+            "store",
+            "update",
+            "uploadAttachment"
+          ]
+        },
+        {
+          "path": "resources/js/pages/health-safety/procedures/index.tsx",
+          "sha256": "cd5f21706cffcde7407bf77714e09ece02d305a99df7393848125b8a7b869d4d",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-020673",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/DataSubjectRequestController.php",
+          "sha256": "7d0c0196fb27db4eb8820f1f32c72df6202f60f6b205796788e99c3fa46ef725",
+          "loci": [
+            "complete",
+            "create",
+            "export",
+            "extend",
+            "index",
+            "refuse",
+            "show",
+            "store",
+            "update",
+            "verifyIdentity"
+          ]
+        },
+        {
+          "path": "resources/js/pages/privacy/requests/show.tsx",
+          "sha256": "32b592caed83195bfdc89fc02881ef0e3002be02ee08d764c881e829b092f35c",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018572",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/HealthSafety/ReturnToWorkController.php",
+          "sha256": "9dc75c85e309da5c08d4c54bbdc8097b1058e0654d3fc8994d052fa26a6957dd",
+          "loci": [
+            "create",
+            "destroyAttachment",
+            "downloadAttachment",
+            "export",
+            "index",
+            "show",
+            "store",
+            "storeCapacityAssessment",
+            "transitionStatus",
+            "update",
+            "uploadAttachment"
+          ]
+        },
+        {
+          "path": "resources/js/pages/health-safety/injuries/index.tsx",
+          "sha256": "710f9122b22722122dbf327d7712e17f95cd394be7373f19693fe04588d94801",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-019966",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Hr/BenefitsController.php",
+          "sha256": "b7f6d390ac645cff43131b2214175ce7ac26e526a0c392ef326674dfadae8378",
+          "loci": [
+            "enroll",
+            "index",
+            "plans",
+            "storePlan",
+            "updateEnrollment",
+            "updatePlan"
+          ]
+        },
+        {
+          "path": "resources/js/pages/hr/compensation/benefits/index.tsx",
+          "sha256": "c2b4abeebef3aeb93a9ae7c6ccd96829522ac7bc8c14d5d9af3d55303b7b44f3",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-020895",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Settings/ApiSettingsController.php",
+          "sha256": "fb2f6524d79b4ea6348de894fa053ddcfe17e2a32b5acdac4ed7e7c2fa256068",
+          "loci": [
+            "destroyWebhook",
+            "index",
+            "revokeKey",
+            "storeKey",
+            "storeWebhook",
+            "testWebhook"
+          ]
+        },
+        {
+          "path": "resources/js/pages/settings/api.tsx",
+          "sha256": "8b7f11ef8c964e149c18eb2a0614213ba7dd5713562076dc5cd1728f2e97ee2d",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-016187",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Hr/CalendarController.php",
+          "sha256": "35ebbeccc4f783dc8adf5e5c12b0af0338576c0ca783c70d9d9cf07460fec6b4",
+          "loci": [
+            "feed",
+            "index"
+          ]
+        },
+        {
+          "path": "resources/js/pages/hr/calendar/index.tsx",
+          "sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-019977",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Hr/CalendarController.php",
+          "sha256": "35ebbeccc4f783dc8adf5e5c12b0af0338576c0ca783c70d9d9cf07460fec6b4",
+          "loci": [
+            "destroy",
+            "destroyAttachment",
+            "downloadAttachment",
+            "feed",
+            "index",
+            "rsvp",
+            "store",
+            "storeAttachment",
+            "update"
+          ]
+        },
+        {
+          "path": "resources/js/pages/hr/calendar/index.tsx",
+          "sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-015518",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/BankingController.php",
+          "sha256": "139ba5ebe2164775eb61a2b972ccb2a9f04ebcd6b7159e8a92daf209dd7592ee",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-017246",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/CombinedReportController.php",
+          "sha256": "060c786355d1a48756d327d44f749afda69252f1c977eb3ed9889207cbef447b",
+          "loci": [
+            "export"
+          ]
+        },
+        {
+          "path": "resources/js/pages/reports/combined.tsx",
+          "sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-017247",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/CombinedReportController.php",
+          "sha256": "060c786355d1a48756d327d44f749afda69252f1c977eb3ed9889207cbef447b",
+          "loci": [
+            "show"
+          ]
+        },
+        {
+          "path": "resources/js/pages/reports/combined.tsx",
+          "sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-017474",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Settings/AccessController.php",
+          "sha256": "b356453e97398a30561e6697c799754fc8d61a64a38ad490c6a5b38ad789c065",
+          "loci": [
+            "approve"
+          ]
+        },
+        {
+          "path": "resources/js/pages/settings/access.tsx",
+          "sha256": "8e14ea58194d48fe8e9307393768aba1a1c45634164f8afc00147f479d08d5fe",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-019505",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/BankingController.php",
+          "sha256": "139ba5ebe2164775eb61a2b972ccb2a9f04ebcd6b7159e8a92daf209dd7592ee",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-020718",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/CombinedReportController.php",
+          "sha256": "060c786355d1a48756d327d44f749afda69252f1c977eb3ed9889207cbef447b",
+          "loci": [
+            "export",
+            "show"
+          ]
+        },
+        {
+          "path": "resources/js/pages/reports/combined.tsx",
+          "sha256": "526aad6589d30862ce8ffc9f96b3b98923fa5a4ec2072400c89f78907cf3db74",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-020104",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Hr/ImportExportController.php",
+          "sha256": "5b92baac08285d4b441088324c00160366963c37281167c8d9e0e586692a6ae0",
+          "loci": [
+            "export",
+            "import",
+            "index",
+            "template"
+          ]
+        },
+        {
+          "path": "resources/js/pages/hr/import-export/index.tsx",
+          "sha256": "3f06240e2cfae6658a7b189fdac6b50080ceccb2ce6616a96870283257d89f58",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-015706",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/LedgerController.php",
+          "sha256": "4222fb123ad0e161691a6f9a7e36e94e79fe583497ce6aa720312927e39586d9",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-015794",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/TaxController.php",
+          "sha256": "74ce9056f00534fc2efccbc4316fa35698568e5baba4584b673cec87952b4b9a",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-019644",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/LedgerController.php",
+          "sha256": "4222fb123ad0e161691a6f9a7e36e94e79fe583497ce6aa720312927e39586d9",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-019708",
+      "sources": [
+        {
+          "path": "app/Domain/Finance/Http/Controllers/TaxController.php",
+          "sha256": "74ce9056f00534fc2efccbc4316fa35698568e5baba4584b673cec87952b4b9a",
+          "loci": [
+            "index"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-020879",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/Settings/AccessController.php",
+          "sha256": "b356453e97398a30561e6697c799754fc8d61a64a38ad490c6a5b38ad789c065",
+          "loci": [
+            "approve",
+            "destroyBoardMember",
+            "index",
+            "storeBoardMember",
+            "update"
+          ]
+        },
+        {
+          "path": "resources/js/pages/settings/access.tsx",
+          "sha256": "8e14ea58194d48fe8e9307393768aba1a1c45634164f8afc00147f479d08d5fe",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018637",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/IncidentController.php",
+          "sha256": "91b44b3ae853d6060263a7a15964bef853b770a55097d22406588854ad93a885",
+          "loci": [
+            "downloadAttachment",
+            "removeAttachment",
+            "show",
+            "store",
+            "update",
+            "updateAttachment",
+            "uploadAttachment"
+          ]
+        },
+        {
+          "path": "resources/js/pages/incidents/index.tsx",
+          "sha256": "20cbbaffa49118c393622758632ba6183f760296486df0fd458a38eb73f730ef",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    },
+    {
+      "visual_id": "VIS-018636",
+      "sources": [
+        {
+          "path": "app/Http/Controllers/IncidentController.php",
+          "sha256": "91b44b3ae853d6060263a7a15964bef853b770a55097d22406588854ad93a885",
+          "loci": [
+            "create",
+            "downloadAttachment",
+            "index",
+            "removeAttachment",
+            "show",
+            "store",
+            "update",
+            "updateAttachment",
+            "uploadAttachment"
+          ]
+        },
+        {
+          "path": "resources/js/pages/incidents/index.tsx",
+          "sha256": "20cbbaffa49118c393622758632ba6183f760296486df0fd458a38eb73f730ef",
+          "loci": [
+            "page component"
+          ]
+        }
+      ]
+    }
+  ],
+  "count_delta": {
+    "visual_assigned": 0,
+    "visual_unresolved": 0,
+    "material_assigned": 0,
+    "material_unresolved": 0,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "visual_assigned": 8168,
+    "visual_rows": 8753,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_rows": 4312,
+    "material_unresolved": 364,
+    "unique_assigned_targets": 774
+  }
+}

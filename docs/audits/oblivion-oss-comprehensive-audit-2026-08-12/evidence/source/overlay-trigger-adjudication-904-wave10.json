@@ -1,0 +1,342 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave10",
+  "generated_at": "2026-08-22T01:40:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Audited-baseline static source pairing only; current-main, runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "identity_rule": "Canonical identity is file:line:symbol under resources/js/pages/emar.",
+    "selection_sha256": "57d3d757d7ffc01a8564d4d374c476d5bf662bcd2d724da3cab372d508ff0f09",
+    "exclusion_count": 90,
+    "exclusion_sha256": "c3aa679aee30beb63b1eca2e9fdf36ef67ff429edd43ffacc385d8acb8793892",
+    "exclusion_reconstruction": [
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave1.json",
+        "count": 10,
+        "sha256": "59dad82256002c2e580d777347cb90722caac4cfbc3e38a53778d749278c5f9d"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave2.json",
+        "count": 10,
+        "sha256": "7e75dd94685373201a02684adf8bb2f0774434f75000f61a746e8f74f843a105"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave3.json",
+        "count": 10,
+        "sha256": "290fd900e6068e047970f60fd96862e6c169d6c6fd69dc0c77dcd7be4a6c2f42"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave4.json",
+        "count": 10,
+        "sha256": "effb162addc169f574859d312f4742a286d7787b975817141891df136ba2b966"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave5.json",
+        "count": 10,
+        "sha256": "0a5e481ac5e1c3f251f92a24c33b9288d441bf6a44d7c4e2a2d5e1177f35684f"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave6.json",
+        "count": 10,
+        "sha256": "d92fff5af8a8fb2fe9af6286c5f4438fa04c4087594c22a348f9751a534adb07"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave7.json",
+        "count": 10,
+        "sha256": "81c14f12e29f225856b3afdab6d7425b1d55b7e96760e2c045689f5b92f40c38"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave8.json",
+        "count": 10,
+        "sha256": "536468783e4225ef97b70ba2c4358b641fba9392a657151d69af96ae3c119c23"
+      },
+      {
+        "path": "evidence/source/overlay-trigger-adjudication-904-wave9.json",
+        "count": 10,
+        "sha256": "f4cab344b6b29225233603539a4ff5e2cf278339456f2a28a378165b57383520"
+      }
+    ],
+    "proof_jsonl_sha256": "86504ddb08410a9b0ba210d34363079959fc40da59df8645292be62022f64f42",
+    "source_map_jsonl_sha256": "3e5a04b31ae9b7ea43a41e2f5d597b2e1b839a7405ae7d7934e982a62fafc11c",
+    "serialization": "Packet-order objects, sorted JSON keys, compact separators, UTF-8/no BOM, LF join without terminal LF.",
+    "independent_review_verdict": "GO_10_exact_static_pairings_zero_runtime_credit"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 459,
+      "symbol": "AddMedicationDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "add triggers L239,L375",
+      "render_open_close_locus": "conditional render/open/close L459",
+      "static_chain": "modal state -> setModal add trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 460,
+      "symbol": "ImportCsvDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "import trigger L243",
+      "render_open_close_locus": "conditional render/open/close L460",
+      "static_chain": "modal state -> setModal import trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 461,
+      "symbol": "InteractionsDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "interactions trigger L355",
+      "render_open_close_locus": "conditional render/open/close L461",
+      "static_chain": "modal state -> setModal interactions trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 462,
+      "symbol": "EditMedicationDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "edit triggers L188,L470",
+      "render_open_close_locus": "conditional render/open/close L462",
+      "static_chain": "modal state -> setModal edit trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 463,
+      "symbol": "DiscontinueDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "discontinue triggers L202,L471",
+      "render_open_close_locus": "conditional render/open/close L463",
+      "static_chain": "modal state -> setModal discontinue trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 464,
+      "symbol": "RejectOrderDialog",
+      "prior_classification": "controlled_without_resolved_activator",
+      "prior_resolution": "unresolved",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "reject triggers L192,L472",
+      "render_open_close_locus": "conditional render/open/close L464",
+      "static_chain": "modal state -> setModal reject trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Medications.tsx",
+      "line": 466,
+      "symbol": "MedicationDetailDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L22-L27; modal/setModal L109",
+      "trigger_loci": "detail triggers L187,L400,L404; nested transitions L470-L472",
+      "render_open_close_locus": "guarded render/open/close L465-L474",
+      "static_chain": "modal state -> setModal detail trigger -> guarded rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Prescriptions.tsx",
+      "line": 549,
+      "symbol": "NewOrderDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L24-L28; modal/setModal L115",
+      "trigger_loci": "new-order trigger L270",
+      "render_open_close_locus": "conditional render/open/close L549",
+      "static_chain": "modal state -> setModal order trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Prescriptions.tsx",
+      "line": 550,
+      "symbol": "CovertDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L24-L28; modal/setModal L115",
+      "trigger_loci": "covert triggers L274,L501",
+      "render_open_close_locus": "conditional render/open/close L550",
+      "static_chain": "modal state -> setModal covert trigger -> conditional rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    },
+    {
+      "file": "resources/js/pages/emar/Prescriptions.tsx",
+      "line": 552,
+      "symbol": "OrderDetailDialog",
+      "prior_classification": "internal_state_trigger_candidate",
+      "prior_resolution": "source_inferred_not_exactly_paired",
+      "state_identifier": "modal",
+      "setter_identifier": "setModal",
+      "state_loci": "Modal union L24-L28; modal/setModal L115; openDetail L190",
+      "trigger_loci": "detail triggers L203,L369,L455,L478,L532",
+      "render_open_close_locus": "guarded render/open/close L551-L560",
+      "static_chain": "modal state -> openDetail/setModal trigger -> guarded rendered dialog -> close",
+      "verdict": "GO_EXACT_STATIC_TRIGGER_PAIRING",
+      "runtime_credit": 0
+    }
+  ],
+  "source_map": [
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:459:AddMedicationDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "add triggers L239,L375",
+        "conditional render/open/close L459"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:460:ImportCsvDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "import trigger L243",
+        "conditional render/open/close L460"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:461:InteractionsDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "interactions trigger L355",
+        "conditional render/open/close L461"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:462:EditMedicationDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "edit triggers L188,L470",
+        "conditional render/open/close L462"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:463:DiscontinueDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "discontinue triggers L202,L471",
+        "conditional render/open/close L463"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:464:RejectOrderDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "reject triggers L192,L472",
+        "conditional render/open/close L464"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Medications.tsx:466:MedicationDetailDialog",
+      "source_path": "resources/js/pages/emar/Medications.tsx",
+      "source_sha256": "ed19e615224a43e8f821e0f6f583a72451c25dbf76be6358439f2b1e968fbe8f",
+      "loci": [
+        "Modal union L22-L27; modal/setModal L109",
+        "detail triggers L187,L400,L404; nested transitions L470-L472",
+        "guarded render/open/close L465-L474"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Prescriptions.tsx:549:NewOrderDialog",
+      "source_path": "resources/js/pages/emar/Prescriptions.tsx",
+      "source_sha256": "97180849f60571e40881b777724c749bf7ea6d11a9366057750a6c0cd976e7d1",
+      "loci": [
+        "Modal union L24-L28; modal/setModal L115",
+        "new-order trigger L270",
+        "conditional render/open/close L549"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Prescriptions.tsx:550:CovertDialog",
+      "source_path": "resources/js/pages/emar/Prescriptions.tsx",
+      "source_sha256": "97180849f60571e40881b777724c749bf7ea6d11a9366057750a6c0cd976e7d1",
+      "loci": [
+        "Modal union L24-L28; modal/setModal L115",
+        "covert triggers L274,L501",
+        "conditional render/open/close L550"
+      ]
+    },
+    {
+      "identity": "resources/js/pages/emar/Prescriptions.tsx:552:OrderDetailDialog",
+      "source_path": "resources/js/pages/emar/Prescriptions.tsx",
+      "source_sha256": "97180849f60571e40881b777724c749bf7ea6d11a9366057750a6c0cd976e7d1",
+      "loci": [
+        "Modal union L24-L28; modal/setModal L115; openDetail L190",
+        "detail triggers L203,L369,L455,L478,L532",
+        "guarded render/open/close L551-L560"
+      ]
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -5,
+    "unresolved_or_blocked": -5,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -5,
+    "controlled_without_resolved_activator": -5,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 253,
+    "source_inferred_not_exactly_paired": 144,
+    "unresolved_or_blocked": 262,
+    "same_scope_state_handler": 234,
+    "internal_state_trigger_candidate": 144,
+    "controlled_without_resolved_activator": 245,
+    "generic_unresolved": 260,
+    "blocked_parent_prop_not_present_at_callsite": 2,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 242,
+    "primitive_unresolved": 235
+  }
+}

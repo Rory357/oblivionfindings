@@ -1,0 +1,734 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave13",
+  "generated_at": "2026-08-14T14:31:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Thirteenth bounded target-specific wave: 12 current unique completion-unproved targets; eleven material direct slices and one bounded NCM decision.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts."
+  },
+  "source_slice_reuse_disclosure": [
+    "No target-key reuse. Sales Invoice ranges are disjoint by target; prior quotation and File waves used different commits or ranges; the risk NCM reuses OpenProject only as bounded rejection evidence."
+  ],
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "f0f18e8c0ce902b4a9ea625aa911ce3dcdb50c1bca6a75391a04926cb34b67bf"
+    }
+  },
+  "repository_snapshots": {
+    "ERP": {
+      "repo": "ERPNext",
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+      "spdx": "GPL-3.0",
+      "license_locus": "license.txt:L1-L17",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only."
+    },
+    "FRAPPE": {
+      "repo": "Frappe",
+      "official_repository_url": "https://github.com/frappe/frappe",
+      "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+      "spdx": "MIT",
+      "license_locus": "LICENSE:L1-L20",
+      "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only."
+    },
+    "OPENPROJECT": {
+      "repo": "OpenProject",
+      "official_repository_url": "https://github.com/opf/openproject",
+      "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "publiccode.yml:L55",
+      "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only."
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 11,
+    "documented_ncm_direct_recommended": 1,
+    "completion_credit_recommended": 12
+  },
+  "selected_keys_sha256": "47106ee802d46e1521b35b4d723a856c5ac28be07d5bf576bc3b20dcf05726ad",
+  "selected_lineage_tuple_sha256": "04db739d77600492a094ef66a3b0eace667af096ed39f9d6214c125dc69d96a3",
+  "review_decision_sha256": "2da53d4f380963b6cb14e071ea34dc25d3d2b65000f93d616d9783bb7165195d",
+  "review_decision_reference_sha256": "5c2efcffd7660c9ddc2485f03dcf33c8b3e9fc30a4dd96769be4a32a3035e613",
+  "evaluations": [
+    {
+      "working_key": "CAP-FIN-BILLING-OVERVIEW",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Represent customer, billing date, totals, outstanding amount and invoice state.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FIN-BILLING"
+        ],
+        "route_ids": [
+          "ROUTE-0498"
+        ],
+        "page_ids": [
+          "PAGE-0127"
+        ],
+        "backend_anchors": [
+          "app/Domain/Finance/Http/Controllers/BillingController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FINANCE"
+      },
+      "benchmark": {
+        "repo": "ERPNext",
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt:L1-L17",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "erpnext/accounts/doctype/sales_invoice/sales_invoice.json",
+            "lines": "L257-L281,L368-L381,L1128-L1148,L1197-L1209,L1260-L1271,L1666-L1677",
+            "sha256": "55200df93a0a4678159a5c75da257305e8e673ebd72a1e9bb2655e031e5c8997",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/be176617cce09ef74a1be6e2f917586aa5f262ef/erpnext/accounts/doctype/sales_invoice/sales_invoice.json"
+          }
+        ],
+        "proven_slice": "ERPNext's Sales Invoice schema materially defines those billing-overview fields.",
+        "parity_limits": "No listing/query authorization, line-item, Site/client, GST or ledger parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@be176617cce09ef74a1be6e2f917586aa5f262ef :: erpnext/accounts/doctype/sales_invoice/sales_invoice.json :: L257-L281,L368-L381,L1128-L1148,L1197-L1209,L1260-L1271,L1666-L1677 :: sha256=55200df93a0a4678159a5c75da257305e8e673ebd72a1e9bb2655e031e5c8997"
+      ]
+    },
+    {
+      "working_key": "CAP-FIN-BILLING-ENTRIES",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist required billing entries and govern selected billing/cancel transitions.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FIN-BILLING"
+        ],
+        "route_ids": [
+          "ROUTE-0499"
+        ],
+        "page_ids": [
+          "PAGE-0126"
+        ],
+        "backend_anchors": [
+          "app/Domain/Finance/Http/Controllers/BillingController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FINANCE"
+      },
+      "benchmark": {
+        "repo": "ERPNext",
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt:L1-L17",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "erpnext/accounts/doctype/sales_invoice/sales_invoice.json",
+            "lines": "L723-L732",
+            "sha256": "55200df93a0a4678159a5c75da257305e8e673ebd72a1e9bb2655e031e5c8997",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/be176617cce09ef74a1be6e2f917586aa5f262ef/erpnext/accounts/doctype/sales_invoice/sales_invoice.json"
+          },
+          {
+            "path": "erpnext/accounts/doctype/sales_invoice/sales_invoice.py",
+            "lines": "L239-L266,L344-L350,L469-L482,L598-L604",
+            "sha256": "2a67cd28b62389cd321b4f6b9f46f887e4c1b07014d8956a248a4229427aa237",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/be176617cce09ef74a1be6e2f917586aa5f262ef/erpnext/accounts/doctype/sales_invoice/sales_invoice.py"
+          }
+        ],
+        "proven_slice": "ERPNext defines a required item table and material invoice validation/cancellation transitions.",
+        "parity_limits": "No agreement entitlement, pricing authority, corrections, audit or Site policy.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@be176617cce09ef74a1be6e2f917586aa5f262ef :: erpnext/accounts/doctype/sales_invoice/sales_invoice.json :: L723-L732 :: sha256=55200df93a0a4678159a5c75da257305e8e673ebd72a1e9bb2655e031e5c8997",
+        "https://github.com/frappe/erpnext@be176617cce09ef74a1be6e2f917586aa5f262ef :: erpnext/accounts/doctype/sales_invoice/sales_invoice.py :: L239-L266,L344-L350,L469-L482,L598-L604 :: sha256=2a67cd28b62389cd321b4f6b9f46f887e4c1b07014d8956a248a4229427aa237"
+      ]
+    },
+    {
+      "working_key": "CAP-FIN-QUOTE-INVOICE-CONVERSION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Convert a submitted quotation to an invoice/customer transaction while validating and mapping customer/items.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FIN-QUOTE"
+        ],
+        "route_ids": [
+          "ROUTE-0667"
+        ],
+        "page_ids": [
+          "PAGE-0186"
+        ],
+        "backend_anchors": [
+          "app/Domain/Finance/Http/Controllers/QuoteController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FINANCE"
+      },
+      "benchmark": {
+        "repo": "ERPNext",
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt:L1-L17",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "erpnext/selling/doctype/quotation/quotation.py",
+            "lines": "L516-L564,L567-L598",
+            "sha256": "1dbd799c08bb98d7140d929c75351ebf33cfded1e9a4eea3596fc6037a2a596c",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/be176617cce09ef74a1be6e2f917586aa5f262ef/erpnext/selling/doctype/quotation/quotation.py"
+          }
+        ],
+        "proven_slice": "ERPNext validates submitted quotations and maps customer and item data into the target document.",
+        "parity_limits": "No idempotency, approval, GST, agreement conversion or scope parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@be176617cce09ef74a1be6e2f917586aa5f262ef :: erpnext/selling/doctype/quotation/quotation.py :: L516-L564,L567-L598 :: sha256=1dbd799c08bb98d7140d929c75351ebf33cfded1e9a4eea3596fc6037a2a596c"
+      ]
+    },
+    {
+      "working_key": "CAP-FIN-BANK-FEED-LOGS",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record queued bank import, rollback/error state, aggregate outcome and permission-gated detailed logs.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FIN-BANK-FEED"
+        ],
+        "route_ids": [
+          "ROUTE-0484"
+        ],
+        "page_ids": [
+          "PAGE-0121"
+        ],
+        "backend_anchors": [
+          "app/Domain/Finance/Http/Controllers/BankFeedController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FINANCE"
+      },
+      "benchmark": {
+        "repo": "ERPNext",
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt:L1-L17",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "erpnext/accounts/doctype/bank_statement_import/bank_statement_import.py",
+            "lines": "L71-L99,L142-L171,L251-L288",
+            "sha256": "3bee457b253bd54cf5fc080f3470f13762ef04d576753e687e41dc6d1dde0005",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/be176617cce09ef74a1be6e2f917586aa5f262ef/erpnext/accounts/doctype/bank_statement_import/bank_statement_import.py"
+          }
+        ],
+        "proven_slice": "ERPNext provides queued import processing, failure state, aggregate outcomes and explicitly permission-gated detailed-log retrieval.",
+        "parity_limits": "The aggregate-status method itself has no explicit cited permission check; no provider, credential, reconciliation, retention or Site parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@be176617cce09ef74a1be6e2f917586aa5f262ef :: erpnext/accounts/doctype/bank_statement_import/bank_statement_import.py :: L71-L99,L142-L171,L251-L288 :: sha256=3bee457b253bd54cf5fc080f3470f13762ef04d576753e687e41dc6d1dde0005"
+      ]
+    },
+    {
+      "working_key": "CAP-GOV-AUDIT-LOG-REVIEW",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Review bounded revisions with field and child-row differences.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "PRIV-GOVERNANCE-AUDIT-LOG"
+        ],
+        "route_ids": [
+          "ROUTE-0866"
+        ],
+        "page_ids": [
+          "PAGE-0267"
+        ],
+        "backend_anchors": [
+          "app/Domain/Governance/Http/Controllers/GovernanceAuditLogController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "GOVERNANCE"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/core/doctype/audit_trail/audit_trail.py",
+            "lines": "L26-L105",
+            "sha256": "45787bdad3586f40946313f1552398bfcdb8b8e821a064294a33643adbccbf51",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/core/doctype/audit_trail/audit_trail.py"
+          }
+        ],
+        "proven_slice": "Frappe materially compares document revisions and exposes field and row differences.",
+        "parity_limits": "No complete immutable log, privacy filtering, taxonomy or global coverage.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/core/doctype/audit_trail/audit_trail.py :: L26-L105 :: sha256=45787bdad3586f40946313f1552398bfcdb8b8e821a064294a33643adbccbf51"
+      ]
+    },
+    {
+      "working_key": "CAP-GOV-AUDIT-LOG-EXPORT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Export permitted audit data with an access record and explicit export authority.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "PRIV-GOVERNANCE-AUDIT-LOG"
+        ],
+        "route_ids": [
+          "ROUTE-0867"
+        ],
+        "page_ids": [
+          "PAGE-0267"
+        ],
+        "backend_anchors": [
+          "app/Domain/Governance/Http/Controllers/GovernanceAuditLogController.php"
+        ],
+        "id_status": "exact",
+        "class": "D",
+        "canonical_module": "GOVERNANCE"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/core/doctype/data_export/exporter.py",
+            "lines": "L33-L74,L362-L398,L453-L466",
+            "sha256": "765f6b9a786aa2aa034b89244fccf10c2bdf0d8dfffe563ffc409aca3fb488f2",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/core/doctype/data_export/exporter.py"
+          }
+        ],
+        "proven_slice": "Frappe logs access, checks export permission and retrieves permitted data for export.",
+        "parity_limits": "No export approval, redaction, encryption, retention or evidence-pack parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/core/doctype/data_export/exporter.py :: L33-L74,L362-L398,L453-L466 :: sha256=765f6b9a786aa2aa034b89244fccf10c2bdf0d8dfffe563ffc409aca3fb488f2"
+      ]
+    },
+    {
+      "working_key": "CAP-GOV-DOCUMENT-DOWNLOAD",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorize a protected document download through its File and governing parent record.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "GOV-GOVERNANCE-DOCUMENT"
+        ],
+        "route_ids": [
+          "ROUTE-0919"
+        ],
+        "page_ids": [
+          "PAGE-0288"
+        ],
+        "backend_anchors": [
+          "app/Domain/Governance/Http/Controllers/GovernanceDocumentController.php"
+        ],
+        "id_status": "exact",
+        "class": "D",
+        "canonical_module": "GOVERNANCE"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/core/doctype/file/file.py",
+            "lines": "L818-L832,L875-L900,L908-L947",
+            "sha256": "ca58ee702ec7ce84471f70eeed38c36b9e1af7b24cb11fce7c73b9976f461166",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/core/doctype/file/file.py"
+          },
+          {
+            "path": "frappe/core/api/file.py",
+            "lines": "L127-L132",
+            "sha256": "f7a8170256e6d2a872d633a90589ba5d62248774a235d303f3b93c361aa5f409",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/core/api/file.py"
+          }
+        ],
+        "proven_slice": "Frappe materially provides generic File authorization and protected-parent permission delegation.",
+        "parity_limits": "No category/version approval, malware, watermarking, retention or Site policy.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/core/doctype/file/file.py :: L818-L832,L875-L900,L908-L947 :: sha256=ca58ee702ec7ce84471f70eeed38c36b9e1af7b24cb11fce7c73b9976f461166",
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/core/api/file.py :: L127-L132 :: sha256=f7a8170256e6d2a872d633a90589ba5d62248774a235d303f3b93c361aa5f409"
+      ]
+    },
+    {
+      "working_key": "CAP-COMP-CALENDAR",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Schedule and retrieve permission-aware compliance calendar events in a bounded date window.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "PRIV-COMPLIANCE"
+        ],
+        "route_ids": [
+          "ROUTE-0908"
+        ],
+        "page_ids": [
+          "PAGE-0280"
+        ],
+        "backend_anchors": [
+          "app/Domain/Governance/Http/Controllers/ComplianceController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "GOVERNANCE"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/desk/doctype/event/event.py",
+            "lines": "L64-L106,L236-L255,L280-L297,L363-L413",
+            "sha256": "1f68c322219896d1a8f8a4015264a4a4a95d4fe93c6b4a54f512330dc4c7ca0d",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/desk/doctype/event/event.py"
+          }
+        ],
+        "proven_slice": "Frappe materially implements permission-aware general event scheduling and date-window retrieval.",
+        "parity_limits": "No compliance obligation ownership, evidence, escalation or due-state parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/desk/doctype/event/event.py :: L64-L106,L236-L255,L280-L297,L363-L413 :: sha256=1f68c322219896d1a8f8a4015264a4a4a95d4fe93c6b4a54f512330dc4c7ca0d"
+      ]
+    },
+    {
+      "working_key": "CAP-SET-EMAIL-DELIVERY-CONFIG",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Configure and validate inbound/outbound email delivery with enabled/default resolution.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "SET-EMAIL-SETTINGS"
+        ],
+        "route_ids": [
+          "ROUTE-2650",
+          "ROUTE-2651",
+          "ROUTE-2652"
+        ],
+        "page_ids": [
+          "PAGE-0844"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Settings/EmailSettingsController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/email/doctype/email_account/email_account.py",
+            "lines": "L126-L190,L221-L235,L383-L417,L480-L511",
+            "sha256": "11d8eb503931b583c12bee74490c30359d55aca202c7e13de27eb9ef89242434",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/email/doctype/email_account/email_account.py"
+          },
+          {
+            "path": "frappe/email/doctype/email_account/email_account.json",
+            "lines": "L81-L115,L299-L391",
+            "sha256": "4fee94cfc1714fb17c4189644b5db65aff406208dc5e3c10efdbb150b799398f",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/email/doctype/email_account/email_account.json"
+          }
+        ],
+        "proven_slice": "Frappe materially defines SMTP/IMAP configuration, validation and enabled-default selection.",
+        "parity_limits": "No secret-store, identity lifecycle, retention or product RBAC parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/email/doctype/email_account/email_account.py :: L126-L190,L221-L235,L383-L417,L480-L511 :: sha256=11d8eb503931b583c12bee74490c30359d55aca202c7e13de27eb9ef89242434",
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/email/doctype/email_account/email_account.json :: L81-L115,L299-L391 :: sha256=4fee94cfc1714fb17c4189644b5db65aff406208dc5e3c10efdbb150b799398f"
+      ]
+    },
+    {
+      "working_key": "CAP-SET-NOTIFICATION-TEMPLATE-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Govern notification definition validation, rendering, recipients, channel dispatch and error recording.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "SET-NOTIFICATION-TEMPLATE"
+        ],
+        "route_ids": [
+          "ROUTE-2693",
+          "ROUTE-2694",
+          "ROUTE-2695",
+          "ROUTE-2696",
+          "ROUTE-2697"
+        ],
+        "page_ids": [
+          "PAGE-0859"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Settings/NotificationTemplateController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/email/doctype/notification/notification.py",
+            "lines": "L78-L153,L190-L246,L298-L354",
+            "sha256": "9b0b2336fa429dec7633c6d918c18a7c92aa6235776b45ced33236217b2e10ef",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/email/doctype/notification/notification.py"
+          },
+          {
+            "path": "frappe/email/doctype/notification/notification.json",
+            "lines": "L56-L228,L276-L306,L350-L354",
+            "sha256": "b203189aba8205447abab0424c0554249490a66e86cfc3f70ae52e035f28b34a",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/email/doctype/notification/notification.json"
+          }
+        ],
+        "proven_slice": "Frappe materially implements those notification-template behaviors.",
+        "parity_limits": "No approval/versioning, recovery, consent or Site-boundary parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/email/doctype/notification/notification.py :: L78-L153,L190-L246,L298-L354 :: sha256=9b0b2336fa429dec7633c6d918c18a7c92aa6235776b45ced33236217b2e10ef",
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/email/doctype/notification/notification.json :: L56-L228,L276-L306,L350-L354 :: sha256=b203189aba8205447abab0424c0554249490a66e86cfc3f70ae52e035f28b34a"
+      ]
+    },
+    {
+      "working_key": "CAP-SET-CALENDAR-PROVIDER-CONNECTION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Connect a calendar provider through OAuth, encrypted refresh-token use and guarded pull/push.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "SET-CALENDAR-SYNC-OAUTH"
+        ],
+        "route_ids": [
+          "ROUTE-2633",
+          "ROUTE-2634",
+          "ROUTE-2635"
+        ],
+        "page_ids": [
+          "PAGE-0842"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Settings/CalendarSyncOAuthController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS"
+      },
+      "benchmark": {
+        "repo": "Frappe",
+        "official_repository_url": "https://github.com/frappe/frappe",
+        "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+        "spdx": "MIT",
+        "license_locus": "LICENSE:L1-L20",
+        "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "frappe/integrations/doctype/google_calendar/google_calendar.py",
+            "lines": "L103-L181,L207-L237,L274-L377,L442-L498",
+            "sha256": "f65e55ed527b870fb92e5a745033b45f0692fead8651a3ad7948aad24afab37d",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/integrations/doctype/google_calendar/google_calendar.py"
+          },
+          {
+            "path": "frappe/integrations/doctype/google_calendar/google_calendar.json",
+            "lines": "L47-L126",
+            "sha256": "07091160b987fc7fe5f2b2f9bf939a49f8c48e21839d6ed19ca9fb769629424d",
+            "primary_source_url": "https://github.com/frappe/frappe/blob/9b8d265b27a1dfb11c7aef21a533a127e14a0a5a/frappe/integrations/doctype/google_calendar/google_calendar.json"
+          }
+        ],
+        "proven_slice": "Frappe materially implements Google OAuth, encrypted refresh-token use and guarded calendar synchronization.",
+        "parity_limits": "No Microsoft provider, revocation, Site mapping, conflict resolution or retention parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/integrations/doctype/google_calendar/google_calendar.py :: L103-L181,L207-L237,L274-L377,L442-L498 :: sha256=f65e55ed527b870fb92e5a745033b45f0692fead8651a3ad7948aad24afab37d",
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/integrations/doctype/google_calendar/google_calendar.json :: L47-L126 :: sha256=07091160b987fc7fe5f2b2f9bf939a49f8c48e21839d6ed19ca9fb769629424d"
+      ]
+    },
+    {
+      "working_key": "CAP-GOV-RISK-REGISTER-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Govern a risk register with risk scoring, treatment/evidence, appetite acceptance, closure rationale and board controls.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "GOV-RISK-REGISTER"
+        ],
+        "route_ids": [
+          "ROUTE-1001",
+          "ROUTE-1002",
+          "ROUTE-1003",
+          "ROUTE-1004",
+          "ROUTE-1007",
+          "ROUTE-1008",
+          "ROUTE-1014"
+        ],
+        "page_ids": [
+          "PAGE-0321",
+          "PAGE-0322",
+          "PAGE-0324",
+          "PAGE-0325"
+        ],
+        "backend_anchors": [
+          "app/Domain/Governance/Http/Controllers/RiskRegisterController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "GOVERNANCE"
+      },
+      "evidence_loci": [
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/models/work_package.rb :: L57-L110,L274-L313 :: sha256=fe6207cbd7edc33fdcbfce9e7da247c6bcf20bbbb0f7e33c8d4150abfb7aefa7",
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/contracts/work_packages/update_contract.rb :: L31-L90 :: sha256=8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467",
+        "https://github.com/frappe/frappe@9b8d265b27a1dfb11c7aef21a533a127e14a0a5a :: frappe/model/workflow.py :: L34-L119 :: sha256=f521f649e42287fb06ad84d34c9c4a1f97a148903cf6e1961bd686fb59183bc5"
+      ],
+      "rejected_repositories": [
+        {
+          "repo": "OpenProject",
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+          "spdx": "GPL-3.0-or-later",
+          "license_locus": "publiccode.yml:L55",
+          "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+          "source_loci": [
+            "app/models/work_package.rb:L57-L110,L274-L313"
+          ],
+          "exact_loci": [
+            {
+              "path": "app/models/work_package.rb",
+              "lines": "L57-L110,L274-L313",
+              "sha256": "fe6207cbd7edc33fdcbfce9e7da247c6bcf20bbbb0f7e33c8d4150abfb7aefa7"
+            }
+          ],
+          "reason": "Generic work items do not establish the material risk-register lifecycle."
+        },
+        {
+          "repo": "OpenProject",
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+          "spdx": "GPL-3.0-or-later",
+          "license_locus": "publiccode.yml:L55",
+          "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+          "source_loci": [
+            "app/contracts/work_packages/update_contract.rb:L31-L90"
+          ],
+          "exact_loci": [
+            {
+              "path": "app/contracts/work_packages/update_contract.rb",
+              "lines": "L31-L90",
+              "sha256": "8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467"
+            }
+          ],
+          "reason": "Generic update validation does not prove risk scoring, treatment or acceptance."
+        },
+        {
+          "repo": "Frappe",
+          "official_repository_url": "https://github.com/frappe/frappe",
+          "commit_sha": "9b8d265b27a1dfb11c7aef21a533a127e14a0a5a",
+          "spdx": "MIT",
+          "license_locus": "LICENSE:L1-L20",
+          "license_sha256": "bc6001a54ffcc4ab520424d7dbb85b293578efcdcb7d8f8055e00dddf942e5d7",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL source is behavioural evidence only.",
+          "source_loci": [
+            "frappe/model/workflow.py:L34-L119"
+          ],
+          "exact_loci": [
+            {
+              "path": "frappe/model/workflow.py",
+              "lines": "L34-L119",
+              "sha256": "f521f649e42287fb06ad84d34c9c4a1f97a148903cf6e1961bd686fb59183bc5"
+            }
+          ],
+          "reason": "Generic workflow transitions do not establish risk governance semantics."
+        }
+      ],
+      "bounded_ncm_reason": "The inspected generic work-item and workflow sources do not establish the exact risk-register completion boundary. This conclusion is bounded to the inspected corpus."
+    }
+  ],
+  "projected_delta": {
+    "verified_benchmark_direct": 11,
+    "documented_ncm_direct": 1,
+    "eligible_total": 12,
+    "completion_unproved": -12
+  }
+}

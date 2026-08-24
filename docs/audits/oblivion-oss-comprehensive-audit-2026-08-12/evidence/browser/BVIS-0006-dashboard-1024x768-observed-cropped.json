@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BVIS-0006",
+  "file": "BVIS-0006-dashboard-1024x768-observed-cropped.png",
+  "route_name": "dashboard",
+  "route_path": "dashboard",
+  "viewport": "1024x768",
+  "classification": "Observed",
+  "metrics": {
+    "clientWidth": 1007,
+    "height": 768,
+    "scrollWidth": 1008,
+    "width": 1024
+  },
+  "crop": {
+    "x": 260,
+    "y": 0,
+    "width": 764,
+    "height": 450
+  },
+  "notes": "One-pixel document overflow signal measured; cropped to work surface; no personal names or record identifiers visible.",
+  "role": "Demo Administrator",
+  "siteScope": "not visibly selected",
+  "environmentEvidence": "owner-confirmed test/development; no visible UI build marker",
+  "auditedCommit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "deployedCommit": "not independently established"
+}

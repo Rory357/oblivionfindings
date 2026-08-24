@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-health-safety-procedure-approval-generation-summary",
+  "generated_at": "2026-08-22T00:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "HS-PROCEDURE-APPROVAL-ASSURANCE-01",
+  "status": "generated_open_p1_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "dcda86ed2a6a4328ddc2ba23780641afd2daafe860d310c3c89218ffa8a07458",
+      "bytes": 667365
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "379b672e77be24ac4d1b8829099b41c5e6f790e58604d8b1218f4aaf20a2bef0",
+      "bytes": 11779296
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "f0354838685d1e59a528979a273a1ffb1ec4bccba984d87e5939d63085146067",
+      "bytes": 1353829
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "d198541f594051b93a4ccb6802498a83bac9f3aecd940a10b87d8770837933ff",
+      "bytes": 251609
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "37ac7bb9f197c4aa98cb840bb709718d7a969e489ac72fbf89bd47f183891029",
+      "bytes": 12654
+    },
+    "pointer": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "0e9e9ef42b074b540723e09b049369fcd85387aaa8fc903c717c80c5916a5213",
+      "bytes": 15655
+    }
+  },
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "12ad928897c5f7e1f45c61c20816004d630f00636418aeaf6fb174fe6d7794c2",
+      "bytes": 1353829
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "044cd531f04f14833c9c6c190193e1f48c8d818155d7d309db3165af9b729dcd",
+      "bytes": 251609
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "12cbda8b0b113a32974b13b30dbc6b229c20feaf5696c180c19808a2da8b958e",
+      "bytes": 12654
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-health-safety-procedure-approval-904-2026-08-21.json",
+      "sha256": "098d533852fc89ba96f23dcd5d83d4036a9e869acb0c6756a08e5d18a3c53bf7",
+      "bytes": 6035
+    }
+  },
+  "counts": {
+    "findings": {
+      "total": 98,
+      "P0": 21,
+      "P1": 65,
+      "P2": 12
+    },
+    "links": {
+      "total": 275,
+      "literal": 176,
+      "literal_targets": 144,
+      "p0_p1_literal": 86
+    },
+    "official_map": {
+      "denominator": 56,
+      "reviewed": 56,
+      "owner_boundary_rows": 30
+    },
+    "benchmark": {
+      "eligible": 484,
+      "unproved": 420
+    }
+  },
+  "credit_boundary": {
+    "runtime": 0,
+    "browser": 0,
+    "remediation": 0,
+    "completion": 0
+  },
+  "idempotence": "A second run validates current outputs and pointer entries and performs no write."
+}

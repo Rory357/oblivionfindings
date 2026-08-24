@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "artifact": "finance-api-feature-id-adjudication",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_split_and_name_adjudication",
+  "audit_boundary": "Read-only static source adjudication. No application code, configuration, routes, database data, tests, builds, browser state, deployments, commits or pushes were changed or executed.",
+  "source_family": "CLI-FINANCIAL-INSIGHTS-API",
+  "source_stable_predecessor": "CLI-FINANCIAL-INSIGHTS-API",
+  "canonical_module": "FINANCE",
+  "naming_rule": "The five CAP-FIN names are audit-assigned stable FEATURE-IDs after target-specific semantic adjudication. Their split identity is source-supported, but the spellings are not claimed as historical source IDs.",
+  "decisions": [
+    {
+      "canonical_id": "CAP-FIN-API-CLIENT-FINANCIAL-SUMMARY-LEDGER",
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "route_ids": ["ROUTE-0456", "ROUTE-0457"],
+      "page_ids": [],
+      "actions": ["clientFinancialSummary", "clientLedger"],
+      "actor_and_scope": "Authenticated finance.dashboard viewer; one selected client and requested period.",
+      "outcome": "Client financial position plus chronological drill-down ledger, optionally with running balance.",
+      "boundary": "The summary composes the same ledger and adds cost/funding aggregates; ledger is its drill-down. Same actor, client scope, period and review job justify one D capability.",
+      "source_loci": ["routes/finance.php:720-742", "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:68-95", "app/Domain/Finance/Services/ClientFinancialSummaryService.php:10-82", "app/Domain/Finance/Services/ClientLedgerService.php:11-97"]
+    },
+    {
+      "canonical_id": "CAP-FIN-API-FINANCIAL-INSIGHTS",
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "route_ids": ["ROUTE-0459"],
+      "page_ids": [],
+      "actions": ["insights"],
+      "actor_and_scope": "Authenticated finance.dashboard viewer; organisation financial signal scope.",
+      "outcome": "Severity-ranked actionable cost, funding, budget, forecast and staffing insights with generation time.",
+      "boundary": "Distinct generated signal/exception outcome rather than a period KPI dataset or object-specific financial summary.",
+      "source_loci": ["routes/finance.php:720-742", "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:146-165", "app/Domain/Finance/Services/FinancialInsightsService.php:12-61"]
+    },
+    {
+      "canonical_id": "CAP-FIN-API-FINANCIAL-KPIS",
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "route_ids": ["ROUTE-0460", "ROUTE-0461", "ROUTE-0462"],
+      "page_ids": [],
+      "actions": ["kpis", "clientKpis", "siteKpis"],
+      "actor_and_scope": "Authenticated finance.dashboard viewer; same organisation and requested period.",
+      "outcome": "Organisation KPI dataset and its client/site projections.",
+      "boundary": "getAll composes the same client and site KPI methods plus staffing. The three routes are aggregate/scoped projections of one dataset family, not separate state or handoff outcomes.",
+      "source_loci": ["routes/finance.php:720-742", "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:97-144", "app/Domain/Finance/Services/FinancialKPIService.php"]
+    },
+    {
+      "canonical_id": "CAP-FIN-API-SITE-FINANCIAL-SUMMARY",
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "route_ids": ["ROUTE-0464"],
+      "page_ids": [],
+      "actions": ["siteFinancialSummary"],
+      "actor_and_scope": "Authenticated finance.dashboard viewer; one selected site and requested period.",
+      "outcome": "Full financial dashboard dataset for a single site.",
+      "boundary": "The authoritative site object and single-site decision context differ from multi-site comparison and organisation KPI datasets.",
+      "source_loci": ["routes/finance.php:720-742", "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:31-47", "app/Domain/Finance/Services/SiteFinancialDashboardService.php:25-85"]
+    },
+    {
+      "canonical_id": "CAP-FIN-API-SITES-FINANCIAL-OVERVIEW",
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "route_ids": ["ROUTE-0468"],
+      "page_ids": [],
+      "actions": ["sitesOverview"],
+      "actor_and_scope": "Authenticated finance.dashboard viewer; multi-site comparison for the current organisation and requested period.",
+      "outcome": "Ranked multi-site financial summaries.",
+      "boundary": "Multi-site comparison is a separate analysis job from one-site detail, despite sharing the dashboard service.",
+      "source_loci": ["routes/finance.php:720-742", "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:49-62", "app/Domain/Finance/Services/SiteFinancialDashboardService.php:88-118"]
+    }
+  ],
+  "split_integrity": {
+    "accepted_targets": 5,
+    "class_counts": {"H": 0, "D": 5, "M": 0},
+    "route_count": 8,
+    "route_ids": ["ROUTE-0456", "ROUTE-0457", "ROUTE-0459", "ROUTE-0460", "ROUTE-0461", "ROUTE-0462", "ROUTE-0464", "ROUTE-0468"],
+    "route_residual": 0,
+    "page_count": 0,
+    "denominator_delta": 0
+  },
+  "security_evidence_gap": {
+    "status": "static_gap_requires_finding_and_runtime_direct_object_proof",
+    "evidence": [
+      "All eight routes use only permission:finance.dashboard at routes/finance.php:720-742.",
+      "FinancialInsightsApiController accepts raw integer site/client identifiers and does not call authorize or a site-access service.",
+      "ClientFinancialSummaryService uses Client::withTrashed()->findOrFail without caller/site scoping.",
+      "ClientLedgerService filters by supplied client_id but does not establish caller access.",
+      "SiteFinancialDashboardService uses Site::findOrFail for single-site detail; only the multi-site overview applies the supplied organisation filter.",
+      "No target-specific direct-object denial test was found for these eight endpoints in the static test inventory."
+    ],
+    "proof_boundary": "This proves an absent controller/service-level direct-object guard in the inspected path. It does not prove exploitability for every deployed role or that finance.dashboard is intended to be site-limited; representative-role runtime execution was not performed."
+  }
+}

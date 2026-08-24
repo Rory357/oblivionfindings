@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-operations-904-2026-08-21",
+  "generated_at": "2026-08-21T23:00:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "selection": {
+    "method": "Highest remaining unresolved linked-finding risk after excluding freshly reviewed eMAR, HR and Fleet modules.",
+    "selected_module": "OPERATIONS",
+    "selected_score": 130,
+    "next_scores": {
+      "CONTROL_ROOM": 121,
+      "RESPITE": 120
+    }
+  },
+  "module_counts": {
+    "targets": 76,
+    "H": 74,
+    "D": 2,
+    "M": 0,
+    "benchmark_decided": 38,
+    "benchmark_unproved": 38,
+    "linked_p0_p1_before_wave": 4,
+    "linked_p0_p1_after_wave": 5,
+    "runtime_unexecuted_human_targets": 74,
+    "primary_inventory_routes": 360,
+    "primary_inventory_pages": 142,
+    "test_inventory_rows": 66
+  },
+  "eight_pass": {
+    "P1": {
+      "reviewed": 76,
+      "denominator": 76,
+      "boundary": "Static identity, routes, owners and source call graph."
+    },
+    "P2": {
+      "executed": 0,
+      "denominator": 74,
+      "boundary": "Representative persisted human tasks unexecuted."
+    },
+    "P3": {
+      "decided": 38,
+      "denominator": 76,
+      "unproved": 38,
+      "boundary": "Benchmark/NCM evidence only; no local behavior credit."
+    },
+    "P4": {
+      "executed": 0,
+      "denominator": 74,
+      "boundary": "Happy/error/recovery/handoff/responsive/accessibility execution absent."
+    },
+    "P5": {
+      "static_reviewed": 76,
+      "denominator": 76,
+      "runtime_data_effects_verified": 0
+    },
+    "P6": {
+      "exact_source_finding_official_links": 1,
+      "denominator": 76,
+      "boundary": "Official propositions frame risk only."
+    },
+    "P7": {
+      "source_constraint_failure_links": 1,
+      "denominator": 76,
+      "tests_executed": 0
+    },
+    "P8": {
+      "static_identity_challenged": 76,
+      "denominator": 76,
+      "module_completion_credit": false
+    }
+  },
+  "new_finding": {
+    "id": "OPS-DASHBOARD-ACTIVITY-SITE-PRIVACY-01",
+    "priority": "P0",
+    "feature_ids": [
+      "OPS-DASHBOARD",
+      "OPS-ACTIVITY-FEED"
+    ],
+    "route_ids": [
+      "ROUTE-1897",
+      "ROUTE-1898"
+    ],
+    "page_ids": [
+      "PAGE-0651",
+      "PAGE-0564"
+    ],
+    "verdict": "independently_reviewed_new_nonduplicate_p0_static_only"
+  },
+  "source_chain": [
+    {
+      "path": "routes/operations.php",
+      "baseline_blob": "ba11f6dcad8fec04385b724a5c59278693280596",
+      "baseline_loci": "L84-L96",
+      "current_main_blob": "357afa5d5258d11e43696ae3061955c7d24f6604",
+      "current_main_loci": "L93-L96"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/DashboardController.php",
+      "baseline_blob": "23fd64512c510c621652b0815d72b24844803fb3",
+      "baseline_loci": "L17-L120,L151-L205,L238-L304,L340-L451,L481-L588,L616-L690",
+      "current_main_blob": "23fd64512c510c621652b0815d72b24844803fb3",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ActivityFeedController.php",
+      "baseline_blob": "f363adac893b186d512e6a3cdab69ec8b28e66c1",
+      "baseline_loci": "L15-L98",
+      "current_main_blob": "f363adac893b186d512e6a3cdab69ec8b28e66c1",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Http/Middleware/RoleScope.php",
+      "baseline_blob": "52a85a1ec8324cb25570357ceaba85fdb0abab92",
+      "baseline_loci": "L25-L55",
+      "current_main_blob": "52a85a1ec8324cb25570357ceaba85fdb0abab92",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Models/User.php",
+      "baseline_blob": "59b118f636dcdcdc196886d0ac78fd41eafc0663",
+      "baseline_loci": "L356-L383",
+      "current_main_blob": "eb12246ce9dd33ebf46cc38cf4b09c43dde82068",
+      "current_main_loci": "L342-L369"
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "baseline_blob": "fed7affe854534221417be93dc2b2d8445488c8d",
+      "baseline_loci": "L22-L46,L196-L284",
+      "current_main_blob": "41d3ed5c671c1774b4865b62e88e053e8aea55a8",
+      "current_main_loci": "L53-L116,L653-L842,L1033-L1084"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "baseline_blob": "4859ab64c19b8a35ba0656ef2f9e40b18943cc98",
+      "baseline_loci": "Coordinator and Operations permission grants",
+      "current_main_blob": "317c399b138d42edcb2d001323f2edb085ab4e41",
+      "current_main_loci": "L670-L699 and Operations permission definitions"
+    },
+    {
+      "path": "tests/Feature/Operations/ShiftSiteIsolationTest.php",
+      "baseline_blob": "8fe74ceab2ebbc0cc0f6d714a887be621ab58e51",
+      "baseline_loci": "L90-L120,L176-L208,L568-L633",
+      "current_main_blob": "2665373284a3658db56748882e44d232de2ede63",
+      "current_main_loci": "L95-L130,L181-L220,L594-L650"
+    },
+    {
+      "path": "resources/js/pages/operations/Index.tsx",
+      "baseline_blob": "659f1e14479c28805e169d24e33aa2628b008378",
+      "baseline_loci": "dashboard props",
+      "current_main_blob": "30cd8ae87dbd4d98e39c7ce7b88915c996844668",
+      "current_main_loci": "dashboard props"
+    },
+    {
+      "path": "resources/js/pages/operations/activity/Index.tsx",
+      "baseline_blob": "66e1f82aa2c912ceec65da737f7b1cffb2add53f",
+      "baseline_loci": "activity props",
+      "current_main_blob": "c39ac64230b7a17e980249d187bd52fed1c08fe8",
+      "current_main_loci": "activity props"
+    }
+  ],
+  "duplicate_boundary": {
+    "existing_finding_count": 96,
+    "related_not_duplicate": [
+      "TASK-RBAC-001",
+      "WF-ATTENDANCE-FORCED-END-SITE",
+      "CTRL-RBAC-001"
+    ],
+    "distinction": "This finding owns the two exact Operations read surfaces and their cross-Site projection boundary."
+  },
+  "credit_boundary": {
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "module_completion_delta": 0,
+    "finding_delta": 1
+  }
+}

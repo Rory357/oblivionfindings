@@ -1,0 +1,5234 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-11T23:48:14.158Z",
+  "viewport": {
+    "cssWidth": 1440,
+    "cssHeight": 900,
+    "devicePixelRatio": 0.8999999761581421,
+    "calibration": "every observed row self-verified 1440x900"
+  },
+  "environmentEvidence": "owner-confirmed test/development; no visible UI environment or build marker",
+  "auditedCommit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "deployedCommit": "not independently established",
+  "denominator": {
+    "parameterizedUserFacingGetTemplates": 483,
+    "safetyOrNonPageExcluded": 79,
+    "noSafeDemoLink": 359,
+    "safelyReachableFromRenderedDemoLinks": 45
+  },
+  "completion": {
+    "observed": 45,
+    "blocked": 0,
+    "safelyReachableCoveragePercent": 100,
+    "horizontalOverflowCandidates": 0
+  },
+  "matchingRule": "Same-origin links discovered from the authenticated rendered-page census; exact static paths and reserved action-word collisions excluded. Identifiers are never persisted.",
+  "observations": [
+    {
+      "route_id": "ROUTE-0124",
+      "feature_id": "CLI-OVERVIEW",
+      "module": "Clients and supported people",
+      "route_name": "",
+      "route_path_template": "clients/{any}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 1599,
+      "final_path_redacted": "/operations/clients/{demo-record}",
+      "redirected": true,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 43,
+      "clientWidth": 1423,
+      "component": "operations/clients/show",
+      "dialogs": 0,
+      "headingCount": 9,
+      "horizontalOverflow": false,
+      "links": 12,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0125",
+      "feature_id": "CLI-OVERVIEW",
+      "module": "Clients and supported people",
+      "route_name": "clients.show",
+      "route_path_template": "clients/{client}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 933,
+      "final_path_redacted": "/operations/clients/{demo-record}",
+      "redirected": true,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 43,
+      "clientWidth": 1423,
+      "component": "operations/clients/show",
+      "dialogs": 0,
+      "headingCount": 9,
+      "horizontalOverflow": false,
+      "links": 12,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0216",
+      "feature_id": "CR-ALERTS",
+      "module": "Control Room",
+      "route_name": "control-room.alerts.show",
+      "route_path_template": "control-room/alerts/{alert}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 716,
+      "final_path_redacted": "/control-room/alerts/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 38,
+      "clientWidth": 1440,
+      "component": "control-room/show",
+      "dialogs": 1,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 31,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0281",
+      "feature_id": "CR-PLAYBOOKS",
+      "module": "Control Room",
+      "route_name": "control-room.playbooks.show",
+      "route_path_template": "control-room/playbooks/{playbook}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 663,
+      "final_path_redacted": "/control-room/playbooks/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1423,
+      "component": "control-room/playbooks/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 31,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0306",
+      "feature_id": "CR-SHIFTS-HANDOVER-PAGE",
+      "module": "Control Room",
+      "route_name": "control-room.shifts.handover-page",
+      "route_path_template": "control-room/shifts/{shift}/handover",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 4820,
+      "final_path_redacted": "/control-room/shifts/{demo-record}/handover",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 4891,
+      "clientWidth": 1423,
+      "component": "control-room/shifts/handover",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 2460,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0567",
+      "feature_id": "ASSET-FIXED-ASSETS",
+      "module": "Assets and equipment",
+      "route_name": "finance.fixed-assets.show",
+      "route_path_template": "finance/fixed-assets/{fixedAsset}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 989,
+      "final_path_redacted": "/finance/fixed-assets/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1423,
+      "component": "finance/fixed-assets/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 33,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0615",
+      "feature_id": "FIN-JOURNALS",
+      "module": "Finance and funding",
+      "route_name": "finance.journals.show",
+      "route_path_template": "finance/journals/{journal}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 921,
+      "final_path_redacted": "/finance/journals/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 20,
+      "clientWidth": 1440,
+      "component": "finance/journals/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 28,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0693",
+      "feature_id": "SITE-SITES-FINANCIAL-DASHBOARD",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.sites.financial-dashboard",
+      "route_path_template": "finance/sites/{site}/financial-dashboard",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 823,
+      "final_path_redacted": "/finance/sites/{demo-record}/financial-dashboard",
+      "redirected": false,
+      "surfaceKind": "non_page_response",
+      "banners": 0,
+      "buttons": 0,
+      "clientWidth": 1440,
+      "component": null,
+      "dialogs": 0,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 0,
+      "mainPresent": false,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0708",
+      "feature_id": "FLEET-ASSETS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.assets.show",
+      "route_path_template": "fleet-assets/assets/{asset}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 878,
+      "final_path_redacted": "/fleet-assets/assets/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 29,
+      "clientWidth": 1423,
+      "component": "fleet-assets/assets/show",
+      "dialogs": 0,
+      "headingCount": 2,
+      "horizontalOverflow": false,
+      "links": 47,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0820",
+      "feature_id": "FLEET-RESIDENT-TRACKING-HISTORY",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.resident-tracking.history",
+      "route_path_template": "fleet-assets/resident-tracking/history/{client}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 800,
+      "final_path_redacted": "/fleet-assets/resident-tracking/history/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 19,
+      "clientWidth": 1440,
+      "component": "fleet-assets/resident-tracking/history",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 46,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0832",
+      "feature_id": "FLEET-TRIPS-PLAYBACK",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.trips.playback",
+      "route_path_template": "fleet-assets/trips/{trip}/playback",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 563,
+      "final_path_redacted": "/fleet-assets/trips/{demo-record}/playback",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 20,
+      "clientWidth": 1440,
+      "component": "fleet-assets/trips/playback",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 13,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0836",
+      "feature_id": "FLEET-VEHICLES",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.vehicles.show",
+      "route_path_template": "fleet-assets/vehicles/{asset}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 642,
+      "final_path_redacted": "/fleet-assets/vehicles/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 32,
+      "clientWidth": 1423,
+      "component": "fleet-assets/vehicles/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 60,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0870",
+      "feature_id": "FIN-BUDGETS",
+      "module": "Finance and funding",
+      "route_name": "governance.budgets.show",
+      "route_path_template": "governance/budgets/{budget}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 637,
+      "final_path_redacted": "/governance/budgets/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 25,
+      "clientWidth": 1423,
+      "component": "Governance/Budgets/Show",
+      "dialogs": 0,
+      "headingCount": 2,
+      "horizontalOverflow": false,
+      "links": 37,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0888",
+      "feature_id": "GOV-CEO-REPORTS",
+      "module": "Governance",
+      "route_name": "governance.ceo-reports.show",
+      "route_path_template": "governance/ceo-reports/{report}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 1004,
+      "final_path_redacted": "/governance/ceo-reports/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 32,
+      "clientWidth": 1440,
+      "component": "Governance/CeoReports/Show",
+      "dialogs": 0,
+      "headingCount": 2,
+      "horizontalOverflow": false,
+      "links": 34,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0903",
+      "feature_id": "PRIV-COMPLIANCE",
+      "module": "Privacy and compliance",
+      "route_name": "governance.compliance.show",
+      "route_path_template": "governance/compliance/{obligation}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 734,
+      "final_path_redacted": "/governance/compliance/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1423,
+      "component": "Governance/Compliance/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 36,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0935",
+      "feature_id": "GOV-MEETINGS",
+      "module": "Governance",
+      "route_name": "governance.meetings.show",
+      "route_path_template": "governance/meetings/{meeting}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 698,
+      "final_path_redacted": "/governance/meetings/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 26,
+      "clientWidth": 1423,
+      "component": "Governance/Meetings/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 37,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-0974",
+      "feature_id": "GOV-POLICIES",
+      "module": "Governance",
+      "route_name": "governance.policies.show",
+      "route_path_template": "governance/policies/{policy}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 763,
+      "final_path_redacted": "/governance/policies/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1440,
+      "component": "Governance/Policies/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 35,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1003",
+      "feature_id": "GOV-RISKS",
+      "module": "Governance",
+      "route_name": "governance.risks.show",
+      "route_path_template": "governance/risks/{risk}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 803,
+      "final_path_redacted": "/governance/risks/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1423,
+      "component": "Governance/Risks/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 36,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1021",
+      "feature_id": "GOV-SPEND-APPROVALS",
+      "module": "Governance",
+      "route_name": "governance.spend-approvals.show",
+      "route_path_template": "governance/spend-approvals/{approval}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 745,
+      "final_path_redacted": "/governance/spend-approvals/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 20,
+      "clientWidth": 1423,
+      "component": "Governance/SpendApprovals/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 36,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1033",
+      "feature_id": "GOV-STRATEGY",
+      "module": "Governance",
+      "route_name": "governance.strategy.show",
+      "route_path_template": "governance/strategy/{plan}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 627,
+      "final_path_redacted": "/governance/strategy/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 21,
+      "clientWidth": 1423,
+      "component": "Governance/Strategy/Show",
+      "dialogs": 0,
+      "headingCount": 2,
+      "horizontalOverflow": false,
+      "links": 36,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1045",
+      "feature_id": "HS-HAZARDS",
+      "module": "Health and safety",
+      "route_name": "sites.hazards.show",
+      "route_path_template": "hazards/{hazard}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 553,
+      "final_path_redacted": "/hazards/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 22,
+      "clientWidth": 1423,
+      "component": "sites/hazards/show",
+      "dialogs": 0,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 14,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1111",
+      "feature_id": "HS-EVENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.events.show",
+      "route_path_template": "health-safety/events/{hsEvent}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 620,
+      "final_path_redacted": "/health-safety/events/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 31,
+      "clientWidth": 1440,
+      "component": "health-safety/events/show",
+      "dialogs": 1,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 33,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1410",
+      "feature_id": "HR-POLICIES",
+      "module": "Human resources",
+      "route_name": "hr.policies.show",
+      "route_path_template": "hr/documents/policies/{policy}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 626,
+      "final_path_redacted": "/hr/documents/policies/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 24,
+      "clientWidth": 1440,
+      "component": "hr/documents/policies/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 41,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1662",
+      "feature_id": "HR-POSITIONS",
+      "module": "Human resources",
+      "route_name": "hr.positions.show",
+      "route_path_template": "hr/positions/{position}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 495,
+      "final_path_redacted": "/hr/positions/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 19,
+      "clientWidth": 1423,
+      "component": "hr/positions/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 14,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1794",
+      "feature_id": "HR-TRAINING-COURSES",
+      "module": "Human resources",
+      "route_name": "hr.training.courses.show",
+      "route_path_template": "hr/training/courses/{course}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 682,
+      "final_path_redacted": "/hr/training/catalog",
+      "redirected": true,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 48,
+      "clientWidth": 1423,
+      "component": "hr/training/catalog",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 42,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1840",
+      "feature_id": "INC-OVERVIEW",
+      "module": "Incidents and safeguarding",
+      "route_name": "incidents.show",
+      "route_path_template": "incidents/{incident}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 653,
+      "final_path_redacted": "/incidents/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 29,
+      "clientWidth": 1440,
+      "component": "incidents/show",
+      "dialogs": 1,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 34,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1857",
+      "feature_id": "INC-TEMPLATES",
+      "module": "Incidents and safeguarding",
+      "route_name": "incidents.templates.edit",
+      "route_path_template": "incidents/templates/{template}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 632,
+      "final_path_redacted": "/incidents/templates/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 24,
+      "clientWidth": 1423,
+      "component": "incidents/templates/edit",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 34,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1908",
+      "feature_id": "OPS-CARE-PLANS",
+      "module": "Operations and rostering",
+      "route_name": "operations.care_plans.show",
+      "route_path_template": "operations/care-plans/{carePlan}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 515,
+      "final_path_redacted": "/operations/care-plans/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 24,
+      "clientWidth": 1423,
+      "component": "operations/care-plans/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 32,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-1936",
+      "feature_id": "OPS-CLIENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.show",
+      "route_path_template": "operations/clients/{client}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 1034,
+      "final_path_redacted": "/operations/clients/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 46,
+      "clientWidth": 1423,
+      "component": "operations/clients/show",
+      "dialogs": 0,
+      "headingCount": 9,
+      "horizontalOverflow": false,
+      "links": 39,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2064",
+      "feature_id": "OPS-FAMILY-PORTAL",
+      "module": "Operations and rostering",
+      "route_name": "operations.family_portal.show",
+      "route_path_template": "operations/family-portal/{client}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 397,
+      "final_path_redacted": "/operations/family-portal/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 19,
+      "clientWidth": 1440,
+      "component": "operations/family-portal/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 32,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2066",
+      "feature_id": "OPS-FAMILY-PORTAL",
+      "module": "Operations and rostering",
+      "route_name": "operations.family_portal.edit",
+      "route_path_template": "operations/family-portal/{client}/edit",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 641,
+      "final_path_redacted": "/operations/family-portal/{demo-record}/edit",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 30,
+      "clientWidth": 1440,
+      "component": "operations/family-portal/Edit",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 31,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2137",
+      "feature_id": "OPS-REPORTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.reports.show",
+      "route_path_template": "operations/reports/{type}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 711,
+      "final_path_redacted": "/operations/reports/client-summary",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 20,
+      "clientWidth": 1440,
+      "component": "operations/reports/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 31,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2172",
+      "feature_id": "OPS-SERVICE-AGREEMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.service_agreements.show",
+      "route_path_template": "operations/service-agreements/{agreement}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 707,
+      "final_path_redacted": "/operations/service-agreements/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 24,
+      "clientWidth": 1423,
+      "component": "operations/service-agreements/Show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 35,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2174",
+      "feature_id": "OPS-SERVICE-AGREEMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.service_agreements.edit",
+      "route_path_template": "operations/service-agreements/{agreement}/edit",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 617,
+      "final_path_redacted": "/operations/service-agreements/{demo-record}/edit",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 26,
+      "clientWidth": 1423,
+      "component": "operations/service-agreements/Edit",
+      "dialogs": 0,
+      "headingCount": 10,
+      "horizontalOverflow": false,
+      "links": 31,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2299",
+      "feature_id": "PRIV-BREACHES",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.breaches.show",
+      "route_path_template": "privacy/breaches/{breach}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 486,
+      "final_path_redacted": "/privacy/breaches/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 20,
+      "clientWidth": 1423,
+      "component": "privacy/breaches/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 13,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2338",
+      "feature_id": "PRIV-RETENTION",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.retention.edit",
+      "route_path_template": "privacy/retention/{policy}/edit",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 738,
+      "final_path_redacted": "/privacy/retention/{demo-record}/edit",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 25,
+      "clientWidth": 1423,
+      "component": "privacy/retention/edit",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 13,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2348",
+      "feature_id": "REP-COMBINED",
+      "module": "Reporting and summaries",
+      "route_name": "reports.combined.show",
+      "route_path_template": "reports/combined/{report}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 566,
+      "final_path_redacted": "/reports/combined/care-quality",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 19,
+      "clientWidth": 1423,
+      "component": "reports/combined",
+      "dialogs": 0,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 45,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2355",
+      "feature_id": "REP-MODULES",
+      "module": "Reporting and summaries",
+      "route_name": "reports.modules.show",
+      "route_path_template": "reports/modules/{module}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 567,
+      "final_path_redacted": "/reports/modules/clients",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 25,
+      "clientWidth": 1423,
+      "component": "reports/module",
+      "dialogs": 0,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 19,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2387",
+      "feature_id": "RESP-EVIDENCE-PACKS",
+      "module": "Respite",
+      "route_name": "respite.evidence-packs.show",
+      "route_path_template": "respite/evidence-packs/{evidencePack}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 544,
+      "final_path_redacted": "/respite/evidence-packs/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 22,
+      "clientWidth": 1423,
+      "component": "respite/evidence-packs/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 38,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2545",
+      "feature_id": "SEC-DEVICES",
+      "module": "Security and devices",
+      "route_name": "security-devices.devices.show",
+      "route_path_template": "security-devices/devices/{device}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 827,
+      "final_path_redacted": "/security-devices/devices/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 29,
+      "clientWidth": 1423,
+      "component": "security-devices/devices/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 27,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2679",
+      "feature_id": "SET-ROLES",
+      "module": "Settings and system access",
+      "route_name": "settings.roles.edit",
+      "route_path_template": "settings/roles/{role}/edit",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 542,
+      "final_path_redacted": "/settings/roles/{demo-record}/edit",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 30,
+      "clientWidth": 1423,
+      "component": "settings/roles/edit",
+      "dialogs": 0,
+      "headingCount": 2,
+      "horizontalOverflow": false,
+      "links": 36,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2730",
+      "feature_id": "SITE-OVERVIEW",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.show",
+      "route_path_template": "sites/{site}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 623,
+      "final_path_redacted": "/sites/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 0,
+      "clientWidth": 1440,
+      "component": "sites/show",
+      "dialogs": 0,
+      "headingCount": 0,
+      "horizontalOverflow": false,
+      "links": 0,
+      "mainPresent": false,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2917",
+      "feature_id": "HR-OVERVIEW",
+      "module": "Human resources",
+      "route_name": "staff.show",
+      "route_path_template": "staff/{user}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 618,
+      "final_path_redacted": "/staff/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 22,
+      "clientWidth": 1440,
+      "component": "staff/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 18,
+      "mainPresent": true,
+      "scrollWidth": 1440,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2921",
+      "feature_id": "OPS-AVAILABILITY",
+      "module": "Operations and rostering",
+      "route_name": "staff.availability.index",
+      "route_path_template": "staff/{user}/availability",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 1160,
+      "final_path_redacted": "/operations/rostering",
+      "redirected": true,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 102,
+      "clientWidth": 1423,
+      "component": "operations/rostering/index",
+      "dialogs": 0,
+      "headingCount": 65,
+      "horizontalOverflow": false,
+      "links": 22,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    {
+      "route_id": "ROUTE-2962",
+      "feature_id": "SET-USERS",
+      "module": "Settings and system access",
+      "route_name": "system.users.show",
+      "route_path_template": "system/users/{target}",
+      "classification": "Observed",
+      "role": "Demo Administrator",
+      "siteScope": "not visibly selected",
+      "durationMs": 629,
+      "final_path_redacted": "/system/users/{demo-record}",
+      "redirected": false,
+      "surfaceKind": "rendered_page",
+      "banners": 0,
+      "buttons": 26,
+      "clientWidth": 1423,
+      "component": "settings/users/show",
+      "dialogs": 0,
+      "headingCount": 1,
+      "horizontalOverflow": false,
+      "links": 13,
+      "mainPresent": true,
+      "scrollWidth": 1423,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    }
+  ],
+  "notSafelyReproducible": [
+    {
+      "route_id": "ROUTE-0019",
+      "feature_id": "MED-ATTACHMENTS",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.attachments.download",
+      "route_path_template": "api/medications/clients/{client}/administrations/{administration}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0020",
+      "feature_id": "MED-ALERTS-CLIENT",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.alerts.client",
+      "route_path_template": "api/medications/clients/{client}/alerts",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0021",
+      "feature_id": "MED-ALLERGIES",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.allergies.index",
+      "route_path_template": "api/medications/clients/{client}/allergies",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0025",
+      "feature_id": "MED-SUPPORTING-ATTACHMENTS",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.supporting_attachments.download",
+      "route_path_template": "api/medications/clients/{client}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0026",
+      "feature_id": "MED-MAR",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.mar.show",
+      "route_path_template": "api/medications/clients/{client}/mar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0029",
+      "feature_id": "MED-PRN-HISTORY",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.prn.history",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/prn-history",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0030",
+      "feature_id": "MED-SAFETY-CHECK",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.safety.check",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/safety-check",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0031",
+      "feature_id": "MED-SCAN-CODE",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.scan_code.show",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/scan-code",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0032",
+      "feature_id": "MED-SCAN-CODE-SVG",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.scan_code.svg",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/scan-code/svg",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0034",
+      "feature_id": "MED-SCHEDULED-COUNTS",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.scheduled_counts.index",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/scheduled-counts",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0036",
+      "feature_id": "MED-VERSIONS",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.versions.index",
+      "route_path_template": "api/medications/clients/{client}/medications/{medication}/versions",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0043",
+      "feature_id": "MED-SHIFT-SUMMARY",
+      "module": "eMAR and medications",
+      "route_name": "api.medications.shift.summary",
+      "route_path_template": "api/medications/shifts/{shiftId}/medication-summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0051",
+      "feature_id": "ASSET-DOCUMENTS",
+      "module": "Assets and equipment",
+      "route_name": "assets.documents.download",
+      "route_path_template": "assets/{asset}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0058",
+      "feature_id": "ASSET-QR",
+      "module": "Assets and equipment",
+      "route_name": "assets.qr.download",
+      "route_path_template": "assets/{asset}/qr.png/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0084",
+      "feature_id": "SITE-FEED",
+      "module": "Sites, facilities and catering",
+      "route_name": "calendar.feed",
+      "route_path_template": "calendar/feed/{token}.ics",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0087",
+      "feature_id": "SITE-HOUSE-FEED",
+      "module": "Sites, facilities and catering",
+      "route_name": "calendar.house-feed",
+      "route_path_template": "calendar/site/{site}/feed/{token}.ics",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0151",
+      "feature_id": "CLI-DOCUMENTS",
+      "module": "Clients and supported people",
+      "route_name": "clients.documents.download",
+      "route_path_template": "clients/{client}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0159",
+      "feature_id": "CLI-INCIDENTS-ATTACHMENTS",
+      "module": "Clients and supported people",
+      "route_name": "clients.incidents.attachments.download",
+      "route_path_template": "clients/{client}/incidents/{incident}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0162",
+      "feature_id": "CLI-MAR-EXPORT-CSV",
+      "module": "Clients and supported people",
+      "route_name": "clients.mar.export_csv",
+      "route_path_template": "clients/{client}/mar/export.csv",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0261",
+      "feature_id": "CR-EVIDENCE",
+      "module": "Control Room",
+      "route_name": "control-room.evidence.export",
+      "route_path_template": "control-room/evidence/{pack}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0264",
+      "feature_id": "CR-EVIDENCE-DOWNLOAD-ITEM",
+      "module": "Control Room",
+      "route_name": "control-room.evidence.download-item",
+      "route_path_template": "control-room/evidence/items/{item}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0332",
+      "feature_id": "MED-AUDIT-EVENT",
+      "module": "eMAR and medications",
+      "route_name": "emar.audit.event.export",
+      "route_path_template": "emar/audit/event/{id}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0473",
+      "feature_id": "PRIV-AUDIT-EXPORTS",
+      "module": "Privacy and compliance",
+      "route_name": "finance.audit-exports.download",
+      "route_path_template": "finance/audit-exports/{export}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0550",
+      "feature_id": "FIN-DONOR-FUNDS-REPORTS",
+      "module": "Finance and funding",
+      "route_name": "finance.donor-funds.reports.download",
+      "route_path_template": "finance/donor-funds/{fund}/reports/{report}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0603",
+      "feature_id": "FIN-INVOICES-PDF",
+      "module": "Finance and funding",
+      "route_name": "finance.invoices.pdf",
+      "route_path_template": "finance/invoices/{invoice}/pdf",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0635",
+      "feature_id": "FIN-PAYMENT-RUNS",
+      "module": "Finance and funding",
+      "route_name": "finance.payment-runs.download",
+      "route_path_template": "finance/payment-runs/{paymentRun}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0755",
+      "feature_id": "FLEET-INCIDENTS-ATTACHMENTS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.incidents.attachments.download",
+      "route_path_template": "fleet-assets/incidents/{incident}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0892",
+      "feature_id": "GOV-CEO-REPORTS-ATTACHMENTS",
+      "module": "Governance",
+      "route_name": "governance.ceo-reports.attachments.download",
+      "route_path_template": "governance/ceo-reports/{report}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0919",
+      "feature_id": "GOV-DOCUMENTS",
+      "module": "Governance",
+      "route_name": "governance.documents.download",
+      "route_path_template": "governance/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0956",
+      "feature_id": "GOV-PACKS-ATTACHMENTS",
+      "module": "Governance",
+      "route_name": "governance.packs.attachments.download",
+      "route_path_template": "governance/packs/{pack}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0958",
+      "feature_id": "GOV-PACKS",
+      "module": "Governance",
+      "route_name": "governance.packs.download",
+      "route_path_template": "governance/packs/{pack}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0986",
+      "feature_id": "GOV-REPORTS",
+      "module": "Governance",
+      "route_name": "governance.reports.export",
+      "route_path_template": "governance/reports/export/{type}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0994",
+      "feature_id": "GOV-RESOLUTIONS-ATTACHMENTS",
+      "module": "Governance",
+      "route_name": "governance.resolutions.attachments.download",
+      "route_path_template": "governance/resolutions/{resolution}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1012",
+      "feature_id": "GOV-RISKS-TREATMENTS-ATTACHMENTS",
+      "module": "Governance",
+      "route_name": "governance.risks.treatments.attachments.download",
+      "route_path_template": "governance/risks/{risk}/treatments/{treatment}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1026",
+      "feature_id": "GOV-SPEND-APPROVALS-ATTACHMENTS",
+      "module": "Governance",
+      "route_name": "governance.spend-approvals.attachments.download",
+      "route_path_template": "governance/spend-approvals/{approval}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1089",
+      "feature_id": "HS-DRILLS-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.drills.attachments.download",
+      "route_path_template": "health-safety/drills/{drill}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1122",
+      "feature_id": "HS-FIRST-AID-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.first-aid.attachments.download",
+      "route_path_template": "health-safety/first-aid/{record}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1133",
+      "feature_id": "HS-INJURIES-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.injuries.attachments.download",
+      "route_path_template": "health-safety/injuries/{injury}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1158",
+      "feature_id": "HS-PPE-ALLOCATIONS-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.ppe.allocations.attachments.download",
+      "route_path_template": "health-safety/ppe/allocations/{allocation}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1163",
+      "feature_id": "HS-PPE-INSPECTIONS-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.ppe.inspections.attachments.download",
+      "route_path_template": "health-safety/ppe/inspections/{inspection}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1169",
+      "feature_id": "HS-PPE-INVENTORY-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.ppe.inventory.attachments.download",
+      "route_path_template": "health-safety/ppe/inventory/{inventory}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1186",
+      "feature_id": "HS-PROCEDURES-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.procedures.attachments.download",
+      "route_path_template": "health-safety/procedures/{procedure}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1205",
+      "feature_id": "HS-RESTRAINTS-EVENTS-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.restraints.events.attachments.download",
+      "route_path_template": "health-safety/restraints/events/{event}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1222",
+      "feature_id": "HS-RISK-ASSESSMENTS-ATTACHMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.risk-assessments.attachments.download",
+      "route_path_template": "health-safety/risk-assessments/{assessment}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1233",
+      "feature_id": "HS-SUBSTANCES-SDS",
+      "module": "Health and safety",
+      "route_name": "health-safety.substances.sds.download",
+      "route_path_template": "health-safety/substances/{substance}/sds/{sds}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1251",
+      "feature_id": "HS-WORKER-PARTICIPATION-MEETINGS-MINUTES",
+      "module": "Health and safety",
+      "route_name": "health-safety.worker-participation.meetings.minutes.download",
+      "route_path_template": "health-safety/worker-participation/meetings/{meeting}/minutes/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1267",
+      "feature_id": "HR-ANNOUNCEMENTS-TRACKING",
+      "module": "Human resources",
+      "route_name": "hr.announcements.tracking.export",
+      "route_path_template": "hr/announcements/{announcement}/tracking/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1292",
+      "feature_id": "HR-ASSETS-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.assets.documents.download",
+      "route_path_template": "hr/assets/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1298",
+      "feature_id": "HR-CALENDAR-ATTACHMENTS",
+      "module": "Human resources",
+      "route_name": "hr.calendar.attachments.download",
+      "route_path_template": "hr/calendar/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1400",
+      "feature_id": "HR-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.documents.download",
+      "route_path_template": "hr/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1413",
+      "feature_id": "HR-POLICIES",
+      "module": "Human resources",
+      "route_name": "hr.policies.download",
+      "route_path_template": "hr/documents/policies/{policy}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1434",
+      "feature_id": "HR-FEED-ATTACHMENTS",
+      "module": "Human resources",
+      "route_name": "hr.feed.attachments.show",
+      "route_path_template": "hr/feed/attachments/{attachment}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1514",
+      "feature_id": "HR-MY-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.my.documents.download",
+      "route_path_template": "hr/my/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1534",
+      "feature_id": "HR-MY-PAYSLIPS",
+      "module": "Human resources",
+      "route_name": "hr.my.payslips.download",
+      "route_path_template": "hr/my/payslips/{payslip}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1591",
+      "feature_id": "HR-PAYSLIPS",
+      "module": "Human resources",
+      "route_name": "hr.payslips.download",
+      "route_path_template": "hr/payroll/payslips/{payslip}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1607",
+      "feature_id": "HR-PEOPLE-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.people.documents.download",
+      "route_path_template": "hr/people/{profile}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1685",
+      "feature_id": "HR-CANDIDATE-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.candidate.documents.download",
+      "route_path_template": "hr/recruitment/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1724",
+      "feature_id": "HR-REPORTS-EXPORTS",
+      "module": "Human resources",
+      "route_name": "hr.reports.exports.download",
+      "route_path_template": "hr/reports/exports/{export}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1728",
+      "feature_id": "HR-REPORTS-SAVED",
+      "module": "Human resources",
+      "route_name": "hr.reports.saved.export",
+      "route_path_template": "hr/reports/saved/{report}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1829",
+      "feature_id": "HR-WELLBEING-SURVEYS",
+      "module": "Human resources",
+      "route_name": "hr.wellbeing.surveys.export",
+      "route_path_template": "hr/wellbeing/surveys/{survey}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1845",
+      "feature_id": "INC-ATTACHMENTS",
+      "module": "Incidents and safeguarding",
+      "route_name": "incidents.attachments.download",
+      "route_path_template": "incidents/{incident}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1922",
+      "feature_id": "OPS-CARE-PLANS-PDF",
+      "module": "Operations and rostering",
+      "route_name": "operations.care_plans.pdf",
+      "route_path_template": "operations/care-plans/{carePlan}/pdf",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1968",
+      "feature_id": "OPS-CLIENTS-DOCUMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.documents.download",
+      "route_path_template": "operations/clients/{client}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1998",
+      "feature_id": "OPS-CLIENTS-INCIDENTS-ATTACHMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.incidents.attachments.download",
+      "route_path_template": "operations/clients/{client}/incidents/{incident}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2007",
+      "feature_id": "OPS-CLIENTS-MAR-EXPORT-CSV",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.mar.export_csv",
+      "route_path_template": "operations/clients/{client}/mar/export.csv",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2254",
+      "feature_id": "CLI-CLIENTS-DOCUMENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.documents.download",
+      "route_path_template": "portal/clients/{client}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2260",
+      "feature_id": "CLI-CLIENTS-INCIDENTS-ATTACHMENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.incidents.attachments.download",
+      "route_path_template": "portal/clients/{client}/incidents/{incident}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2296",
+      "feature_id": "PRIV-ATTACHMENTS",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.attachments.download",
+      "route_path_template": "privacy/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2330",
+      "feature_id": "PRIV-REQUESTS",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.requests.export",
+      "route_path_template": "privacy/requests/{dsRequest}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2349",
+      "feature_id": "REP-COMBINED",
+      "module": "Reporting and summaries",
+      "route_name": "reports.combined.export",
+      "route_path_template": "reports/combined/{report}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2356",
+      "feature_id": "REP-MODULES",
+      "module": "Reporting and summaries",
+      "route_name": "reports.modules.export",
+      "route_path_template": "reports/modules/{module}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2390",
+      "feature_id": "RESP-EVIDENCE-PACKS",
+      "module": "Respite",
+      "route_name": "respite.evidence-packs.export",
+      "route_path_template": "respite/evidence-packs/{evidencePack}/export",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2512",
+      "feature_id": "INC-ATTACHMENTS",
+      "module": "Incidents and safeguarding",
+      "route_name": "safeguarding.attachments.download",
+      "route_path_template": "safeguarding/{concern}/attachments/{attachment}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2633",
+      "feature_id": "SET-CALENDAR-SYNC-CALLBACK",
+      "module": "Settings and system access",
+      "route_name": "settings.calendar-sync.callback",
+      "route_path_template": "settings/calendar-sync/callback/{provider}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2635",
+      "feature_id": "SET-CALENDAR-SYNC-CONNECT",
+      "module": "Settings and system access",
+      "route_name": "settings.calendar-sync.connect",
+      "route_path_template": "settings/calendar-sync/connect/{provider}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2638",
+      "feature_id": "SET-CALENDAR-SYNC-RESOURCES",
+      "module": "Settings and system access",
+      "route_name": "settings.calendar-sync.resources",
+      "route_path_template": "settings/calendar-sync/resources/{provider}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2783",
+      "feature_id": "SITE-DOCUMENTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.documents.download",
+      "route_path_template": "sites/{site}/documents/{document}/download",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2787",
+      "feature_id": "SITE-EMERGENCY-PLAN",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.emergency-plan.download",
+      "route_path_template": "sites/{site}/emergency-plan.pdf",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2820",
+      "feature_id": "SITE-LEDGER-ENTRIES",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.ledger.entries.download",
+      "route_path_template": "sites/{site}/ledger/entries/{entry}/download",
+      "classification": "Reviewed",
+      "reason": null
+    }
+  ],
+  "unmatchedTemplates": [
+    {
+      "route_id": "ROUTE-0046",
+      "feature_id": "ASSET-OVERVIEW",
+      "module": "Assets and equipment",
+      "route_name": "assets.show",
+      "route_path_template": "assets/{asset}",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0057",
+      "feature_id": "ASSET-QR-PNG",
+      "module": "Assets and equipment",
+      "route_name": "assets.qr.png",
+      "route_path_template": "assets/{asset}/qr.png",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0059",
+      "feature_id": "ASSET-QR-SVG",
+      "module": "Assets and equipment",
+      "route_name": "assets.qr.svg",
+      "route_path_template": "assets/{asset}/qr.svg",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0064",
+      "feature_id": "ASSET-QR",
+      "module": "Assets and equipment",
+      "route_name": "assets.qr.redirect",
+      "route_path_template": "assets/qr/{token}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0074",
+      "feature_id": "CLI-EXPORTS-CLIENT",
+      "module": "Clients and supported people",
+      "route_name": "audit.exports.client",
+      "route_path_template": "audit-exports/clients/{client}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0075",
+      "feature_id": "INC-EXPORTS-INCIDENT",
+      "module": "Incidents and safeguarding",
+      "route_name": "audit.exports.incident",
+      "route_path_template": "audit-exports/incidents/{incident}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0089",
+      "feature_id": "HR-OVERVIEW",
+      "module": "Human resources",
+      "route_name": "careers.show",
+      "route_path_template": "careers/{slug}",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0090",
+      "feature_id": "HR-APPLICATION-STATUS",
+      "module": "Human resources",
+      "route_name": "careers.application.status",
+      "route_path_template": "careers/application/{token}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0091",
+      "feature_id": "HR-APPLY",
+      "module": "Human resources",
+      "route_name": "careers.apply",
+      "route_path_template": "careers/jobs/{job:slug}/apply",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0093",
+      "feature_id": "HR-OFFER",
+      "module": "Human resources",
+      "route_name": "careers.offer.show",
+      "route_path_template": "careers/offers/{token}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0095",
+      "feature_id": "HR-REFERENCE",
+      "module": "Human resources",
+      "route_name": "careers.reference.show",
+      "route_path_template": "careers/references/{token}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0106",
+      "feature_id": "SITE-RECIPES",
+      "module": "Sites, facilities and catering",
+      "route_name": "catering.recipes.show",
+      "route_path_template": "catering/recipes/{recipe}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0108",
+      "feature_id": "SITE-RECIPES",
+      "module": "Sites, facilities and catering",
+      "route_name": "catering.recipes.edit",
+      "route_path_template": "catering/recipes/{recipe}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0115",
+      "feature_id": "SITE-CHECKLISTS-SHOW-RUN",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.checklists.showRun",
+      "route_path_template": "checklists/runs/{run}",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0130",
+      "feature_id": "CLI-ASSIGNMENTS",
+      "module": "Clients and supported people",
+      "route_name": "clients.assignments.edit",
+      "route_path_template": "clients/{client}/assignments",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0132",
+      "feature_id": "CLIN-BEHAVIOUR-ABC",
+      "module": "Health and clinical",
+      "route_name": "clients.behaviour.abc.index",
+      "route_path_template": "clients/{client}/behaviour/abc",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0135",
+      "feature_id": "CLIN-BEHAVIOUR-ABC",
+      "module": "Health and clinical",
+      "route_name": "clients.behaviour.abc.show",
+      "route_path_template": "clients/{client}/behaviour/abc/{abc}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0142",
+      "feature_id": "CLI-CALENDAR-EVENTS",
+      "module": "Clients and supported people",
+      "route_name": "client.calendar.events",
+      "route_path_template": "clients/{client}/calendar/events",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0144",
+      "feature_id": "CLIN-CLINICAL-OBSERVATIONS",
+      "module": "Health and clinical",
+      "route_name": "clients.clinical.observations.index",
+      "route_path_template": "clients/{client}/clinical/observations",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0147",
+      "feature_id": "CLI-DOCUMENTS",
+      "module": "Clients and supported people",
+      "route_name": "clients.documents.index",
+      "route_path_template": "clients/{client}/documents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0152",
+      "feature_id": "CLI-OVERVIEW",
+      "module": "Clients and supported people",
+      "route_name": "clients.edit",
+      "route_path_template": "clients/{client}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0156",
+      "feature_id": "CLI-INCIDENTS",
+      "module": "Clients and supported people",
+      "route_name": "clients.incidents.index",
+      "route_path_template": "clients/{client}/incidents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0160",
+      "feature_id": "CLI-MAR",
+      "module": "Clients and supported people",
+      "route_name": "clients.mar.show",
+      "route_path_template": "clients/{client}/mar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0163",
+      "feature_id": "CLI-MEAL-PREFERENCES",
+      "module": "Clients and supported people",
+      "route_name": "clients.meal-preferences.show",
+      "route_path_template": "clients/{client}/meal-preferences",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0167",
+      "feature_id": "CLI-MEDICAL",
+      "module": "Clients and supported people",
+      "route_name": "clients.medical.show",
+      "route_path_template": "clients/{client}/medical",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0186",
+      "feature_id": "CLI-PORTAL-USERS",
+      "module": "Clients and supported people",
+      "route_name": "clients.portal_users.edit",
+      "route_path_template": "clients/{client}/portal-users",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0190",
+      "feature_id": "CLI-RISKS",
+      "module": "Clients and supported people",
+      "route_name": "clients.risks.index",
+      "route_path_template": "clients/{client}/risks",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0195",
+      "feature_id": "CLI-CLIENT",
+      "module": "Clients and supported people",
+      "route_name": "timeline.client",
+      "route_path_template": "clients/{client}/timeline",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0204",
+      "feature_id": "HR-FRAMEWORKS",
+      "module": "Human resources",
+      "route_name": "competency.frameworks.show",
+      "route_path_template": "competency/frameworks/{framework}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0206",
+      "feature_id": "HR-FRAMEWORKS",
+      "module": "Human resources",
+      "route_name": "competency.frameworks.edit",
+      "route_path_template": "competency/frameworks/{framework}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0222",
+      "feature_id": "CR-DISCUSSIONS",
+      "module": "Control Room",
+      "route_name": "control-room.discussions.index",
+      "route_path_template": "control-room/alerts/{alert}/discussions",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0226",
+      "feature_id": "CR-EVIDENCE",
+      "module": "Control Room",
+      "route_name": "control-room.evidence.index",
+      "route_path_template": "control-room/alerts/{alert}/evidence",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0234",
+      "feature_id": "CR-TASKS",
+      "module": "Control Room",
+      "route_name": "control-room.tasks.index",
+      "route_path_template": "control-room/alerts/{alert}/tasks",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0237",
+      "feature_id": "CR-TIME-ENTRIES",
+      "module": "Control Room",
+      "route_name": "control-room.time-entries.index",
+      "route_path_template": "control-room/alerts/{alert}/time-entries",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0242",
+      "feature_id": "CR-WATCHERS",
+      "module": "Control Room",
+      "route_name": "control-room.watchers.index",
+      "route_path_template": "control-room/alerts/{alert}/watchers",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0250",
+      "feature_id": "CR-BROADCAST",
+      "module": "Control Room",
+      "route_name": "control-room.broadcast.show",
+      "route_path_template": "control-room/broadcast/{groupId}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0252",
+      "feature_id": "CR-DEVICES",
+      "module": "Control Room",
+      "route_name": "control-room.devices.show",
+      "route_path_template": "control-room/devices/{device}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0326",
+      "feature_id": "PLAT-VERIFY",
+      "module": "Platform and shared infrastructure",
+      "route_name": "verification.verify",
+      "route_path_template": "email/verify/{id}/{hash}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0334",
+      "feature_id": "MED-AUDIT-EVENT-INTEGRITY",
+      "module": "eMAR and medications",
+      "route_name": "emar.audit.event.integrity",
+      "route_path_template": "emar/audit/event/{id}/integrity",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0343",
+      "feature_id": "MED-CLIENTS-INR",
+      "module": "eMAR and medications",
+      "route_name": "emar.clients.inr.index",
+      "route_path_template": "emar/clients/{client}/inr",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0387",
+      "feature_id": "MED-MEDICATIONS-DETAIL",
+      "module": "eMAR and medications",
+      "route_name": "emar.medications.detail",
+      "route_path_template": "emar/medications/{medication}/detail",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0420",
+      "feature_id": "MED-ROUND",
+      "module": "eMAR and medications",
+      "route_name": "meds.round.show",
+      "route_path_template": "emar/rounds/{round}/guided",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0451",
+      "feature_id": "FIN-ACCOUNTS",
+      "module": "Finance and funding",
+      "route_name": "finance.accounts.show",
+      "route_path_template": "finance/accounts/{account}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0453",
+      "feature_id": "FIN-ACCOUNTS",
+      "module": "Finance and funding",
+      "route_name": "finance.accounts.edit",
+      "route_path_template": "finance/accounts/{account}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0456",
+      "feature_id": "CLI-API-CLIENTS-FINANCIAL-SUMMARY",
+      "module": "Clients and supported people",
+      "route_name": "finance.api.clients.financial-summary",
+      "route_path_template": "finance/api/clients/{client}/financial-summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0457",
+      "feature_id": "CLI-API-CLIENTS-LEDGER",
+      "module": "Clients and supported people",
+      "route_name": "finance.api.clients.ledger",
+      "route_path_template": "finance/api/clients/{client}/ledger",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0463",
+      "feature_id": "SITE-API-SITES-BUDGET",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.api.sites.budget",
+      "route_path_template": "finance/api/sites/{site}/budget",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0464",
+      "feature_id": "SITE-API-SITES-FINANCIAL-SUMMARY",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.api.sites.financial-summary",
+      "route_path_template": "finance/api/sites/{site}/financial-summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0465",
+      "feature_id": "SITE-API-SITES-FORECAST",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.api.sites.forecast",
+      "route_path_template": "finance/api/sites/{site}/forecast",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0466",
+      "feature_id": "SITE-API-SITES-VARIANCE",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.api.sites.variance",
+      "route_path_template": "finance/api/sites/{site}/variance",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0467",
+      "feature_id": "SITE-API-SITES-VARIANCE-TREND",
+      "module": "Sites, facilities and catering",
+      "route_name": "finance.api.sites.variance.trend",
+      "route_path_template": "finance/api/sites/{site}/variance/trend",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0477",
+      "feature_id": "FIN-BANK-ACCOUNTS",
+      "module": "Finance and funding",
+      "route_name": "finance.bank-accounts.show",
+      "route_path_template": "finance/bank-accounts/{bankAccount}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0479",
+      "feature_id": "FIN-BANK-ACCOUNTS",
+      "module": "Finance and funding",
+      "route_name": "finance.bank-accounts.edit",
+      "route_path_template": "finance/bank-accounts/{bankAccount}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0484",
+      "feature_id": "FIN-BANK-FEEDS-LOGS",
+      "module": "Finance and funding",
+      "route_name": "finance.bank-feeds.logs",
+      "route_path_template": "finance/bank-feeds/{feed}/logs",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0489",
+      "feature_id": "FIN-BANK-RECONCILIATION",
+      "module": "Finance and funding",
+      "route_name": "finance.bank-reconciliation.show",
+      "route_path_template": "finance/bank-reconciliation/{reconciliation}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0502",
+      "feature_id": "FIN-BILLS",
+      "module": "Finance and funding",
+      "route_name": "finance.bills.show",
+      "route_path_template": "finance/bills/{bill}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0506",
+      "feature_id": "FIN-BILLS",
+      "module": "Finance and funding",
+      "route_name": "finance.bills.edit",
+      "route_path_template": "finance/bills/{bill}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0513",
+      "feature_id": "FIN-CASH-FLOW-FORECAST",
+      "module": "Finance and funding",
+      "route_name": "finance.cash-flow-forecast.show",
+      "route_path_template": "finance/cash-flow-forecast/{forecast}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0516",
+      "feature_id": "CLI-CLIENTS-FINANCIALS",
+      "module": "Clients and supported people",
+      "route_name": "finance.clients.financials",
+      "route_path_template": "finance/clients/{client}/financials",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0519",
+      "feature_id": "FIN-CONSOLIDATION",
+      "module": "Finance and funding",
+      "route_name": "finance.consolidation.show",
+      "route_path_template": "finance/consolidation/{group}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0522",
+      "feature_id": "FIN-CONSOLIDATION-MAPPING",
+      "module": "Finance and funding",
+      "route_name": "finance.consolidation.mapping",
+      "route_path_template": "finance/consolidation/{group}/mapping",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0525",
+      "feature_id": "FIN-CONSOLIDATION-RUNS",
+      "module": "Finance and funding",
+      "route_name": "finance.consolidation.runs",
+      "route_path_template": "finance/consolidation/{group}/runs",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0526",
+      "feature_id": "FIN-CONSOLIDATION-SHOW-RUN",
+      "module": "Finance and funding",
+      "route_name": "finance.consolidation.show-run",
+      "route_path_template": "finance/consolidation/{group}/runs/{run}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0533",
+      "feature_id": "FIN-CREDIT-NOTES",
+      "module": "Finance and funding",
+      "route_name": "finance.credit-notes.show",
+      "route_path_template": "finance/credit-notes/{creditNote}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0544",
+      "feature_id": "FIN-DONOR-FUNDS",
+      "module": "Finance and funding",
+      "route_name": "finance.donor-funds.show",
+      "route_path_template": "finance/donor-funds/{fund}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0549",
+      "feature_id": "FIN-DONOR-FUNDS-REPORTS",
+      "module": "Finance and funding",
+      "route_name": "finance.donor-funds.reports",
+      "route_path_template": "finance/donor-funds/{fund}/reports",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0554",
+      "feature_id": "FIN-EFTPOS-BATCHES",
+      "module": "Finance and funding",
+      "route_name": "finance.eftpos.batches.show",
+      "route_path_template": "finance/eftpos/batches/{batch}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0570",
+      "feature_id": "ASSET-FIXED-ASSETS",
+      "module": "Assets and equipment",
+      "route_name": "finance.fixed-assets.edit",
+      "route_path_template": "finance/fixed-assets/{fixedAsset}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0583",
+      "feature_id": "FIN-GST-RETURNS",
+      "module": "Finance and funding",
+      "route_name": "finance.gst-returns.show",
+      "route_path_template": "finance/gst-returns/{gstReturn}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0590",
+      "feature_id": "FIN-INTEGRATIONS-MAPPING",
+      "module": "Finance and funding",
+      "route_name": "finance.integrations.mapping",
+      "route_path_template": "finance/integrations/{integration}/mapping",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0594",
+      "feature_id": "FIN-INTERCOMPANY",
+      "module": "Finance and funding",
+      "route_name": "finance.intercompany.index",
+      "route_path_template": "finance/intercompany/{group}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0599",
+      "feature_id": "FIN-INVOICES",
+      "module": "Finance and funding",
+      "route_name": "finance.invoices.show",
+      "route_path_template": "finance/invoices/{invoice}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0602",
+      "feature_id": "FIN-INVOICES",
+      "module": "Finance and funding",
+      "route_name": "finance.invoices.edit",
+      "route_path_template": "finance/invoices/{invoice}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0608",
+      "feature_id": "FIN-IRD-FILINGS",
+      "module": "Finance and funding",
+      "route_name": "finance.ird-filings.show",
+      "route_path_template": "finance/ird-filings/{filing}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0634",
+      "feature_id": "FIN-PAYMENT-RUNS",
+      "module": "Finance and funding",
+      "route_name": "finance.payment-runs.show",
+      "route_path_template": "finance/payment-runs/{paymentRun}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0641",
+      "feature_id": "FIN-PETTY-CASH",
+      "module": "Finance and funding",
+      "route_name": "finance.petty-cash.show",
+      "route_path_template": "finance/petty-cash/{fund}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0646",
+      "feature_id": "FIN-PRICE-BOOKS",
+      "module": "Finance and funding",
+      "route_name": "finance.price_books.show",
+      "route_path_template": "finance/price-books/{priceBook}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0648",
+      "feature_id": "FIN-PRICE-BOOKS",
+      "module": "Finance and funding",
+      "route_name": "finance.price_books.edit",
+      "route_path_template": "finance/price-books/{priceBook}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0655",
+      "feature_id": "FIN-PURCHASE-ORDERS",
+      "module": "Finance and funding",
+      "route_name": "finance.purchase-orders.show",
+      "route_path_template": "finance/purchase-orders/{purchaseOrder}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0659",
+      "feature_id": "FIN-PURCHASE-ORDERS",
+      "module": "Finance and funding",
+      "route_name": "finance.purchase-orders.edit",
+      "route_path_template": "finance/purchase-orders/{purchaseOrder}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0663",
+      "feature_id": "FIN-QUOTES",
+      "module": "Finance and funding",
+      "route_name": "finance.quotes.show",
+      "route_path_template": "finance/quotes/{quote}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0668",
+      "feature_id": "FIN-QUOTES",
+      "module": "Finance and funding",
+      "route_name": "finance.quotes.edit",
+      "route_path_template": "finance/quotes/{quote}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0679",
+      "feature_id": "FIN-RECURRING-CHARGES",
+      "module": "Finance and funding",
+      "route_name": "finance.recurring_charges.edit",
+      "route_path_template": "finance/recurring-charges/{charge}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0697",
+      "feature_id": "FIN-VENDORS",
+      "module": "Finance and funding",
+      "route_name": "finance.vendors.show",
+      "route_path_template": "finance/vendors/{vendor}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0699",
+      "feature_id": "FIN-VENDORS",
+      "module": "Finance and funding",
+      "route_name": "finance.vendors.edit",
+      "route_path_template": "finance/vendors/{vendor}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0710",
+      "feature_id": "FLEET-ASSETS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.assets.edit",
+      "route_path_template": "fleet-assets/assets/{asset}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0714",
+      "feature_id": "FLEET-BOOKINGS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.bookings.show",
+      "route_path_template": "fleet-assets/bookings/{booking}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0725",
+      "feature_id": "FLEET-DEVICES",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.devices.show",
+      "route_path_template": "fleet-assets/devices/{device}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0732",
+      "feature_id": "FLEET-DRIVERS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.drivers.show",
+      "route_path_template": "fleet-assets/drivers/{user}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0733",
+      "feature_id": "FLEET-DRIVERS-SCORECARD",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.drivers.scorecard",
+      "route_path_template": "fleet-assets/drivers/{user}/scorecard",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0740",
+      "feature_id": "FLEET-GEOFENCES",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.geofences.edit",
+      "route_path_template": "fleet-assets/geofences/{geofence}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0745",
+      "feature_id": "FLEET-HANDOVERS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.handovers.show",
+      "route_path_template": "fleet-assets/handovers/{handover}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0751",
+      "feature_id": "FLEET-INCIDENTS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.incidents.show",
+      "route_path_template": "fleet-assets/incidents/{incident}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0766",
+      "feature_id": "FLEET-INSPECTIONS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.inspections.show",
+      "route_path_template": "fleet-assets/inspections/{run}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0783",
+      "feature_id": "FLEET-WORK-ORDERS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.work-orders.show",
+      "route_path_template": "fleet-assets/maintenance/work-orders/{workOrder}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0800",
+      "feature_id": "FLEET-OUTINGS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.outings.show",
+      "route_path_template": "fleet-assets/outings/{outing}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0824",
+      "feature_id": "FLEET-TRANSPORTS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.transports.show",
+      "route_path_template": "fleet-assets/transports/{transport}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0827",
+      "feature_id": "FLEET-TRANSPORTS-PRE-CHECK",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.transports.pre-check",
+      "route_path_template": "fleet-assets/transports/{transport}/pre-check",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0833",
+      "feature_id": "FLEET-TRIPS-PLAYBACK",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.trips.playback.data",
+      "route_path_template": "fleet-assets/trips/{trip}/playback/data",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0838",
+      "feature_id": "FLEET-VEHICLES-ALERTS-CONFIG",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet-assets.vehicles.alerts-config",
+      "route_path_template": "fleet-assets/vehicles/{asset}/alerts-config",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0847",
+      "feature_id": "FLEET-TRIPS",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet.trips.show",
+      "route_path_template": "fleet/trips/{trip}",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0850",
+      "feature_id": "FLEET-TRIPS-PLAYBACK",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet.trips.playback",
+      "route_path_template": "fleet/trips/{trip}/playback",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0851",
+      "feature_id": "FLEET-VEHICLES",
+      "module": "Fleet and vehicles",
+      "route_name": "fleet.vehicles.show",
+      "route_path_template": "fleet/vehicles/{asset}",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0856",
+      "feature_id": "GOV-ACTIONS",
+      "module": "Governance",
+      "route_name": "governance.actions.show",
+      "route_path_template": "governance/actions/{action}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0879",
+      "feature_id": "FIN-BUDGETS",
+      "module": "Finance and funding",
+      "route_name": "governance.budgets.edit",
+      "route_path_template": "governance/budgets/{budget}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0906",
+      "feature_id": "PRIV-COMPLIANCE",
+      "module": "Privacy and compliance",
+      "route_name": "governance.compliance.edit",
+      "route_path_template": "governance/compliance/{obligation}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0914",
+      "feature_id": "GOV-DASHBOARD-WIDGET",
+      "module": "Governance",
+      "route_name": "governance.dashboard.widget",
+      "route_path_template": "governance/dashboard/widget/{widget}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0918",
+      "feature_id": "GOV-DOCUMENTS",
+      "module": "Governance",
+      "route_name": "governance.documents.show",
+      "route_path_template": "governance/documents/{document}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0922",
+      "feature_id": "GOV-EVALUATIONS",
+      "module": "Governance",
+      "route_name": "governance.evaluations.show",
+      "route_path_template": "governance/evaluations/{evaluation}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0926",
+      "feature_id": "GOV-EVALUATIONS-RESULTS",
+      "module": "Governance",
+      "route_name": "governance.evaluations.results",
+      "route_path_template": "governance/evaluations/{evaluation}/results",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0942",
+      "feature_id": "GOV-MEETINGS",
+      "module": "Governance",
+      "route_name": "governance.meetings.edit",
+      "route_path_template": "governance/meetings/{meeting}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0953",
+      "feature_id": "GOV-PACKS",
+      "module": "Governance",
+      "route_name": "governance.packs.show",
+      "route_path_template": "governance/packs/{pack}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0963",
+      "feature_id": "HR-PERFORMANCE",
+      "module": "Human resources",
+      "route_name": "governance.performance.show",
+      "route_path_template": "governance/performance/{review}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0967",
+      "feature_id": "HR-PERFORMANCE",
+      "module": "Human resources",
+      "route_name": "governance.performance.edit",
+      "route_path_template": "governance/performance/{review}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0978",
+      "feature_id": "GOV-POLICIES",
+      "module": "Governance",
+      "route_name": "governance.policies.edit",
+      "route_path_template": "governance/policies/{policy}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0983",
+      "feature_id": "GOV-REPORTS-COMMITTEE",
+      "module": "Governance",
+      "route_name": "governance.reports.committee",
+      "route_path_template": "governance/reports/committee/{committee}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-0990",
+      "feature_id": "GOV-RESOLUTIONS",
+      "module": "Governance",
+      "route_name": "governance.resolutions.show",
+      "route_path_template": "governance/resolutions/{resolution}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1007",
+      "feature_id": "GOV-RISKS",
+      "module": "Governance",
+      "route_name": "governance.risks.edit",
+      "route_path_template": "governance/risks/{risk}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1013",
+      "feature_id": "GOV-RISKS-COMMITTEE",
+      "module": "Governance",
+      "route_name": "governance.risks.committee",
+      "route_path_template": "governance/risks/committee/{committee}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1027",
+      "feature_id": "GOV-SPEND-APPROVALS",
+      "module": "Governance",
+      "route_name": "governance.spend-approvals.edit",
+      "route_path_template": "governance/spend-approvals/{approval}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1036",
+      "feature_id": "GOV-STRATEGY-CHANGES",
+      "module": "Governance",
+      "route_name": "governance.strategy.changes",
+      "route_path_template": "governance/strategy/{plan}/changes",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1037",
+      "feature_id": "GOV-STRATEGY",
+      "module": "Governance",
+      "route_name": "governance.strategy.edit",
+      "route_path_template": "governance/strategy/{plan}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1051",
+      "feature_id": "HS-HAZARDS-MEDIA",
+      "module": "Health and safety",
+      "route_name": "sites.hazards.media.show",
+      "route_path_template": "hazards/{hazard}/media/{kind}/{index}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1059",
+      "feature_id": "CLIN-CLIENTS-CLINICAL-CARD",
+      "module": "Health and clinical",
+      "route_name": "health-clinical.clients.clinical-card",
+      "route_path_template": "health-clinical/clients/{client}/clinical-card",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1060",
+      "feature_id": "CLIN-CLIENTS-SUMMARY",
+      "module": "Health and clinical",
+      "route_name": "health-clinical.clients.summary",
+      "route_path_template": "health-clinical/clients/{client}/summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1061",
+      "feature_id": "CLIN-CLIENTS-TRENDS",
+      "module": "Health and clinical",
+      "route_name": "health-clinical.clients.trends",
+      "route_path_template": "health-clinical/clients/{client}/trends",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1074",
+      "feature_id": "CLIN-PROTOCOLS",
+      "module": "Health and clinical",
+      "route_name": "health-clinical.protocols.edit",
+      "route_path_template": "health-clinical/protocols/{protocol}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1085",
+      "feature_id": "HS-DRILLS",
+      "module": "Health and safety",
+      "route_name": "health-safety.drills.show",
+      "route_path_template": "health-safety/drills/{drill}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1118",
+      "feature_id": "HS-FIRST-AID",
+      "module": "Health and safety",
+      "route_name": "health-safety.first-aid.show",
+      "route_path_template": "health-safety/first-aid/{record}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1129",
+      "feature_id": "HS-INJURIES",
+      "module": "Health and safety",
+      "route_name": "health-safety.injuries.show",
+      "route_path_template": "health-safety/injuries/{injury}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1179",
+      "feature_id": "HS-PROCEDURES",
+      "module": "Health and safety",
+      "route_name": "health-safety.procedures.show",
+      "route_path_template": "health-safety/procedures/{procedure}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1187",
+      "feature_id": "HS-PROCEDURES",
+      "module": "Health and safety",
+      "route_name": "health-safety.procedures.edit",
+      "route_path_template": "health-safety/procedures/{procedure}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1200",
+      "feature_id": "HS-RESTRAINTS-CLIENTS-SUMMARY",
+      "module": "Health and safety",
+      "route_name": "health-safety.restraints.clients.summary",
+      "route_path_template": "health-safety/restraints/clients/{client}/summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1216",
+      "feature_id": "HS-RISK-ASSESSMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.risk-assessments.show",
+      "route_path_template": "health-safety/risk-assessments/{assessment}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1228",
+      "feature_id": "HS-SUBSTANCES",
+      "module": "Health and safety",
+      "route_name": "health-safety.substances.show",
+      "route_path_template": "health-safety/substances/{substance}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1243",
+      "feature_id": "HS-WORKER-PARTICIPATION-CONSULTATIONS-DOCUMENTS",
+      "module": "Health and safety",
+      "route_name": "health-safety.worker-participation.consultations.documents.download",
+      "route_path_template": "health-safety/worker-participation/consultations/{consultation}/documents/{type}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1259",
+      "feature_id": "HR-ANNOUNCEMENTS",
+      "module": "Human resources",
+      "route_name": "hr.announcements.show",
+      "route_path_template": "hr/announcements/{announcement}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1266",
+      "feature_id": "HR-ANNOUNCEMENTS-TRACKING",
+      "module": "Human resources",
+      "route_name": "hr.announcements.tracking",
+      "route_path_template": "hr/announcements/{announcement}/tracking",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1269",
+      "feature_id": "HR-ANNOUNCEMENTS-ATTACHMENTS",
+      "module": "Human resources",
+      "route_name": "hr.announcements.attachments.show",
+      "route_path_template": "hr/announcements/attachments/{attachment}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1281",
+      "feature_id": "HR-ASSETS",
+      "module": "Human resources",
+      "route_name": "hr.assets.show",
+      "route_path_template": "hr/assets/{asset}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1286",
+      "feature_id": "HR-ASSETS-QR-SVG",
+      "module": "Human resources",
+      "route_name": "hr.assets.qr.svg",
+      "route_path_template": "hr/assets/{asset}/qr.svg",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1295",
+      "feature_id": "HR-ASSETS-QR",
+      "module": "Human resources",
+      "route_name": "hr.assets.qr.redirect",
+      "route_path_template": "hr/assets/qr/{token}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1307",
+      "feature_id": "HR-CASES",
+      "module": "Human resources",
+      "route_name": "hr.cases.show",
+      "route_path_template": "hr/cases/{case}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1311",
+      "feature_id": "HR-CASES-DISCIPLINARY",
+      "module": "Human resources",
+      "route_name": "hr.cases.disciplinary.create",
+      "route_path_template": "hr/cases/{case}/disciplinary/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1313",
+      "feature_id": "HR-CASES-EVENTS",
+      "module": "Human resources",
+      "route_name": "hr.cases.events.create",
+      "route_path_template": "hr/cases/{case}/events/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1317",
+      "feature_id": "HR-CASES-DISCIPLINARY",
+      "module": "Human resources",
+      "route_name": "hr.cases.disciplinary.edit",
+      "route_path_template": "hr/cases/disciplinary/{action}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1333",
+      "feature_id": "HR-COMPENSATION-EXPENSES",
+      "module": "Human resources",
+      "route_name": "hr.compensation.expenses.show",
+      "route_path_template": "hr/compensation/expenses/{expenseClaim}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1335",
+      "feature_id": "HR-COMPENSATION-EXPENSES-RECEIPT",
+      "module": "Human resources",
+      "route_name": "hr.compensation.expenses.receipt",
+      "route_path_template": "hr/compensation/expenses/{expenseClaim}/items/{item}/receipt",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1342",
+      "feature_id": "HR-COMPENSATION-HISTORY",
+      "module": "Human resources",
+      "route_name": "hr.compensation.history",
+      "route_path_template": "hr/compensation/history/{profile}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1345",
+      "feature_id": "HR-COMPENSATION-REVIEWS",
+      "module": "Human resources",
+      "route_name": "hr.compensation.reviews.show",
+      "route_path_template": "hr/compensation/reviews/{review}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1360",
+      "feature_id": "FLEET-DRIVERS",
+      "module": "Fleet and vehicles",
+      "route_name": "hr.drivers.show",
+      "route_path_template": "hr/compliance/drivers/{eligibility}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1372",
+      "feature_id": "HR-COMPLIANCE-STAFF",
+      "module": "Human resources",
+      "route_name": "hr.compliance.staff",
+      "route_path_template": "hr/compliance/staff/{staff}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1375",
+      "feature_id": "HR-COMPLIANCE-STATUS-EVIDENCE",
+      "module": "Human resources",
+      "route_name": "hr.compliance.status.evidence",
+      "route_path_template": "hr/compliance/status/{status}/evidence",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1380",
+      "feature_id": "HR-VETTING",
+      "module": "Human resources",
+      "route_name": "hr.vetting.show",
+      "route_path_template": "hr/compliance/vetting/{check}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1384",
+      "feature_id": "HR-VETTING",
+      "module": "Human resources",
+      "route_name": "hr.vetting.edit",
+      "route_path_template": "hr/compliance/vetting/{check}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1390",
+      "feature_id": "HR-DEPARTMENTS",
+      "module": "Human resources",
+      "route_name": "hr.departments.show",
+      "route_path_template": "hr/departments/{department}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1393",
+      "feature_id": "HR-DIRECTORY",
+      "module": "Human resources",
+      "route_name": "hr.directory.show",
+      "route_path_template": "hr/directory/{profile}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1399",
+      "feature_id": "HR-DOCUMENTS-AUDIT",
+      "module": "Human resources",
+      "route_name": "hr.documents.audit",
+      "route_path_template": "hr/documents/{document}/audit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1401",
+      "feature_id": "HR-DOCUMENTS-SIGNED",
+      "module": "Human resources",
+      "route_name": "hr.documents.signed",
+      "route_path_template": "hr/documents/{document}/signed",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1414",
+      "feature_id": "HR-POLICIES",
+      "module": "Human resources",
+      "route_name": "hr.policies.edit",
+      "route_path_template": "hr/documents/policies/{policy}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1423",
+      "feature_id": "HR-DOCUMENTS-TEMPLATES",
+      "module": "Human resources",
+      "route_name": "hr.documents.templates.edit",
+      "route_path_template": "hr/documents/templates/{template}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1429",
+      "feature_id": "HR-EXIT-INTERVIEWS",
+      "module": "Human resources",
+      "route_name": "hr.exit-interviews.show",
+      "route_path_template": "hr/exit-interviews/{exitInterview}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1446",
+      "feature_id": "HR-FEEDBACK-RESPOND",
+      "module": "Human resources",
+      "route_name": "hr.feedback.respond",
+      "route_path_template": "hr/feedback/{feedbackRequest}/respond",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1451",
+      "feature_id": "HR-FEEDBACK-SUMMARY",
+      "module": "Human resources",
+      "route_name": "hr.feedback.summary",
+      "route_path_template": "hr/feedback/summary/{user}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1458",
+      "feature_id": "HR-GOALS",
+      "module": "Human resources",
+      "route_name": "hr.goals.show",
+      "route_path_template": "hr/goals/{goal}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1480",
+      "feature_id": "HR-ICAL-FEED",
+      "module": "Human resources",
+      "route_name": "hr.ical.feed",
+      "route_path_template": "hr/ical/{token}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1489",
+      "feature_id": "HR-LEAVE",
+      "module": "Human resources",
+      "route_name": "hr.leave.show",
+      "route_path_template": "hr/leave/{leaveRequest}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1494",
+      "feature_id": "HR-LEAVE-BALANCES-LEDGER",
+      "module": "Human resources",
+      "route_name": "hr.leave.balances.ledger",
+      "route_path_template": "hr/leave/balances/{user}/ledger",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1533",
+      "feature_id": "HR-MY-PAYSLIPS",
+      "module": "Human resources",
+      "route_name": "hr.my.payslips.show",
+      "route_path_template": "hr/my/payslips/{payslip}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1547",
+      "feature_id": "OPS-MY-TIME-SHIFT-CALENDAR",
+      "module": "Operations and rostering",
+      "route_name": "hr.my.time.shift-calendar",
+      "route_path_template": "hr/my/time/shifts/{shift}/calendar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1551",
+      "feature_id": "HR-OFFBOARDING",
+      "module": "Human resources",
+      "route_name": "hr.offboarding.show",
+      "route_path_template": "hr/offboarding/{checklist}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1557",
+      "feature_id": "HR-ONBOARDING",
+      "module": "Human resources",
+      "route_name": "hr.onboarding.show",
+      "route_path_template": "hr/onboarding/{checklist}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1570",
+      "feature_id": "HR-ONBOARDING-EMAILS",
+      "module": "Human resources",
+      "route_name": "hr.onboarding.emails.preview",
+      "route_path_template": "hr/onboarding/emails/{email}/preview",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1590",
+      "feature_id": "HR-PAYSLIPS",
+      "module": "Human resources",
+      "route_name": "hr.payslips.show",
+      "route_path_template": "hr/payroll/payslips/{payslip}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1596",
+      "feature_id": "HR-PAYROLL-RUNS-NET-PAY-FILE",
+      "module": "Human resources",
+      "route_name": "hr.payroll.runs.net-pay-file",
+      "route_path_template": "hr/payroll/runs/{run}/net-pay-file",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1600",
+      "feature_id": "HR-PEOPLE",
+      "module": "Human resources",
+      "route_name": "hr.people.show",
+      "route_path_template": "hr/people/{profile}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1603",
+      "feature_id": "HR-PEOPLE-DOCUMENTS",
+      "module": "Human resources",
+      "route_name": "hr.people.documents",
+      "route_path_template": "hr/people/{profile}/documents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1608",
+      "feature_id": "HR-PEOPLE",
+      "module": "Human resources",
+      "route_name": "hr.people.edit",
+      "route_path_template": "hr/people/{profile}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1617",
+      "feature_id": "HR-COMPETENCIES-PROFILE",
+      "module": "Human resources",
+      "route_name": "hr.competencies.profile",
+      "route_path_template": "hr/performance/competencies/{profile}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1620",
+      "feature_id": "HR-COMPETENCIES-ASSESSMENTS-EVIDENCE",
+      "module": "Human resources",
+      "route_name": "hr.competencies.assessments.evidence.show",
+      "route_path_template": "hr/performance/competencies/assessments/{assessment}/evidence",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1626",
+      "feature_id": "HR-PIPS",
+      "module": "Human resources",
+      "route_name": "hr.pips.show",
+      "route_path_template": "hr/performance/pips/{pip}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1635",
+      "feature_id": "HR-PIPS-MILESTONES-EVIDENCE",
+      "module": "Human resources",
+      "route_name": "hr.pips.milestones.evidence.show",
+      "route_path_template": "hr/performance/pips/milestones/{milestone}/evidence",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1641",
+      "feature_id": "HR-PERFORMANCE-REVIEWS",
+      "module": "Human resources",
+      "route_name": "hr.performance.reviews.show",
+      "route_path_template": "hr/performance/reviews/{review}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1644",
+      "feature_id": "HR-PERFORMANCE-REVIEWS",
+      "module": "Human resources",
+      "route_name": "hr.performance.reviews.edit",
+      "route_path_template": "hr/performance/reviews/{review}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1645",
+      "feature_id": "HR-PERFORMANCE-REVIEWS-EVIDENCE",
+      "module": "Human resources",
+      "route_name": "hr.performance.reviews.evidence.show",
+      "route_path_template": "hr/performance/reviews/{review}/evidence",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1655",
+      "feature_id": "HR-PERFORMANCE-SUPERVISION",
+      "module": "Human resources",
+      "route_name": "hr.performance.supervision.show",
+      "route_path_template": "hr/performance/supervision/{note}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1658",
+      "feature_id": "HR-PERFORMANCE-SUPERVISION",
+      "module": "Human resources",
+      "route_name": "hr.performance.supervision.edit",
+      "route_path_template": "hr/performance/supervision/{note}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1664",
+      "feature_id": "HR-POSITIONS",
+      "module": "Human resources",
+      "route_name": "hr.positions.edit",
+      "route_path_template": "hr/positions/{position}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1670",
+      "feature_id": "HR-OFFERS",
+      "module": "Human resources",
+      "route_name": "hr.offers.create",
+      "route_path_template": "hr/recruitment/applications/{application}/offer/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1676",
+      "feature_id": "HR-CANDIDATES",
+      "module": "Human resources",
+      "route_name": "hr.candidates.show",
+      "route_path_template": "hr/recruitment/candidates/{candidate}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1710",
+      "feature_id": "HR-OFFERS-LETTER",
+      "module": "Human resources",
+      "route_name": "hr.offers.letter",
+      "route_path_template": "hr/recruitment/offers/{offer}/letter",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1723",
+      "feature_id": "HR-REPORTS-EXPORTS",
+      "module": "Human resources",
+      "route_name": "hr.reports.exports.show",
+      "route_path_template": "hr/reports/exports/{export}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1735",
+      "feature_id": "HR-SETTINGS-AUDIT-LOG",
+      "module": "Human resources",
+      "route_name": "hr.settings.audit-log.show",
+      "route_path_template": "hr/settings/audit-log/{type}/{id}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1750",
+      "feature_id": "HR-SIGNATURES",
+      "module": "Human resources",
+      "route_name": "hr.signatures.show",
+      "route_path_template": "hr/signatures/{signature}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1752",
+      "feature_id": "HR-SIGNATURES-DOCUMENT",
+      "module": "Human resources",
+      "route_name": "hr.signatures.document",
+      "route_path_template": "hr/signatures/{signature}/document",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1762",
+      "feature_id": "HR-SUCCESSION",
+      "module": "Human resources",
+      "route_name": "hr.succession.show",
+      "route_path_template": "hr/succession/{plan}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1770",
+      "feature_id": "HR-SURVEYS",
+      "module": "Human resources",
+      "route_name": "hr.surveys.show",
+      "route_path_template": "hr/surveys/{survey}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1771",
+      "feature_id": "HR-SURVEYS-RESPOND",
+      "module": "Human resources",
+      "route_name": "hr.surveys.respond",
+      "route_path_template": "hr/surveys/{survey}/respond",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1779",
+      "feature_id": "HR-TIME-ENTRIES-AMENDMENTS",
+      "module": "Human resources",
+      "route_name": "hr.time.entries.amendments",
+      "route_path_template": "hr/time/entries/{entry}/amendments",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1796",
+      "feature_id": "HR-TRAINING-COURSES-DETAIL",
+      "module": "Human resources",
+      "route_name": "hr.training.courses.detail",
+      "route_path_template": "hr/training/courses/{course}/detail",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1801",
+      "feature_id": "HR-TRAINING-CERTIFICATE",
+      "module": "Human resources",
+      "route_name": "hr.training.certificate",
+      "route_path_template": "hr/training/enrollments/{enrollment}/certificate",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1823",
+      "feature_id": "HR-WELLBEING-SURVEYS",
+      "module": "Human resources",
+      "route_name": "hr.wellbeing.surveys.show",
+      "route_path_template": "hr/wellbeing/surveys/{survey}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1873",
+      "feature_id": "MED-OVERVIEW",
+      "module": "eMAR and medications",
+      "route_name": "",
+      "route_path_template": "medications/{any}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1911",
+      "feature_id": "OPS-CARE-PLANS",
+      "module": "Operations and rostering",
+      "route_name": "operations.care_plans.edit",
+      "route_path_template": "operations/care-plans/{carePlan}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1914",
+      "feature_id": "OPS-CARE-PLANS-GOALS",
+      "module": "Operations and rostering",
+      "route_name": "operations.care_plans.goals.show",
+      "route_path_template": "operations/care-plans/{carePlan}/goals/{goal}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1929",
+      "feature_id": "OPS-CLIENT-FUNDS",
+      "module": "Operations and rostering",
+      "route_name": "operations.client_funds.show",
+      "route_path_template": "operations/client-funds/{fund}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1938",
+      "feature_id": "OPS-CLIENTS-ACTIONS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.actions.index",
+      "route_path_template": "operations/clients/{client}/actions",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1942",
+      "feature_id": "OPS-CLIENTS-ASSIGNMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.assignments.edit",
+      "route_path_template": "operations/clients/{client}/assignments",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1946",
+      "feature_id": "OPS-CALENDAR",
+      "module": "Operations and rostering",
+      "route_name": "client.calendar",
+      "route_path_template": "operations/clients/{client}/calendar",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1947",
+      "feature_id": "OPS-CLIENTS-CARE",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.care",
+      "route_path_template": "operations/clients/{client}/care",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1948",
+      "feature_id": "OPS-CLIENTS-CONSENT-REQUESTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.consent-requests.index",
+      "route_path_template": "operations/clients/{client}/consent-requests",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1950",
+      "feature_id": "OPS-CLIENTS-CONSENT-REQUESTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.consent-requests.show",
+      "route_path_template": "operations/clients/{client}/consent-requests/{consentRequest}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1952",
+      "feature_id": "OPS-CLIENTS-CONSENT-REQUESTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.consent-requests.create",
+      "route_path_template": "operations/clients/{client}/consent-requests/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1953",
+      "feature_id": "OPS-CLIENTS-CONSENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.consents.index",
+      "route_path_template": "operations/clients/{client}/consents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1956",
+      "feature_id": "OPS-CLIENTS-DAILY-NOTES",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.daily-notes.index",
+      "route_path_template": "operations/clients/{client}/daily-notes",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1962",
+      "feature_id": "OPS-CLIENTS-DAILY-NOTES-REVIEW-QUEUE",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.daily-notes.review-queue",
+      "route_path_template": "operations/clients/{client}/daily-notes/review-queue",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1964",
+      "feature_id": "OPS-CLIENTS-DOCUMENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.documents.index",
+      "route_path_template": "operations/clients/{client}/documents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1969",
+      "feature_id": "OPS-CLIENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.edit",
+      "route_path_template": "operations/clients/{client}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1973",
+      "feature_id": "OPS-CLIENTS-FAMILY-CHAT",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.family-chat.show",
+      "route_path_template": "operations/clients/{client}/family-chat",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1977",
+      "feature_id": "OPS-CLIENTS-GALLERY-PHOTOS-MEDIA",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.gallery-photos.media",
+      "route_path_template": "operations/clients/{client}/gallery-photos/{photo}/media",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1978",
+      "feature_id": "OPS-CLIENTS-GALLERY-PHOTOS-THUMBNAIL",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.gallery-photos.thumbnail",
+      "route_path_template": "operations/clients/{client}/gallery-photos/{photo}/thumbnail",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1979",
+      "feature_id": "CLIN-CLIENTS-HEALTH-BOWEL",
+      "module": "Health and clinical",
+      "route_name": "operations.clients.health.bowel.index",
+      "route_path_template": "operations/clients/{client}/health/bowel",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1983",
+      "feature_id": "CLIN-CLIENTS-HEALTH-FLUID",
+      "module": "Health and clinical",
+      "route_name": "operations.clients.health.fluid.index",
+      "route_path_template": "operations/clients/{client}/health/fluid",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1987",
+      "feature_id": "CLIN-CLIENTS-HEALTH-SEIZURE",
+      "module": "Health and clinical",
+      "route_name": "operations.clients.health.seizure.index",
+      "route_path_template": "operations/clients/{client}/health/seizure",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1991",
+      "feature_id": "CLIN-CLIENTS-HEALTH-SLEEP",
+      "module": "Health and clinical",
+      "route_name": "operations.clients.health.sleep.index",
+      "route_path_template": "operations/clients/{client}/health/sleep",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-1995",
+      "feature_id": "OPS-CLIENTS-INCIDENTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.incidents.index",
+      "route_path_template": "operations/clients/{client}/incidents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2003",
+      "feature_id": "OPS-CLIENTS-LOCATION-HISTORY",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.location.history",
+      "route_path_template": "operations/clients/{client}/location/history",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2005",
+      "feature_id": "OPS-CLIENTS-MAR",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.mar.show",
+      "route_path_template": "operations/clients/{client}/mar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2011",
+      "feature_id": "OPS-CLIENTS-MEDICAL",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.medical.show",
+      "route_path_template": "operations/clients/{client}/medical",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2036",
+      "feature_id": "OPS-CLIENTS-PORTAL-USERS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.portal_users.edit",
+      "route_path_template": "operations/clients/{client}/portal-users",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2042",
+      "feature_id": "OPS-CLIENTS-RISKS",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.risks.index",
+      "route_path_template": "operations/clients/{client}/risks",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2046",
+      "feature_id": "OPS-CLIENTS-ROUTINES",
+      "module": "Operations and rostering",
+      "route_name": "operations.clients.routines.index",
+      "route_path_template": "operations/clients/{client}/routines",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2053",
+      "feature_id": "OPS-VISIT-REQUESTS",
+      "module": "Operations and rostering",
+      "route_name": "client.visit-requests.index",
+      "route_path_template": "operations/clients/{client}/visit-requests",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2059",
+      "feature_id": "OPS-EVV",
+      "module": "Operations and rostering",
+      "route_name": "operations.evv.show",
+      "route_path_template": "operations/evv/{record}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2069",
+      "feature_id": "OPS-FORMS",
+      "module": "Operations and rostering",
+      "route_name": "operations.forms.show",
+      "route_path_template": "operations/forms/{form}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2071",
+      "feature_id": "OPS-FORMS",
+      "module": "Operations and rostering",
+      "route_name": "operations.forms.edit",
+      "route_path_template": "operations/forms/{form}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2072",
+      "feature_id": "OPS-FORMS-SUBMISSIONS",
+      "module": "Operations and rostering",
+      "route_name": "operations.forms.submissions",
+      "route_path_template": "operations/forms/{form}/submissions",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2078",
+      "feature_id": "OPS-FUNDING-CLAIMS",
+      "module": "Operations and rostering",
+      "route_name": "operations.funding.claims.show",
+      "route_path_template": "operations/funding/claims/{claim}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2089",
+      "feature_id": "OPS-HANDOVERS",
+      "module": "Operations and rostering",
+      "route_name": "operations.handovers.show",
+      "route_path_template": "operations/handovers/{handover}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2099",
+      "feature_id": "OPS-MESSAGES",
+      "module": "Operations and rostering",
+      "route_name": "operations.messages.show",
+      "route_path_template": "operations/messages/{conversation}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2115",
+      "feature_id": "OPS-NOTE-TEMPLATES",
+      "module": "Operations and rostering",
+      "route_name": "operations.note_templates.edit",
+      "route_path_template": "operations/note-templates/{template}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2122",
+      "feature_id": "OPS-ONBOARDING",
+      "module": "Operations and rostering",
+      "route_name": "operations.onboarding.show",
+      "route_path_template": "operations/onboarding/{workflow}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2135",
+      "feature_id": "OPS-QUALIFICATIONS-CHECK",
+      "module": "Operations and rostering",
+      "route_name": "operations.qualifications.check",
+      "route_path_template": "operations/qualifications/check/{shift}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2150",
+      "feature_id": "OPS-ROSTERING-PERIODS-DIFF",
+      "module": "Operations and rostering",
+      "route_name": "operations.rostering.periods.diff",
+      "route_path_template": "operations/rostering/periods/{period}/diff",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2153",
+      "feature_id": "OPS-ROSTERING-PERIODS-REVIEW",
+      "module": "Operations and rostering",
+      "route_name": "operations.rostering.periods.review.show",
+      "route_path_template": "operations/rostering/periods/{period}/review",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2156",
+      "feature_id": "OPS-ROSTERING-SUGGESTIONS",
+      "module": "Operations and rostering",
+      "route_name": "operations.rostering.suggestions.show",
+      "route_path_template": "operations/rostering/suggestions/{run}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2193",
+      "feature_id": "OPS-SHIFTS",
+      "module": "Operations and rostering",
+      "route_name": "operations.shifts.show",
+      "route_path_template": "operations/shifts/{shift}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2199",
+      "feature_id": "OPS-SHIFTS-CANDIDATES",
+      "module": "Operations and rostering",
+      "route_name": "operations.shifts.candidates",
+      "route_path_template": "operations/shifts/{shift}/candidates",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2202",
+      "feature_id": "OPS-SHIFTS-EDITABLE",
+      "module": "Operations and rostering",
+      "route_name": "operations.shifts.editable",
+      "route_path_template": "operations/shifts/{shift}/editable",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2217",
+      "feature_id": "OPS-SHIFTS-SERIES",
+      "module": "Operations and rostering",
+      "route_name": "operations.shifts.series.show",
+      "route_path_template": "operations/shifts/series/{series}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2223",
+      "feature_id": "OPS-TIMESHEETS",
+      "module": "Operations and rostering",
+      "route_name": "operations.timesheets.show",
+      "route_path_template": "operations/timesheets/{timesheet}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2227",
+      "feature_id": "OPS-TIMESHEETS",
+      "module": "Operations and rostering",
+      "route_name": "operations.timesheets.edit",
+      "route_path_template": "operations/timesheets/{timesheet}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2245",
+      "feature_id": "CLI-CLIENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.show",
+      "route_path_template": "portal/clients/{client}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2246",
+      "feature_id": "CLI-CLIENTS-CALENDAR",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.calendar",
+      "route_path_template": "portal/clients/{client}/calendar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2247",
+      "feature_id": "CLI-CLIENTS-CALENDAR-EVENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.calendar.events",
+      "route_path_template": "portal/clients/{client}/calendar/events",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2248",
+      "feature_id": "CLI-CLIENTS-CONSENT-REQUESTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.consent-requests.show",
+      "route_path_template": "portal/clients/{client}/consent-requests/{consentRequest}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2251",
+      "feature_id": "CLI-CLIENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.dashboard",
+      "route_path_template": "portal/clients/{client}/dashboard",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2252",
+      "feature_id": "CLI-CLIENTS-DOCUMENTS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.documents",
+      "route_path_template": "portal/clients/{client}/documents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2255",
+      "feature_id": "CLI-CLIENTS-FAMILY-NOTES",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.family-notes",
+      "route_path_template": "portal/clients/{client}/family-notes",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2259",
+      "feature_id": "CLI-CLIENTS-HEALTH",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.health",
+      "route_path_template": "portal/clients/{client}/health",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2261",
+      "feature_id": "CLI-CLIENTS-LOCATION",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.location",
+      "route_path_template": "portal/clients/{client}/location",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2262",
+      "feature_id": "CLI-CLIENTS-LOCATION-HISTORY",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.location.history",
+      "route_path_template": "portal/clients/{client}/location/history",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2263",
+      "feature_id": "CLI-CLIENTS-MESSAGES",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.messages",
+      "route_path_template": "portal/clients/{client}/messages",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2264",
+      "feature_id": "CLI-CLIENTS-MESSAGES",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.messages.search",
+      "route_path_template": "portal/clients/{client}/messages-search",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2265",
+      "feature_id": "CLI-CLIENTS-MESSAGES",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.messages.show",
+      "route_path_template": "portal/clients/{client}/messages/{conversation}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2271",
+      "feature_id": "CLI-CLIENTS-PHOTOS",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.photos",
+      "route_path_template": "portal/clients/{client}/photos",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2273",
+      "feature_id": "CLI-CLIENTS-PHOTOS-MEDIA",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.photos.media",
+      "route_path_template": "portal/clients/{client}/photos/{photo}/media",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2274",
+      "feature_id": "CLI-CLIENTS-PHOTOS-THUMBNAIL",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.photos.thumbnail",
+      "route_path_template": "portal/clients/{client}/photos/{photo}/thumbnail",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2276",
+      "feature_id": "CLI-CLIENTS-SCHEDULE",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.schedule",
+      "route_path_template": "portal/clients/{client}/schedule",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2277",
+      "feature_id": "CLI-CLIENTS-TIMELINE",
+      "module": "Clients and supported people",
+      "route_name": "portal.clients.timeline",
+      "route_path_template": "portal/clients/{client}/timeline",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2311",
+      "feature_id": "PRIV-LEGAL-HOLDS",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.legal-holds.edit",
+      "route_path_template": "privacy/legal-holds/{hold}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2316",
+      "feature_id": "PRIV-DPIA",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.dpia.show",
+      "route_path_template": "privacy/pia/{dpia}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2319",
+      "feature_id": "PRIV-DPIA",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.dpia.edit",
+      "route_path_template": "privacy/pia/{dpia}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2327",
+      "feature_id": "PRIV-REQUESTS",
+      "module": "Privacy and compliance",
+      "route_name": "privacy.requests.show",
+      "route_path_template": "privacy/requests/{dsRequest}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2359",
+      "feature_id": "AUTH-RESET",
+      "module": "Authentication and account security",
+      "route_name": "password.reset",
+      "route_path_template": "reset-password/{token}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2366",
+      "feature_id": "RESP-BOOKINGS",
+      "module": "Respite",
+      "route_name": "respite.bookings.show",
+      "route_path_template": "respite/bookings/{booking}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2371",
+      "feature_id": "CLI-CLIENTS-RISK-PLAN-ACTIVATIONS",
+      "module": "Clients and supported people",
+      "route_name": "respite.clients.risk-plan-activations",
+      "route_path_template": "respite/clients/{clientId}/risk-plan-activations",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2374",
+      "feature_id": "RESP-COMMUNICATION-LOGS",
+      "module": "Respite",
+      "route_name": "respite.communication-logs.show",
+      "route_path_template": "respite/communication-logs/{communicationLog}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2380",
+      "feature_id": "RESP-DAILY-NOTES",
+      "module": "Respite",
+      "route_name": "respite.daily-notes.show",
+      "route_path_template": "respite/daily-notes/{dailyNote}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2396",
+      "feature_id": "OPS-HANDOVER-NOTES",
+      "module": "Operations and rostering",
+      "route_name": "respite.handover-notes.show",
+      "route_path_template": "respite/handover-notes/{handoverNote}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2403",
+      "feature_id": "RESP-PROCEDURE-RUNS",
+      "module": "Respite",
+      "route_name": "respite.procedure-runs.show",
+      "route_path_template": "respite/procedure-runs/{procedureRun}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2414",
+      "feature_id": "RESP-PROCEDURES",
+      "module": "Respite",
+      "route_name": "respite.procedures.show",
+      "route_path_template": "respite/procedures/{template}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2418",
+      "feature_id": "CLI-REFERRALS",
+      "module": "Clients and supported people",
+      "route_name": "respite.referrals.show",
+      "route_path_template": "respite/referrals/{referral}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2423",
+      "feature_id": "RESP-REQUESTS",
+      "module": "Respite",
+      "route_name": "respite.requests.show",
+      "route_path_template": "respite/requests/{request}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2433",
+      "feature_id": "RESP-RISK-PLAN-ACTIVATIONS",
+      "module": "Respite",
+      "route_name": "respite.risk-plan-activations.show",
+      "route_path_template": "respite/risk-plan-activations/{riskPlanActivation}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2444",
+      "feature_id": "RESP-STAYS",
+      "module": "Respite",
+      "route_name": "respite.stays.show",
+      "route_path_template": "respite/stays/{stay}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2447",
+      "feature_id": "RESP-STAYS-COMMUNICATION-LOGS",
+      "module": "Respite",
+      "route_name": "respite.stays.communication-logs",
+      "route_path_template": "respite/stays/{stay}/communication-logs",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2449",
+      "feature_id": "RESP-STAYS-DAILY-NOTES",
+      "module": "Respite",
+      "route_name": "respite.stays.daily-notes",
+      "route_path_template": "respite/stays/{stay}/daily-notes",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2451",
+      "feature_id": "RESP-STAYS-EVIDENCE-PACK",
+      "module": "Respite",
+      "route_name": "respite.stays.evidence-pack",
+      "route_path_template": "respite/stays/{stay}/evidence-pack",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2453",
+      "feature_id": "OPS-STAYS-HANDOVER-NOTES",
+      "module": "Operations and rostering",
+      "route_name": "respite.stays.handover-notes",
+      "route_path_template": "respite/stays/{stay}/handover-notes",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2457",
+      "feature_id": "RESP-STAYS-RISK-PLAN-ACTIVATIONS",
+      "module": "Respite",
+      "route_name": "respite.stays.risk-plan-activations",
+      "route_path_template": "respite/stays/{stay}/risk-plan-activations",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2459",
+      "feature_id": "RESP-TASKS",
+      "module": "Respite",
+      "route_name": "respite.tasks.show",
+      "route_path_template": "respite/tasks/{task}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2479",
+      "feature_id": "ROAD-INITIATIVES",
+      "module": "Roadmap",
+      "route_name": "roadmap.initiatives.show",
+      "route_path_template": "roadmap/initiatives/{initiative}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2484",
+      "feature_id": "ROAD-PLANS",
+      "module": "Roadmap",
+      "route_name": "roadmap.plans.show",
+      "route_path_template": "roadmap/quarterly-plans/{plan}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2492",
+      "feature_id": "ROAD-REPORTS",
+      "module": "Roadmap",
+      "route_name": "roadmap.reports.show",
+      "route_path_template": "roadmap/reports/snapshots/{snapshot}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2499",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "rostering/{any}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2504",
+      "feature_id": "INC-OVERVIEW",
+      "module": "Incidents and safeguarding",
+      "route_name": "safeguarding.show",
+      "route_path_template": "safeguarding/{concern}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2514",
+      "feature_id": "INC-OVERVIEW",
+      "module": "Incidents and safeguarding",
+      "route_name": "safeguarding.edit",
+      "route_path_template": "safeguarding/{concern}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2534",
+      "feature_id": "SEC-DEVICE-GROUPS",
+      "module": "Security and devices",
+      "route_name": "security-devices.device-groups.show",
+      "route_path_template": "security-devices/device-groups/{group}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2536",
+      "feature_id": "SEC-DEVICE-GROUPS-AUTO-RULES",
+      "module": "Security and devices",
+      "route_name": "security-devices.device-groups.auto-rules.preview",
+      "route_path_template": "security-devices/device-groups/{group}/auto-rules/preview",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2538",
+      "feature_id": "SEC-DEVICE-GROUPS",
+      "module": "Security and devices",
+      "route_name": "security-devices.device-groups.edit",
+      "route_path_template": "security-devices/device-groups/{group}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2550",
+      "feature_id": "SEC-DEVICES-ASSIGNMENTS",
+      "module": "Security and devices",
+      "route_name": "security-devices.devices.assignments",
+      "route_path_template": "security-devices/devices/{device}/assignments",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2553",
+      "feature_id": "SEC-DEVICES-DOCUMENTS",
+      "module": "Security and devices",
+      "route_name": "security-devices.devices.documents.download",
+      "route_path_template": "security-devices/devices/{device}/documents/{document}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2554",
+      "feature_id": "SEC-DEVICES",
+      "module": "Security and devices",
+      "route_name": "security-devices.devices.edit",
+      "route_path_template": "security-devices/devices/{device}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2702",
+      "feature_id": "SET-USERS",
+      "module": "Settings and system access",
+      "route_name": "settings.users.show",
+      "route_path_template": "settings/users/{target}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2710",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "shifts/{any}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2711",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "shifts/{shift}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2717",
+      "feature_id": "CLIN-CLINICAL-OBSERVATIONS-DUE",
+      "module": "Health and clinical",
+      "route_name": "shifts.clinical.observations.due",
+      "route_path_template": "shifts/{shift}/clinical/observations/due",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2734",
+      "feature_id": "SITE-CALENDAR",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.calendar.index",
+      "route_path_template": "sites/{site}/calendar",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2735",
+      "feature_id": "SITE-CALENDAR-EVENTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.calendar.events",
+      "route_path_template": "sites/{site}/calendar/events",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2744",
+      "feature_id": "SITE-CHECKLISTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.checklists.index",
+      "route_path_template": "sites/{site}/checklists",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2748",
+      "feature_id": "SITE-CHECKLISTS-RUNS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.checklists.runs",
+      "route_path_template": "sites/{site}/checklists/runs",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2752",
+      "feature_id": "PRIV-COMPLIANCE",
+      "module": "Privacy and compliance",
+      "route_name": "sites.compliance.dashboard",
+      "route_path_template": "sites/{site}/compliance",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2763",
+      "feature_id": "SITE-CREDENTIALS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.credentials.index",
+      "route_path_template": "sites/{site}/credentials",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2767",
+      "feature_id": "SITE-CREDENTIALS-AUDIT",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.credentials.audit",
+      "route_path_template": "sites/{site}/credentials/{credential}/audit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2774",
+      "feature_id": "SITE-DAMAGES",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.damages.index",
+      "route_path_template": "sites/{site}/damages",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2779",
+      "feature_id": "SITE-DOCUMENTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.documents.index",
+      "route_path_template": "sites/{site}/documents",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2784",
+      "feature_id": "SITE-OVERVIEW",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.edit",
+      "route_path_template": "sites/{site}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2785",
+      "feature_id": "SITE-EMERGENCY-PLAN",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.emergency-plan.show",
+      "route_path_template": "sites/{site}/emergency-plan",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2788",
+      "feature_id": "SITE-FEEDBACK",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.feedback",
+      "route_path_template": "sites/{site}/feedback",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2795",
+      "feature_id": "SITE-HARDWARE",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.hardware.index",
+      "route_path_template": "sites/{site}/hardware",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2800",
+      "feature_id": "HS-HAZARDS",
+      "module": "Health and safety",
+      "route_name": "sites.hazards.index",
+      "route_path_template": "sites/{site}/hazards",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2802",
+      "feature_id": "HS-HAZARDS",
+      "module": "Health and safety",
+      "route_name": "sites.hazards.create",
+      "route_path_template": "sites/{site}/hazards/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2803",
+      "feature_id": "SITE-HOUSE-CHECKLISTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.house-checklists.index",
+      "route_path_template": "sites/{site}/house-checklists",
+      "classification": "Reviewed/closure",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2804",
+      "feature_id": "SITE-INSPECTIONS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.inspections.index",
+      "route_path_template": "sites/{site}/inspections",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2808",
+      "feature_id": "SITE-INTEGRATIONS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.integrations.index",
+      "route_path_template": "sites/{site}/integrations",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2816",
+      "feature_id": "SITE-LEDGER",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.ledger.index",
+      "route_path_template": "sites/{site}/ledger",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2819",
+      "feature_id": "SITE-LEDGER-ENTRIES-ATTACHMENT",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.ledger.entries.attachment",
+      "route_path_template": "sites/{site}/ledger/entries/{entry}/attachment",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2823",
+      "feature_id": "SITE-MEALS-INVENTORY",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.inventory.index",
+      "route_path_template": "sites/{site}/meal-inventory",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2828",
+      "feature_id": "SITE-MEALS-INVENTORY-MOVEMENTS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.inventory.movements",
+      "route_path_template": "sites/{site}/meal-inventory/movements",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2830",
+      "feature_id": "SITE-MEALS-PLAN",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.plan.index",
+      "route_path_template": "sites/{site}/meal-plan",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2838",
+      "feature_id": "SITE-MEALS-PLAN-WEEK-SUMMARY",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.plan.weekSummary",
+      "route_path_template": "sites/{site}/meal-plan/week-summary",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2839",
+      "feature_id": "SITE-MEALS-BOOTSTRAP",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.bootstrap",
+      "route_path_template": "sites/{site}/meal-planner/bootstrap",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2843",
+      "feature_id": "SITE-MEALS-TAKEAWAY-VENDORS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.takeawayVendors",
+      "route_path_template": "sites/{site}/meal-planner/takeaway-vendors",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2844",
+      "feature_id": "SITE-MEALS-SHOPPING",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.shopping.index",
+      "route_path_template": "sites/{site}/meal-shopping-lists",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2851",
+      "feature_id": "SITE-MEALS-TEMPLATES",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.meals.templates.index",
+      "route_path_template": "sites/{site}/meal-templates",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2859",
+      "feature_id": "SITE-PLAN",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.plan.show",
+      "route_path_template": "sites/{site}/plan",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2868",
+      "feature_id": "SITE-RESOURCES",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.resources.index",
+      "route_path_template": "sites/{site}/resources",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2872",
+      "feature_id": "SITE-ROOMS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.rooms.index",
+      "route_path_template": "sites/{site}/rooms",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2879",
+      "feature_id": "SITE-ROOMS-DOOR-CARD",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.rooms.door-card",
+      "route_path_template": "sites/{site}/rooms/{room}/door-card",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2888",
+      "feature_id": "SITE-VENDORS",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.vendors.index",
+      "route_path_template": "sites/{site}/vendors",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2893",
+      "feature_id": "SITE-ZONES",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.zones.index",
+      "route_path_template": "sites/{site}/zones",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2912",
+      "feature_id": "SITE-REPORTS-SITE-DETAIL",
+      "module": "Sites, facilities and catering",
+      "route_name": "sites.reports.site-detail",
+      "route_path_template": "sites/reports/site/{site}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2919",
+      "feature_id": "HR-ASSIGNMENTS",
+      "module": "Human resources",
+      "route_name": "staff.assignments.edit",
+      "route_path_template": "staff/{user}/assignments",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2924",
+      "feature_id": "HR-BACKGROUND-CHECKS-USER",
+      "module": "Human resources",
+      "route_name": "staff.background-checks.user",
+      "route_path_template": "staff/{user}/background-checks",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2926",
+      "feature_id": "HR-BACKGROUND-CHECKS",
+      "module": "Human resources",
+      "route_name": "staff.background-checks.create",
+      "route_path_template": "staff/{user}/background-checks/create",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2927",
+      "feature_id": "HR-CREDENTIALS",
+      "module": "Human resources",
+      "route_name": "staff.credentials.index",
+      "route_path_template": "staff/{user}/credentials",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2931",
+      "feature_id": "HR-OVERVIEW",
+      "module": "Human resources",
+      "route_name": "staff.edit",
+      "route_path_template": "staff/{user}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2932",
+      "feature_id": "HR-INDUCTION",
+      "module": "Human resources",
+      "route_name": "staff.induction.show",
+      "route_path_template": "staff/{user}/induction",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2934",
+      "feature_id": "HR-STAFF",
+      "module": "Human resources",
+      "route_name": "timeline.staff",
+      "route_path_template": "staff/{user}/timeline",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2936",
+      "feature_id": "HR-BACKGROUND-CHECKS",
+      "module": "Human resources",
+      "route_name": "staff.background-checks.show",
+      "route_path_template": "staff/background-checks/{check}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2939",
+      "feature_id": "HR-BACKGROUND-CHECKS",
+      "module": "Human resources",
+      "route_name": "staff.background-checks.edit",
+      "route_path_template": "staff/background-checks/{check}/edit",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2946",
+      "feature_id": "CLI-CLIENT",
+      "module": "Clients and supported people",
+      "route_name": "summaries.client",
+      "route_path_template": "summaries/clients/{client}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2949",
+      "feature_id": "HR-STAFF",
+      "module": "Human resources",
+      "route_name": "summaries.staff",
+      "route_path_template": "summaries/staff/{user}",
+      "classification": "Reviewed",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2986",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "timesheets/{any}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2987",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "timesheets/{timesheet}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-2990",
+      "feature_id": "OPS-OVERVIEW",
+      "module": "Operations and rostering",
+      "route_name": "",
+      "route_path_template": "timesheets/{timesheet}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-3003",
+      "feature_id": "HR-COURSES",
+      "module": "Human resources",
+      "route_name": "",
+      "route_path_template": "training/courses/{course}",
+      "classification": "Redirect/legacy",
+      "reason": null
+    },
+    {
+      "route_id": "ROUTE-3005",
+      "feature_id": "HR-COURSES",
+      "module": "Human resources",
+      "route_name": "",
+      "route_path_template": "training/courses/{course}/edit",
+      "classification": "Redirect/legacy",
+      "reason": null
+    }
+  ]
+}

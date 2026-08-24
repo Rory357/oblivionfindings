@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave3",
+  "generated_at": "2026-08-21T21:30:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Static source trigger pairing only. Runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "selection_sha256": "290fd900e6068e047970f60fd96862e6c169d6c6fd69dc0c77dcd7be4a6c2f42",
+    "exclusion_sha256": "1cedf51984148e75067ed086b6a052d8f3710c808ffe209c55d4ff491833733f",
+    "independent_proof_tuple_sha256": "47283e7b352d4f4447328fc802eca633ad779d9b35909c40dced1ae92ef6fa48",
+    "independent_source_map_sha256": "ad9aed02a45b8f18697b678b30eac767d66c894ce964dfd8e2ff41dc6a667dbd",
+    "verdict": "GO_10_exact_static_trigger_pairings"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/components/respite/workspace.tsx",
+      "line": 475,
+      "symbol": "RestraintEventWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/respite/workspace.tsx",
+        "source_sha256": "372f9df625ca14dfd8c9f2885e15afefb4d0ea9481d05c0163fac44bed4fe0b7",
+        "state_identifier": "restraintStay",
+        "setter": "setRestraintStay",
+        "static_chain": "state 138; callback/setter 401; child stays.tsx:267; bind 474/open 477",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/components/respite/workspace.tsx",
+      "line": 506,
+      "symbol": "ReasonDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/respite/workspace.tsx",
+        "source_sha256": "372f9df625ca14dfd8c9f2885e15afefb4d0ea9481d05c0163fac44bed4fe0b7",
+        "state_identifier": "reasonAction",
+        "setter": "setReasonAction",
+        "static_chain": "state 147; onDecline/setter 342-343; child referrals.tsx:178; bind 505/open 507",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/components/rostering/calendar-pane.tsx",
+      "line": 1642,
+      "symbol": "PeekPopover",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/rostering/calendar-pane.tsx",
+        "source_sha256": "db91992debab73eeb37e6e2d59eda7f0fd61bcff11a487ca1ea77e5585e17dcf",
+        "state_identifier": "peek",
+        "setter": "setPeek",
+        "static_chain": "state 972; onChipPeek/setter 1212-1219; intrinsic button 279-281; bind 1641",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/analytics.tsx",
+      "line": 843,
+      "symbol": "DrillModal",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/analytics.tsx",
+        "source_sha256": "ce3a441569662d3eadf49b90702fd6d23a8b4e9095daffd6487733b97c5e894a",
+        "state_identifier": "drill",
+        "setter": "setDrill",
+        "static_chain": "state 536; openDrill/setter 569; direct menu 574; render 843",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/dashboard.tsx",
+      "line": 261,
+      "symbol": "ReportIncidentDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/dashboard.tsx",
+        "source_sha256": "2a7210a9931e60fc62ebe622a193c8c2431887853c99303c8ff5f170dc5d10bd",
+        "state_identifier": "activeWizard",
+        "setter": "setActiveWizard",
+        "static_chain": "state 148; onWorkflow/setter 248-257; launcher incident 37/72; bind 260",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/dashboard.tsx",
+      "line": 266,
+      "symbol": "SubstanceWizardDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/dashboard.tsx",
+        "source_sha256": "2a7210a9931e60fc62ebe622a193c8c2431887853c99303c8ff5f170dc5d10bd",
+        "state_identifier": "activeWizard",
+        "setter": "setActiveWizard",
+        "static_chain": "state 148; onWorkflow/setter 248-257; launcher substance 43/72; bind 265",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/drills/index.tsx",
+      "line": 377,
+      "symbol": "DrillCompleteDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/drills/index.tsx",
+        "source_sha256": "708530f18c8be8f7ae18e738a301c534dfcbbebb5ed5100bd08ead24636c7fe2",
+        "state_identifier": "completeDrill",
+        "setter": "setCompleteDrill",
+        "static_chain": "state 102; launchComplete/setter 127-128; direct menu 159; bind 376/open 377",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/risk-assessments/index.tsx",
+      "line": 412,
+      "symbol": "RaWizardDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/risk-assessments/index.tsx",
+        "source_sha256": "47fb2b22e65e242441bcb156fc71a6a97a1aa943dd0a3d452f54730d1e055a58",
+        "state_identifier": "modal",
+        "setter": "setModal",
+        "static_chain": "state 122; openNew/setter 194-195; direct Button 343; bind 411",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/calendar/index.tsx",
+      "line": 892,
+      "symbol": "ICalSubscribeDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/calendar/index.tsx",
+        "source_sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+        "state_identifier": "subscribeOpen",
+        "setter": "setSubscribeOpen",
+        "static_chain": "state 225; callback/setter 677; hero QuickAction 180; bind 892",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/calendar/index.tsx",
+      "line": 928,
+      "symbol": "CalendarDetailPopover",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/calendar/index.tsx",
+        "source_sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+        "state_identifier": "detail",
+        "setter": "setDetail",
+        "static_chain": "state 227; handleEventClick/setter 494-499; direct menu 552; bind 927",
+        "credit_boundary": "static pairing only"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 183,
+    "source_inferred_not_exactly_paired": 203,
+    "unresolved_or_blocked": 273,
+    "same_scope_state_handler": 164,
+    "internal_state_trigger_candidate": 203,
+    "controlled_without_resolved_activator": 256,
+    "generic_unresolved": 271,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208,
+    "primitive_unresolved": 269
+  }
+}

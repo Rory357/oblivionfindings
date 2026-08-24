@@ -1,0 +1,69 @@
+# CAP-HR-HR-DOCUMENT-LIBRARY — Hr Document Library
+
+Status: **Blocked — source-derived final-ID script; representative-role execution and independent task validation not performed.**
+
+## Evidence boundary
+
+- Capability: `CAP-HR-HR-DOCUMENT-LIBRARY`
+- Canonical module: `HR`
+- ID provenance: `exact`
+- Source families: `HR-HR-DOCUMENT`
+- Route scope: exact target allocation
+- Route evidence: `ROUTE-1395`, `ROUTE-1396`, `ROUTE-1397`, `ROUTE-1398`, `ROUTE-1399`, `ROUTE-1400`, `ROUTE-1401`, `ROUTE-1402`, `ROUTE-1403`, `ROUTE-1404`, `ROUTE-1406`, `ROUTE-1426`
+- Route names: `hr.documents.audit`, `hr.documents.bulk-delete`, `hr.documents.bulk-download`, `hr.documents.destroy`, `hr.documents.download`, `hr.documents.export`, `hr.documents.index`, `hr.documents.move`, `hr.documents.signed`, `hr.documents.store`, `hr.documents.update`, `hr.documents.upload`
+- Route paths: `hr/documents`, `hr/documents/{document}`, `hr/documents/{document}/audit`, `hr/documents/{document}/download`, `hr/documents/{document}/signed`, `hr/documents/bulk-delete`, `hr/documents/bulk-download`, `hr/documents/export`, `hr/documents/move`, `hr/documents/upload`
+- Page scope: exact/shared target support allocation retained in the working manifest
+- Page evidence: `PAGE-0436`, `PAGE-0438`, `PAGE-0443`
+- Exact target actions: `audit`, `bulkDestroy`, `bulkDownload`, `createUpload`, `destroy`, `download`, `downloadSigned`, `export`, `index`, `move`, `store`, `update`
+- Backend anchors: `app/Http/Controllers/Hr/HrDocumentController.php`
+- Exact working-ID findings: No exact working-ID finding link is currently established.
+
+Blank or source-family-envelope evidence must not be read as proof that this capability has no route/page or that every family route belongs exclusively to it.
+
+## Representative task
+
+Actor: Authorised HR practitioner, manager or employee where self-service applies
+
+Goal: Complete **Hr Document Library** on the authoritative record, then verify an unambiguous persisted outcome, actor/time provenance, downstream effect and next accountable owner or terminal state.
+
+Prerequisites:
+
+- A non-production representative account with the documented global/site/ownership scope.
+- A resettable synthetic record in the correct prerequisite state.
+- Target authorization evidence. Exact route permission atoms where enriched: `hr.documents.manage`, `hr.documents.view`
+- Known wrong-site, wrong-parent and wrong-record fixtures for denial checks.
+
+Steps:
+
+1. Enter through an authorised route/page for this final capability. If target-exclusive entry evidence is not enriched, locate the source-family owner without assuming a shared page is an exclusive entry.
+2. Confirm the actor, site, parent/child relation, owning record and prerequisite state before disclosing or changing data.
+3. Perform only the action(s) evidenced for this capability; do not infer a split target's action from the entire source-family envelope.
+4. Verify the authoritative persisted state and immutable/auditable actor, effective time and source provenance. A rendered page, toast or HTTP success alone is not completion.
+5. Verify the next owner, notification/outbox/reporting effect or terminal outcome, then exercise the documented correction/retry path where safe.
+
+## Required error and recovery checks
+
+- Wrong site, person, parent or nested child: deny before disclosure or side effect.
+- Invalid input: retain safe input, bind messages to fields and preserve authoritative state.
+- Stale, concurrent or replayed action: at most one effect; expose the current state and a safe retry/review path.
+- Background or integration failure: retain visible queued/failed evidence, stable source identity and authorised replay/reconciliation.
+- Correction/reversal: preserve prior provenance and re-check authorization and state.
+
+## Current ease scores
+
+All ten current scores are **Not measured**. Under the audit rubric, numeric 0 means blocked, misleading, inaccessible or missing; it is therefore not used as a substitute for absent representative-user measurement.
+
+| Dimension | Score |
+|---|---:|
+| Discoverability | Not measured |
+| Comprehension | Not measured |
+| Learnability | Not measured |
+| Efficiency | Not measured |
+| Error prevention | Not measured |
+| Recovery | Not measured |
+| Accessibility | Not measured |
+| Safety and trust | Not measured |
+| Consistency | Not measured |
+| Cross-module continuity | Not measured |
+
+Target scores are not assigned until the task is executed and independently reviewed. No ease or completion claim is made.

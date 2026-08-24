@@ -1,0 +1,5487 @@
+{
+  "schema_version": "1.0",
+  "artifact": "finance-sites-static-route-enrichment",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "static_target_lineage_enriched_with_explicit_unresolved_targets_runtime_unverified",
+  "proof_boundary": "Read-only static route/page/backend lineage for the six named canonical modules at the audited commit. Shared parameter/host routes are explicitly non-exclusive. No browser execution, actor authorization, persisted outcome, recovery, handoff, notification, test, deployment, or workflow completion is claimed.",
+  "summary": {
+    "canonical_target_count": 255,
+    "module_counts": {
+      "ASSETS": {
+        "targets": 8,
+        "targets_with_route_ids": 8,
+        "targets_with_page_ids": 3,
+        "route_relations": 16,
+        "page_relations": 4
+      },
+      "FINANCE": {
+        "targets": 71,
+        "targets_with_route_ids": 71,
+        "targets_with_page_ids": 64,
+        "route_relations": 236,
+        "page_relations": 102
+      },
+      "FLEET": {
+        "targets": 48,
+        "targets_with_route_ids": 44,
+        "targets_with_page_ids": 41,
+        "route_relations": 139,
+        "page_relations": 104
+      },
+      "REPORTING": {
+        "targets": 21,
+        "targets_with_route_ids": 21,
+        "targets_with_page_ids": 21,
+        "route_relations": 41,
+        "page_relations": 21
+      },
+      "SECURITY_DEVICES": {
+        "targets": 37,
+        "targets_with_route_ids": 37,
+        "targets_with_page_ids": 29,
+        "route_relations": 92,
+        "page_relations": 50
+      },
+      "SITES": {
+        "targets": 70,
+        "targets_with_route_ids": 69,
+        "targets_with_page_ids": 61,
+        "route_relations": 228,
+        "page_relations": 167
+      }
+    },
+    "targets_with_route_ids": 250,
+    "targets_without_route_ids": 5,
+    "targets_with_page_ids": 219,
+    "targets_with_backend_anchors": 250,
+    "route_relations": 752,
+    "unique_route_ids": 716,
+    "page_relations": 448,
+    "unique_page_ids": 266,
+    "backend_relations": 260,
+    "unique_backend_anchors": 142,
+    "prior_specialist_delta_before_service_lineage_correction": {
+      "status": "superseded_metric_retained_for_reconciliation_only",
+      "target_patches": 235,
+      "module_patch_counts": {
+        "ASSETS": 8,
+        "FINANCE": 69,
+        "FLEET": 44,
+        "REPORTING": 7,
+        "SECURITY_DEVICES": 37,
+        "SITES": 70
+      },
+      "new_route_relations": 707,
+      "unique_new_route_ids": 697,
+      "new_page_relations": 436,
+      "unique_new_page_ids": 262,
+      "new_backend_relations": 247,
+      "unique_new_backend_anchors": 142
+    },
+    "lineage_correction": {
+      "working_key": "CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "removed_target_exclusive_route_ids": [
+        "ROUTE-0097",
+        "ROUTE-0098",
+        "ROUTE-2836",
+        "ROUTE-2837"
+      ],
+      "removed_target_exclusive_page_ids": [
+        "PAGE-0021",
+        "PAGE-0023",
+        "PAGE-0864",
+        "PAGE-0898",
+        "PAGE-0899",
+        "PAGE-0901",
+        "PAGE-0902",
+        "PAGE-0909"
+      ],
+      "reason": "SITE-DASHBOARD lineage does not prove the SITE-SITE-MEAL-PLAN serve/unserve actions as this target's exclusive route ownership."
+    }
+  },
+  "targets": {
+    "ASSET-ASSET-DOCUMENT": {
+      "source_family_ids": [
+        "ASSET-ASSET-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-0049",
+        "ROUTE-0050",
+        "ROUTE-0051"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetDocumentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "ASSET-ASSET-REPORT": {
+      "source_family_ids": [
+        "ASSET-ASSET-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2347"
+      ],
+      "page_ids": [
+        "PAGE-0748"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "ASSET-ASSET-TRACKER": {
+      "source_family_ids": [
+        "ASSET-ASSET-TRACKER"
+      ],
+      "route_ids": [
+        "ROUTE-0061",
+        "ROUTE-0062"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetTrackerController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-ASSET-ASSET-QR-LABEL-ARTIFACT": {
+      "source_family_ids": [
+        "ASSET-ASSET-QR"
+      ],
+      "route_ids": [
+        "ROUTE-0057",
+        "ROUTE-0058",
+        "ROUTE-0059"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetQrController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-ASSET-ASSET-QR-TOKEN-RESOLUTION": {
+      "source_family_ids": [
+        "ASSET-ASSET-QR"
+      ],
+      "route_ids": [
+        "ROUTE-0064"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetQrController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-ASSET-FIXED-ASSET-DEPRECIATION": {
+      "source_family_ids": [
+        "ASSET-FIXED-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-0572"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FixedAssetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-ASSET-FIXED-ASSET-DISPOSAL": {
+      "source_family_ids": [
+        "ASSET-FIXED-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-0569"
+      ],
+      "page_ids": [
+        "PAGE-0152"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FixedAssetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-ASSET-FIXED-ASSET-REGISTER": {
+      "source_family_ids": [
+        "ASSET-FIXED-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-0565",
+        "ROUTE-0566",
+        "ROUTE-0567",
+        "ROUTE-0568"
+      ],
+      "page_ids": [
+        "PAGE-0151",
+        "PAGE-0152"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FixedAssetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTING-INTEGRATION-ACCOUNT-MAPPING": {
+      "source_family_ids": [
+        "FIN-ACCOUNTING-INTEGRATION"
+      ],
+      "route_ids": [
+        "ROUTE-0590",
+        "ROUTE-0591"
+      ],
+      "page_ids": [
+        "PAGE-0160"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE": {
+      "source_family_ids": [
+        "FIN-ACCOUNTING-INTEGRATION"
+      ],
+      "route_ids": [
+        "ROUTE-0586",
+        "ROUTE-0587",
+        "ROUTE-0588",
+        "ROUTE-0589",
+        "ROUTE-0593"
+      ],
+      "page_ids": [
+        "PAGE-0159"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTING-INTEGRATION-SYNC": {
+      "source_family_ids": [
+        "FIN-ACCOUNTING-INTEGRATION"
+      ],
+      "route_ids": [
+        "ROUTE-0592"
+      ],
+      "page_ids": [
+        "PAGE-0159"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTS-RECEIVABLE-AGING": {
+      "source_family_ids": [
+        "FIN-ACCOUNTS-RECEIVABLE"
+      ],
+      "route_ids": [
+        "ROUTE-0671",
+        "ROUTE-0672"
+      ],
+      "page_ids": [
+        "PAGE-0187",
+        "PAGE-0188"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountsReceivableController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTS-RECEIVABLE-ALLOCATION": {
+      "source_family_ids": [
+        "FIN-ACCOUNTS-RECEIVABLE"
+      ],
+      "route_ids": [
+        "ROUTE-0673"
+      ],
+      "page_ids": [
+        "PAGE-0188"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountsReceivableController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ACCOUNTS-RECEIVABLE-STATEMENTS": {
+      "source_family_ids": [
+        "FIN-ACCOUNTS-RECEIVABLE"
+      ],
+      "route_ids": [
+        "ROUTE-0674"
+      ],
+      "page_ids": [
+        "PAGE-0189"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AccountsReceivableController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-API-CLIENT-FINANCIAL-SUMMARY-LEDGER": {
+      "source_family_ids": [
+        "CLI-FINANCIAL-INSIGHTS-API"
+      ],
+      "route_ids": [
+        "ROUTE-0456",
+        "ROUTE-0457"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php"
+      ],
+      "origin_files": [
+        "finance-api-feature-id-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-API-FINANCIAL-INSIGHTS": {
+      "source_family_ids": [
+        "CLI-FINANCIAL-INSIGHTS-API"
+      ],
+      "route_ids": [
+        "ROUTE-0459"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php"
+      ],
+      "origin_files": [
+        "finance-api-feature-id-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-API-FINANCIAL-KPIS": {
+      "source_family_ids": [
+        "CLI-FINANCIAL-INSIGHTS-API"
+      ],
+      "route_ids": [
+        "ROUTE-0460",
+        "ROUTE-0461",
+        "ROUTE-0462"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php"
+      ],
+      "origin_files": [
+        "finance-api-feature-id-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-API-SITE-FINANCIAL-SUMMARY": {
+      "source_family_ids": [
+        "CLI-FINANCIAL-INSIGHTS-API"
+      ],
+      "route_ids": [
+        "ROUTE-0464"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php"
+      ],
+      "origin_files": [
+        "finance-api-feature-id-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-API-SITES-FINANCIAL-OVERVIEW": {
+      "source_family_ids": [
+        "CLI-FINANCIAL-INSIGHTS-API"
+      ],
+      "route_ids": [
+        "ROUTE-0468"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php"
+      ],
+      "origin_files": [
+        "finance-api-feature-id-adjudication.json",
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-AUDIT-EXPORT-DOWNLOAD": {
+      "source_family_ids": [
+        "PRIV-AUDIT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0473"
+      ],
+      "page_ids": [
+        "PAGE-0117"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AuditExportController.php"
+      ],
+      "origin_files": [
+        "manifest-privacy-transfers.json"
+      ]
+    },
+    "CAP-FIN-AUDIT-EXPORT-PACKAGE": {
+      "source_family_ids": [
+        "PRIV-AUDIT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0470",
+        "ROUTE-0471",
+        "ROUTE-0472"
+      ],
+      "page_ids": [
+        "PAGE-0117"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/AuditExportController.php"
+      ],
+      "origin_files": [
+        "manifest-privacy-transfers.json"
+      ]
+    },
+    "CAP-FIN-BANK-FEED-CONNECTION-SYNC": {
+      "source_family_ids": [
+        "FIN-BANK-FEED"
+      ],
+      "route_ids": [
+        "ROUTE-0481",
+        "ROUTE-0482",
+        "ROUTE-0483",
+        "ROUTE-0485",
+        "ROUTE-0486"
+      ],
+      "page_ids": [
+        "PAGE-0120"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BankFeedController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-BANK-FEED-LOGS": {
+      "source_family_ids": [
+        "FIN-BANK-FEED"
+      ],
+      "route_ids": [
+        "ROUTE-0484"
+      ],
+      "page_ids": [
+        "PAGE-0121"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BankFeedController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-BILLING-ENTRIES": {
+      "source_family_ids": [
+        "FIN-BILLING"
+      ],
+      "route_ids": [
+        "ROUTE-0499"
+      ],
+      "page_ids": [
+        "PAGE-0126"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BillingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-BILLING-OVERVIEW": {
+      "source_family_ids": [
+        "FIN-BILLING"
+      ],
+      "route_ids": [
+        "ROUTE-0498"
+      ],
+      "page_ids": [
+        "PAGE-0127"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BillingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-CLIENT-FINANCIAL-OVERVIEW": {
+      "source_family_ids": [
+        "CLI-CLIENT-FINANCIALS"
+      ],
+      "route_ids": [
+        "ROUTE-0516"
+      ],
+      "page_ids": [
+        "PAGE-0034"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/ClientFinancialsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION": {
+      "source_family_ids": [
+        "FIN-CONSOLIDATION"
+      ],
+      "route_ids": [
+        "ROUTE-0517",
+        "ROUTE-0518",
+        "ROUTE-0519",
+        "ROUTE-0520",
+        "ROUTE-0521",
+        "ROUTE-0522",
+        "ROUTE-0523"
+      ],
+      "page_ids": [
+        "PAGE-0136",
+        "PAGE-0138"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/ConsolidationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-CONSOLIDATION-RUNS": {
+      "source_family_ids": [
+        "FIN-CONSOLIDATION"
+      ],
+      "route_ids": [
+        "ROUTE-0524",
+        "ROUTE-0525",
+        "ROUTE-0526"
+      ],
+      "page_ids": [
+        "PAGE-0137",
+        "PAGE-0138"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/ConsolidationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-CONTROLLERS-BUDGET-ACTUALS-OVERSIGHT": {
+      "source_family_ids": [
+        "FIN-CONTROLLERS-BUDGET"
+      ],
+      "route_ids": [
+        "ROUTE-0868",
+        "ROUTE-0870",
+        "ROUTE-0884"
+      ],
+      "page_ids": [
+        "PAGE-0270",
+        "PAGE-0271"
+      ],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/BudgetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-CONTROLLERS-BUDGET-APPROVAL-ADJUSTMENT": {
+      "source_family_ids": [
+        "FIN-CONTROLLERS-BUDGET"
+      ],
+      "route_ids": [
+        "ROUTE-0872",
+        "ROUTE-0873",
+        "ROUTE-0874",
+        "ROUTE-0878",
+        "ROUTE-0883"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/BudgetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-CONTROLLERS-BUDGET-DESIGN": {
+      "source_family_ids": [
+        "FIN-CONTROLLERS-BUDGET"
+      ],
+      "route_ids": [
+        "ROUTE-0869",
+        "ROUTE-0871",
+        "ROUTE-0875",
+        "ROUTE-0876",
+        "ROUTE-0877",
+        "ROUTE-0879",
+        "ROUTE-0880",
+        "ROUTE-0881",
+        "ROUTE-0882",
+        "ROUTE-0885"
+      ],
+      "page_ids": [
+        "PAGE-0268",
+        "PAGE-0269"
+      ],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/BudgetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-DONOR-FUND-LIFECYCLE": {
+      "source_family_ids": [
+        "FIN-DONOR-FUND"
+      ],
+      "route_ids": [
+        "ROUTE-0542",
+        "ROUTE-0543",
+        "ROUTE-0544",
+        "ROUTE-0545"
+      ],
+      "page_ids": [
+        "PAGE-0144",
+        "PAGE-0145"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/DonorFundController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-DONOR-FUND-REPORTS": {
+      "source_family_ids": [
+        "FIN-DONOR-FUND"
+      ],
+      "route_ids": [
+        "ROUTE-0548",
+        "ROUTE-0549",
+        "ROUTE-0550"
+      ],
+      "page_ids": [
+        "PAGE-0145"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/DonorFundController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-DONOR-FUND-TRANSACTIONS": {
+      "source_family_ids": [
+        "FIN-DONOR-FUND"
+      ],
+      "route_ids": [
+        "ROUTE-0546",
+        "ROUTE-0547"
+      ],
+      "page_ids": [
+        "PAGE-0145"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/DonorFundController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-EFTPOS-BATCHES": {
+      "source_family_ids": [
+        "FIN-EFTPOS"
+      ],
+      "route_ids": [
+        "ROUTE-0553",
+        "ROUTE-0554",
+        "ROUTE-0555",
+        "ROUTE-0556"
+      ],
+      "page_ids": [
+        "PAGE-0146",
+        "PAGE-0147"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/EftposController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-EFTPOS-TERMINALS": {
+      "source_family_ids": [
+        "FIN-EFTPOS"
+      ],
+      "route_ids": [
+        "ROUTE-0557",
+        "ROUTE-0558",
+        "ROUTE-0559"
+      ],
+      "page_ids": [
+        "PAGE-0148"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/EftposController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-AGED-PAYABLES": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0682"
+      ],
+      "page_ids": [
+        "PAGE-0191"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-AGED-RECEIVABLES": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0683"
+      ],
+      "page_ids": [
+        "PAGE-0192"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-BALANCE-SHEET": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0684"
+      ],
+      "page_ids": [
+        "PAGE-0193"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-CASH-FLOW": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0687"
+      ],
+      "page_ids": [
+        "PAGE-0195"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-FUNDING-STREAM-SUMMARY": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0688"
+      ],
+      "page_ids": [
+        "PAGE-0196"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-PROFIT-LOSS": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0689"
+      ],
+      "page_ids": [
+        "PAGE-0197"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-FINANCIAL-REPORT-TRIAL-BALANCE": {
+      "source_family_ids": [
+        "FIN-FINANCIAL-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0690"
+      ],
+      "page_ids": [
+        "PAGE-0198"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinancialReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-PURCHASE-ORDER-BILL-CONVERSION": {
+      "source_family_ids": [
+        "FIN-PURCHASE-ORDER"
+      ],
+      "route_ids": [
+        "ROUTE-0658"
+      ],
+      "page_ids": [
+        "PAGE-0184"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PurchaseOrderController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-PURCHASE-ORDER-LIFECYCLE": {
+      "source_family_ids": [
+        "FIN-PURCHASE-ORDER"
+      ],
+      "route_ids": [
+        "ROUTE-0653",
+        "ROUTE-0654",
+        "ROUTE-0655",
+        "ROUTE-0656",
+        "ROUTE-0657",
+        "ROUTE-0659",
+        "ROUTE-0660"
+      ],
+      "page_ids": [
+        "PAGE-0181",
+        "PAGE-0182",
+        "PAGE-0183",
+        "PAGE-0184"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PurchaseOrderController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-QUOTE-AGREEMENT-CONVERSION": {
+      "source_family_ids": [
+        "FIN-QUOTE"
+      ],
+      "route_ids": [
+        "ROUTE-0666"
+      ],
+      "page_ids": [
+        "PAGE-0186"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/QuoteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-QUOTE-INVOICE-CONVERSION": {
+      "source_family_ids": [
+        "FIN-QUOTE"
+      ],
+      "route_ids": [
+        "ROUTE-0667"
+      ],
+      "page_ids": [
+        "PAGE-0186"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/QuoteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-QUOTE-LIFECYCLE": {
+      "source_family_ids": [
+        "FIN-QUOTE"
+      ],
+      "route_ids": [
+        "ROUTE-0661",
+        "ROUTE-0662",
+        "ROUTE-0663",
+        "ROUTE-0664",
+        "ROUTE-0665",
+        "ROUTE-0669"
+      ],
+      "page_ids": [
+        "PAGE-0185",
+        "PAGE-0186"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/QuoteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FIN-ROADMAP-BUDGET-API": {
+      "source_family_ids": [
+        "FIN-CONTROLLERS-BUDGET-448958"
+      ],
+      "route_ids": [
+        "ROUTE-2472",
+        "ROUTE-2473"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Roadmap/Http/Controllers/BudgetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-CHECKLIST-RUN-EXECUTION": {
+      "source_family_ids": [
+        "FLEET-CHECKLIST"
+      ],
+      "route_ids": [],
+      "page_ids": [],
+      "backend_anchors": [],
+      "origin_files": [
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION": {
+      "source_family_ids": [
+        "FLEET-CHECKLIST"
+      ],
+      "route_ids": [],
+      "page_ids": [],
+      "backend_anchors": [],
+      "origin_files": [
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-DEVICE-REGISTRY-PAIRING": {
+      "source_family_ids": [
+        "FLEET-DEVICE"
+      ],
+      "route_ids": [],
+      "page_ids": [],
+      "backend_anchors": [],
+      "origin_files": [
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-DEVICE-TRACKING-CONSENT": {
+      "source_family_ids": [
+        "FLEET-DEVICE"
+      ],
+      "route_ids": [],
+      "page_ids": [],
+      "backend_anchors": [],
+      "origin_files": [
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-DRIVER-DIRECTORY": {
+      "source_family_ids": [
+        "FLEET-DRIVER"
+      ],
+      "route_ids": [
+        "ROUTE-0731",
+        "ROUTE-0732"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0218",
+        "PAGE-0219"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/DriverController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-DRIVER-SCORECARD": {
+      "source_family_ids": [
+        "FLEET-DRIVER"
+      ],
+      "route_ids": [
+        "ROUTE-0733"
+      ],
+      "page_ids": [
+        "PAGE-0219"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/DriverController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-INCIDENT-CLAIMS-POLICE-REPORTS": {
+      "source_family_ids": [
+        "FLEET-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0757",
+        "ROUTE-0761"
+      ],
+      "page_ids": [
+        "PAGE-0226"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/IncidentController.php",
+        "resources/js/components/fleet/fleet-incident-dialog.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-INCIDENT-FOLLOWUPS": {
+      "source_family_ids": [
+        "FLEET-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0758",
+        "ROUTE-0759"
+      ],
+      "page_ids": [
+        "PAGE-0226"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/IncidentController.php",
+        "resources/js/components/fleet/fleet-incident-dialog.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-INCIDENT-RECORD-EVIDENCE": {
+      "source_family_ids": [
+        "FLEET-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0749",
+        "ROUTE-0750",
+        "ROUTE-0751",
+        "ROUTE-0752",
+        "ROUTE-0753",
+        "ROUTE-0754",
+        "ROUTE-0755",
+        "ROUTE-0763"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0226",
+        "PAGE-0364",
+        "PAGE-0370"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/IncidentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-INCIDENT-VEHICLE-RESPONSE": {
+      "source_family_ids": [
+        "FLEET-INCIDENT"
+      ],
+      "route_ids": [
+        "ROUTE-0756",
+        "ROUTE-0760",
+        "ROUTE-0762"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/IncidentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-REPORT-BY-HOUSE": {
+      "source_family_ids": [
+        "FLEET-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0808"
+      ],
+      "page_ids": [
+        "PAGE-0245"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-REPORT-OVERVIEW": {
+      "source_family_ids": [
+        "FLEET-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0807",
+        "ROUTE-0811"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0248"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-REPORT-REIMBURSEMENT": {
+      "source_family_ids": [
+        "FLEET-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0812",
+        "ROUTE-0813"
+      ],
+      "page_ids": [
+        "PAGE-0249"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-RESIDENT-TRACKING-ASSIGNMENT": {
+      "source_family_ids": [
+        "FLEET-RESIDENT-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-0817",
+        "ROUTE-0818",
+        "ROUTE-0819"
+      ],
+      "page_ids": [
+        "PAGE-0251"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+        "resources/js/pages/fleet-assets/resident-tracking/index.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-RESIDENT-TRACKING-HISTORY": {
+      "source_family_ids": [
+        "FLEET-RESIDENT-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-0820"
+      ],
+      "page_ids": [
+        "PAGE-0250"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+        "resources/js/pages/fleet-assets/resident-tracking/history.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-RESIDENT-TRACKING-LIVE-RESPONSE": {
+      "source_family_ids": [
+        "FLEET-RESIDENT-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-0814",
+        "ROUTE-0815",
+        "ROUTE-0816"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0251"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+        "resources/js/pages/fleet-assets/resident-tracking/index.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-RESIDENT-TRANSPORT-LIFECYCLE": {
+      "source_family_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0822",
+        "ROUTE-0823",
+        "ROUTE-0824",
+        "ROUTE-0825",
+        "ROUTE-0827",
+        "ROUTE-0828",
+        "ROUTE-0829"
+      ],
+      "page_ids": [
+        "PAGE-0253",
+        "PAGE-0256",
+        "PAGE-0257"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY": {
+      "source_family_ids": [
+        "FLEET-RESIDENT-TRANSPORT"
+      ],
+      "route_ids": [
+        "ROUTE-0788",
+        "ROUTE-0789",
+        "ROUTE-0826",
+        "ROUTE-0830"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-TRIP-LIFECYCLE": {
+      "source_family_ids": [
+        "FLEET-FLEET-TRIP"
+      ],
+      "route_ids": [
+        "ROUTE-0846",
+        "ROUTE-0848",
+        "ROUTE-0849"
+      ],
+      "page_ids": [
+        "PAGE-0259"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Fleet/FleetTripController.php",
+        "resources/js/pages/fleet-assets/trips/playback.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-TRIP-PLAYBACK": {
+      "source_family_ids": [
+        "FLEET-FLEET-TRIP"
+      ],
+      "route_ids": [
+        "ROUTE-0832",
+        "ROUTE-0833"
+      ],
+      "page_ids": [
+        "PAGE-0259"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Fleet/FleetTripController.php",
+        "resources/js/pages/fleet-assets/trips/playback.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-ALERT-CONFIG": {
+      "source_family_ids": [
+        "FLEET-VEHICLE"
+      ],
+      "route_ids": [
+        "ROUTE-0838",
+        "ROUTE-0839"
+      ],
+      "page_ids": [
+        "PAGE-0260"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-BOOKING-CHECKOUT-RETURN": {
+      "source_family_ids": [
+        "FLEET-VEHICLE-BOOKING"
+      ],
+      "route_ids": [
+        "ROUTE-0717",
+        "ROUTE-0719"
+      ],
+      "page_ids": [
+        "PAGE-0211"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleBookingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-BOOKING-DECISION": {
+      "source_family_ids": [
+        "FLEET-VEHICLE-BOOKING"
+      ],
+      "route_ids": [
+        "ROUTE-0715",
+        "ROUTE-0718"
+      ],
+      "page_ids": [
+        "PAGE-0211"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleBookingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-BOOKING-REQUEST": {
+      "source_family_ids": [
+        "FLEET-VEHICLE-BOOKING"
+      ],
+      "route_ids": [
+        "ROUTE-0712",
+        "ROUTE-0713",
+        "ROUTE-0714",
+        "ROUTE-0716",
+        "ROUTE-0720"
+      ],
+      "page_ids": [
+        "PAGE-0209",
+        "PAGE-0210",
+        "PAGE-0211",
+        "PAGE-0213",
+        "PAGE-0214"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleBookingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-FUEL": {
+      "source_family_ids": [
+        "FLEET-VEHICLE"
+      ],
+      "route_ids": [
+        "ROUTE-0734",
+        "ROUTE-0735"
+      ],
+      "page_ids": [
+        "PAGE-0220"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-REGISTER": {
+      "source_family_ids": [
+        "FLEET-VEHICLE"
+      ],
+      "route_ids": [
+        "ROUTE-0835",
+        "ROUTE-0836",
+        "ROUTE-0837",
+        "ROUTE-0840"
+      ],
+      "page_ids": [
+        "PAGE-0261",
+        "PAGE-0262"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-FLEET-VEHICLE-TRIPS": {
+      "source_family_ids": [
+        "FLEET-VEHICLE"
+      ],
+      "route_ids": [
+        "ROUTE-0831",
+        "ROUTE-0834"
+      ],
+      "page_ids": [
+        "PAGE-0258"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "CAP-REP-COMBINED-REPORT-CARE-QUALITY": {
+      "source_family_ids": [
+        "REP-COMBINED-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2348",
+        "ROUTE-2349"
+      ],
+      "page_ids": [
+        "PAGE-0749"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/CombinedReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK": {
+      "source_family_ids": [
+        "REP-COMBINED-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2348",
+        "ROUTE-2349"
+      ],
+      "page_ids": [
+        "PAGE-0749"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/CombinedReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS": {
+      "source_family_ids": [
+        "REP-COMBINED-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2348",
+        "ROUTE-2349"
+      ],
+      "page_ids": [
+        "PAGE-0749"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/CombinedReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-ASSETS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-AUDIT-LOGS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-CLIENTS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-CONTROLLED-DRUG-DISCREPANCIES": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-FLEET-TRIPS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-INCIDENTS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-MEDICATION-ADMINISTRATIONS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-RESPITE-BOOKINGS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-RESPITE-REQUESTS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-SAFEGUARDING": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-SHIFTS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-SITES": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-STAFF": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-MODULE-REPORT-TIMESHEETS": {
+      "source_family_ids": [
+        "REP-MODULE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "page_ids": [
+        "PAGE-0753"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ModuleReportController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-SUMMARY-CLIENT": {
+      "source_family_ids": [
+        "REP-SUMMARY"
+      ],
+      "route_ids": [
+        "ROUTE-2946"
+      ],
+      "page_ids": [
+        "PAGE-0949"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SummaryController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-SUMMARY-GENERATION": {
+      "source_family_ids": [
+        "REP-SUMMARY"
+      ],
+      "route_ids": [
+        "ROUTE-2290",
+        "ROUTE-2947"
+      ],
+      "page_ids": [
+        "PAGE-0949"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SummaryController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-REP-SUMMARY-STAFF": {
+      "source_family_ids": [
+        "REP-SUMMARY"
+      ],
+      "route_ids": [
+        "ROUTE-2219",
+        "ROUTE-2948",
+        "ROUTE-2949"
+      ],
+      "page_ids": [
+        "PAGE-0949"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SummaryController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-ACCESS-CONTROL": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2527"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-ALARMS": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2528"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-CCTV": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2530"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-FACILITIES": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2561"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-IT-INFRASTRUCTURE": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2603"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-SMART-IOT-HEALTHCARE": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2611"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-CATEGORY-PAGE-TRACKING-DEVICES": {
+      "source_family_ids": [
+        "SEC-CATEGORY-PAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2612"
+      ],
+      "page_ids": [
+        "PAGE-0815",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/CategoryPageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-DEVICE-GROUP-AUTO-RULES": {
+      "source_family_ids": [
+        "SEC-DEVICE-GROUP"
+      ],
+      "route_ids": [
+        "ROUTE-2536",
+        "ROUTE-2537"
+      ],
+      "page_ids": [
+        "PAGE-0819",
+        "PAGE-0821"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceGroupController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-DEVICE-GROUP-LIFECYCLE": {
+      "source_family_ids": [
+        "SEC-DEVICE-GROUP"
+      ],
+      "route_ids": [
+        "ROUTE-2531",
+        "ROUTE-2532",
+        "ROUTE-2533",
+        "ROUTE-2534",
+        "ROUTE-2535",
+        "ROUTE-2538",
+        "ROUTE-2541"
+      ],
+      "page_ids": [
+        "PAGE-0816",
+        "PAGE-0818",
+        "PAGE-0819",
+        "PAGE-0820",
+        "PAGE-0821"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceGroupController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-DEVICE-GROUP-MEMBERSHIP": {
+      "source_family_ids": [
+        "SEC-DEVICE-GROUP"
+      ],
+      "route_ids": [
+        "ROUTE-2539",
+        "ROUTE-2540"
+      ],
+      "page_ids": [
+        "PAGE-0821"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceGroupController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-DEVICE-IDENTITY-ATTRIBUTES": {
+      "source_family_ids": [
+        "SEC-DEVICE"
+      ],
+      "route_ids": [
+        "ROUTE-2542",
+        "ROUTE-2543",
+        "ROUTE-2544",
+        "ROUTE-2545",
+        "ROUTE-2546",
+        "ROUTE-2554",
+        "ROUTE-2555",
+        "ROUTE-2560"
+      ],
+      "page_ids": [
+        "PAGE-0822",
+        "PAGE-0823",
+        "PAGE-0824",
+        "PAGE-0825",
+        "PAGE-0826"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-DEVICE-LINKAGE": {
+      "source_family_ids": [
+        "SEC-DEVICE"
+      ],
+      "route_ids": [
+        "ROUTE-2547",
+        "ROUTE-2548",
+        "ROUTE-2557",
+        "ROUTE-2558"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-COMMANDS": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2570",
+        "ROUTE-2571",
+        "ROUTE-2573"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-CONFIGURATION": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2574",
+        "ROUTE-2575",
+        "ROUTE-2576",
+        "ROUTE-2577",
+        "ROUTE-2579",
+        "ROUTE-2588"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-DEVICE-CUSTODY": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2568",
+        "ROUTE-2569",
+        "ROUTE-2572",
+        "ROUTE-2581",
+        "ROUTE-2582"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-FRAMES-DIAGNOSTICS": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2583",
+        "ROUTE-2591"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2568",
+        "ROUTE-2572",
+        "ROUTE-2581"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-PRESETS-SETTINGS": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2580",
+        "ROUTE-2586",
+        "ROUTE-2587",
+        "ROUTE-2590"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-QUECLINK-HUB-RESIDENT-SAFETY": {
+      "source_family_ids": [
+        "SEC-QUECLINK-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2578"
+      ],
+      "page_ids": [
+        "PAGE-0829"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-REPORTS-CATALOGUE": {
+      "source_family_ids": [
+        "SEC-REPORTS"
+      ],
+      "route_ids": [
+        "ROUTE-2607"
+      ],
+      "page_ids": [
+        "PAGE-0816",
+        "PAGE-0834"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-REPORTS-DEVICE-EXPORT": {
+      "source_family_ids": [
+        "SEC-REPORTS"
+      ],
+      "route_ids": [
+        "ROUTE-2608"
+      ],
+      "page_ids": [
+        "PAGE-0834"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-REPORTS-EVENT-EXPORT": {
+      "source_family_ids": [
+        "SEC-REPORTS"
+      ],
+      "route_ids": [
+        "ROUTE-2609"
+      ],
+      "page_ids": [
+        "PAGE-0834"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-REPORTS-MAINTENANCE-EXPORT": {
+      "source_family_ids": [
+        "SEC-REPORTS"
+      ],
+      "route_ids": [
+        "ROUTE-2610"
+      ],
+      "page_ids": [
+        "PAGE-0834"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/ReportsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-UNIFI-CREDENTIALS": {
+      "source_family_ids": [
+        "SEC-UNIFI"
+      ],
+      "route_ids": [
+        "ROUTE-2596",
+        "ROUTE-2599",
+        "ROUTE-2602"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-UNIFI-DEFAULTS": {
+      "source_family_ids": [
+        "SEC-UNIFI"
+      ],
+      "route_ids": [
+        "ROUTE-2593",
+        "ROUTE-2594"
+      ],
+      "page_ids": [
+        "PAGE-0831"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-UNIFI-DISCOVERY-SYNC": {
+      "source_family_ids": [
+        "SEC-UNIFI"
+      ],
+      "route_ids": [
+        "ROUTE-2600",
+        "ROUTE-2601"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-UNIFI-HARDWARE-ROOM-ASSIGNMENT": {
+      "source_family_ids": [
+        "SEC-UNIFI"
+      ],
+      "route_ids": [
+        "ROUTE-2595"
+      ],
+      "page_ids": [
+        "PAGE-0831"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SEC-UNIFI-SITE-MAPPING": {
+      "source_family_ids": [
+        "SEC-UNIFI"
+      ],
+      "route_ids": [
+        "ROUTE-2597",
+        "ROUTE-2598"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-CLIENT-ALLOCATION": {
+      "source_family_ids": [
+        "CLI-SITE-CLIENT"
+      ],
+      "route_ids": [
+        "ROUTE-2749",
+        "ROUTE-2750",
+        "ROUTE-2751"
+      ],
+      "page_ids": [
+        "PAGE-0878"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SiteClientController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-SITE-DIETARY-TAG-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-DIETARY-TAG"
+      ],
+      "route_ids": [
+        "ROUTE-0110",
+        "ROUTE-0111",
+        "ROUTE-0112",
+        "ROUTE-0113"
+      ],
+      "page_ids": [
+        "PAGE-0021",
+        "PAGE-0904"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Catering/DietaryTagController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-GEOCODE": {
+      "source_family_ids": [
+        "CLI-SITE-GEOCODING"
+      ],
+      "route_ids": [
+        "ROUTE-2902"
+      ],
+      "page_ids": [
+        "PAGE-0868"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteGeocodingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "CAP-SITE-MEAL-BUDGET-CONFIG": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2842"
+      ],
+      "page_ids": [
+        "PAGE-0900",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealPlanController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-INVENTORY-ITEM-REGISTER": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-INVENTORY"
+      ],
+      "route_ids": [
+        "ROUTE-2823",
+        "ROUTE-2825",
+        "ROUTE-2826",
+        "ROUTE-2827",
+        "ROUTE-2828"
+      ],
+      "page_ids": [
+        "PAGE-0900",
+        "PAGE-0903",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealInventoryController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-PLANNING": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2830",
+        "ROUTE-2831",
+        "ROUTE-2832",
+        "ROUTE-2833",
+        "ROUTE-2834",
+        "ROUTE-2835",
+        "ROUTE-2838",
+        "ROUTE-2839",
+        "ROUTE-2840",
+        "ROUTE-2841",
+        "ROUTE-2843"
+      ],
+      "page_ids": [
+        "PAGE-0899",
+        "PAGE-0900",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealPlanController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-SERVICE-COMPLETION": {
+      "source_family_ids": [
+        "SITE-DASHBOARD"
+      ],
+      "route_ids": [],
+      "page_ids": [],
+      "backend_anchors": [],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-STOCK-CONTROL": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-INVENTORY"
+      ],
+      "route_ids": [
+        "ROUTE-2824",
+        "ROUTE-2829"
+      ],
+      "page_ids": [
+        "PAGE-0900",
+        "PAGE-0903",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealInventoryController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-WEEK-TEMPLATE-APPLY": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-WEEK-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2855"
+      ],
+      "page_ids": [
+        "PAGE-0899",
+        "PAGE-0900",
+        "PAGE-0908",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealWeekTemplateController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-MEAL-WEEK-TEMPLATE-DEFINITION": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-WEEK-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2851",
+        "ROUTE-2852",
+        "ROUTE-2853",
+        "ROUTE-2854"
+      ],
+      "page_ids": [
+        "PAGE-0899",
+        "PAGE-0900",
+        "PAGE-0908",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealWeekTemplateController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-PRODUCT-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-PRODUCT"
+      ],
+      "route_ids": [
+        "ROUTE-0099",
+        "ROUTE-0100",
+        "ROUTE-0101",
+        "ROUTE-0102"
+      ],
+      "page_ids": [
+        "PAGE-0021",
+        "PAGE-0900",
+        "PAGE-0904"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Catering/ProductController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-RECIPE-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-RECIPE"
+      ],
+      "route_ids": [
+        "ROUTE-0103",
+        "ROUTE-0104",
+        "ROUTE-0105",
+        "ROUTE-0106",
+        "ROUTE-0107",
+        "ROUTE-0108",
+        "ROUTE-0109"
+      ],
+      "page_ids": [
+        "PAGE-0021",
+        "PAGE-0905"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Catering/RecipeController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-SHOPPING-LIST-GENERATE": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-SHOPPING-LIST"
+      ],
+      "route_ids": [
+        "ROUTE-2844",
+        "ROUTE-2850"
+      ],
+      "page_ids": [
+        "PAGE-0899",
+        "PAGE-0900",
+        "PAGE-0906",
+        "PAGE-0907",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealShoppingListController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-SHOPPING-PROCUREMENT": {
+      "source_family_ids": [
+        "SITE-SITE-MEAL-SHOPPING-LIST"
+      ],
+      "route_ids": [
+        "ROUTE-2845",
+        "ROUTE-2846",
+        "ROUTE-2847",
+        "ROUTE-2848",
+        "ROUTE-2849"
+      ],
+      "page_ids": [
+        "PAGE-0907",
+        "PAGE-0909"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteMealShoppingListController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json",
+        "manifest-full-global-exact-ids.json"
+      ]
+    },
+    "CAP-SITE-SITE-ACTIVATION-ARCHIVE": {
+      "source_family_ids": [
+        "SITE-SITE"
+      ],
+      "route_ids": [
+        "ROUTE-2732",
+        "ROUTE-2733",
+        "ROUTE-2887",
+        "ROUTE-2897"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/SiteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CALENDAR-EVENT-PLANNING": {
+      "source_family_ids": [
+        "SITE-SITE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-0082",
+        "ROUTE-0083",
+        "ROUTE-2734",
+        "ROUTE-2735",
+        "ROUTE-2736",
+        "ROUTE-2737",
+        "ROUTE-2738",
+        "ROUTE-2739",
+        "ROUTE-2740"
+      ],
+      "page_ids": [
+        "PAGE-0015",
+        "PAGE-0873",
+        "PAGE-0874",
+        "PAGE-0875"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCalendarController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CALENDAR-FEEDS": {
+      "source_family_ids": [
+        "SITE-SITE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-0084",
+        "ROUTE-0085",
+        "ROUTE-0086",
+        "ROUTE-0087"
+      ],
+      "page_ids": [
+        "PAGE-0875"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCalendarController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW": {
+      "source_family_ids": [
+        "SITE-SITE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-0082",
+        "ROUTE-0083",
+        "ROUTE-0086"
+      ],
+      "page_ids": [
+        "PAGE-0015"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCalendarController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CHECKLIST-ASSIGNMENT-RUN-CREATION": {
+      "source_family_ids": [
+        "SITE-SITE-CHECKLIST"
+      ],
+      "route_ids": [
+        "ROUTE-2744",
+        "ROUTE-2745",
+        "ROUTE-2746",
+        "ROUTE-2747"
+      ],
+      "page_ids": [
+        "PAGE-0877"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteChecklistController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CHECKLIST-RUN-EXECUTION": {
+      "source_family_ids": [
+        "SITE-SITE-CHECKLIST"
+      ],
+      "route_ids": [
+        "ROUTE-0116",
+        "ROUTE-0117",
+        "ROUTE-0118",
+        "ROUTE-0119",
+        "ROUTE-0120",
+        "ROUTE-0121"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteChecklistController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-COMPLIANCE-CERTIFICATIONS": {
+      "source_family_ids": [
+        "SITE-SITE-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2741",
+        "ROUTE-2742",
+        "ROUTE-2743",
+        "ROUTE-2752"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0880"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-COMPLIANCE-CHECKS": {
+      "source_family_ids": [
+        "SITE-SITE-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2753",
+        "ROUTE-2754",
+        "ROUTE-2755"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-COMPLIANCE-COVERAGE-REQUIREMENTS": {
+      "source_family_ids": [
+        "SITE-SITE-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2760",
+        "ROUTE-2761",
+        "ROUTE-2762"
+      ],
+      "page_ids": [
+        "PAGE-0934"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php",
+        "resources/js/pages/sites/show.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-COMPLIANCE-FEEDBACK": {
+      "source_family_ids": [
+        "SITE-SITE-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2788",
+        "ROUTE-2789",
+        "ROUTE-2790",
+        "ROUTE-2791"
+      ],
+      "page_ids": [
+        "PAGE-0890"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-COMPLIANCE-STAFF-REQUIREMENTS": {
+      "source_family_ids": [
+        "SITE-SITE-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-2884",
+        "ROUTE-2885",
+        "ROUTE-2886"
+      ],
+      "page_ids": [
+        "PAGE-0934"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteComplianceController.php",
+        "resources/js/pages/sites/show.tsx"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CREDENTIAL-AUDIT": {
+      "source_family_ids": [
+        "SITE-SITE-CREDENTIAL"
+      ],
+      "route_ids": [
+        "ROUTE-2767"
+      ],
+      "page_ids": [
+        "PAGE-0885",
+        "PAGE-0934",
+        "PAGE-0939"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCredentialController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CREDENTIAL-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-SITE-CREDENTIAL"
+      ],
+      "route_ids": [
+        "ROUTE-2763",
+        "ROUTE-2764",
+        "ROUTE-2765",
+        "ROUTE-2766",
+        "ROUTE-2768"
+      ],
+      "page_ids": [
+        "PAGE-0884",
+        "PAGE-0934",
+        "PAGE-0939"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCredentialController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CREDENTIAL-REVEAL-TOTP": {
+      "source_family_ids": [
+        "SITE-SITE-CREDENTIAL"
+      ],
+      "route_ids": [
+        "ROUTE-2770",
+        "ROUTE-2772",
+        "ROUTE-2773"
+      ],
+      "page_ids": [
+        "PAGE-0884",
+        "PAGE-0939"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCredentialController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-CREDENTIAL-ROTATION-REAUTH": {
+      "source_family_ids": [
+        "SITE-SITE-CREDENTIAL"
+      ],
+      "route_ids": [
+        "ROUTE-2769",
+        "ROUTE-2771"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteCredentialController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-INSPECTION-GLOBAL-OVERVIEW": {
+      "source_family_ids": [
+        "SITE-SITE-INSPECTION"
+      ],
+      "route_ids": [
+        "ROUTE-2903"
+      ],
+      "page_ids": [
+        "PAGE-0895"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteInspectionController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-INSPECTION-SITE-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-SITE-INSPECTION"
+      ],
+      "route_ids": [
+        "ROUTE-2804",
+        "ROUTE-2805",
+        "ROUTE-2806",
+        "ROUTE-2807"
+      ],
+      "page_ids": [
+        "PAGE-0896"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteInspectionController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-INTEGRATION-CONNECTION-SECRETS": {
+      "source_family_ids": [
+        "SITE-SITE-INTEGRATION"
+      ],
+      "route_ids": [
+        "ROUTE-2808",
+        "ROUTE-2809",
+        "ROUTE-2812",
+        "ROUTE-2815"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteIntegrationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-INTEGRATION-SYNC-OVERRIDES": {
+      "source_family_ids": [
+        "SITE-SITE-INTEGRATION"
+      ],
+      "route_ids": [
+        "ROUTE-2810",
+        "ROUTE-2811",
+        "ROUTE-2813",
+        "ROUTE-2814"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteIntegrationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-PROFILE-ONBOARDING": {
+      "source_family_ids": [
+        "SITE-SITE"
+      ],
+      "route_ids": [
+        "ROUTE-2728",
+        "ROUTE-2729",
+        "ROUTE-2730",
+        "ROUTE-2731",
+        "ROUTE-2756",
+        "ROUTE-2784",
+        "ROUTE-2822",
+        "ROUTE-2858",
+        "ROUTE-2883",
+        "ROUTE-2901"
+      ],
+      "page_ids": [
+        "PAGE-0021",
+        "PAGE-0363",
+        "PAGE-0552",
+        "PAGE-0555",
+        "PAGE-0557",
+        "PAGE-0864",
+        "PAGE-0866",
+        "PAGE-0868",
+        "PAGE-0869",
+        "PAGE-0870",
+        "PAGE-0872",
+        "PAGE-0873",
+        "PAGE-0875",
+        "PAGE-0879",
+        "PAGE-0882",
+        "PAGE-0883",
+        "PAGE-0888",
+        "PAGE-0894",
+        "PAGE-0898",
+        "PAGE-0901",
+        "PAGE-0902",
+        "PAGE-0909",
+        "PAGE-0911",
+        "PAGE-0912",
+        "PAGE-0913",
+        "PAGE-0914",
+        "PAGE-0915",
+        "PAGE-0916",
+        "PAGE-0917",
+        "PAGE-0918",
+        "PAGE-0919",
+        "PAGE-0920",
+        "PAGE-0934"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SiteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-ASSET-CONDITION": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2905"
+      ],
+      "page_ids": [
+        "PAGE-0922"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-CATALOGUE": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2904"
+      ],
+      "page_ids": [
+        "PAGE-0927"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-CHECKLIST-TRENDS": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2906"
+      ],
+      "page_ids": [
+        "PAGE-0923"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-EXPORT": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2907"
+      ],
+      "page_ids": [
+        "PAGE-0927"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-FACILITIES": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2908"
+      ],
+      "page_ids": [
+        "PAGE-0924"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-HEAD-OFFICE": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2909"
+      ],
+      "page_ids": [
+        "PAGE-0925"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-HOUSES": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2910"
+      ],
+      "page_ids": [
+        "PAGE-0926"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-OVERDUE-CORRECTIVE-ACTIONS": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2911"
+      ],
+      "page_ids": [
+        "PAGE-0928"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-SITE-DETAIL": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2912"
+      ],
+      "page_ids": [
+        "PAGE-0929"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-REPORTING-VENDOR-CONTACTS-EXPORT": {
+      "source_family_ids": [
+        "SITE-SITE-REPORTING"
+      ],
+      "route_ids": [
+        "ROUTE-2913"
+      ],
+      "page_ids": [
+        "PAGE-0927"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteReportingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-ROOM-ASSET-LINKAGE": {
+      "source_family_ids": [
+        "SITE-SITE-ROOM"
+      ],
+      "route_ids": [
+        "ROUTE-2876",
+        "ROUTE-2877"
+      ],
+      "page_ids": [
+        "PAGE-0931",
+        "PAGE-0933"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteRoomController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-ROOM-DOOR-CARD": {
+      "source_family_ids": [
+        "SITE-SITE-ROOM"
+      ],
+      "route_ids": [
+        "ROUTE-2879"
+      ],
+      "page_ids": [
+        "PAGE-0933"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteRoomController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-ROOM-ROOM-LAYOUT": {
+      "source_family_ids": [
+        "SITE-SITE-ROOM"
+      ],
+      "route_ids": [
+        "ROUTE-2872",
+        "ROUTE-2873",
+        "ROUTE-2874",
+        "ROUTE-2875",
+        "ROUTE-2880",
+        "ROUTE-2881",
+        "ROUTE-2882"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0932",
+        "PAGE-0933"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteRoomController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-ROOM-ROOM-OCCUPANCY": {
+      "source_family_ids": [
+        "SITE-SITE-ROOM"
+      ],
+      "route_ids": [
+        "ROUTE-2878"
+      ],
+      "page_ids": [
+        "PAGE-0932",
+        "PAGE-0933"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteRoomController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-TYPE-PLAN-EDITOR": {
+      "source_family_ids": [
+        "SITE-SITE-TYPE-PLAN",
+        "SITE-SITE-TYPE-PLAN-PIN"
+      ],
+      "route_ids": [
+        "ROUTE-2859",
+        "ROUTE-2860",
+        "ROUTE-2861",
+        "ROUTE-2862",
+        "ROUTE-2863",
+        "ROUTE-2864",
+        "ROUTE-2865",
+        "ROUTE-2866",
+        "ROUTE-2867"
+      ],
+      "page_ids": [
+        "PAGE-0910",
+        "PAGE-0911",
+        "PAGE-0912",
+        "PAGE-0913",
+        "PAGE-0914",
+        "PAGE-0915",
+        "PAGE-0916",
+        "PAGE-0917",
+        "PAGE-0918",
+        "PAGE-0919",
+        "PAGE-0920",
+        "PAGE-0921"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteTypePlanController.php",
+        "app/Http/Controllers/Sites/SiteTypePlanPinController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-VENDOR-GLOBAL-AUDIT": {
+      "source_family_ids": [
+        "SITE-SITE-VENDOR"
+      ],
+      "route_ids": [
+        "ROUTE-3022"
+      ],
+      "page_ids": [
+        "PAGE-0936",
+        "PAGE-0939",
+        "PAGE-0940"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteVendorController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-VENDOR-GLOBAL-DIRECTORY": {
+      "source_family_ids": [
+        "SITE-SITE-VENDOR"
+      ],
+      "route_ids": [
+        "ROUTE-3021"
+      ],
+      "page_ids": [
+        "PAGE-0937",
+        "PAGE-0939",
+        "PAGE-0940"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteVendorController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CAP-SITE-SITE-VENDOR-LIFECYCLE": {
+      "source_family_ids": [
+        "SITE-SITE-VENDOR"
+      ],
+      "route_ids": [
+        "ROUTE-2888",
+        "ROUTE-2889",
+        "ROUTE-2890",
+        "ROUTE-2891",
+        "ROUTE-2892"
+      ],
+      "page_ids": [
+        "PAGE-0934",
+        "PAGE-0935"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteVendorController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "CLI-CLIENT-MEAL-PREFERENCES": {
+      "source_family_ids": [
+        "CLI-CLIENT-MEAL-PREFERENCES"
+      ],
+      "route_ids": [
+        "ROUTE-0163",
+        "ROUTE-0164",
+        "ROUTE-0165",
+        "ROUTE-0166"
+      ],
+      "page_ids": [
+        "PAGE-0575"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientMealPreferencesController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-clients-source-final.json"
+      ]
+    },
+    "FIN-BANK-ACCOUNT": {
+      "source_family_ids": [
+        "FIN-BANK-ACCOUNT"
+      ],
+      "route_ids": [
+        "ROUTE-0475",
+        "ROUTE-0476",
+        "ROUTE-0477",
+        "ROUTE-0478"
+      ],
+      "page_ids": [
+        "PAGE-0118",
+        "PAGE-0119"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BankAccountController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-BANK-RECONCILIATION": {
+      "source_family_ids": [
+        "FIN-BANK-RECONCILIATION"
+      ],
+      "route_ids": [
+        "ROUTE-0487",
+        "ROUTE-0488",
+        "ROUTE-0489",
+        "ROUTE-0490",
+        "ROUTE-0491",
+        "ROUTE-0492",
+        "ROUTE-0493"
+      ],
+      "page_ids": [
+        "PAGE-0122",
+        "PAGE-0123",
+        "PAGE-0124"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BankReconciliationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-BANK-TRANSACTION": {
+      "source_family_ids": [
+        "FIN-BANK-TRANSACTION"
+      ],
+      "route_ids": [
+        "ROUTE-0494",
+        "ROUTE-0495",
+        "ROUTE-0496"
+      ],
+      "page_ids": [
+        "PAGE-0125"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BankTransactionController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-BILL": {
+      "source_family_ids": [
+        "FIN-BILL"
+      ],
+      "route_ids": [
+        "ROUTE-0500",
+        "ROUTE-0501",
+        "ROUTE-0502",
+        "ROUTE-0503",
+        "ROUTE-0504",
+        "ROUTE-0505",
+        "ROUTE-0506",
+        "ROUTE-0507"
+      ],
+      "page_ids": [
+        "PAGE-0128",
+        "PAGE-0129",
+        "PAGE-0130",
+        "PAGE-0131"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BillController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-BUDGET-ACTUALS": {
+      "source_family_ids": [
+        "FIN-BUDGET-ACTUALS"
+      ],
+      "route_ids": [
+        "ROUTE-0685",
+        "ROUTE-0686"
+      ],
+      "page_ids": [
+        "PAGE-0194"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BudgetActualsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-CASH-FLOW-FORECAST": {
+      "source_family_ids": [
+        "FIN-CASH-FLOW-FORECAST"
+      ],
+      "route_ids": [
+        "ROUTE-0510",
+        "ROUTE-0511",
+        "ROUTE-0512",
+        "ROUTE-0513"
+      ],
+      "page_ids": [
+        "PAGE-0134",
+        "PAGE-0135"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/CashFlowForecastController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-CASH-POSITION": {
+      "source_family_ids": [
+        "FIN-CASH-POSITION"
+      ],
+      "route_ids": [
+        "ROUTE-0515"
+      ],
+      "page_ids": [
+        "PAGE-0133"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/CashPositionController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-CHART-OF-ACCOUNTS": {
+      "source_family_ids": [
+        "FIN-CHART-OF-ACCOUNTS"
+      ],
+      "route_ids": [
+        "ROUTE-0448",
+        "ROUTE-0449",
+        "ROUTE-0450",
+        "ROUTE-0451",
+        "ROUTE-0452",
+        "ROUTE-0453",
+        "ROUTE-0454"
+      ],
+      "page_ids": [
+        "PAGE-0113",
+        "PAGE-0114",
+        "PAGE-0115",
+        "PAGE-0116"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/ChartOfAccountsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-COST-CENTRE": {
+      "source_family_ids": [
+        "FIN-COST-CENTRE"
+      ],
+      "route_ids": [
+        "ROUTE-0527",
+        "ROUTE-0528",
+        "ROUTE-0529",
+        "ROUTE-0530"
+      ],
+      "page_ids": [
+        "PAGE-0139"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/CostCentreController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-CREDIT-NOTE": {
+      "source_family_ids": [
+        "FIN-CREDIT-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-0531",
+        "ROUTE-0532",
+        "ROUTE-0533",
+        "ROUTE-0534"
+      ],
+      "page_ids": [
+        "PAGE-0140",
+        "PAGE-0141"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/CreditNoteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-CURRENCY": {
+      "source_family_ids": [
+        "FIN-CURRENCY"
+      ],
+      "route_ids": [
+        "ROUTE-0536",
+        "ROUTE-0537",
+        "ROUTE-0538",
+        "ROUTE-0539",
+        "ROUTE-0540"
+      ],
+      "page_ids": [
+        "PAGE-0142"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/CurrencyController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-EXECUTIVE-FINANCIAL-DASHBOARD": {
+      "source_family_ids": [
+        "FIN-EXECUTIVE-FINANCIAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0560"
+      ],
+      "page_ids": [
+        "PAGE-0149"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/ExecutiveFinancialDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-FINANCE-CALENDAR": {
+      "source_family_ids": [
+        "FIN-FINANCE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-0508",
+        "ROUTE-0509"
+      ],
+      "page_ids": [
+        "PAGE-0132"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinanceCalendarController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-FINANCE-DASHBOARD": {
+      "source_family_ids": [
+        "FIN-FINANCE-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0447"
+      ],
+      "page_ids": [
+        "PAGE-0143"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FinanceDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-FISCAL-PERIOD": {
+      "source_family_ids": [
+        "FIN-FISCAL-PERIOD"
+      ],
+      "route_ids": [
+        "ROUTE-0561",
+        "ROUTE-0562",
+        "ROUTE-0563",
+        "ROUTE-0564"
+      ],
+      "page_ids": [
+        "PAGE-0150"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FiscalPeriodController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-FUNDING-STREAM": {
+      "source_family_ids": [
+        "FIN-FUNDING-STREAM"
+      ],
+      "route_ids": [
+        "ROUTE-0573",
+        "ROUTE-0574",
+        "ROUTE-0575",
+        "ROUTE-0576"
+      ],
+      "page_ids": [
+        "PAGE-0153"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FundingStreamController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-FX-REVALUATION": {
+      "source_family_ids": [
+        "FIN-FX-REVALUATION"
+      ],
+      "route_ids": [
+        "ROUTE-0577",
+        "ROUTE-0578",
+        "ROUTE-0579",
+        "ROUTE-0580"
+      ],
+      "page_ids": [
+        "PAGE-0154",
+        "PAGE-0155"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/FxRevaluationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-GST-RETURN": {
+      "source_family_ids": [
+        "FIN-GST-RETURN"
+      ],
+      "route_ids": [
+        "ROUTE-0581",
+        "ROUTE-0582",
+        "ROUTE-0583",
+        "ROUTE-0584",
+        "ROUTE-0585"
+      ],
+      "page_ids": [
+        "PAGE-0156",
+        "PAGE-0157",
+        "PAGE-0158"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/GstReturnController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-INTERCOMPANY": {
+      "source_family_ids": [
+        "FIN-INTERCOMPANY"
+      ],
+      "route_ids": [
+        "ROUTE-0594",
+        "ROUTE-0595",
+        "ROUTE-0596"
+      ],
+      "page_ids": [
+        "PAGE-0161"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/IntercompanyController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-INVOICE": {
+      "source_family_ids": [
+        "FIN-INVOICE"
+      ],
+      "route_ids": [
+        "ROUTE-0597",
+        "ROUTE-0598",
+        "ROUTE-0599",
+        "ROUTE-0600",
+        "ROUTE-0601",
+        "ROUTE-0602",
+        "ROUTE-0603",
+        "ROUTE-0604",
+        "ROUTE-0605",
+        "ROUTE-0606"
+      ],
+      "page_ids": [
+        "PAGE-0162",
+        "PAGE-0163",
+        "PAGE-0164",
+        "PAGE-0165"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/InvoiceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-IRD-FILING": {
+      "source_family_ids": [
+        "FIN-IRD-FILING"
+      ],
+      "route_ids": [
+        "ROUTE-0607",
+        "ROUTE-0608",
+        "ROUTE-0609",
+        "ROUTE-0610",
+        "ROUTE-0611",
+        "ROUTE-0612"
+      ],
+      "page_ids": [
+        "PAGE-0166",
+        "PAGE-0167"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/IrdFilingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-JOURNAL": {
+      "source_family_ids": [
+        "FIN-JOURNAL"
+      ],
+      "route_ids": [
+        "ROUTE-0613",
+        "ROUTE-0614",
+        "ROUTE-0615",
+        "ROUTE-0616",
+        "ROUTE-0617",
+        "ROUTE-0618"
+      ],
+      "page_ids": [
+        "PAGE-0168",
+        "PAGE-0169",
+        "PAGE-0170"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/JournalController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-MATCH-RULE": {
+      "source_family_ids": [
+        "FIN-MATCH-RULE"
+      ],
+      "route_ids": [
+        "ROUTE-0620",
+        "ROUTE-0621",
+        "ROUTE-0622",
+        "ROUTE-0623"
+      ],
+      "page_ids": [
+        "PAGE-0171"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/MatchRuleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-PAYMENT-ALLOCATION": {
+      "source_family_ids": [
+        "FIN-PAYMENT-ALLOCATION"
+      ],
+      "route_ids": [
+        "ROUTE-0625",
+        "ROUTE-0626"
+      ],
+      "page_ids": [
+        "PAGE-0172"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentAllocationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-PAYMENT-MATCH": {
+      "source_family_ids": [
+        "FIN-PAYMENT-MATCH"
+      ],
+      "route_ids": [
+        "ROUTE-0627",
+        "ROUTE-0628",
+        "ROUTE-0629",
+        "ROUTE-0630",
+        "ROUTE-0631"
+      ],
+      "page_ids": [
+        "PAGE-0173"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentMatchController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-PAYMENT-RUN": {
+      "source_family_ids": [
+        "FIN-PAYMENT-RUN"
+      ],
+      "route_ids": [
+        "ROUTE-0632",
+        "ROUTE-0633",
+        "ROUTE-0634",
+        "ROUTE-0635",
+        "ROUTE-0636",
+        "ROUTE-0637",
+        "ROUTE-0638"
+      ],
+      "page_ids": [
+        "PAGE-0174",
+        "PAGE-0175",
+        "PAGE-0176"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PaymentRunController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-PETTY-CASH": {
+      "source_family_ids": [
+        "FIN-PETTY-CASH"
+      ],
+      "route_ids": [
+        "ROUTE-0639",
+        "ROUTE-0640",
+        "ROUTE-0641",
+        "ROUTE-0642"
+      ],
+      "page_ids": [
+        "PAGE-0177",
+        "PAGE-0178"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PettyCashController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-PRICE-BOOK": {
+      "source_family_ids": [
+        "FIN-PRICE-BOOK"
+      ],
+      "route_ids": [
+        "ROUTE-0644",
+        "ROUTE-0645",
+        "ROUTE-0646",
+        "ROUTE-0647",
+        "ROUTE-0649",
+        "ROUTE-0650",
+        "ROUTE-0651"
+      ],
+      "page_ids": [
+        "PAGE-0179",
+        "PAGE-0180"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/PriceBookController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-RECURRING-CHARGE": {
+      "source_family_ids": [
+        "FIN-RECURRING-CHARGE"
+      ],
+      "route_ids": [
+        "ROUTE-0675",
+        "ROUTE-0676",
+        "ROUTE-0677",
+        "ROUTE-0678"
+      ],
+      "page_ids": [
+        "PAGE-0190"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/RecurringChargeController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FIN-VENDOR": {
+      "source_family_ids": [
+        "FIN-VENDOR"
+      ],
+      "route_ids": [
+        "ROUTE-0695",
+        "ROUTE-0696",
+        "ROUTE-0697",
+        "ROUTE-0698",
+        "ROUTE-0699",
+        "ROUTE-0700"
+      ],
+      "page_ids": [
+        "PAGE-0201",
+        "PAGE-0202",
+        "PAGE-0203",
+        "PAGE-0204"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/VendorController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-ALERT": {
+      "source_family_ids": [
+        "FLEET-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0702",
+        "ROUTE-0703",
+        "ROUTE-0704",
+        "ROUTE-0705"
+      ],
+      "page_ids": [
+        "PAGE-0205",
+        "PAGE-0214"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/AlertController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-ASSET": {
+      "source_family_ids": [
+        "FLEET-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-0706",
+        "ROUTE-0707",
+        "ROUTE-0708",
+        "ROUTE-0709",
+        "ROUTE-0710",
+        "ROUTE-0711"
+      ],
+      "page_ids": [
+        "PAGE-0206",
+        "PAGE-0207",
+        "PAGE-0208",
+        "PAGE-0213",
+        "PAGE-0214"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/AssetController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-COMMUNITY-ACCESS": {
+      "source_family_ids": [
+        "FLEET-COMMUNITY-ACCESS"
+      ],
+      "route_ids": [
+        "ROUTE-0809"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0246"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/CommunityAccessController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-COMPLIANCE": {
+      "source_family_ids": [
+        "FLEET-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0721"
+      ],
+      "page_ids": [
+        "PAGE-0212",
+        "PAGE-0214"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ComplianceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-COST-ALLOCATION": {
+      "source_family_ids": [
+        "FLEET-COST-ALLOCATION"
+      ],
+      "route_ids": [
+        "ROUTE-0810"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0247"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/CostAllocationController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-DAILY-CHECK": {
+      "source_family_ids": [
+        "FLEET-DAILY-CHECK"
+      ],
+      "route_ids": [
+        "ROUTE-0722",
+        "ROUTE-0723"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0215"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-DASHBOARD": {
+      "source_family_ids": [
+        "FLEET-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0701"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0216"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/DashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-DRIVER-ELIGIBILITY": {
+      "source_family_ids": [
+        "FLEET-DRIVER-ELIGIBILITY"
+      ],
+      "route_ids": [
+        "ROUTE-1358",
+        "ROUTE-1359",
+        "ROUTE-1360",
+        "ROUTE-1361",
+        "ROUTE-1362",
+        "ROUTE-1363"
+      ],
+      "page_ids": [
+        "PAGE-0427",
+        "PAGE-0428",
+        "PAGE-0430",
+        "PAGE-0431",
+        "PAGE-0444",
+        "PAGE-0445"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/DriverEligibilityController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-FLEET-MAP-USAGE-DASHBOARD": {
+      "source_family_ids": [
+        "FLEET-FLEET-MAP-USAGE-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0843"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0263"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Fleet/FleetMapUsageDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-GEOFENCE": {
+      "source_family_ids": [
+        "FLEET-GEOFENCE"
+      ],
+      "route_ids": [
+        "ROUTE-0736",
+        "ROUTE-0737",
+        "ROUTE-0738",
+        "ROUTE-0739",
+        "ROUTE-0740",
+        "ROUTE-0741",
+        "ROUTE-0742"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0221",
+        "PAGE-0222",
+        "PAGE-0223"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/GeofenceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-HANDOVER": {
+      "source_family_ids": [
+        "FLEET-HANDOVER"
+      ],
+      "route_ids": [
+        "ROUTE-0743",
+        "ROUTE-0744",
+        "ROUTE-0745",
+        "ROUTE-0746",
+        "ROUTE-0747",
+        "ROUTE-0748"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0224",
+        "PAGE-0225"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/HandoverController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-INSPECTION": {
+      "source_family_ids": [
+        "FLEET-INSPECTION"
+      ],
+      "route_ids": [
+        "ROUTE-0764",
+        "ROUTE-0765",
+        "ROUTE-0766",
+        "ROUTE-0767"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0227",
+        "PAGE-0228",
+        "PAGE-0229",
+        "PAGE-0233"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/InspectionController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-KEY": {
+      "source_family_ids": [
+        "FLEET-KEY"
+      ],
+      "route_ids": [
+        "ROUTE-0768",
+        "ROUTE-0769",
+        "ROUTE-0770",
+        "ROUTE-0771"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0230"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/KeyController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-LIVE-MAP": {
+      "source_family_ids": [
+        "FLEET-LIVE-MAP"
+      ],
+      "route_ids": [
+        "ROUTE-0787"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0239"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/LiveMapController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-MAINTENANCE-DASHBOARD": {
+      "source_family_ids": [
+        "FLEET-MAINTENANCE-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0776"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0234"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/MaintenanceDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-MILEAGE": {
+      "source_family_ids": [
+        "FLEET-MILEAGE"
+      ],
+      "route_ids": [
+        "ROUTE-0790",
+        "ROUTE-0791",
+        "ROUTE-0792",
+        "ROUTE-0793",
+        "ROUTE-0794",
+        "ROUTE-0795",
+        "ROUTE-0796"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0240"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/MileageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-MOBILE": {
+      "source_family_ids": [
+        "FLEET-MOBILE"
+      ],
+      "route_ids": [
+        "ROUTE-0797"
+      ],
+      "page_ids": [
+        "PAGE-0241"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/MobileController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-OUTING": {
+      "source_family_ids": [
+        "FLEET-OUTING"
+      ],
+      "route_ids": [
+        "ROUTE-0798",
+        "ROUTE-0799",
+        "ROUTE-0800",
+        "ROUTE-0801",
+        "ROUTE-0802",
+        "ROUTE-0803",
+        "ROUTE-0804",
+        "ROUTE-0805",
+        "ROUTE-0806"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0242",
+        "PAGE-0243",
+        "PAGE-0244"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/OutingController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-SERVICE-SCHEDULE": {
+      "source_family_ids": [
+        "FLEET-SERVICE-SCHEDULE"
+      ],
+      "route_ids": [
+        "ROUTE-0777",
+        "ROUTE-0778",
+        "ROUTE-0779",
+        "ROUTE-0780"
+      ],
+      "page_ids": [
+        "PAGE-0214",
+        "PAGE-0233",
+        "PAGE-0235"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/ServiceScheduleController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-WANDERING-ALERT": {
+      "source_family_ids": [
+        "FLEET-WANDERING-ALERT"
+      ],
+      "route_ids": [
+        "ROUTE-0841"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/WanderingAlertController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "FLEET-WORK-ORDER": {
+      "source_family_ids": [
+        "FLEET-WORK-ORDER"
+      ],
+      "route_ids": [
+        "ROUTE-0781",
+        "ROUTE-0782",
+        "ROUTE-0783",
+        "ROUTE-0784",
+        "ROUTE-0785",
+        "ROUTE-0786"
+      ],
+      "page_ids": [
+        "PAGE-0213",
+        "PAGE-0214",
+        "PAGE-0233",
+        "PAGE-0236",
+        "PAGE-0237",
+        "PAGE-0238"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/FleetAssets/WorkOrderController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-1.json"
+      ]
+    },
+    "REP-REPORTS": {
+      "source_family_ids": [
+        "REP-REPORTS"
+      ],
+      "route_ids": [
+        "ROUTE-2346"
+      ],
+      "page_ids": [
+        "PAGE-0751"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ReportsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-ALERTS-EVENTS": {
+      "source_family_ids": [
+        "SEC-ALERTS-EVENTS"
+      ],
+      "route_ids": [
+        "ROUTE-2529"
+      ],
+      "page_ids": [
+        "PAGE-0814",
+        "PAGE-0816"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/AlertsEventsController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-ASSET-TELEMETRY-INGEST": {
+      "source_family_ids": [
+        "SEC-ASSET-TELEMETRY-INGEST"
+      ],
+      "route_ids": [
+        "ROUTE-2980",
+        "ROUTE-2981"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AssetTelemetryIngestController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-DASHBOARD": {
+      "source_family_ids": [
+        "SEC-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-2526"
+      ],
+      "page_ids": [
+        "PAGE-0816",
+        "PAGE-0817"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-DEVICE-ASSIGNMENT": {
+      "source_family_ids": [
+        "SEC-DEVICE-ASSIGNMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2549",
+        "ROUTE-2550",
+        "ROUTE-2559"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceAssignmentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-DEVICE-DOCUMENT": {
+      "source_family_ids": [
+        "SEC-DEVICE-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2551",
+        "ROUTE-2552",
+        "ROUTE-2553"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/DeviceDocumentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-INTEGRATIONS-HUB": {
+      "source_family_ids": [
+        "SEC-INTEGRATIONS-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-2562"
+      ],
+      "page_ids": [
+        "PAGE-0816",
+        "PAGE-0832"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/IntegrationsHubController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-MAINTENANCE-HEALTH": {
+      "source_family_ids": [
+        "SEC-MAINTENANCE-HEALTH"
+      ],
+      "route_ids": [
+        "ROUTE-2556",
+        "ROUTE-2604",
+        "ROUTE-2605",
+        "ROUTE-2606"
+      ],
+      "page_ids": [
+        "PAGE-0816",
+        "PAGE-0833"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/MaintenanceHealthController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-MILESIGHT": {
+      "source_family_ids": [
+        "SEC-MILESIGHT"
+      ],
+      "route_ids": [
+        "ROUTE-2563",
+        "ROUTE-2564",
+        "ROUTE-2565",
+        "ROUTE-2566",
+        "ROUTE-2567"
+      ],
+      "page_ids": [
+        "PAGE-0828"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SEC-QUECLINK": {
+      "source_family_ids": [
+        "SEC-QUECLINK"
+      ],
+      "route_ids": [
+        "ROUTE-2584",
+        "ROUTE-2585",
+        "ROUTE-2589",
+        "ROUTE-2592"
+      ],
+      "page_ids": [
+        "PAGE-0830"
+      ],
+      "backend_anchors": [
+        "app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-BUDGET-FORECAST-API": {
+      "source_family_ids": [
+        "SITE-BUDGET-FORECAST-API"
+      ],
+      "route_ids": [
+        "ROUTE-0455",
+        "ROUTE-0458",
+        "ROUTE-0463",
+        "ROUTE-0465",
+        "ROUTE-0466",
+        "ROUTE-0467",
+        "ROUTE-0469"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/BudgetForecastApiController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-CHECKLISTS-DASHBOARD": {
+      "source_family_ids": [
+        "SITE-CHECKLISTS-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0114"
+      ],
+      "page_ids": [
+        "PAGE-0029"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/ChecklistsDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-CREDENTIAL-TYPE": {
+      "source_family_ids": [
+        "SITE-CREDENTIAL-TYPE"
+      ],
+      "route_ids": [
+        "ROUTE-0321",
+        "ROUTE-0322"
+      ],
+      "page_ids": [
+        "PAGE-0938",
+        "PAGE-0939"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/CredentialTypeController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-HOUSE-LEDGER": {
+      "source_family_ids": [
+        "SITE-HOUSE-LEDGER"
+      ],
+      "route_ids": [
+        "ROUTE-2816",
+        "ROUTE-2817",
+        "ROUTE-2818",
+        "ROUTE-2819",
+        "ROUTE-2820",
+        "ROUTE-2821"
+      ],
+      "page_ids": [
+        "PAGE-0867",
+        "PAGE-0897"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/HouseLedgerController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-QUALITY-CHECKLIST": {
+      "source_family_ids": [
+        "SITE-QUALITY-CHECKLIST"
+      ],
+      "route_ids": [
+        "ROUTE-2341"
+      ],
+      "page_ids": [
+        "PAGE-0747"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/QualityChecklistController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-CHECKLIST-TEMPLATE": {
+      "source_family_ids": [
+        "SITE-SITE-CHECKLIST-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2898",
+        "ROUTE-2899",
+        "ROUTE-2900"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteChecklistTemplateController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-CONTACT": {
+      "source_family_ids": [
+        "SITE-SITE-CONTACT"
+      ],
+      "route_ids": [
+        "ROUTE-2757",
+        "ROUTE-2758",
+        "ROUTE-2759"
+      ],
+      "page_ids": [
+        "PAGE-0881"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SiteContactController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-DAMAGE": {
+      "source_family_ids": [
+        "SITE-SITE-DAMAGE"
+      ],
+      "route_ids": [
+        "ROUTE-2774",
+        "ROUTE-2775",
+        "ROUTE-2776",
+        "ROUTE-2777"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0886"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteDamageController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-DOCUMENT": {
+      "source_family_ids": [
+        "SITE-SITE-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2778",
+        "ROUTE-2779",
+        "ROUTE-2780",
+        "ROUTE-2781",
+        "ROUTE-2782",
+        "ROUTE-2783"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0866",
+        "PAGE-0887"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/SiteDocumentController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-EMERGENCY-PLAN": {
+      "source_family_ids": [
+        "SITE-SITE-EMERGENCY-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2785",
+        "ROUTE-2786",
+        "ROUTE-2787"
+      ],
+      "page_ids": [
+        "PAGE-0889",
+        "PAGE-0911",
+        "PAGE-0912",
+        "PAGE-0913",
+        "PAGE-0914",
+        "PAGE-0915",
+        "PAGE-0916",
+        "PAGE-0917",
+        "PAGE-0918",
+        "PAGE-0919",
+        "PAGE-0920"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteEmergencyPlanController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-FINANCIAL-DASHBOARD": {
+      "source_family_ids": [
+        "SITE-SITE-FINANCIAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-0693"
+      ],
+      "page_ids": [
+        "PAGE-0199"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/SiteFinancialDashboardController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-GEOFENCE": {
+      "source_family_ids": [
+        "SITE-SITE-GEOFENCE"
+      ],
+      "route_ids": [
+        "ROUTE-2792",
+        "ROUTE-2793",
+        "ROUTE-2794"
+      ],
+      "page_ids": [
+        "PAGE-0871"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteGeofenceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-HARDWARE": {
+      "source_family_ids": [
+        "SITE-SITE-HARDWARE"
+      ],
+      "route_ids": [
+        "ROUTE-2795",
+        "ROUTE-2796",
+        "ROUTE-2797",
+        "ROUTE-2798",
+        "ROUTE-2799"
+      ],
+      "page_ids": [
+        "PAGE-0891",
+        "PAGE-0912",
+        "PAGE-0914",
+        "PAGE-0915",
+        "PAGE-0917",
+        "PAGE-0919"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteHardwareController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-NOTE": {
+      "source_family_ids": [
+        "SITE-SITE-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2856",
+        "ROUTE-2857"
+      ],
+      "page_ids": [
+        "PAGE-0868"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteNoteController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-RESOURCE": {
+      "source_family_ids": [
+        "SITE-SITE-RESOURCE"
+      ],
+      "route_ids": [
+        "ROUTE-2868",
+        "ROUTE-2869",
+        "ROUTE-2870",
+        "ROUTE-2871"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0930"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteResourceController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITE-ZONE": {
+      "source_family_ids": [
+        "SITE-SITE-ZONE"
+      ],
+      "route_ids": [
+        "ROUTE-2893",
+        "ROUTE-2894",
+        "ROUTE-2895",
+        "ROUTE-2896"
+      ],
+      "page_ids": [
+        "PAGE-0864",
+        "PAGE-0941"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Sites/SiteZoneController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    },
+    "SITE-SITES-FINANCIAL-OVERVIEW": {
+      "source_family_ids": [
+        "SITE-SITES-FINANCIAL-OVERVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-0692"
+      ],
+      "page_ids": [
+        "PAGE-0200",
+        "PAGE-0867"
+      ],
+      "backend_anchors": [
+        "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php"
+      ],
+      "origin_files": [
+        "full-distinct-capability-adjudication.json",
+        "manifest-finance-sites-tuples-2.json"
+      ]
+    }
+  },
+  "origin_files": [
+    "finance-api-feature-id-adjudication.json",
+    "full-distinct-capability-adjudication.json",
+    "inventory.json",
+    "manifest-clients-source-final.json",
+    "manifest-finance-sites-tuples-1.json",
+    "manifest-finance-sites-tuples-2.json",
+    "manifest-full-global-exact-ids.json",
+    "manifest-privacy-transfers.json",
+    "working-capability-manifest-894.json"
+  ],
+  "deliberate_shared_route_cases": [
+    {
+      "case": "combined_report_parameter_dispatch",
+      "route_ids": [
+        "ROUTE-2348",
+        "ROUTE-2349"
+      ],
+      "working_keys": [
+        "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+        "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+        "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+      ],
+      "reason": "The exact {report} parameter dispatches three accepted report propositions through the same show/export controller routes and render root; this is shared static transport evidence, not duplicate exclusive ownership."
+    },
+    {
+      "case": "module_report_parameter_dispatch",
+      "route_ids": [
+        "ROUTE-2355",
+        "ROUTE-2356"
+      ],
+      "working_keys": [
+        "CAP-REP-MODULE-REPORT-ASSETS",
+        "CAP-REP-MODULE-REPORT-AUDIT-LOGS",
+        "CAP-REP-MODULE-REPORT-CLIENTS",
+        "CAP-REP-MODULE-REPORT-CONTROLLED-DRUG-DISCREPANCIES",
+        "CAP-REP-MODULE-REPORT-FLEET-TRIPS",
+        "CAP-REP-MODULE-REPORT-INCIDENTS",
+        "CAP-REP-MODULE-REPORT-MEDICATION-ADMINISTRATIONS",
+        "CAP-REP-MODULE-REPORT-RESPITE-BOOKINGS",
+        "CAP-REP-MODULE-REPORT-RESPITE-REQUESTS",
+        "CAP-REP-MODULE-REPORT-SAFEGUARDING",
+        "CAP-REP-MODULE-REPORT-SHIFTS",
+        "CAP-REP-MODULE-REPORT-SITES",
+        "CAP-REP-MODULE-REPORT-STAFF",
+        "CAP-REP-MODULE-REPORT-TIMESHEETS"
+      ],
+      "reason": "The exact {module} parameter dispatches fourteen accepted module-report propositions through the same show/export routes and render root; ReportCatalog supplies the proposition key."
+    },
+    {
+      "case": "queclink_pending_to_custody_boundary",
+      "route_ids": [
+        "ROUTE-2568",
+        "ROUTE-2572",
+        "ROUTE-2581"
+      ],
+      "working_keys": [
+        "CAP-SEC-QUECLINK-HUB-DEVICE-CUSTODY",
+        "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE"
+      ],
+      "reason": "The hub index plus claim/reject actions are the shared static boundary between pending intake and device custody. Their reuse does not prove either workflow at runtime."
+    },
+    {
+      "case": "global_calendar_host_and_data_boundary",
+      "route_ids": [
+        "ROUTE-0082",
+        "ROUTE-0083",
+        "ROUTE-0086"
+      ],
+      "working_keys": [
+        "CAP-SITE-SITE-CALENDAR-EVENT-PLANNING",
+        "CAP-SITE-SITE-CALENDAR-FEEDS",
+        "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW"
+      ],
+      "reason": "The global calendar host, exception action and global-events data route support overlapping planning/feed/overview propositions. The relation is deliberately non-exclusive and runtime-unverified."
+    }
+  ],
+  "unresolved_targets": [
+    {
+      "working_key": "CAP-FLEET-CHECKLIST-RUN-EXECUTION",
+      "reason": "FLEET-CHECKLIST has a retained four-route envelope, but no independently retained exact target split allocates execution routes/pages without re-adjudicating the sibling template-definition target.",
+      "status": "target_exclusive_route_page_allocation_unproved"
+    },
+    {
+      "working_key": "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION",
+      "reason": "FLEET-CHECKLIST has a retained four-route envelope, but no independently retained exact target split allocates template-definition routes/pages without re-adjudicating the sibling run-execution target.",
+      "status": "target_exclusive_route_page_allocation_unproved"
+    },
+    {
+      "working_key": "CAP-FLEET-DEVICE-REGISTRY-PAIRING",
+      "reason": "FLEET-DEVICE has a retained seven-route envelope, but no independently retained exact target split allocates registry/pairing routes/pages without re-adjudicating the sibling consent target.",
+      "status": "target_exclusive_route_page_allocation_unproved"
+    },
+    {
+      "working_key": "CAP-FLEET-DEVICE-TRACKING-CONSENT",
+      "reason": "FLEET-DEVICE has a retained seven-route envelope, but no independently retained exact target split allocates consent routes/pages without re-adjudicating the sibling registry/pairing target.",
+      "status": "target_exclusive_route_page_allocation_unproved"
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "reason": "The accepted target retains SITE-DASHBOARD source lineage, but the semantic serve/unserve routes ROUTE-2836 and ROUTE-2837 belong to SITE-SITE-MEAL-PLAN. Assigning them here would cross the accepted source-family boundary, so target-exclusive route/page/backend evidence remains empty.",
+      "status": "source_lineage_conflict_target_exclusive_mapping_unproved"
+    }
+  ],
+  "checksums": {
+    "inputs": {
+      "working-capability-manifest-894.json": "0bcef71148e275df3e066a20146ba8389f81bb0121ec5b7708d50921d1aa3b16",
+      "inventory.json": "e4ec65d0ee7e1745bb513da220f4efc0d480cbc76e846a7b7b6117a79eed4570",
+      "full-distinct-capability-adjudication.json": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715"
+    },
+    "canonical_working_keys_sha256": "599d3a47d8575f8aaa7653046156f242aadd5e99d4efd5035ba7ef77e9b3e0fe",
+    "target_lineage_sha256": "0a4c1f7890ff1b548e16e2a315d353080ff865439a635f0e1197b81ee02dcc1a",
+    "route_relations_sha256": "37f4cf8bffdc816e5892100c47144efca79da46cdb314c3d68c00f59ab6ec160",
+    "page_relations_sha256": "bc4163a685cb03356505d55f421b59d92e50c117c1fc0306fcb8afab65f2f6a1",
+    "backend_relations_sha256": "cfcb382767e172e702837676414418dee902d3c2633501796195db9cec10e59e"
+  },
+  "validation": {
+    "exact_manifest_target_set": true,
+    "source_family_ids_match_manifest": true,
+    "all_route_ids_exist_in_inventory": true,
+    "all_page_ids_exist_in_inventory": true,
+    "all_arrays_sorted_unique": true,
+    "accepted_full_name_sites_working_keys_used": true,
+    "route_family_mismatch_count": 0,
+    "all_shared_route_ids_declared": true,
+    "shared_route_id_count": 10,
+    "shared_route_relation_count": 46,
+    "unresolved_targets_equal_route_empty_targets": true,
+    "all_backend_anchors_exist": true,
+    "all_origin_files_exist": true,
+    "runtime_or_completion_claimed": false
+  }
+}

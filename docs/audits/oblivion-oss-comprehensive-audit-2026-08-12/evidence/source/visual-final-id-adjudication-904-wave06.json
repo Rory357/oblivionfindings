@@ -1,0 +1,229 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "visual-final-id-adjudication-904-wave06",
+  "generated_at": "2026-08-21T22:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_zero_promotion",
+  "audit_boundary": "Static final-ID ownership adjudication only. No browser, runtime, screenshot, usability, finding, benchmark or completion credit is inferred.",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "598d76cd63b23a7ea49164ad43e12cb10afdb9fed8437807d8b50d20b090cb9b",
+      "bytes": 11775291
+    },
+    "visual_matrix": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "707885a83264c8e2ab3f92898578a2b20ba3e8a2ccdb3ece17156d8c0774c293",
+      "bytes": 8377597
+    }
+  },
+  "selection": {
+    "rule": "Exclude 132 reviewed IDs; exhaust remaining three-route rows then take first 16 exact-controller four-route rows; every exact owner intersection is empty and no singleton page fallback exists.",
+    "exclusion_count": 132,
+    "exclusion_sha256": "dc02634beb28e7a592e751ce4230e9d1cf4ec56bcfcd782594e164a9cd0fcf1e",
+    "ordered_ids": [
+      "VIS-019390",
+      "VIS-019967",
+      "VIS-020307",
+      "VIS-020678",
+      "VIS-020686",
+      "VIS-020688",
+      "VIS-020698",
+      "VIS-021202",
+      "VIS-021285",
+      "VIS-017874",
+      "VIS-017875",
+      "VIS-017995",
+      "VIS-017996",
+      "VIS-018056",
+      "VIS-018057",
+      "VIS-018058",
+      "VIS-019077",
+      "VIS-019142",
+      "VIS-019143",
+      "VIS-019177",
+      "VIS-019178",
+      "VIS-020239",
+      "VIS-020304",
+      "VIS-020393",
+      "VIS-020506"
+    ],
+    "ordered_sha256": "4767152706c40530ed9f36cef1232704893207be1c35777f93e922e4169cbc1a",
+    "sorted_sha256": "75f4886251dcf45f8926c6ca778e3c6c9a0199cec8596e21259ad8df9d6804f6",
+    "proof_tuple_sha256": "46c1eec5443a52e3ecc21dd2e489fca1c3284c9cb3e35ee4aeb424ca514ffdac",
+    "source_map_sha256": "8de7ac50470fad0fda30a60df1949998cd03d4a8ba37dec695d4f4a04178352e"
+  },
+  "adjudications": [
+    {
+      "visual_id": "VIS-019390",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019967",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020307",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020678",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020686",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020688",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020698",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-021202",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-021285",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017874",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017875",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017995",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-017996",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018056",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018057",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-018058",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019077",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019142",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019143",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019177",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-019178",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020239",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020304",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020393",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    },
+    {
+      "visual_id": "VIS-020506",
+      "verdict": "RETAIN_UNRESOLVED",
+      "reason": "Exact route owners have an empty final-ID intersection and no singleton exact page fallback.",
+      "runtime_credit": 0
+    }
+  ],
+  "count_delta": {
+    "visual_assigned": 0,
+    "visual_unresolved": 0,
+    "material_assigned": 0,
+    "material_unresolved": 0,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "visual_assigned": 8168,
+    "visual_rows": 8753,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_rows": 4312,
+    "material_unresolved": 364,
+    "unique_assigned_targets": 774
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-visual-wave04-05-overlay3-4-generation-summary",
+  "generated_at": "2026-08-21T21:30:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "outputs": {
+    "visual_wave04": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave04.json",
+      "sha256": "ca2ee2e2c283ba242eea8ebd05a23eedfb69a5e9c3f7b41da275205b3457fc53",
+      "bytes": 8272
+    },
+    "visual_wave05": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave05.json",
+      "sha256": "d6216348faf79f2fefaa32090929ed0002980b651214fcc2619607d64487ec91",
+      "bytes": 8262
+    },
+    "overlay_wave3": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave3.json",
+      "sha256": "1677c2919ad82f97cf0bc0baba81330ce1a6fb978e13f6bb07e2f859ae196903",
+      "bytes": 7986
+    },
+    "overlay_wave4": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave4.json",
+      "sha256": "54f620e9a8fd0d75dd9e845cf21b4ad4abc7da2ac258cbe5f81caeabd82e1ae3",
+      "bytes": 7859
+    },
+    "overlay_classifier": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "fadee31f31a3d8a382a69a81b78f87698a4365bd3e45c197c9811c7b904e4262",
+      "bytes": 1115954
+    }
+  },
+  "counts": {
+    "visual_assigned": 8168,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "overlay_exact_resolved": 193,
+    "overlay_unresolved_or_blocked": 273,
+    "primitive_exact_resolved": 208,
+    "primitive_unresolved": 269
+  },
+  "credit_boundary": {
+    "visual_final_id_promotions": 0,
+    "overlay_static_pairings": 20,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

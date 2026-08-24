@@ -1,0 +1,1473 @@
+{
+  "schema_version": "1.0",
+  "artifact": "route-page-gap-reconciliation-904",
+  "status": "static_read_only_reconciliation_not_runtime_or_completion_claim",
+  "generated_at": "2026-08-21T23:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Static source and inventory reconciliation only. No routes, tests, browser sessions, databases or external systems were executed or changed.",
+  "inputs": [
+    {
+      "file": "route-page-gap-reconciliation-902.json",
+      "role": "frozen 902 route/page relation corpus",
+      "sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb"
+    },
+    {
+      "file": "working-capability-manifest-904.json",
+      "role": "accepted 904 FEATURE-ID identity",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10"
+    },
+    {
+      "file": "canonical-denominator-904-adjudication.json",
+      "role": "two-capability/eight-route denominator decision",
+      "sha256": "60e98d2af1b48a95c38c61b51e49b0cafb33e083e276986c881de1d83a91fe90"
+    }
+  ],
+  "denominator": {
+    "baseline": 894,
+    "accepted_new": 10,
+    "accepted": 904,
+    "accepted_new_class_counts": {
+      "H": 6,
+      "D": 3,
+      "M": 1
+    },
+    "accepted_new_target_ids": [
+      "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "CAP-CR-SIGNAL-TO-ALERT-PIPELINE",
+      "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "HR-COMPLIANCE-EXPORT",
+      "HR-REFERENCE",
+      "OPS-CLIENT-FUND"
+    ]
+  },
+  "normalization_note": "The 902 surface corpus is retained except that the eight independently owned medical mutation routes move from medical_reachability_unproved to two accepted 904 H targets. PAGE-0038 and PAGE-0590 remain resolver-orphans. ROUTE-0098 is now a shared, nonexclusive support-only count projection for three accepted Site library lifecycles; ROUTE-0821/PAGE-0252 remain excluded as reachable UI-only nonpersistent no-op surfaces.",
+  "excluded_mapping_rule": "Each route/page outside an accepted H/D/M target has a stable SURFACE-* disposition ID. These are excluded classification/tombstone IDs, not user-capability denominator rows and not completion credit.",
+  "legend": {
+    "accepted_new_exact": "accepted_new_exact_target",
+    "existing_exact": "existing_exact_target",
+    "excluded_dead_or_unreachable": "excluded_dead_or_unreachable",
+    "medical_reachability_unproved": "medical_reachability_unproved",
+    "unresolved_ambiguity": "unresolved_ambiguity",
+    "dead_or_noop": "dead_or_noop",
+    "generated_or_test_only": "generated_or_test_only",
+    "infrastructure_or_out_of_product": "infrastructure_or_out_of_product",
+    "page_accepted_new_exact": "accepted_new_exact_target",
+    "page_existing_exact": "existing_exact_target",
+    "page_support_only": "support_only",
+    "page_resolver_orphan": "resolver_orphan",
+    "page_dead_or_noop": "dead_or_noop",
+    "page_generated_or_test_only": "generated_or_test_only",
+    "page_infrastructure_or_out_of_product": "infrastructure_or_out_of_product",
+    "route_support_only": "support_only"
+  },
+  "routes": {
+    "accepted_new_exact": [
+      {
+        "route_ids": [
+          "ROUTE-0095",
+          "ROUTE-0096"
+        ],
+        "target_ids": [
+          "HR-REFERENCE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0168",
+          "ROUTE-0169",
+          "ROUTE-0170",
+          "ROUTE-2012",
+          "ROUTE-2013",
+          "ROUTE-2014"
+        ],
+        "target_ids": [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0180",
+          "ROUTE-2023"
+        ],
+        "target_ids": [
+          "CAP-MED-CLIENT-MEDICAL-PROFILE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0324",
+          "ROUTE-0325",
+          "ROUTE-0326"
+        ],
+        "target_ids": [
+          "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1364"
+        ],
+        "target_ids": [
+          "HR-COMPLIANCE-EXPORT",
+          "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+          "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT"
+        ],
+        "selectors": {
+          "staff": "HR-COMPLIANCE-EXPORT",
+          "vetting": "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+          "drivers": "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+          "renewals": "dead_branch_excluded"
+        }
+      },
+      {
+        "route_ids": [
+          "ROUTE-1927",
+          "ROUTE-1928",
+          "ROUTE-1929",
+          "ROUTE-1930",
+          "ROUTE-1932"
+        ],
+        "target_ids": [
+          "OPS-CLIENT-FUND"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1931"
+        ],
+        "target_ids": [
+          "CAP-OPS-CLIENT-FUND-TRANSACTIONS"
+        ]
+      }
+    ],
+    "existing_exact": [
+      {
+        "route_ids": [
+          "ROUTE-0044",
+          "ROUTE-0045",
+          "ROUTE-0046"
+        ],
+        "target_ids": [
+          "FLEET-ASSET"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0052",
+          "ROUTE-0053"
+        ],
+        "target_ids": [
+          "FLEET-GEOFENCE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0063"
+        ],
+        "target_ids": [
+          "FLEET-ALERT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0070",
+          "ROUTE-0071"
+        ],
+        "target_ids": [
+          "CAP-OPS-FAMILY-NOTE-SHIFT-HANDOFF"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0097"
+        ],
+        "target_ids": [
+          "CAP-SITE-MEAL-PLANNING"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0115"
+        ],
+        "target_ids": [
+          "CAP-SITE-SITE-CHECKLIST-RUN-EXECUTION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0167",
+          "ROUTE-2011"
+        ],
+        "target_ids": [
+          "CAP-MED-MEDICATION-ORDER-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0202",
+          "ROUTE-0204",
+          "ROUTE-0206"
+        ],
+        "target_ids": [
+          "CAP-HR-COMPETENCY-DEFINITIONS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0361",
+          "ROUTE-1872"
+        ],
+        "target_ids": [
+          "CAP-MED-EMAR-WORKSPACE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0445"
+        ],
+        "target_ids": [
+          "CAP-MED-BREAK-GLASS-OVERSIGHT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0474"
+        ],
+        "target_ids": [
+          "CAP-FIN-AUDIT-EXPORT-PACKAGE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0479",
+          "ROUTE-0480"
+        ],
+        "target_ids": [
+          "FIN-BANK-ACCOUNT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0497"
+        ],
+        "target_ids": [
+          "FIN-BANK-ACCOUNT",
+          "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+          "FIN-PETTY-CASH"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0514"
+        ],
+        "target_ids": [
+          "FIN-CASH-FLOW-FORECAST"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0535"
+        ],
+        "target_ids": [
+          "FIN-CREDIT-NOTE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0541"
+        ],
+        "target_ids": [
+          "FIN-FINANCE-DASHBOARD"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0551"
+        ],
+        "target_ids": [
+          "CAP-FIN-DONOR-FUND-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0552"
+        ],
+        "target_ids": [
+          "CAP-FIN-EFTPOS-TERMINALS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0570",
+          "ROUTE-0571"
+        ],
+        "target_ids": [
+          "CAP-ASSET-FIXED-ASSET-REGISTER"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0619"
+        ],
+        "target_ids": [
+          "FIN-CHART-OF-ACCOUNTS",
+          "FIN-COST-CENTRE",
+          "CAP-ASSET-FIXED-ASSET-REGISTER",
+          "FIN-FX-REVALUATION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0624"
+        ],
+        "target_ids": [
+          "FIN-BILL"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0643"
+        ],
+        "target_ids": [
+          "FIN-PETTY-CASH"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0648",
+          "ROUTE-0652"
+        ],
+        "target_ids": [
+          "FIN-PRICE-BOOK"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0668",
+          "ROUTE-0670"
+        ],
+        "target_ids": [
+          "CAP-FIN-QUOTE-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0679",
+          "ROUTE-0680"
+        ],
+        "target_ids": [
+          "FIN-RECURRING-CHARGE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0681"
+        ],
+        "target_ids": [
+          "CAP-FIN-FINANCIAL-REPORT-PROFIT-LOSS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0691"
+        ],
+        "target_ids": [
+          "CAP-FIN-ACCOUNTING-INTEGRATION-CONNECTION-LIFECYCLE",
+          "FIN-FUNDING-STREAM"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0694"
+        ],
+        "target_ids": [
+          "FIN-GST-RETURN",
+          "FIN-IRD-FILING",
+          "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+          "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0724",
+          "ROUTE-0725",
+          "ROUTE-0728",
+          "ROUTE-0730"
+        ],
+        "target_ids": [
+          "CAP-FLEET-DEVICE-REGISTRY-PAIRING"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0726",
+          "ROUTE-0727",
+          "ROUTE-0729"
+        ],
+        "target_ids": [
+          "CAP-FLEET-DEVICE-TRACKING-CONSENT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0772",
+          "ROUTE-0773"
+        ],
+        "target_ids": [
+          "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0774",
+          "ROUTE-0775"
+        ],
+        "target_ids": [
+          "CAP-FLEET-CHECKLIST-RUN-EXECUTION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0842"
+        ],
+        "target_ids": [
+          "FLEET-DASHBOARD"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0844"
+        ],
+        "target_ids": [
+          "CAP-FLEET-VEHICLE-FUEL"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0845"
+        ],
+        "target_ids": [
+          "CAP-FLEET-REPORT-OVERVIEW"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0847",
+          "ROUTE-0850"
+        ],
+        "target_ids": [
+          "CAP-FLEET-TRIP-PLAYBACK"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0851"
+        ],
+        "target_ids": [
+          "CAP-FLEET-VEHICLE-REGISTER"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-0912"
+        ],
+        "target_ids": [
+          "CAP-GOV-EXECUTIVE-BOARD-COCKPIT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1254"
+        ],
+        "target_ids": [
+          "CAP-HR-MY-HR-HOME-DIRECTORY-BENEFITS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1296"
+        ],
+        "target_ids": [
+          "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+          "CAP-HR-CALENDAR-PARTICIPATION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1322"
+        ],
+        "target_ids": [
+          "CAP-HR-BENEFITS-PLAN-ADMINISTRATION",
+          "CAP-HR-BENEFITS-ENROLLMENT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1392",
+          "ROUTE-1394",
+          "ROUTE-1600",
+          "ROUTE-1601",
+          "ROUTE-1608"
+        ],
+        "target_ids": [
+          "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1393"
+        ],
+        "target_ids": [
+          "CAP-HR-MY-HR-HOME-DIRECTORY-BENEFITS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1482"
+        ],
+        "target_ids": [
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+          "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1486",
+          "ROUTE-1667",
+          "ROUTE-1691",
+          "ROUTE-1701"
+        ],
+        "target_ids": [
+          "HR-RECRUITMENT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1702"
+        ],
+        "target_ids": [
+          "HR-INTERVIEW-KIT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1769",
+          "ROUTE-1770",
+          "ROUTE-1771",
+          "ROUTE-1772"
+        ],
+        "target_ids": [
+          "CAP-HR-WELLBEING-SURVEYS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1838",
+          "ROUTE-1840"
+        ],
+        "target_ids": [
+          "CAP-INC-INCIDENT-AUTHOR",
+          "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+          "CAP-INC-INCIDENT-FOLLOWUP",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1860"
+        ],
+        "target_ids": [
+          "CAP-SEC-UNIFI-DEFAULTS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1892"
+        ],
+        "target_ids": [
+          "CAP-DAY-MY-DAY-WORKSPACE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-1947"
+        ],
+        "target_ids": [
+          "CAP-OPS-CLIENT-RECORD-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2127"
+        ],
+        "target_ids": [
+          "CAP-OPS-CLIENT-NOTE",
+          "CAP-OPS-CLIENT-RECORD-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2128",
+          "ROUTE-2129",
+          "ROUTE-2130"
+        ],
+        "target_ids": [
+          "CAP-OPS-CLIENT-NOTE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2143"
+        ],
+        "target_ids": [
+          "CAP-OPS-ROSTERING-PLANNING"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2144",
+          "ROUTE-2145"
+        ],
+        "target_ids": [
+          "CAP-OPS-ROSTERING-PLANNING",
+          "CAP-OPS-SHIFT-PLANNING-PUBLISH"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2234"
+        ],
+        "target_ids": [
+          "CAP-OPS-TIMESHEET-MANAGER-REVIEW"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2238"
+        ],
+        "target_ids": [
+          "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2357"
+        ],
+        "target_ids": [
+          "OPS-SHIFT-REPORT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2498"
+        ],
+        "target_ids": [
+          "CAP-OPS-ROSTERING-PLANNING"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2500",
+          "ROUTE-2501"
+        ],
+        "target_ids": [
+          "CAP-OPS-STAFF-TIME-OFF"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2502"
+        ],
+        "target_ids": [
+          "CAP-INC-SAFEGUARDING-ACTION-PLAN",
+          "CAP-INC-SAFEGUARDING-CONCERN-INTAKE",
+          "CAP-INC-SAFEGUARDING-EVIDENCE-MANAGEMENT",
+          "CAP-INC-SAFEGUARDING-EXTERNAL-REPORT",
+          "CAP-INC-SAFEGUARDING-INVESTIGATION",
+          "CAP-INC-SAFEGUARDING-RISK-ASSESSMENT",
+          "CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2504"
+        ],
+        "target_ids": [
+          "CAP-INC-SAFEGUARDING-ACTION-PLAN",
+          "CAP-INC-SAFEGUARDING-EVIDENCE-DOWNLOAD",
+          "CAP-INC-SAFEGUARDING-EVIDENCE-MANAGEMENT",
+          "CAP-INC-SAFEGUARDING-EXTERNAL-REPORT",
+          "CAP-INC-SAFEGUARDING-INVESTIGATION",
+          "CAP-INC-SAFEGUARDING-RISK-ASSESSMENT",
+          "CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2525"
+        ],
+        "target_ids": [
+          "CAP-OPS-ROSTERING-PLANNING"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2653"
+        ],
+        "target_ids": [
+          "SEC-INTEGRATIONS-HUB"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2654"
+        ],
+        "target_ids": [
+          "CAP-SEC-UNIFI-DEFAULTS"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2708",
+          "ROUTE-2709",
+          "ROUTE-2711",
+          "ROUTE-2712",
+          "ROUTE-2726"
+        ],
+        "target_ids": [
+          "CAP-OPS-SHIFT-PLANNING-PUBLISH"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2713",
+          "ROUTE-2721",
+          "ROUTE-2722",
+          "ROUTE-2725"
+        ],
+        "target_ids": [
+          "CAP-OPS-SHIFT-STAFFING-COVER"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2714",
+          "ROUTE-2718",
+          "ROUTE-2720",
+          "ROUTE-2723"
+        ],
+        "target_ids": [
+          "CAP-OPS-SHIFT-EXECUTION-RECOVERY"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2724"
+        ],
+        "target_ids": [
+          "CAP-OPS-MY-DAY-SHIFT-TASK-COMPLETION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2727"
+        ],
+        "target_ids": [
+          "CAP-OPS-SHIFT-SERIES-LIFECYCLE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2748",
+          "ROUTE-2803"
+        ],
+        "target_ids": [
+          "CAP-SITE-SITE-CHECKLIST-ASSIGNMENT-RUN-CREATION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2836",
+          "ROUTE-2837"
+        ],
+        "target_ids": [
+          "CAP-SITE-MEAL-SERVICE-COMPLETION"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2914"
+        ],
+        "target_ids": [
+          "CAP-SITE-SITE-VENDOR-GLOBAL-DIRECTORY"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2917"
+        ],
+        "target_ids": [
+          "CAP-HR-STAFF-OPERATIONAL-PROFILE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2932"
+        ],
+        "target_ids": [
+          "CAP-HR-ONBOARDING-CHECKLIST-CASE"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2945"
+        ],
+        "target_ids": [
+          "CAP-REP-SUMMARY-STAFF"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2984",
+          "ROUTE-2985",
+          "ROUTE-2987",
+          "ROUTE-2988",
+          "ROUTE-2990",
+          "ROUTE-2992",
+          "ROUTE-2994",
+          "ROUTE-2999"
+        ],
+        "target_ids": [
+          "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-2989",
+          "ROUTE-2991",
+          "ROUTE-2993",
+          "ROUTE-2995",
+          "ROUTE-2996",
+          "ROUTE-2997",
+          "ROUTE-2998"
+        ],
+        "target_ids": [
+          "CAP-OPS-TIMESHEET-MANAGER-REVIEW"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-3001",
+          "ROUTE-3002",
+          "ROUTE-3003",
+          "ROUTE-3004",
+          "ROUTE-3005",
+          "ROUTE-3006"
+        ],
+        "target_ids": [
+          "CAP-HR-TRAINING-COURSE-SESSION-CATALOG"
+        ]
+      },
+      {
+        "route_ids": [
+          "ROUTE-3024"
+        ],
+        "target_ids": [
+          "CAP-HR-STAFF-OPERATIONAL-PROFILE"
+        ]
+      }
+    ],
+    "support_only": [
+      {
+        "route_ids": [
+          "ROUTE-0098"
+        ],
+        "target_ids": [
+          "CAP-SITE-DIETARY-TAG-LIFECYCLE",
+          "CAP-SITE-PRODUCT-LIFECYCLE",
+          "CAP-SITE-RECIPE-LIFECYCLE"
+        ],
+        "relation_scope": "shared_supporting_projection_nonexclusive",
+        "reason": "Shared read-only aggregate-count projection for recipe, product and dietary-tag libraries. It is nonexclusive support evidence only and awards no independent capability, lifecycle, Site-scope, browser, runtime or completion credit.",
+        "independent_capability_credit": false,
+        "runtime_credit": false
+      }
+    ],
+    "excluded_dead_or_unreachable": [
+      {
+        "route_ids": [
+          "ROUTE-0047",
+          "ROUTE-0048"
+        ],
+        "tombstone_id": "ASSET-ASSET-ASSIGNMENT",
+        "excluded_disposition_id": "SURFACE-ROUTE-0047-0048-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0054"
+        ],
+        "tombstone_id": "ASSET-ASSET-INSPECTION",
+        "excluded_disposition_id": "SURFACE-ROUTE-0054-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0055"
+        ],
+        "tombstone_id": "ASSET-ASSET-MAINTENANCE",
+        "excluded_disposition_id": "SURFACE-ROUTE-0055-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0056"
+        ],
+        "tombstone_id": "ASSET-ASSET-OWNERSHIP",
+        "excluded_disposition_id": "SURFACE-ROUTE-0056-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0060"
+        ],
+        "tombstone_id": "ASSET-ASSET-SCAN-EVENT",
+        "excluded_disposition_id": "SURFACE-ROUTE-0060-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0404",
+          "ROUTE-0405",
+          "ROUTE-0406"
+        ],
+        "tombstone_id": "MED-REFUSAL-FOLLOW-UP",
+        "excluded_disposition_id": "SURFACE-ROUTE-0404-0405-0406-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0207"
+        ],
+        "reason": "shadowed_by_prior_unconstrained_framework_parameter",
+        "excluded_disposition_id": "SURFACE-ROUTE-0207-EXCLUDED-DEAD-OR-UNREACHABLE"
+      },
+      {
+        "route_ids": [
+          "ROUTE-2719"
+        ],
+        "reason": "registered_uri_differs_from_only_caller",
+        "candidate_target_id": "CAP-INC-INCIDENT-AUTHOR",
+        "excluded_disposition_id": "SURFACE-ROUTE-2719-EXCLUDED-DEAD-OR-UNREACHABLE"
+      }
+    ],
+    "medical_reachability_unproved": [],
+    "unresolved_ambiguity": [
+      {
+        "route_ids": [
+          "ROUTE-0124",
+          "ROUTE-1873",
+          "ROUTE-2499",
+          "ROUTE-2710",
+          "ROUTE-2986"
+        ],
+        "excluded_disposition_id": "SURFACE-ROUTE-0124-1873-2499-2710-2986-UNRESOLVED-AMBIGUITY"
+      }
+    ],
+    "dead_or_noop": [
+      {
+        "route_ids": [
+          "ROUTE-0203",
+          "ROUTE-0205",
+          "ROUTE-2933",
+          "ROUTE-2941",
+          "ROUTE-2942"
+        ],
+        "excluded_disposition_id": "SURFACE-ROUTE-0203-0205-2933-2941-2942-DEAD-OR-NOOP"
+      },
+      {
+        "route_ids": [
+          "ROUTE-0821"
+        ],
+        "excluded_disposition_id": "SURFACE-ROUTE-0821-REACHABLE-UI-ONLY-NONPERSISTENT-NOOP",
+        "reason": "Reachable authenticated UI; toggles and Save change transient client state only; no persistence request or backend owner exists."
+      }
+    ],
+    "generated_or_test_only": [
+      {
+        "route_ids": [
+          "ROUTE-0001",
+          "ROUTE-0002",
+          "ROUTE-0003"
+        ],
+        "excluded_disposition_id": "SURFACE-ROUTE-0001-0002-0003-GENERATED-OR-TEST-ONLY"
+      }
+    ],
+    "infrastructure_or_out_of_product": [
+      {
+        "route_ids": [
+          "ROUTE-1861",
+          "ROUTE-2497",
+          "ROUTE-2943",
+          "ROUTE-2944",
+          "ROUTE-3010"
+        ],
+        "excluded_disposition_id": "SURFACE-ROUTE-1861-2497-2943-2944-3010-INFRASTRUCTURE-OR-OUT-OF-PRODUCT"
+      }
+    ]
+  },
+  "pages": {
+    "accepted_new_exact": [
+      {
+        "page_ids": [
+          "PAGE-0014"
+        ],
+        "target_ids": [
+          "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0020"
+        ],
+        "target_ids": [
+          "HR-REFERENCE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0571",
+          "PAGE-0572"
+        ],
+        "target_ids": [
+          "OPS-CLIENT-FUND"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0573"
+        ],
+        "target_ids": [
+          "OPS-CLIENT-FUND",
+          "CAP-OPS-CLIENT-FUND-TRANSACTIONS"
+        ]
+      }
+    ],
+    "existing_exact": [
+      {
+        "page_ids": [
+          "PAGE-0023"
+        ],
+        "target_ids": [
+          "CAP-SITE-MEAL-PLANNING"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0024"
+        ],
+        "target_ids": [
+          "CAP-SITE-PRODUCT-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0025",
+          "PAGE-0026",
+          "PAGE-0027"
+        ],
+        "target_ids": [
+          "CAP-SITE-RECIPE-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0028"
+        ],
+        "target_ids": [
+          "CAP-SITE-DIETARY-TAG-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0039"
+        ],
+        "target_ids": [
+          "CLI-CLIENT-PORTAL-USER"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0217"
+        ],
+        "target_ids": [
+          "CAP-FLEET-DEVICE-REGISTRY-PAIRING",
+          "CAP-FLEET-DEVICE-TRACKING-CONSENT"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0231"
+        ],
+        "target_ids": [
+          "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION",
+          "CAP-FLEET-CHECKLIST-RUN-EXECUTION"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0232"
+        ],
+        "target_ids": [
+          "CAP-FLEET-CHECKLIST-RUN-EXECUTION"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0254"
+        ],
+        "target_ids": [
+          "CAP-FLEET-RESIDENT-TRANSPORT-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0255"
+        ],
+        "target_ids": [
+          "CAP-FLEET-RESIDENT-TRANSPORT-MEDICATION-CUSTODY"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0408"
+        ],
+        "target_ids": [
+          "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+          "CAP-HR-CALENDAR-PARTICIPATION"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0415"
+        ],
+        "target_ids": [
+          "CAP-HR-BENEFITS-PLAN-ADMINISTRATION",
+          "CAP-HR-BENEFITS-ENROLLMENT"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0447",
+          "PAGE-0449"
+        ],
+        "target_ids": [
+          "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0461"
+        ],
+        "target_ids": [
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+          "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0532"
+        ],
+        "target_ids": [
+          "CAP-IT-PROVISIONING-REQUEST",
+          "CAP-IT-SUPPORT-TICKET"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0596"
+        ],
+        "target_ids": [
+          "CAP-PRIV-SYSTEM-AUDIT-LOG-REVIEW"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0604"
+        ],
+        "target_ids": [
+          "CAP-FIN-CLIENT-FINANCIAL-OVERVIEW"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0722"
+        ],
+        "target_ids": [
+          "CAP-OPS-CONVERSATIONS"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0810"
+        ],
+        "target_ids": [
+          "CAP-ROAD-DECISION-REQUEST",
+          "CAP-ROAD-INITIATIVE-LIFECYCLE",
+          "CAP-ROAD-QUARTERLY-PLAN-PREPARATION",
+          "CAP-ROAD-QUARTERLY-PLAN-APPROVAL-PUBLISH",
+          "CAP-ROAD-SUGGESTION-TRIAGE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0865"
+        ],
+        "target_ids": [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE",
+          "CAP-SITE-SITE-VENDOR-GLOBAL-DIRECTORY",
+          "CAP-SITE-SITE-VENDOR-GLOBAL-AUDIT",
+          "CAP-SITE-SITE-CREDENTIAL-LIFECYCLE",
+          "CAP-SITE-SITE-CREDENTIAL-REVEAL-TOTP",
+          "SITE-CREDENTIAL-TYPE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0948"
+        ],
+        "target_ids": [
+          "CAP-HR-STAFF-OPERATIONAL-PROFILE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0955"
+        ],
+        "target_ids": [
+          "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+        ]
+      }
+    ],
+    "support_only": [
+      {
+        "page_ids": [
+          "PAGE-0543",
+          "PAGE-0544",
+          "PAGE-0547",
+          "PAGE-0548",
+          "PAGE-0549",
+          "PAGE-0550",
+          "PAGE-0551",
+          "PAGE-0558",
+          "PAGE-0560",
+          "PAGE-0561"
+        ],
+        "target_ids": [
+          "CAP-DAY-MY-DAY-WORKSPACE"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0679",
+          "PAGE-0681",
+          "PAGE-0683",
+          "PAGE-0684",
+          "PAGE-0685"
+        ],
+        "target_ids": [
+          "CAP-OPS-SHIFT-NOTE-AUTHORING",
+          "CAP-OPS-SHIFT-NOTE-REVIEW"
+        ]
+      },
+      {
+        "page_ids": [
+          "PAGE-0846"
+        ],
+        "target_ids": [
+          "CAP-SET-ROLE-NOTIFICATION-DEFAULTS",
+          "CAP-SET-NOTIFICATION-ESCALATION-CONFIG",
+          "CAP-SET-PERSONAL-NOTIFICATION-PREFERENCES"
+        ]
+      }
+    ],
+    "resolver_orphan": [
+      {
+        "page_ids": [
+          "PAGE-0022",
+          "PAGE-0035",
+          "PAGE-0037",
+          "PAGE-0038",
+          "PAGE-0100",
+          "PAGE-0285",
+          "PAGE-0530",
+          "PAGE-0590",
+          "PAGE-0827",
+          "PAGE-0835",
+          "PAGE-0836",
+          "PAGE-0858",
+          "PAGE-0876",
+          "PAGE-0962"
+        ],
+        "excluded_disposition_id": "SURFACE-PAGE-0022-0035-0037-0038-0100-0285-0530-0590-0827-0835-0836-0858-0876-0962-RESOLVER-ORPHAN"
+      }
+    ],
+    "dead_or_noop": [
+      {
+        "page_ids": [
+          "PAGE-0252"
+        ],
+        "excluded_disposition_id": "SURFACE-PAGE-0252-DEAD-OR-NOOP",
+        "reason": "Reachable authenticated UI; toggles and Save change transient client state only; no persistence request or backend owner exists."
+      }
+    ],
+    "generated_or_test_only": [
+      {
+        "page_ids": [
+          "PAGE-0559"
+        ],
+        "excluded_disposition_id": "SURFACE-PAGE-0559-GENERATED-OR-TEST-ONLY"
+      }
+    ],
+    "infrastructure_or_out_of_product": [
+      {
+        "page_ids": [
+          "PAGE-0531"
+        ],
+        "excluded_disposition_id": "SURFACE-PAGE-0531-INFRASTRUCTURE-OR-OUT-OF-PRODUCT"
+      }
+    ]
+  },
+  "changed_source_anchors": {
+    "asset_tombstones": [
+      "routes/assets.php:180-233",
+      "app/Http/Controllers/AssetAssignmentController.php:12-69",
+      "app/Http/Controllers/AssetInspectionController.php:12-49",
+      "app/Http/Controllers/AssetMaintenanceController.php:12-52",
+      "app/Http/Controllers/AssetOwnershipController.php:12-44",
+      "app/Http/Controllers/AssetScanEventController.php:12-45"
+    ],
+    "refusal_followup_tombstone": [
+      "routes/emar.php:340-348",
+      "app/Http/Controllers/Emar/RefusalFollowUpController.php:17-108"
+    ],
+    "shadowed_competency_create": [
+      "routes/training.php:69-82"
+    ],
+    "shift_incident_uri_mismatch": [
+      "routes/incidents.php:115-118",
+      "resources/js/pages/operations/shifts/show.tsx:3659-3661"
+    ],
+    "compliance_export_selectors": [
+      "app/Http/Controllers/Hr/ComplianceExportController.php:22-58",
+      "app/Http/Controllers/Hr/ComplianceExportController.php:62-84",
+      "app/Http/Controllers/Hr/ComplianceExportController.php:87-108",
+      "app/Http/Controllers/Hr/ComplianceExportController.php:111-131",
+      "app/Http/Controllers/Hr/ComplianceExportController.php:133-157"
+    ],
+    "public_reference": [
+      "routes/web.php:106-107",
+      "app/Http/Controllers/Careers/ReferenceController.php:28-87"
+    ],
+    "email_verification": [
+      "vendor/laravel/fortify/routes/routes.php:85-96"
+    ],
+    "client_funds": [
+      "routes/operations.php:1151-1158",
+      "app/Http/Controllers/Operations/ClientFundController.php:20-211"
+    ],
+    "roadmap_shared_imports": [
+      "resources/js/pages/Roadmap/Decisions.tsx:28",
+      "resources/js/pages/Roadmap/Initiatives.tsx:25",
+      "resources/js/pages/Roadmap/Quarterly/Index.tsx:24",
+      "resources/js/pages/Roadmap/Quarterly/Show.tsx:24",
+      "resources/js/pages/Roadmap/Suggestions.tsx:30",
+      "resources/js/pages/Roadmap/shared.ts"
+    ],
+    "site_vendor_credential_dialog_shared_imports": [
+      "resources/js/pages/sites/vendors/_dialogs.tsx:42",
+      "resources/js/pages/sites/credentials/_dialogs.tsx:56",
+      "resources/js/pages/sites/vendors-credentials/global.tsx:54",
+      "resources/js/pages/sites/vendors-credentials/_audit-dialog.tsx:36",
+      "resources/js/pages/sites/vendors-credentials/_manage-types-dialog.tsx:30",
+      "resources/js/pages/sites/_dialog-shared.tsx"
+    ]
+  },
+  "counts": {
+    "routes": {
+      "accepted_new_exact": 20,
+      "existing_exact": 146,
+      "excluded_dead_or_unreachable": 11,
+      "medical_reachability_unproved": 0,
+      "unresolved_ambiguity": 5,
+      "dead_or_noop": 6,
+      "generated_or_test_only": 3,
+      "infrastructure_or_out_of_product": 5,
+      "support_only": 1
+    },
+    "pages": {
+      "accepted_new_exact": 5,
+      "existing_exact": 25,
+      "support_only": 16,
+      "resolver_orphan": 14,
+      "dead_or_noop": 1,
+      "generated_or_test_only": 1,
+      "infrastructure_or_out_of_product": 1
+    },
+    "route_total": 197,
+    "page_total": 63,
+    "route_target_relations": 207,
+    "page_target_relations": 70,
+    "medical_reachability_challenges": 0,
+    "other_page_only_denominator_challenges": 0
+  },
+  "validation": {
+    "route_coverage": "197/197",
+    "page_coverage": "63/63",
+    "duplicate_routes": 0,
+    "duplicate_pages": 0,
+    "missing_routes": 0,
+    "missing_pages": 0,
+    "all_target_ids_exist_in_manifest": true,
+    "medical_orphan_pages": [
+      "PAGE-0038",
+      "PAGE-0590"
+    ],
+    "manifest_target_count": 904,
+    "manifest_class_counts": {
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "manifest_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 5,
+      "audit_assigned": 18
+    },
+    "new_machine_target_has_no_route_or_page": true,
+    "inventory_route_surface_preserved": "2994 accepted + 30 excluded = 3024",
+    "inventory_page_surface_preserved": "945 accepted + 17 excluded = 962",
+    "accepted_feature_id_completion_gate": "blocked",
+    "medical_mutation_routes_promoted_to_exact_owner": 8,
+    "medical_reachability_challenges": 0,
+    "route_0098_support_only_targets": [
+      "CAP-SITE-DIETARY-TAG-LIFECYCLE",
+      "CAP-SITE-PRODUCT-LIFECYCLE",
+      "CAP-SITE-RECIPE-LIFECYCLE"
+    ],
+    "route_0098_independent_capability_credit": false,
+    "route_0821_reachable_ui_only_nonpersistent_noop": true
+  },
+  "checksums": {
+    "coverage_sha256": "4647d5c21f0327ce59196077fd4400177c61a1340332cc1322dacce79315f2ac",
+    "coverage_recipe": "audited commit, denominator, sorted accepted IDs since 894, then sorted ROUTE-ID|disposition and PAGE-ID|disposition; LF; no terminal LF; UTF-8 SHA-256"
+  },
+  "accepted_feature_id_gate": {
+    "identity_register": "904/904 statically registered",
+    "surface_disposition": "3024/3024 routes and 962/962 pages retain an accepted-target or excluded-SURFACE disposition",
+    "completion_status": "blocked",
+    "reason": "Accepted FEATURE-ID registration and static route/page disposition are not runtime, role, error, recovery, handoff, viewport, test, or product-completion proof."
+  }
+}

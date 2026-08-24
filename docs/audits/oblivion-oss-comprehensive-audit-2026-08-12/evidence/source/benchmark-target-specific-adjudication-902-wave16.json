@@ -1,0 +1,200 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave16",
+  "generated_at": "2026-08-21T12:35:47+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Sixteenth bounded target-specific wave: seven current completion-unproved Health and Clinical targets; four direct OpenMRS benchmark recommendations and three conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "62a72879e9c701bd63f552a4e2398717a43b0dbaa8697b4317bbae80272a973b",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at the pinned official-source loci. Generic adjacency, configurability without the target domain, or a lower-level primitive is retained unproved.",
+    "absence_rule": "A zero path-name result in a complete pinned repository tree is candidate rejection evidence only and never a global no-match claim."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "2c4c70238c7f7dfb1861808237be8e9b44deb44858c14c82ce9c461e5b7dbf5d"
+    },
+    "project_catalogue": {
+      "path": "evidence/benchmarks/github-metadata-2026-08-12.json",
+      "selection": "Pinned official OpenMRS community repositories already present in the 97-project catalogue."
+    }
+  },
+  "repository_snapshots": {
+    "OPENMRS_PATIENT_CHART": {
+      "repo": "openmrs/openmrs-esm-patient-chart",
+      "official_repository_url": "https://github.com/openmrs/openmrs-esm-patient-chart",
+      "commit_sha": "80db8ffc6ae52b7f708ed32aaa2f8a8b9abd4776",
+      "recursive_tree_complete": true,
+      "recursive_tree_entries": 2258,
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "fa36d460dbedd5c0dd13672317f42abf13511bbbf29478ecdfce8b3279e26958",
+      "edition_boundary": "Pinned official community repository source only; hosted implementations, private configuration, commercial services and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/esm-patient-chart-app/src/patient-chart/chart-review/dashboard-view.component.tsx",
+          "lines": "L34-L82",
+          "sha256": "c144b331bcb6b996cb89bb6a5de6d592f051cf25513a75647a8bc5f7ef3e3187"
+        },
+        {
+          "path": "packages/esm-patient-tests-app/src/test-results/trendline/trendline.component.tsx",
+          "lines": "L66-L168,L170-L240",
+          "sha256": "28943ba65cbea0a66c1900237976b06720da3f929bd9b71968b51e0b1f1aec78"
+        },
+        {
+          "path": "packages/esm-patient-tests-app/src/test-results/trendline/trendline-resource.tsx",
+          "lines": "L8-L74,L76-L115",
+          "sha256": "e74c42344dcee6fd0d83cb50c91f19526cc406ec9cd02083596154bb3242910e"
+        },
+        {
+          "path": "packages/esm-patient-chart-app/src/clinical-views/encounter-list/encounter-list.component.tsx",
+          "lines": "L23-L74,L78-L114,L154-L225,L248-L305",
+          "sha256": "db85b4efe7583b94e629e507ceaf38e15582036831fa003a8d1e63ac406744fd"
+        }
+      ]
+    },
+    "OPENMRS_PATIENT_MANAGEMENT": {
+      "repo": "openmrs/openmrs-esm-patient-management",
+      "official_repository_url": "https://github.com/openmrs/openmrs-esm-patient-management",
+      "commit_sha": "710bf9b201f0663ed6dd0afb7af0591a9db4f3d4",
+      "recursive_tree_complete": true,
+      "recursive_tree_entries": 1508,
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE.md",
+      "license_sha256": "fa36d460dbedd5c0dd13672317f42abf13511bbbf29478ecdfce8b3279e26958",
+      "edition_boundary": "Pinned official community repository source only; hosted implementations, private configuration, commercial services and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/esm-patient-search-app/src/patient-search.resource.tsx",
+          "lines": "L28-L125,L211-L260",
+          "sha256": "22fe97ede0cb505b8ec73d228b5290ea3b1f69d574a4ebfdce187ef79f8d3b08"
+        },
+        {
+          "path": "packages/esm-patient-search-app/src/compact-patient-search/compact-patient-banner.component.tsx",
+          "lines": "L195-L240",
+          "sha256": "5e20505ae0ccad24b2575a709e2cfe63ddb9e61f77f9f8e0018904118c20af4c"
+        },
+        {
+          "path": "packages/esm-patient-search-app/src/patient-search-workspace/patient-search2.workspace.tsx",
+          "lines": "L8-L45,L51-L102",
+          "sha256": "7e99f9b020ef4cb060467c834b2600641aa91b5b8971efde898cea030d535878"
+        }
+      ]
+    },
+    "OPENMRS_CORE": {
+      "repo": "openmrs/openmrs-core",
+      "official_repository_url": "https://github.com/openmrs/openmrs-core",
+      "commit_sha": "8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e",
+      "recursive_tree_complete": true,
+      "recursive_tree_entries": 2258,
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+      "edition_boundary": "Pinned official community repository source only; hosted implementations, private configuration, commercial services and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "api/src/main/java/org/openmrs/api/CohortService.java",
+          "lines": "L23-L34,L118-L180,L299-L309",
+          "sha256": "28f1810e8d66af9f54bd0b44c8c45f160f89af153531db144fc2fb4ac3cc1728"
+        }
+      ]
+    },
+    "OPENMRS_FHIR2": {
+      "repo": "openmrs/openmrs-module-fhir2",
+      "official_repository_url": "https://github.com/openmrs/openmrs-module-fhir2",
+      "commit_sha": "4dc2236334dd8ac35a61b2095b68f655f4cb9b65",
+      "recursive_tree_complete": true,
+      "recursive_tree_entries": 1123,
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "ee05fbb49ff7a2874d80f0386b1283ff3f4df73101eafdd2fa93c94878476151",
+      "edition_boundary": "Pinned official community repository source only; hosted implementations, private configuration, commercial services and unpinned behavior are excluded.",
+      "tree_query_evidence": "Complete recursive tree contained zero paths matching careplan (case-insensitive); this rejects this pinned candidate only and is not NCM completion evidence."
+    }
+  },
+  "counts": {
+    "evaluated": 7,
+    "verified_benchmark_direct_recommended": 4,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 3,
+    "completion_credit_recommended": 4
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-CLIN-ASSESSMENT-REGISTER",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Maintain a patient-scoped register of typed clinical assessments with list, add, view, edit, delete, empty, loading and paginated states.",
+      "research_candidate": "openmrs/openmrs-esm-patient-chart EncounterList at pinned loci",
+      "evidence_loci": "openmrs/openmrs-esm-patient-chart@80db8ffc6ae52b7f708ed32aaa2f8a8b9abd4776 :: packages/esm-patient-chart-app/src/clinical-views/encounter-list/encounter-list.component.tsx :: L23-L74,L78-L114,L154-L225,L248-L305",
+      "reason": "The configurable encounter-type register is patient-scoped, loads a typed form definition, lists and paginates records, launches add/view/edit/delete actions, refreshes after save, and exposes loading and empty states. This is a direct neutral behavior benchmark for an assessment register without importing OpenMRS implementation or UI."
+    },
+    {
+      "working_key": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Maintain a clinically governed behaviour-event register with the behavior-specific fields, risk/support context, lifecycle and access boundaries required by supported-living care.",
+      "research_candidate": "openmrs/openmrs-esm-patient-chart generic EncounterList at pinned loci",
+      "reason": "The generic encounter register can be configured for a form but the inspected source does not prove behavior-event semantics, antecedent/response/consequence context, risk/support linkage, behavior-specific lifecycle or governed review. Generic configurability is insufficient for direct credit and no bounded multi-repository NCM packet was completed."
+    },
+    {
+      "working_key": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Present care plans through a review lens that exposes review status, due/overdue timing, accountable owner and safe navigation to the canonical plan.",
+      "research_candidate": "openmrs/openmrs-module-fhir2 complete pinned tree and openmrs patient-chart generic dashboard/register loci",
+      "reason": "The complete pinned FHIR2 tree contains no CarePlan path, and the patient-chart dashboard/register primitives do not prove a care-plan review status/due/owner lens. This is candidate rejection only; no global NCM claim or completion credit follows."
+    },
+    {
+      "working_key": "CAP-CLIN-CLIENT-TRENDS",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Show patient-specific longitudinal clinical observations with date range, reference ranges, interpretation, chart/table views, loading/empty behavior and non-lossy export affordances.",
+      "research_candidate": "openmrs/openmrs-esm-patient-chart test-result trendline and resource at pinned loci",
+      "evidence_loci": "openmrs/openmrs-esm-patient-chart@80db8ffc6ae52b7f708ed32aaa2f8a8b9abd4776 :: packages/esm-patient-tests-app/src/test-results/trendline/trendline.component.tsx :: L66-L168,L170-L240; packages/esm-patient-tests-app/src/test-results/trendline/trendline-resource.tsx :: L8-L74,L76-L115",
+      "reason": "The pinned source fetches observation-tree data by patient and concept, recursively resolves observation/reference-range interpretation, renders dated chart and tabular values, supports date range and loading/empty/error states, and exposes CSV/PNG/fullscreen controls. This directly benchmarks the neutral patient-trend job."
+    },
+    {
+      "working_key": "CAP-CLIN-MODULE-DASHBOARD",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Compose a patient-scoped clinical dashboard from bounded widgets while passing canonical patient context and allowing configured dashboard views without duplicating domain owners.",
+      "research_candidate": "openmrs/openmrs-esm-patient-chart DashboardView at pinned loci",
+      "evidence_loci": "openmrs/openmrs-esm-patient-chart@80db8ffc6ae52b7f708ed32aaa2f8a8b9abd4776 :: packages/esm-patient-chart-app/src/patient-chart/chart-review/dashboard-view.component.tsx :: L34-L82",
+      "reason": "The dashboard passes patient and patient UUID into configured extension slots, resolves view-specific titles and layout metadata, and composes bounded widgets without replacing their owners. This directly benchmarks the neutral clinical module dashboard composition job."
+    },
+    {
+      "working_key": "CAP-CLIN-POPULATION-TRENDS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Compute and present clinically meaningful aggregate trends across an authorized population/cohort with metric definition, time window, denominator and safe drill-down.",
+      "research_candidate": "openmrs/openmrs-core CohortService at pinned loci and patient-chart patient-level trendline",
+      "reason": "OpenMRS core proves authorized cohort membership management and the patient chart proves individual trendlines, but neither inspected locus proves aggregate clinical trend computation, denominator/time-window semantics or authorized drill-down. Combining primitives cannot inherit direct target credit."
+    },
+    {
+      "working_key": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Provide a reusable clinical-record workflow context that searches people, returns stable patient identity/summary data and hands the selected patient into a bounded child workflow without implicit global state.",
+      "research_candidate": "openmrs/openmrs-esm-patient-management patient-search resource, result banner and reusable workspace at pinned loci",
+      "evidence_loci": "openmrs/openmrs-esm-patient-management@710bf9b201f0663ed6dd0afb7af0591a9db4f3d4 :: packages/esm-patient-search-app/src/patient-search.resource.tsx :: L28-L125,L211-L260; packages/esm-patient-search-app/src/compact-patient-search/compact-patient-banner.component.tsx :: L195-L240; packages/esm-patient-search-app/src/patient-search-workspace/patient-search2.workspace.tsx :: L8-L45,L51-L102",
+      "reason": "The reusable workspace performs bounded patient search, returns stable patient identity and summary fields, supports non-navigation selection callbacks, and hands patient UUID/object plus child-workspace controls to the consuming workflow. This directly benchmarks the neutral context-API job while leaving Oblivion authorization and Site constraints native."
+    }
+  ],
+  "count_delta": {
+    "verified_benchmark_direct": 4,
+    "documented_ncm_direct": 0,
+    "eligible_total": 4,
+    "completion_unproved": -4
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 339,
+    "documented_ncm": 89,
+    "eligible": 428,
+    "completion_unproved": 474
+  }
+}

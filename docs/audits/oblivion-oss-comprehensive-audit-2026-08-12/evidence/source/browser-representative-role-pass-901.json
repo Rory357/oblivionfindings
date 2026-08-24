@@ -1,0 +1,242 @@
+{
+  "schema_version": "browser_representative_role_pass_901.v2",
+  "artifact": "browser-representative-role-pass-901",
+  "generated_at": "2026-08-13T11:12:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "environment": {
+    "url": "https://oblivionfindings.com",
+    "identity": "Demo Admin <admin@demo.test>",
+    "environment_basis": "The authenticated account, target users and visible records all use the demo.test/demo naming convention.",
+    "deployment_commit_visible_in_ui": false
+  },
+  "scope_boundary": {
+    "browser": "User-connected Chrome tab",
+    "roles_observed": [
+      "Administrator",
+      "Support Worker",
+      "Provider Manager",
+      "Auditor (Read only)",
+      "Next of Kin / Guardian (Portal)",
+      "Coordinator / Scheduler",
+      "HR",
+      "Finance",
+      "Health and Safety Officer",
+      "Control Room operator",
+      "Client portal user"
+    ],
+    "domain_forms_submitted": 0,
+    "records_created_updated_or_deleted": 0,
+    "downloads_triggered": 0,
+    "impersonation_side_effect": "The built-in impersonation start/stop endpoints write their normal audit-log entries. The user explicitly authorised role impersonation; no domain workflow mutation was performed.",
+    "credentials_cookies_or_session_storage_inspected": false,
+    "claim_limit": "This is a bounded representative-role observation pass, not 788-task completion or proof that deployed assets equal the audited commit."
+  },
+  "role_observations": [
+    {
+      "role": "Administrator",
+      "identity": "Demo Admin <admin@demo.test>",
+      "entry_url": "https://oblivionfindings.com/dashboard",
+      "observed": [
+        "Authenticated dashboard and full primary navigation rendered.",
+        "At the 390x844 override the document overflowed horizontally: clientWidth 416, scrollWidth 592.",
+        "At the 1440, 1280, 1024 and 768 checks the dashboard did not overflow horizontally."
+      ]
+    },
+    {
+      "role": "Support Worker",
+      "identity": "Codex Roster Loop Worker <codex-roster-loop-worker@demo.test>",
+      "entry_url": "https://oblivionfindings.com/my-day",
+      "observed": [
+        "Role-safe My Day landing rendered with clock, task, medication, incident and paperwork affordances.",
+        "No clock, task, medication, incident or timesheet action was submitted.",
+        "At 390x844 the page overflowed horizontally: clientWidth 416, scrollWidth 714.",
+        "At 768x1024 the page also overflowed horizontally: clientWidth 836, scrollWidth 1120.",
+        "At 1440, 1280 and 1024 checks the page did not overflow horizontally."
+      ]
+    },
+    {
+      "role": "Provider Manager",
+      "identity": "Demo Manager <manager@demo.test>",
+      "entry_url": "https://oblivionfindings.com/dashboard",
+      "observed": [
+        "Manager dashboard rendered and omitted the Health & Clinical navigation link.",
+        "A focused direct GET to /health-clinical returned 403 Forbidden."
+      ]
+    },
+    {
+      "role": "Auditor (Read only)",
+      "identity": "Demo Auditor <auditor@demo.test>",
+      "entry_url": "https://oblivionfindings.com/system/users",
+      "observed": [
+        "The impersonation transition redirected back to the administrator-only System Users URL, leaving the new auditor on 403 Forbidden.",
+        "Focused direct GETs to /system/users and /system/users/create both returned 403 Forbidden.",
+        "No user form or action menu was available after a fresh auditor request."
+      ]
+    },
+    {
+      "role": "Next of Kin / Guardian (Portal)",
+      "identity": "Guardian of Aroha <portal.nok.9005@demo.test>",
+      "entry_url": "https://oblivionfindings.com/portal/clients/9005/dashboard",
+      "observed": [
+        "The Aroha-specific family portal rendered with timeline, visits, messages, health, location, documents and photos navigation.",
+        "A focused cross-client GET to /portal/clients/9006/dashboard returned 403 Forbidden.",
+        "The Request a Visit dialog rendered; required date and visit type were visible and Submit Request remained disabled while incomplete.",
+        "The visit dialog itself did not overflow at the 390x844 override and was closed without submission.",
+        "The underlying portal dashboard overflowed at 390x844: clientWidth 416, scrollWidth 574; 1440, 1280, 1024 and 768 checks did not overflow."
+      ]
+    },
+    {
+      "role": "Coordinator / Scheduler",
+      "identity": "Demo Coordinator (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/operations/rostering",
+      "observed": [
+        "The Rostering workspace rendered with roster tabs, filters and an empty 0-shift/0-site state.",
+        "The site combobox opened and exposed only the All sites empty-state option; it was closed with Escape.",
+        "No roster assignment, publication or other domain action was submitted."
+      ]
+    },
+    {
+      "role": "HR",
+      "identity": "Demo HR (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/hr/people",
+      "observed": [
+        "The HR landing redirected to /hr/my and the People register rendered with 0 people across 0 sites.",
+        "The Add employee five-step dialog opened and exposed its required fields; it was closed with Escape without typing or submission.",
+        "No employee, account or employment record was created or changed."
+      ]
+    },
+    {
+      "role": "Finance",
+      "identity": "Demo Finance (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/finance",
+      "observed": [
+        "The Finance Dashboard rendered across the visible demo-site scope with no funding records.",
+        "Journal, bill, invoice and receipt affordances were visible but were not opened or submitted.",
+        "A focused direct GET to /health-clinical returned 403 Forbidden."
+      ]
+    },
+    {
+      "role": "Health and Safety Officer",
+      "identity": "Demo H&S Officer (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/health-safety",
+      "observed": [
+        "The H&S command centre rendered with the scoped incident, WorkSafe, hazard and related demo-state summaries.",
+        "The Report chooser opened and exposed incident, hazard/risk, first-aid, restraint, drill, injury, substance, lone-worker and participation pathways.",
+        "The chooser was closed with Escape and no report was started or submitted."
+      ]
+    },
+    {
+      "role": "Control Room operator",
+      "identity": "Dedicated demo Control Room operator (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/control-room",
+      "observed": [
+        "The Control Room Desk rendered with active, unassigned and SLA-breached worklist summaries.",
+        "One alert action menu opened and exposed continue, claim, acknowledge, queue, escalation, snooze, incident and copy-reference choices.",
+        "The menu was closed without invoking any alert action."
+      ]
+    },
+    {
+      "role": "Client portal user",
+      "identity": "Demo client portal user (redacted demo identity)",
+      "entry_url": "https://oblivionfindings.com/portal/clients/9005/dashboard",
+      "observed": [
+        "The client's own portal dashboard rendered.",
+        "A focused direct GET to a different client dashboard returned 403 Forbidden.",
+        "No portal form or workflow action was submitted."
+      ]
+    }
+  ],
+  "required_actor_coverage": {
+    "required": 12,
+    "observed": 11,
+    "percent": 91.67,
+    "mapping": {
+      "frontline worker": "Support Worker",
+      "site lead": "Provider Manager",
+      "scheduler": "Coordinator / Scheduler",
+      "HR": "HR",
+      "finance": "Finance",
+      "clinical/medication lead": "blocked-no-current-user",
+      "H&S lead": "Health and Safety Officer",
+      "Control Room operator": "Control Room operator",
+      "IT agent": "Administrator",
+      "executive/governance reader": "Auditor (Read only)",
+      "client": "Client portal user",
+      "authorised delegate": "Next of Kin / Guardian (Portal)"
+    },
+    "blocked_actor": {
+      "actor_class": "clinical/medication lead",
+      "evidence": "The exact Clinical Lead role filter returned no users in the signed-in System Users register. Static review confirmed the dedicated role and lead permissions exist, but the current/default user population omits it. No account was created and no broader role was treated as an equivalent substitute.",
+      "minimum_honest_closure": "Provide a dedicated current Clinical/Medication Lead demo user with documented site/global scope; creating or re-roling an account was outside this read-only audit."
+    }
+  },
+  "functional_proxy_observation": {
+    "identity_class": "Coordinator / Scheduler",
+    "actor_claim": "functional clinical-surface proxy only; not Clinical/Medication Lead actor coverage",
+    "entry_urls": [
+      "https://oblivionfindings.com/health-clinical",
+      "https://oblivionfindings.com/emar/settings"
+    ],
+    "observed": [
+      "The Coordinator rendered the Health & Clinical command centre, whose own copy targets registered nurses and clinical leads, including observation/event entry affordances and sign-off oversight.",
+      "The Coordinator rendered eMAR Medication Administration Rules with the Add Rule governance control and the full medication-management navigation.",
+      "No observation, clinical event, medication rule or other domain form was started or submitted."
+    ],
+    "basis": "Static permission review shows the Coordinator has the sampled clinical and medication permissions assigned to Clinical Lead, but its RBAC identity and user job remain Coordinator and it already represents the scheduler actor.",
+    "impersonation_restored": "Demo Administrator restored at /system/users after the two GET observations."
+  },
+  "additional_browser_observation": {
+    "location": "System Users filtered register",
+    "state": "Clinical Lead role filter with zero matching users",
+    "observation": "Filtered summary cards displayed negative values (Total Users -4, Active -4, Staff Members -2) while the unfiltered top-level totals remained positive.",
+    "screenshot_status": "Capture timed out; this observation is not accompanied by a screenshot and must not be presented as screenshot-proved.",
+    "workflow_mutation": false
+  },
+  "viewport_matrix": {
+    "requested_sizes": [
+      "1440x900",
+      "1280x800",
+      "1024x768",
+      "768x1024",
+      "390x844"
+    ],
+    "measurement_note": "Chrome's external-tab viewport override reported a larger layout client width than the requested CSS width; overflow is based on the authoritative document scrollWidth > clientWidth comparison at each override.",
+    "admin_dashboard": {
+      "1440x900": {"client_width": 1583, "scroll_width": 1583, "overflow": false},
+      "1280x800": {"client_width": 1405, "scroll_width": 1405, "overflow": false},
+      "1024x768": {"client_width": 1121, "scroll_width": 1121, "overflow": false},
+      "768x1024": {"client_width": 836, "scroll_width": 836, "overflow": false},
+      "390x844": {"client_width": 416, "scroll_width": 592, "overflow": true}
+    },
+    "support_worker_my_day": {
+      "1440x900": {"client_width": 1600, "scroll_width": 1600, "overflow": false},
+      "1280x800": {"client_width": 1422, "scroll_width": 1422, "overflow": false},
+      "1024x768": {"client_width": 1121, "scroll_width": 1121, "overflow": false},
+      "768x1024": {"client_width": 836, "scroll_width": 1120, "overflow": true},
+      "390x844": {"client_width": 416, "scroll_width": 714, "overflow": true}
+    },
+    "guardian_portal_dashboard": {
+      "1440x900": {"client_width": 1583, "scroll_width": 1583, "overflow": false},
+      "1280x800": {"client_width": 1405, "scroll_width": 1405, "overflow": false},
+      "1024x768": {"client_width": 1121, "scroll_width": 1121, "overflow": false},
+      "768x1024": {"client_width": 836, "scroll_width": 836, "overflow": false},
+      "390x844": {"client_width": 416, "scroll_width": 574, "overflow": true}
+    }
+  },
+  "screenshots": [
+    {
+      "path": "evidence/browser/BVIS-901-admin-dashboard-390x844-overflow-2026-08-13.png",
+      "sha256": "9cc17cd2b8739754573865612f2773846d54d4c4d3207a6280f5afdb4f408fa1",
+      "classification": "Browser-observed demo screenshot"
+    },
+    {
+      "path": "evidence/browser/BVIS-901-support-worker-my-day-390x844-overflow-2026-08-13.png",
+      "sha256": "059655a55c1d649161701899bd0a902edb3fd5039b40c43b67f60cf022de0cd8",
+      "classification": "Browser-observed demo screenshot"
+    }
+  ],
+  "completion_gate": {
+    "complete": false,
+    "reason": "Eleven of twelve representative actor classes were sampled, but the clinical/medication-lead class has no current user and 788 canonical human tasks, failure/recovery/handoff paths, all material states, independent reviews and deployment-to-commit identity remain incomplete."
+  }
+}

@@ -1,0 +1,220 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "pass8-health-and-clinical-904-2026-08-21",
+  "generated_at": "2026-08-21T21:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "source_only_pass8_challenge_no_module_completion_credit",
+  "selection": {
+    "method": "Risk-ranked exact finding module score after completed eMAR and HR waves: 100×P0 + 10×P1 + P2.",
+    "selected_module": "CLINICAL",
+    "selected_score": 200,
+    "next_scores": {
+      "HEALTH_SAFETY": 131,
+      "OPERATIONS": 130
+    }
+  },
+  "module_counts": {
+    "targets": 20,
+    "H": 19,
+    "D": 1,
+    "M": 0,
+    "benchmark_decided": 17,
+    "benchmark_unproved": 3,
+    "linked_p0_p1_before_wave": 2,
+    "linked_p0_p1_after_wave": 3,
+    "runtime_unexecuted": 20,
+    "routes": 55,
+    "pages": 22,
+    "models": 6,
+    "policies": 3,
+    "services": 8,
+    "events": 2,
+    "jobs": 0,
+    "test_inventory_rows": 36
+  },
+  "eight_pass": {
+    "P1": {
+      "reviewed": 20,
+      "denominator": 20,
+      "boundary": "Static identity, routes, owners and source call graph."
+    },
+    "P2": {
+      "executed": 0,
+      "denominator": 20,
+      "boundary": "Representative persisted tasks unexecuted."
+    },
+    "P3": {
+      "decided": 17,
+      "denominator": 20,
+      "unproved": 3,
+      "boundary": "Benchmark evidence only; no local behavior credit."
+    },
+    "P4": {
+      "executed": 0,
+      "denominator": 20,
+      "boundary": "Happy/error/recovery/handoff/responsive/accessibility execution absent."
+    },
+    "P5": {
+      "static_reviewed": 20,
+      "denominator": 20,
+      "runtime_data_effects_verified": 0
+    },
+    "P6": {
+      "exact_source_finding_official_links": 1,
+      "denominator": 20,
+      "boundary": "HDC-R4 and OWNER-CLINICAL are guidance only."
+    },
+    "P7": {
+      "source_constraint_failure_links": 1,
+      "denominator": 20,
+      "tests_executed": 0
+    },
+    "P8": {
+      "static_identity_challenged": 20,
+      "denominator": 20,
+      "module_completion_credit": false
+    }
+  },
+  "new_finding": {
+    "id": "CLIN-PROTOCOL-SCHEDULING-01",
+    "priority": "P1",
+    "feature_ids": [
+      "CAP-CLIN-PROTOCOL-DEFINITION-LIFECYCLE"
+    ],
+    "route_ids": [
+      "ROUTE-1071",
+      "ROUTE-1072",
+      "ROUTE-1073",
+      "ROUTE-1074",
+      "ROUTE-1075",
+      "ROUTE-1076"
+    ],
+    "page_ids": [
+      "PAGE-0344",
+      "PAGE-0354",
+      "PAGE-0356",
+      "PAGE-0357",
+      "PAGE-0358"
+    ],
+    "verdict": "independently_reviewed_new_nonduplicate_p1_static_only"
+  },
+  "source_chain": [
+    {
+      "path": "routes/health-clinical.php",
+      "baseline_blob": "c40268f9bab43ff2db6811ca08421b6e42fcfe1d",
+      "baseline_loci": "L69-L86",
+      "current_blob": "c40268f9bab43ff2db6811ca08421b6e42fcfe1d",
+      "current_loci": "L69-L86",
+      "baseline_sha256": "4a1cc60c820235565bd2551e252d15b737a84bede26eba6e929d28dbbccf39fd",
+      "current_sha256": "4a1cc60c820235565bd2551e252d15b737a84bede26eba6e929d28dbbccf39fd"
+    },
+    {
+      "path": "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php",
+      "baseline_blob": "271195101f16ff31ae3d71e4d4faa3bd7226976d",
+      "baseline_loci": "L22-L132",
+      "current_blob": "eb8af63c9d12c3f2d710096b7710c8160addbcf0",
+      "current_loci": "L22-L132",
+      "baseline_sha256": "52c0b09545c599c86325e7fcb28cc6d043d887c47204a667f231e8b6aede95d5",
+      "current_sha256": "3e26c5155a59781d1c4ef700e911a198acd007309af165b7c620c830aedb7d0d"
+    },
+    {
+      "path": "app/Domain/Clinical/Policies/ClinicalProtocolPolicy.php",
+      "baseline_blob": "adb8f199a6eecfb0198d45344f867adc38ba2ae8",
+      "baseline_loci": "L15-L42",
+      "current_blob": "f6d57c0b9f480a198d652885903c284bc48cb7b8",
+      "current_loci": "L15-L42",
+      "baseline_sha256": "a8206f61756c35d9ab341b14b6b727464a0d20db6aad036afac8a6a770f31983",
+      "current_sha256": "032cd0f2d391e46f53dd3c51637d2c38e7d6f12338ea4479c6a5db9f6ace4244"
+    },
+    {
+      "path": "app/Domain/Clinical/Services/ClinicalProtocolService.php",
+      "baseline_blob": "c7d754121247ee5e9bab748c6f225aa9bd9d73ee",
+      "baseline_loci": "L25-L65,L68-L126",
+      "current_blob": "c7d754121247ee5e9bab748c6f225aa9bd9d73ee",
+      "current_loci": "L25-L65,L68-L126",
+      "baseline_sha256": "542434dd2e48d4eacfcdc810a8345b6bc2629d1dd1737788bfad1d1ee4a437d9",
+      "current_sha256": "542434dd2e48d4eacfcdc810a8345b6bc2629d1dd1737788bfad1d1ee4a437d9"
+    },
+    {
+      "path": "app/Domain/Clinical/Enums/ProtocolFrequency.php",
+      "baseline_blob": "76ede33b3a9e3bab594786ade2b2e84647baa51c",
+      "baseline_loci": "L7-L13,L28-L41",
+      "current_blob": "76ede33b3a9e3bab594786ade2b2e84647baa51c",
+      "current_loci": "L7-L13,L28-L41",
+      "baseline_sha256": "51cfaeb4cb7f2a11d086b66bbee3bf796287cb75e1cfcc609c81508997c5b76a",
+      "current_sha256": "51cfaeb4cb7f2a11d086b66bbee3bf796287cb75e1cfcc609c81508997c5b76a"
+    },
+    {
+      "path": "app/Http/Controllers/Clinical/ShiftClinicalController.php",
+      "baseline_blob": "d16b5257f117a3f4b95ad3d4591771bd09732510",
+      "baseline_loci": "L32-L49",
+      "current_blob": "18cfe17a7b979001de3335d903ccc821e4975a4e",
+      "current_loci": "L32-L49",
+      "baseline_sha256": "bcaad29d770528863a906a9678dbd396b6b54feb30932d197e3a22f090cb02a2",
+      "current_sha256": "b469941a5fe0e4e6bb18d55a1312c921a2e4d995d68aa4a9df629d508f302dba"
+    },
+    {
+      "path": "app/Domain/Clinical/Services/ClinicalDashboardService.php",
+      "baseline_blob": "98bd7681a1c83011bee2a42c92276dedea876bd8",
+      "baseline_loci": "L60-L74,L240-L264,L922-L952",
+      "current_blob": "631175337be83313f3c9dbd577bf0e993b42ed60",
+      "current_loci": "L60-L74,L240-L264,L922-L952",
+      "baseline_sha256": "f7c52fb7e45766ccd6c70d5adfe704e7fd068a1a7bc0ecdee13e2ef48e996384",
+      "current_sha256": "148367bcf7a7300da177a91ac7573031a780073407ed310d4715f53489da533a"
+    },
+    {
+      "path": "routes/console.php",
+      "baseline_blob": "13801c8af7e71149bf4c882157264dd3db855615",
+      "baseline_loci": "full file",
+      "current_blob": "26cb23a8880ba5c67413dd3adf2b829fe2dcc642",
+      "current_loci": "full file",
+      "baseline_sha256": "d59a6437b3c8327e5ae82f77cb0f2422fd3b9dc62e846b8716c60b2ffa305957",
+      "current_sha256": "3cfaca3274d2f5fd1b00824403060bfb7009f6c88b5162d893b9715f2ca67776"
+    },
+    {
+      "path": "tests/Feature/Domain/Clinical/ClinicalProtocolServiceTest.php",
+      "baseline_blob": "37e467ba0de54e88ba133cf5133b24b7a68a3766",
+      "baseline_loci": "L33-L127",
+      "current_blob": "37e467ba0de54e88ba133cf5133b24b7a68a3766",
+      "current_loci": "L33-L127",
+      "baseline_sha256": "10cbd24c00907cf56a4621cd6936e712197348d7bc4bd6399b3125c9e3927cda",
+      "current_sha256": "10cbd24c00907cf56a4621cd6936e712197348d7bc4bd6399b3125c9e3927cda"
+    },
+    {
+      "path": "tests/Feature/Domain/Clinical/ClinicalProtocolManagementControllerTest.php",
+      "baseline_blob": "85113096949b2933f31999ee5a1b8314e6f4421c",
+      "baseline_loci": "L133-L160",
+      "current_blob": "b16958c48c18a1801427a33fbf44911d2af2c4da",
+      "current_loci": "L133-L160",
+      "baseline_sha256": "dcc9c051c1c75f7e9ba0dcf31b8bd080bf76c0bd141dc1a53067b37bc6ca178a",
+      "current_sha256": "5403bef061aa5f11169974961d83c125772164395edd05be95e4354b34d0707f"
+    }
+  ],
+  "call_graph": {
+    "search_scope": [
+      "app",
+      "routes",
+      "bootstrap",
+      "config"
+    ],
+    "generate_schedule_hits": [
+      "app/Domain/Clinical/Services/ClinicalProtocolService.php:25 declaration"
+    ],
+    "production_callers": 0
+  },
+  "duplicate_boundary": {
+    "existing_finding_count": 94,
+    "related_not_duplicate": [
+      "CLIN-SCHEDULE-01"
+    ],
+    "distinction": "Existing finding governs wrong resident/type completion after a schedule exists; this finding governs absence of schedule creation."
+  },
+  "credit_boundary": {
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "module_completion_delta": 0,
+    "finding_delta": 1
+  }
+}

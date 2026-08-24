@@ -1,0 +1,438 @@
+{
+  "schema_version": "1.0",
+  "artifact": "visual-final-id-adjudication-904-wave12",
+  "generated_at": "2026-08-23T16:32:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "reviewer": "/root/visual_owner_wave",
+  "status": "reviewed_zero_promotion_exact_blockers_added",
+  "selection": {
+    "rows": 20,
+    "visual_ids": [
+      "VIS-000569",
+      "VIS-000570",
+      "VIS-000571",
+      "VIS-000572",
+      "VIS-000925",
+      "VIS-000926",
+      "VIS-000927",
+      "VIS-000928",
+      "VIS-001165",
+      "VIS-001166",
+      "VIS-001167",
+      "VIS-001168",
+      "VIS-001169",
+      "VIS-001170",
+      "VIS-001171",
+      "VIS-001172",
+      "VIS-001181",
+      "VIS-001182",
+      "VIS-001183",
+      "VIS-001184"
+    ],
+    "ordered_id_sha256": "9362b1455635e6d7210364a369dab0afcaff041a7f130afb7fafe9989f8c98eb",
+    "rule": "Earliest 20 unresolved VISUAL-ID rows in existing matrix order."
+  },
+  "sources": [
+    {
+      "path": "routes/fleet-assets.php",
+      "sha256": "fe035d667c199077369bff7a43a875e5e1777933451dbff67f73d78a195080cd",
+      "loci": "L96-L99"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/notifications.tsx",
+      "sha256": "bf33b5560f332b5f1ef42cfab3b0ff5c2a3746fd552e40d88302a8ed92e9b806",
+      "loci": "L154-L173,L278-L285"
+    },
+    {
+      "path": "routes/hr.php",
+      "sha256": "29a6d6f7d1f733c633995fdbbdc7bc66d3debbf4cd6073e27b66d0cd71c843fb",
+      "loci": "L1111-L1120"
+    },
+    {
+      "path": "app/Http/Controllers/Hr/CalendarController.php",
+      "sha256": "35ebbeccc4f783dc8adf5e5c12b0af0338576c0ca783c70d9d9cf07460fec6b4",
+      "loci": "L38-L102,L179,L223,L498"
+    },
+    {
+      "path": "resources/js/pages/hr/calendar/index.tsx",
+      "sha256": "a0e00dec21bf6f91ed218da1b55aca1cc0012216480f9208891d283b0840104d",
+      "loci": "L224-L317,L425-L538"
+    },
+    {
+      "path": "routes/incidents.php",
+      "sha256": "6f66cbc8ecf17ad668b87d51aa95a4efa71d718187a10aff7ccced9c72c6ea04",
+      "loci": "L45-L96"
+    },
+    {
+      "path": "app/Http/Controllers/IncidentController.php",
+      "sha256": "91b44b3ae853d6060263a7a15964bef853b770a55097d22406588854ad93a885",
+      "loci": "L33-L278,L693-L700"
+    },
+    {
+      "path": "resources/js/pages/incidents/index.tsx",
+      "sha256": "20cbbaffa49118c393622758632ba6183f760296486df0fd458a38eb73f730ef",
+      "loci": "L240-L277,L344-L492"
+    },
+    {
+      "path": "resources/js/pages/incidents/show.tsx",
+      "sha256": "c66152a2407a4acadbac8dcc436697036780778170fe8f0408b07d07dae7cf69",
+      "loci": "L6-L21"
+    },
+    {
+      "path": "resources/js/components/incidents/incident-detail-dialog.tsx",
+      "sha256": "af2cb54ac22e6f6273acf64a1d652f3282c90d05e47da342dc70e7ba5b1be154",
+      "loci": "L154-L351,L557-L715"
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "85a5d4eb667019d82d99b4b5347541218582584874c01e08d4b077b76cfaaafb",
+      "loci": "L116-L127"
+    },
+    {
+      "path": "resources/js/pages/internal/_design/page-hero.tsx",
+      "sha256": "d57cd7e18493d7b754182acd07bdef78dc04d027691507a76d1879575af1d282",
+      "loci": "L57-L96,L267-L268"
+    }
+  ],
+  "changes": [
+    {
+      "visual_id": "VIS-000569",
+      "group": "fleet_notifications_excluded_noop",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id FLEET-ROUTE-FLEET-ASSETS-SETTINGS-NOTIFICATIONS has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-0821 and PAGE-0252 are explicitly excluded from the accepted 904 capability denominator: reachable authenticated UI whose toggles and Save change transient client state only; no persistence request, backend owner, candidate target or final FEATURE-ID exists (SURFACE-ROUTE-0821-REACHABLE-UI-ONLY-NONPERSISTENT-NOOP; SURFACE-PAGE-0252-DEAD-OR-NOOP)."
+      }
+    },
+    {
+      "visual_id": "VIS-000570",
+      "group": "fleet_notifications_excluded_noop",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id FLEET-ROUTE-FLEET-ASSETS-SETTINGS-NOTIFICATIONS has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-0821 and PAGE-0252 are explicitly excluded from the accepted 904 capability denominator: reachable authenticated UI whose toggles and Save change transient client state only; no persistence request, backend owner, candidate target or final FEATURE-ID exists (SURFACE-ROUTE-0821-REACHABLE-UI-ONLY-NONPERSISTENT-NOOP; SURFACE-PAGE-0252-DEAD-OR-NOOP)."
+      }
+    },
+    {
+      "visual_id": "VIS-000571",
+      "group": "fleet_notifications_excluded_noop",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id FLEET-ROUTE-FLEET-ASSETS-SETTINGS-NOTIFICATIONS has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-0821 and PAGE-0252 are explicitly excluded from the accepted 904 capability denominator: reachable authenticated UI whose toggles and Save change transient client state only; no persistence request, backend owner, candidate target or final FEATURE-ID exists (SURFACE-ROUTE-0821-REACHABLE-UI-ONLY-NONPERSISTENT-NOOP; SURFACE-PAGE-0252-DEAD-OR-NOOP)."
+      }
+    },
+    {
+      "visual_id": "VIS-000572",
+      "group": "fleet_notifications_excluded_noop",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id FLEET-ROUTE-FLEET-ASSETS-SETTINGS-NOTIFICATIONS has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-0821 and PAGE-0252 are explicitly excluded from the accepted 904 capability denominator: reachable authenticated UI whose toggles and Save change transient client state only; no persistence request, backend owner, candidate target or final FEATURE-ID exists (SURFACE-ROUTE-0821-REACHABLE-UI-ONLY-NONPERSISTENT-NOOP; SURFACE-PAGE-0252-DEAD-OR-NOOP)."
+      }
+    },
+    {
+      "visual_id": "VIS-000925",
+      "group": "hr_calendar_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "split source family HR-CALENDAR; inventory route_ids=ROUTE-1296; route targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; inventory page_ids=PAGE-0408; page targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; shared family envelope not promoted"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1296 and PAGE-0408 are exact-shared by CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; the page source also loads ROUTE-1304 owned by CAP-HR-CALENDAR-FEED. The initial page envelope is not an event-management action, participation action or feed response, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-000926",
+      "group": "hr_calendar_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "split source family HR-CALENDAR; inventory route_ids=ROUTE-1296; route targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; inventory page_ids=PAGE-0408; page targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; shared family envelope not promoted"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1296 and PAGE-0408 are exact-shared by CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; the page source also loads ROUTE-1304 owned by CAP-HR-CALENDAR-FEED. The initial page envelope is not an event-management action, participation action or feed response, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-000927",
+      "group": "hr_calendar_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "split source family HR-CALENDAR; inventory route_ids=ROUTE-1296; route targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; inventory page_ids=PAGE-0408; page targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; shared family envelope not promoted"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1296 and PAGE-0408 are exact-shared by CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; the page source also loads ROUTE-1304 owned by CAP-HR-CALENDAR-FEED. The initial page envelope is not an event-management action, participation action or feed response, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-000928",
+      "group": "hr_calendar_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "split source family HR-CALENDAR; inventory route_ids=ROUTE-1296; route targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; inventory page_ids=PAGE-0408; page targets=CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; shared family envelope not promoted"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-FEED|CAP-HR-CALENDAR-PARTICIPATION",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1296 and PAGE-0408 are exact-shared by CAP-HR-CALENDAR-EVENT-MANAGEMENT|CAP-HR-CALENDAR-PARTICIPATION; the page source also loads ROUTE-1304 owned by CAP-HR-CALENDAR-FEED. The initial page envelope is not an event-management action, participation action or feed response, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001165",
+      "group": "incident_index_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1838 and PAGE-0526 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001166",
+      "group": "incident_index_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1838 and PAGE-0526 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001167",
+      "group": "incident_index_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1838 and PAGE-0526 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001168",
+      "group": "incident_index_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1838 and PAGE-0526 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001169",
+      "group": "incident_show_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1840 and PAGE-0527 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001170",
+      "group": "incident_show_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1840 and PAGE-0527 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001171",
+      "group": "incident_show_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1840 and PAGE-0527 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001172",
+      "group": "incident_show_shared_envelope",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id CAP-INC-INCIDENT-CORRECTIVE-HANDOFF has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE",
+        "feature_link_status": "unresolved_split_family_page_ambiguous",
+        "feature_link_evidence": "ROUTE-1840 and PAGE-0527 are exact-shared by CAP-INC-INCIDENT-AUTHOR|CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT|CAP-INC-INCIDENT-FOLLOWUP|CAP-INC-INCIDENT-REVIEW-CLOSURE. The initial register/detail envelope exposes distinct authoring, evidence, follow-up and review/closure jobs; the retired legacy label CAP-INC-INCIDENT-CORRECTIVE-HANDOFF is not a final 904 key, so no singleton final owner is proved."
+      }
+    },
+    {
+      "visual_id": "VIS-001181",
+      "group": "pagehero_showcase_excluded_infrastructure",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id PLAT-ROUTE-INTERNAL-DESIGN-PAGE-HERO has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-1861 and PAGE-0531 are explicitly excluded from the accepted 904 capability denominator as infrastructure_or_out_of_product. The admin/local PageHero design-system showcase has demo controls but no product action, persisted data owner, candidate target or final FEATURE-ID (SURFACE-ROUTE-1861-2497-2943-2944-3010-INFRASTRUCTURE-OR-OUT-OF-PRODUCT; SURFACE-PAGE-0531-INFRASTRUCTURE-OR-OUT-OF-PRODUCT)."
+      }
+    },
+    {
+      "visual_id": "VIS-001182",
+      "group": "pagehero_showcase_excluded_infrastructure",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id PLAT-ROUTE-INTERNAL-DESIGN-PAGE-HERO has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-1861 and PAGE-0531 are explicitly excluded from the accepted 904 capability denominator as infrastructure_or_out_of_product. The admin/local PageHero design-system showcase has demo controls but no product action, persisted data owner, candidate target or final FEATURE-ID (SURFACE-ROUTE-1861-2497-2943-2944-3010-INFRASTRUCTURE-OR-OUT-OF-PRODUCT; SURFACE-PAGE-0531-INFRASTRUCTURE-OR-OUT-OF-PRODUCT)."
+      }
+    },
+    {
+      "visual_id": "VIS-001183",
+      "group": "pagehero_showcase_excluded_infrastructure",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id PLAT-ROUTE-INTERNAL-DESIGN-PAGE-HERO has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-1861 and PAGE-0531 are explicitly excluded from the accepted 904 capability denominator as infrastructure_or_out_of_product. The admin/local PageHero design-system showcase has demo controls but no product action, persisted data owner, candidate target or final FEATURE-ID (SURFACE-ROUTE-1861-2497-2943-2944-3010-INFRASTRUCTURE-OR-OUT-OF-PRODUCT; SURFACE-PAGE-0531-INFRASTRUCTURE-OR-OUT-OF-PRODUCT)."
+      }
+    },
+    {
+      "visual_id": "VIS-001184",
+      "group": "pagehero_showcase_excluded_infrastructure",
+      "old": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "legacy feature_id PLAT-ROUTE-INTERNAL-DESIGN-PAGE-HERO has no exact final key or retained source-family lineage"
+      },
+      "new": {
+        "feature_id": "",
+        "working_feature_ids": "",
+        "feature_link_status": "unresolved_no_manifest_lineage",
+        "feature_link_evidence": "ROUTE-1861 and PAGE-0531 are explicitly excluded from the accepted 904 capability denominator as infrastructure_or_out_of_product. The admin/local PageHero design-system showcase has demo controls but no product action, persisted data owner, candidate target or final FEATURE-ID (SURFACE-ROUTE-1861-2497-2943-2944-3010-INFRASTRUCTURE-OR-OUT-OF-PRODUCT; SURFACE-PAGE-0531-INFRASTRUCTURE-OR-OUT-OF-PRODUCT)."
+      }
+    }
+  ],
+  "post_counts": {
+    "rows": 8753,
+    "assigned_final_feature_id": 8168,
+    "unresolved_final_feature_id": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "unresolved_status_counts": {
+      "unresolved_no_manifest_lineage": 250,
+      "unresolved_split_family_page_ambiguous": 246,
+      "unresolved_split_source_family": 89
+    }
+  },
+  "credit_boundary": {
+    "final_id_promotions": 0,
+    "material_id_promotions": 0,
+    "browser_credit_delta": 0,
+    "runtime_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

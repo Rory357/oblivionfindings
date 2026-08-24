@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-visual-wave10-overlay9-generation-summary",
+  "generated_at": "2026-08-22T00:55:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "outputs": {
+    "visual_wave10": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave10.json",
+      "sha256": "a019d1ca8c7976ce18e024e2f24774710bcda17503c74cbb287899df24acfa84",
+      "bytes": 101469
+    },
+    "overlay_wave9": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave9.json",
+      "sha256": "cf11eedae81524315a811972326b7753b9a7281217a668198ebd7f4c2d792afe",
+      "bytes": 13424
+    },
+    "overlay_classifier": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "79b605ee62810497ccc955fca4f2dc523870da22891488a39a4af4ef4cb9da36",
+      "bytes": 1151151
+    }
+  },
+  "proof_hashes": {
+    "visual": "96ca389483c7b3b663d38158861e3a5a5c3fdd3e1f0909723dacc92bc34cf580",
+    "visual_source_map": "8926a97d3f2cd03f79e2375fe3a530a19e2058566692564ae18e58bee304ca91",
+    "overlay": "91248506ab55d875f3ac357f5ac6bc0b8e362fa5b52f124fe5487c6fe644d6a2",
+    "overlay_source_map": "9c0cd385146e8439afc2dca912487b64a295c2da8f5cd741dd502d0d2c72e4f2"
+  },
+  "counts": {
+    "visual_assigned": 8168,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "overlay_exact_resolved": 243,
+    "overlay_unresolved_or_blocked": 267,
+    "primitive_exact_resolved": 242,
+    "primitive_unresolved": 235
+  },
+  "credit_boundary": {
+    "visual_final_id_promotions": 0,
+    "overlay_static_pairings": 10,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

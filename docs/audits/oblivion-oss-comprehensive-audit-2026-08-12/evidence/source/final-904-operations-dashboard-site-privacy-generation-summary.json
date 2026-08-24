@@ -1,0 +1,175 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-operations-dashboard-site-privacy-generation-summary",
+  "generated_at": "2026-08-21T23:00:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "OPS-DASHBOARD-ACTIVITY-SITE-PRIVACY-01",
+  "status": "generated_open_p0_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "3bda9a751759f2f24e0ff56f8e5fbddbedc548528ca4bcc5511b53d187eba710",
+      "bytes": 662998
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "bca2b2549bef0e737df5bde5e2db6a158dd53f978aa6b84800e3a7f561ed8ec2",
+      "bytes": 11775641
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "9b558790b30636fc4f7d2f7f6b0ccb7b79e4a595bf2f8ff5abfdc3dbdd8faf1c",
+      "bytes": 1337247
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "4d9e5581fee9015c85c1c6d56395e14310373cf11a84ba006c0c2ea86ff8131c",
+      "bytes": 248063
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "a35aa48109023cb73bff0f37d945406740ded64eb92f22f1f340b0aae9172a46",
+      "bytes": 12509
+    }
+  },
+  "source_chain": [
+    {
+      "path": "routes/operations.php",
+      "baseline_blob": "ba11f6dcad8fec04385b724a5c59278693280596",
+      "baseline_loci": "L84-L96",
+      "current_main_blob": "357afa5d5258d11e43696ae3061955c7d24f6604",
+      "current_main_loci": "L93-L96"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/DashboardController.php",
+      "baseline_blob": "23fd64512c510c621652b0815d72b24844803fb3",
+      "baseline_loci": "L17-L120,L151-L205,L238-L304,L340-L451,L481-L588,L616-L690",
+      "current_main_blob": "23fd64512c510c621652b0815d72b24844803fb3",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ActivityFeedController.php",
+      "baseline_blob": "f363adac893b186d512e6a3cdab69ec8b28e66c1",
+      "baseline_loci": "L15-L98",
+      "current_main_blob": "f363adac893b186d512e6a3cdab69ec8b28e66c1",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Http/Middleware/RoleScope.php",
+      "baseline_blob": "52a85a1ec8324cb25570357ceaba85fdb0abab92",
+      "baseline_loci": "L25-L55",
+      "current_main_blob": "52a85a1ec8324cb25570357ceaba85fdb0abab92",
+      "current_main_loci": "same loci"
+    },
+    {
+      "path": "app/Models/User.php",
+      "baseline_blob": "59b118f636dcdcdc196886d0ac78fd41eafc0663",
+      "baseline_loci": "L356-L383",
+      "current_main_blob": "eb12246ce9dd33ebf46cc38cf4b09c43dde82068",
+      "current_main_loci": "L342-L369"
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "baseline_blob": "fed7affe854534221417be93dc2b2d8445488c8d",
+      "baseline_loci": "L22-L46,L196-L284",
+      "current_main_blob": "41d3ed5c671c1774b4865b62e88e053e8aea55a8",
+      "current_main_loci": "L53-L116,L653-L842,L1033-L1084"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "baseline_blob": "4859ab64c19b8a35ba0656ef2f9e40b18943cc98",
+      "baseline_loci": "Coordinator and Operations permission grants",
+      "current_main_blob": "317c399b138d42edcb2d001323f2edb085ab4e41",
+      "current_main_loci": "L670-L699 and Operations permission definitions"
+    },
+    {
+      "path": "tests/Feature/Operations/ShiftSiteIsolationTest.php",
+      "baseline_blob": "8fe74ceab2ebbc0cc0f6d714a887be621ab58e51",
+      "baseline_loci": "L90-L120,L176-L208,L568-L633",
+      "current_main_blob": "2665373284a3658db56748882e44d232de2ede63",
+      "current_main_loci": "L95-L130,L181-L220,L594-L650"
+    },
+    {
+      "path": "resources/js/pages/operations/Index.tsx",
+      "baseline_blob": "659f1e14479c28805e169d24e33aa2628b008378",
+      "baseline_loci": "dashboard props",
+      "current_main_blob": "30cd8ae87dbd4d98e39c7ce7b88915c996844668",
+      "current_main_loci": "dashboard props"
+    },
+    {
+      "path": "resources/js/pages/operations/activity/Index.tsx",
+      "baseline_blob": "66e1f82aa2c912ceec65da737f7b1cffb2add53f",
+      "baseline_loci": "activity props",
+      "current_main_blob": "c39ac64230b7a17e980249d187bd52fed1c08fe8",
+      "current_main_loci": "activity props"
+    }
+  ],
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "d16af44a07063985f282e3887ae2a0fb29167c19f875b57519860e3ef026715f",
+      "bytes": 1337247
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "d198541f594051b93a4ccb6802498a83bac9f3aecd940a10b87d8770837933ff",
+      "bytes": 248063
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "37ac7bb9f197c4aa98cb840bb709718d7a969e489ac72fbf89bd47f183891029",
+      "bytes": 12509
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-operations-904-2026-08-21.json",
+      "sha256": "5ac9b55ccffb447e1efb6b081d5d28d5f02b1ff71612e4e954c7931c976a9300",
+      "bytes": 6029
+    }
+  },
+  "counts": {
+    "denominator": {
+      "total": 904,
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "benchmark": {
+      "eligible": 473,
+      "verified": 384,
+      "ncm": 89,
+      "unproved": 431
+    },
+    "findings": {
+      "total": 97,
+      "P0": 21,
+      "P1": 64,
+      "P2": 12
+    },
+    "finding_links": {
+      "total": 273,
+      "literal": 174,
+      "literal_targets": 142,
+      "p0_p1_literal": 85
+    },
+    "official_map": {
+      "denominator": 55,
+      "reviewed": 55,
+      "owner_boundary_rows": 29
+    }
+  },
+  "credit_boundary": {
+    "static_finding_added": 1,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "remediation_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "idempotence": "A second run validates hashes and pointer entries and performs no write."
+}

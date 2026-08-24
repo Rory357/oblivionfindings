@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave17",
+  "generated_at": "2026-08-21T13:48:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Seventeenth bounded target-specific wave: eight current completion-unproved Finance and Privacy targets; two direct CISO Assistant community benchmark recommendations and six conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "a7d1470c4625670a42f834b9392788ce2e3a20b72099c3cd010f8393b3806a78",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Generic adjacency, per-document evidence, field presence or a lower-level primitive remains unproved.",
+    "reuse_rule": "Shared repositories do not grant family credit. The two accepted CISO targets use distinct report-computation and export slices; every other reused candidate is explicitly retained unproved."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "04c451ec5abc64504d3e4a4051ea65bbbe8c73ab7360363f00e053fe4bb3e407"
+    }
+  },
+  "repository_snapshots": {
+    "BIGCAPITAL": {
+      "repo": "bigcapitalhq/bigcapital",
+      "official_repository_url": "https://github.com/bigcapitalhq/bigcapital",
+      "commit_sha": "b9a431c1685a427b71b9bb757a97450b85ecb35f",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE:L1-L14",
+      "license_sha256": "6222fdf64728d91bef797fae1c610f97737df67fd07026b7a83d661252fdade6",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration, commercial offerings and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/server/src/modules/Dashboard/Dashboard.service.ts",
+          "lines": "L24-L87",
+          "sha256": "76110aa1966e73fe21d758525bb30386761b2fd1959b595858be127d7a7b6ac9"
+        },
+        {
+          "path": "packages/server/src/modules/Dashboard/Dashboard.controller.ts",
+          "lines": "L24-L42",
+          "sha256": "c3b979d654502e4de72b1930f89a3276caad28b93e067e169dfcbc5df3141dc4"
+        }
+      ]
+    },
+    "ERPNEXT": {
+      "repo": "erpnext/erpnext",
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "be176617cce09ef74a1be6e2f917586aa5f262ef",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "license.txt:L1-L17",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community repository source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "erpnext/selling/doctype/quotation/quotation.py",
+          "lines": "L516-L564,L567-L598",
+          "sha256": "1dbd799c08bb98d7140d929c75351ebf33cfded1e9a4eea3596fc6037a2a596c"
+        }
+      ]
+    },
+    "CISO_ASSISTANT_COMMUNITY": {
+      "repo": "intuitem/ciso-assistant-community",
+      "official_repository_url": "https://github.com/intuitem/ciso-assistant-community",
+      "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE.md:L1-L5",
+      "license_sha256": "5d880897167f748de8e9750feebd8331c04b06daba8f829ace3cbfc13866d13a",
+      "edition_boundary": "Pinned official community source only. The enterprise directory and commercially licensed edition are excluded.",
+      "files": [
+        {
+          "path": "backend/privacy/models.py",
+          "lines": "L475-L550",
+          "sha256": "da4b89b07ca205e50d2349dbbf167c5fc5031032220907748eb76810f9f51ecc"
+        },
+        {
+          "path": "backend/privacy/views.py",
+          "lines": "L330-L394,L588-L800,L836-L864",
+          "sha256": "711dd7527a8e9a61f3b4b20b2a2804037be30e890c1c984983b608d8ca24f815"
+        },
+        {
+          "path": "backend/core/views.py",
+          "lines": "L500-L625",
+          "sha256": "08fff7f928f8c9b568ebfc71bcb586bb1f12dac0ec18314283cda2eafbcb6e11"
+        }
+      ]
+    },
+    "DOCUMENSO": {
+      "repo": "documenso/documenso",
+      "official_repository_url": "https://github.com/documenso/documenso",
+      "commit_sha": "962cffc9f546be68860be3489247f67255c83a66",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE:L1-L10",
+      "license_sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "packages/trpc/server/document-router/find-document-audit-logs.ts",
+          "lines": "L9-L33",
+          "sha256": "1972cfdf99ec987f9d8f7e5f87cbe6ad3742a84e5f9a6cc4fa49b1477390869e"
+        },
+        {
+          "path": "packages/lib/server-only/document/document-audit-logs.ts",
+          "lines": "L37-L117",
+          "sha256": "43b6678f0b9841801d086a8ae467b33420d38214757985fe2c7bda3da971b407"
+        },
+        {
+          "path": "apps/remix/app/components/tables/document-audit-log-table.tsx",
+          "lines": "L60-L135",
+          "sha256": "9f4f10721cf50c91246570c8860dcde72714fa8a5b0c447b3bbc4f9f7287cde0"
+        },
+        {
+          "path": "packages/trpc/server/document-router/find-document-audit-log-download.ts",
+          "lines": "L13-L62",
+          "sha256": "258f35db114e0c917cf9949e7989ea4cf5ba38af0dcb3ee14bdd01a3dfad0403"
+        },
+        {
+          "path": "apps/remix/app/components/general/document/document-page-sidebar/download-audit-log.tsx",
+          "lines": "L17-L55",
+          "sha256": "52fe8af3f65ddc05b8d97506e0640ba9eb820dac8be1cbec98bdb8a6f456e109"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "verified_benchmark_direct_recommended": 2,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 6,
+    "completion_credit_recommended": 2
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-FIN-API-FINANCIAL-INSIGHTS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Return governed, interpretable financial insights through the API rather than only generic dashboard bootstrap metadata.",
+      "research_candidate": "bigcapitalhq/bigcapital Dashboard service and controller at pinned loci",
+      "reason": "The inspected source returns dashboard aggregate/bootstrap values and guarded metadata but does not prove a separately owned financial-insight lifecycle, interpretation contract or Site-aware API target. Generic adjacency is insufficient."
+    },
+    {
+      "working_key": "CAP-FIN-API-FINANCIAL-KPIS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Compute and return explicitly defined financial KPIs through a governed API with measure semantics and authorization.",
+      "research_candidate": "bigcapitalhq/bigcapital Dashboard service and controller at pinned loci",
+      "reason": "The same generic dashboard aggregates do not establish a distinct KPI computation/definition target. The reused source receives no field- or family-level inherited credit."
+    },
+    {
+      "working_key": "CAP-FIN-QUOTE-AGREEMENT-CONVERSION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Convert an accepted quote into the canonical agreement/contract lifecycle with preserved provenance and replay rules.",
+      "research_candidate": "erpnext/erpnext quotation mapping at pinned loci",
+      "reason": "The pinned ERPNext mapping proves quotation to sales order/invoice only and is already valid for CAP-FIN-QUOTE-INVOICE-CONVERSION. It does not create an agreement contract, so reuse is explicitly rejected."
+    },
+    {
+      "working_key": "CAP-PRIV-BREACH-NOTIFICATION-RESPONSE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern breach notification and response dispatch with accountable actor, recipient/authority, idempotency, retry and durable outcome evidence.",
+      "research_candidate": "intuitem/ciso-assistant-community breach model and CRUD view at pinned loci",
+      "reason": "The source records breach classification, notification dates/references, remediation and evidence, but the generic CRUD view does not prove authoritative notification/send/retry workflow ownership."
+    },
+    {
+      "working_key": "CAP-PRIV-COMPLIANCE-REPORT",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Compute an authorized privacy-compliance report from bounded processing, recipient, request, breach and legal-basis data.",
+      "research_candidate": "intuitem/ciso-assistant-community privacy aggregation at pinned loci",
+      "evidence_loci": "intuitem/ciso-assistant-community@1ba187b0117f4dba9e00605bd7d5319ded61cee3 :: backend/privacy/views.py :: L588-L800",
+      "reason": "The role-scoped privacy aggregation calculates processing, recipient, request and breach metrics and produces data-category to processing to legal-basis graph/report data. This directly benchmarks the neutral authorized compliance-report job without importing implementation or UI."
+    },
+    {
+      "working_key": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Export an authorized privacy-compliance report with stable fields, safe cell handling and bounded output formats.",
+      "research_candidate": "intuitem/ciso-assistant-community processing export and shared ExportMixin at pinned loci",
+      "evidence_loci": "intuitem/ciso-assistant-community@1ba187b0117f4dba9e00605bd7d5319ded61cee3 :: backend/privacy/views.py :: L330-L394; backend/core/views.py :: L500-L625",
+      "reason": "The processing-activity export exposes status, assignee and DPIA fields while the shared exporter applies accessible-object filtering, CSV/XLSX output and formula-safe handling. This is a distinct direct export benchmark, not inherited report credit."
+    },
+    {
+      "working_key": "CAP-PRIV-SYSTEM-AUDIT-LOG-REVIEW",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Review the system-wide audit log with bounded authorization, filters, event semantics and safe pagination.",
+      "research_candidate": "documenso/documenso document audit-log query and table at pinned loci",
+      "reason": "Documenso proves authorized paginated review of one document's audit log, not a system-wide audit-log review. Object-specific evidence cannot inherit system-audit scope."
+    },
+    {
+      "working_key": "CAP-PRIV-SYSTEM-AUDIT-LOG-EXPORT",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Export the authorized system-wide audit log with bounded filters, provenance and safe output semantics.",
+      "research_candidate": "documenso/documenso document audit download at pinned loci",
+      "reason": "The authorized export is per-document audit evidence, not a system audit export. The difference in object cardinality and authority is material, so no credit is granted."
+    }
+  ],
+  "count_delta": {
+    "verified_benchmark_direct": 2,
+    "documented_ncm_direct": 0,
+    "eligible_total": 2,
+    "completion_unproved": -2
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 341,
+    "documented_ncm": 89,
+    "eligible": 430,
+    "completion_unproved": 472
+  }
+}

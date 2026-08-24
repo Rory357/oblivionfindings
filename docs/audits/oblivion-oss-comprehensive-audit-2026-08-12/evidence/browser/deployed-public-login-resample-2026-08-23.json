@@ -1,0 +1,36 @@
+{
+  "schema_version": "oblivion-deployed-public-login-resample-v1",
+  "generated_at": "2026-08-23T15:44:58+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "method": "Codex in-app Browser, read-only unauthenticated navigation",
+  "observations": {
+    "public_home_url": "https://oblivionfindings.com/",
+    "public_home_reachable": true,
+    "dashboard_request_url": "https://oblivionfindings.com/dashboard",
+    "dashboard_final_url": "https://oblivionfindings.com/login",
+    "dashboard_redirected_to_login": true,
+    "login_form_visible": true,
+    "deployed_git_or_release_identifier_exposed": false
+  },
+  "credentials": {
+    "OBLIVION_AUDIT_BROWSER_USERNAME_present": false,
+    "OBLIVION_AUDIT_BROWSER_PASSWORD_present": false,
+    "OBLIVION_DEMO_USERNAME_present": false,
+    "OBLIVION_DEMO_PASSWORD_present": false,
+    "credentials_entered": false
+  },
+  "actions_not_taken": [
+    "No authentication attempt",
+    "No form submission",
+    "No domain mutation",
+    "No screenshot or browser-state credit",
+    "No build or release identity inference"
+  ],
+  "credit_boundary": {
+    "completion_credit_delta": 0,
+    "audited_baseline_browser_credit_delta": 0,
+    "current_main_browser_credit_delta": 0,
+    "reason": "The public site was reachable, but the protected dashboard redirected to login and no authorized credential or deployed build marker was available."
+  },
+  "status": "blocked_unauthenticated_and_deployed_build_identity_absent"
+}

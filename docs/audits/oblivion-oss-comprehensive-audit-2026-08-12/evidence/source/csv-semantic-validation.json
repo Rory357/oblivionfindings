@@ -1,0 +1,143 @@
+{
+  "schema_version": "4.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "current_csvs_parse_canonical_identity_rows_integrated_substantive_completion_blocked",
+  "current_csv_shapes": {
+    "02-eight-pass-coverage-ledger.csv": {
+      "data_rows": 904,
+      "columns": 18,
+      "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+      "required_rows": 904,
+      "canonical_identity_rows_complete": true,
+      "all_eight_status_cells_populated": true,
+      "all_eight_passes_complete": false
+    },
+    "03-feature-to-benchmark-matrix.csv": {
+      "data_rows": 904,
+      "columns": 32,
+      "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+      "required_rows": 904,
+      "canonical_identity_rows_complete": true,
+      "benchmark_mapped": 500,
+      "benchmark_verified": 411,
+      "benchmark_documented_no_credible_match": 89,
+      "benchmark_completion_unproved": 404,
+      "feature_benchmark_gate_complete": false
+    },
+    "04-workflow-usability-scorecard.csv": {
+      "data_rows": 790,
+      "columns": 32,
+      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "required_rows": 790,
+      "structural_rows_complete": true,
+      "runtime_executed": 0,
+      "independently_reviewed": 0,
+      "current_scores_measured": 0,
+      "substantive_gate_complete": false
+    },
+    "05-browser-visual-coverage-matrix.csv": {
+      "data_rows": 8753,
+      "columns": 22,
+      "sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+      "semantic_tuple_sha256": "5aba32b52bb309e5a3d9be34ca15e69b4dc85cd7327e61c5a8fbe533577b8097",
+      "assigned_final_feature_id": 8168,
+      "unresolved_final_feature_id": 585,
+      "unique_assigned_final_feature_ids": 774,
+      "manifest_ids_with_any_visual_lineage": 836,
+      "final_feature_links_complete": false,
+      "required_rows": 8753,
+      "classification_counts": {
+        "Blocked": 497,
+        "Not safely reproducible": 4312,
+        "Observed": 2503,
+        "Source-inferred": 1441
+      }
+    },
+    "06-open-source-benchmark-register.csv": {
+      "data_rows": 98,
+      "columns": 20,
+      "identity_rows_complete": true,
+      "project_specific_triage_rows": 98,
+      "project_specific_triage_complete": true,
+      "sha256": "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe",
+      "required_rows": 98,
+      "prompt_listed_project_denominator": 97,
+      "prompt_listed_identity_rows_complete": 97,
+      "supplemental_project_rows": 1,
+      "physical_rows": 98,
+      "project_specific_triage_prompt_listed_rows": 97,
+      "project_specific_triage_supplemental_rows": 1,
+      "selected_native_deep_comparison_prompt_rows": 72
+    }
+  },
+  "working_manifest": {
+    "path": "working-capability-manifest-904.json",
+    "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+    "rows": 904,
+    "unique_stable_ids": 904,
+    "classes": {
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "stable_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 5,
+      "audit_assigned": 18
+    },
+    "route_enrichment": {
+      "targets": 903,
+      "relations": 3076,
+      "unique_routes": 2994,
+      "inventory_routes": 3024,
+      "accepted_percent": 99.01,
+      "excluded_surface_relations": 30,
+      "static_disposition_total": 3024
+    },
+    "page_enrichment": {
+      "targets": 682,
+      "relations": 968,
+      "unique_pages": 714,
+      "inventory_pages": 727,
+      "accepted_percent": 98.21,
+      "unmapped_pages": 13,
+      "static_disposition_total": 727
+    },
+    "backend_enrichment": {
+      "targets": 731,
+      "relations": 830,
+      "unique_anchors": 469
+    },
+    "benchmark_mapping": {
+      "eligible": 500,
+      "verified_benchmark": 411,
+      "verified_direct": 389,
+      "verified_rename": 22,
+      "documented_no_credible_match": 89,
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "completion_unproved": 404
+    },
+    "derivation_note": "The required unversioned aliases now select the 904 register. The archived 902 defaults remain immutable historical evidence; excluded surfaces remain outside H/D/M counts.",
+    "source_tree_page_enrichment": {
+      "targets": 756,
+      "relations": 1526,
+      "unique_files_with_accepted_relations": 945,
+      "classified_source_files": 962
+    }
+  },
+  "semantic_checks": {
+    "csv_parse": true,
+    "canonical_02_03_key_coverage": true,
+    "canonical_04_human_key_coverage": true,
+    "final_task_file_link_integrity": true,
+    "final_benchmark_mapping_artifact_key_coverage": true,
+    "feature_benchmark_completion": false,
+    "visual_final_id_linkage_complete": false,
+    "current_visual_classification_arithmetic": true,
+    "browser_claim_labels_use_permitted_vocabulary": true,
+    "all_route_page_inventory_ids_have_static_disposition": true
+  },
+  "completion_boundary": "Structural identity, route/page static disposition, prompt-list project triage and task files are complete. Target-level benchmark research, exact visual linkage, current ease scores, representative runtime roles/tasks/states and tests remain incomplete.",
+  "generated_at": "2026-08-23T15:44:58+12:00"
+}

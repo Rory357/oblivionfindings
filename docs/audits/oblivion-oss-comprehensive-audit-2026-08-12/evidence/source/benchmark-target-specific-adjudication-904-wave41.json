@@ -1,0 +1,311 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-904-wave41",
+  "generated_at": "2026-08-22T01:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eight current Health and Safety completion-unproved targets independently reviewed; four bounded direct decisions and four retained-unproved decisions.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "Comparator evidence changes benchmark P3 mapping completion_credit only; product, runtime, browser, representative-task, release and overall-audit completion deltas remain zero.",
+    "no_copy_rule": "Behavioural evidence only; no source, schema, UI, assets or wording is copied.",
+    "selection_preimage_rule": "Packet-order IDs joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "7546c09bad476fcd6b209d21a2d9bd2ee518bcb221f3a8f72ba7b2e3e48b60c8",
+    "evaluation_proof_rule": "Packet-order evaluation objects; JSON sorted keys, compact separators; LF joined without terminal LF; UTF-8 without BOM.",
+    "evaluation_proof_sha256": "90a6054a66a68ef34c14320ca0309bdf677d677e86eafc05c5a9f7c75f7d7cdf",
+    "source_registry_rule": "Exact verified file objects sorted by path; JSON sorted keys, compact separators; LF joined without terminal LF; UTF-8 without BOM.",
+    "source_registry_sha256": "9e85c6c7f821b44e89b70d006bcf764de7386b1e5e682fed0eb62871464a97f7",
+    "source_path_rule": "Source paths sorted lexicographically and joined by LF without terminal LF; UTF-8 without BOM.",
+    "source_path_sha256": "f2afe45f1a80dcdc88bbe32269885bd9795c18b50bf3b7ff7551c760fa45e453",
+    "independent_review_verdict": "GO_4_direct_4_retained_with_exact_path_and_AGPL_precision"
+  },
+  "selected_target_ids": [
+    "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+    "CAP-HS-PROCEDURE-REVIEW-APPROVAL",
+    "CAP-HS-PROCEDURE-ACKNOWLEDGEMENT",
+    "CAP-HS-PROCEDURE-ARCHIVE-RESTORE",
+    "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+    "CAP-HS-PROCEDURE-REGISTER-EXPORT",
+    "CAP-HS-WORKER-PARTICIPATION-CONSULTATION-DOWNLOAD",
+    "CAP-HS-WORKER-PARTICIPATION-MINUTES-DOWNLOAD"
+  ],
+  "input_pins": {
+    "benchmark_before_wave": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "dad3d1d194c83e2556bb3fa7b2c6d86ca8a1fe9a21bbae58e73a9eda6769c37b",
+      "bytes": 672357
+    },
+    "inventory_before_wave": {
+      "path": "inventory-904.json",
+      "sha256": "9b3efa1334e7a8db65c3380ccbb6c1206142196cbfd9e0bc69cecb7516e224f4",
+      "bytes": 11784079
+    },
+    "ledger_before_wave": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "1890d20026d24e0cd32be5d294ca38b463b00808cced831a804ee894ec6bf837",
+      "bytes": 1959658
+    },
+    "matrix_before_wave": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "1a5375e86ea75028c70de8d54ba7b43087d9ce301643e0dd5a9d5f84d8caae6a",
+      "bytes": 3310178
+    },
+    "pointer_before_wave": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "2820b0224414ae00796710eed82ccc2e2ea112a3e4f426ca242dbac4de6c28c4",
+      "bytes": 19967
+    }
+  },
+  "repository_snapshots": {
+    "BEACONHS": {
+      "repo": "braedonsaunders/beaconhs",
+      "url": "https://github.com/braedonsaunders/beaconhs",
+      "commit": "7e1f3ec12708e2d612755c41ef36599c9de24a5c",
+      "parent": "bf0ca8f51d47599b1606b5c61251ddfddf9ade3f",
+      "tree": "a57745b337988b1259dd818c8be7fda7d235e01d",
+      "committer_date": "2026-08-17T19:24:26Z",
+      "subject": "chore: keep main quality gates clean",
+      "default_branch": "main",
+      "repository_root_licence": "AGPL-3.0-or-later (package declaration; root LICENSE is GNU AGPLv3 text)",
+      "edition_boundary": "Official public repository paths at the pinned commit only; no uncited service, deployment, commercial or proprietary behavior inferred."
+    }
+  },
+  "verified_files": [
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "LICENSE",
+      "blob": "be3f7b28e564e7dd05eaf59d64adba1a4065ac0e",
+      "bytes": 34523,
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "loci": "L1-L25"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "README.md",
+      "blob": "10f0bdaca4c54d8d91aff44c683f404a96711f94",
+      "bytes": 14816,
+      "sha256": "9eb1497e04bef29f12a54470afa3a338a04c40ac90c130b596d3cb2e415da517",
+      "loci": "L1-L80"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "package.json",
+      "blob": "ba32547af34e9c3d59a26fee317f2ed3c76642f2",
+      "bytes": 1144,
+      "sha256": "6fbe1569ff6010e2f73205612bafa226fa140b42250f2f56f62ac9ccfe61aa89",
+      "loci": "L1-L12"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "packages/db/src/schema/documents.ts",
+      "blob": "7ba2455b0739ca25f50d030aaa2936c415855658",
+      "bytes": 17083,
+      "sha256": "ddb5b12c7a3088bea235c9d5700a210ece59d8c42e0f039ec43aa3ee5977b52b",
+      "loci": "L23-L130,L132-L318"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "packages/db/src/schema/document-types.ts",
+      "blob": "5cbfce591db6614dd23d92de7f04ea93e2f72a64",
+      "bytes": 2824,
+      "sha256": "46e3b6e3a7894d333ba62c2996229b96f6a244e237f881d818cf1eb74a42f0a9",
+      "loci": "L13-L59"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/_actions.ts",
+      "blob": "12679d31d0c05572ccf4b1c9f595a954c72a24dd",
+      "bytes": 12266,
+      "sha256": "58df36f5ab06169de9c1ed87eee2a90e2eb25c26f9e80b16250687e9c83839d3",
+      "loci": "L32-L55,L61-L115"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/_actions.ts",
+      "blob": "8c16d9040c3c1a0633063c9793313621438f24d6",
+      "bytes": 13087,
+      "sha256": "09cbe32e022c387c11be9d5680d2a3a33923a6f4d2baecf2c447a5aa21deb8af",
+      "loci": "L158-L259,L261-L349"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/_ack-actions.ts",
+      "blob": "69601ff951063f6d9edbe7cbd4e7756f80d1fe8e",
+      "bytes": 20251,
+      "sha256": "528d83ea604e38a1f4f90da1c5b052d3a8cb18580283b9a181665ae00dfcd205",
+      "loci": "L96-L248"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/_master-actions.ts",
+      "blob": "eec8ef269c374c9770a994ac7cb73816aed0d4f7",
+      "bytes": 13301,
+      "sha256": "86bb0356b21380a34f00be18722d6a5d15faef36c62d262306499f7603db434b",
+      "loci": "L114-L225,L228-L379"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/page.tsx",
+      "blob": "1598d00a1cd54202eb85bb3e6cbd8ed87b007144",
+      "bytes": 64445,
+      "sha256": "4acbee3ce165b45aabec55dceac3a5bbdfce95604737a16b7742dc6c6df02198",
+      "loci": "L112-L320,L840-L856,L1120-L1165,L1202-L1219"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/_acknowledgments-panel.tsx",
+      "blob": "8eb542cd50ec0acde860a9b74cdd87ad3be6a339",
+      "bytes": 11633,
+      "sha256": "bce75a660e3c0511941cb3f297be628afe19899f76c54c2dd606dc5daf179bd1",
+      "loci": "L20,L46-L91,L103-L145"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/[id]/versions/[versionId]/download/route.ts",
+      "blob": "33caf9f12d945b058103315cc6aa69ebfd41f7fa",
+      "bytes": 2846,
+      "sha256": "0227f1cd9a5eb701321a70c36e0e6cd5fec6a87a56e13a1ff2cb3b7f25e40171",
+      "loci": "L16-L69"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/export.csv/route.ts",
+      "blob": "47c00c59e227777673b75370ff4902fae7510d2d",
+      "bytes": 4249,
+      "sha256": "e7d6a2eebb735489dd3319b957ba4acdd67233c8c784df46900151a9e85c57a4",
+      "loci": "L23-L120"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/lib/csv.ts",
+      "blob": "bfbdfd1f6f24b8c550d6f6e31b0584c2d81adbc4",
+      "bytes": 2432,
+      "sha256": "04efb53d6e4a1dee45795c022949f2757dadb3574a14debccee8b001e7b4e8a4",
+      "loci": "L12-L67"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "packages/db/src/schema/document-management-reviews.ts",
+      "blob": "592ed3a5f9d47266fa575e52e0a7d26578b2f550",
+      "bytes": 6292,
+      "sha256": "063f1eee307be9178466b6596b27cbc827ab63231c3357cd1884b51d17d96dfe",
+      "loci": "L27-L117"
+    },
+    {
+      "repo": "braedonsaunders/beaconhs",
+      "path": "apps/web/src/app/(app)/documents/management-reviews/[id]/actions.ts",
+      "blob": "2453b20b2ed09b2f5248c4ec38a9b10e549dbd17",
+      "bytes": 8787,
+      "sha256": "fe32ffa6efaa97363a133adccf0629c2a74d7ca3b00d9fe203d5063cc95d880d",
+      "loci": "L24-L250"
+    }
+  ],
+  "counts": {
+    "evaluated": 8,
+    "direct": 4,
+    "retained_unproved": 4,
+    "documented_ncm": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-HS-PROCEDURE-AUTHORING-EVIDENCE",
+      "decision": "direct",
+      "candidate": "BeaconHS controlled-document authoring and immutable publish snapshots",
+      "requirement": "Author controlled procedures from a working master and publish immutable numbered evidence with actor, time, change and rendered-output provenance.",
+      "behavior": "Typed controlled documents support create, update and import of a working DOCX master, then produce an immutable numbered publish snapshot with actor, time, changelog, rendered attachment lifecycle and audit evidence.",
+      "loci": "braedonsaunders/beaconhs@7e1f3ec12708e2d612755c41ef36599c9de24a5c :: packages/db/src/schema/documents.ts L23-L130; packages/db/src/schema/document-types.ts L13-L59; apps/web/src/app/(app)/documents/_actions.ts L32-L55; apps/web/src/app/(app)/documents/[id]/_actions.ts L158-L349; apps/web/src/app/(app)/documents/[id]/_master-actions.ts L114-L379; apps/web/src/app/(app)/documents/[id]/page.tsx L112-L220",
+      "reason": "Bounded controlled-document analogue only; no Oblivion Site/RBAC, procedure state, approval, runtime or safety-certification parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HS-PROCEDURE-REVIEW-APPROVAL",
+      "decision": "retain",
+      "candidate": "BeaconHS periodic published-document review",
+      "reason": "Periodic approved-no-change, updated or retired review against an already-published version does not prove draft submission, request-changes, maker-checker approval or approval-gated publication.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-HS-PROCEDURE-ACKNOWLEDGEMENT",
+      "decision": "direct",
+      "candidate": "BeaconHS exact-version document acknowledgement",
+      "requirement": "Bind a worker acknowledgement to the exact published procedure version with actor, time, replay control, signature/evidence and audit provenance.",
+      "behavior": "The acknowledgement panel invokes a permission-bound action that locks a published document, resolves its current published version, rejects or absorbs replay, and persists a unique person-version acknowledgement with time, signature/evidence and audit record.",
+      "loci": "braedonsaunders/beaconhs@7e1f3ec12708e2d612755c41ef36599c9de24a5c :: packages/db/src/schema/documents.ts L200-L260; apps/web/src/app/(app)/documents/[id]/_ack-actions.ts L96-L248; apps/web/src/app/(app)/documents/[id]/_acknowledgments-panel.tsx L20,L46-L91,L103-L145; apps/web/src/app/(app)/documents/[id]/page.tsx L1202-L1219",
+      "reason": "Exact-version acknowledgement analogue only; no Oblivion workforce eligibility, Site, expiry, competency, runtime or browser parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HS-PROCEDURE-ARCHIVE-RESTORE",
+      "decision": "retain",
+      "candidate": "BeaconHS document archive and retire behavior",
+      "reason": "Archive/retire behavior exists, but no explicit archived-record restore transition and audit path is proved; unpublish/publish is not restore.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-HS-PROCEDURE-ATTACHMENT-DOWNLOAD",
+      "decision": "direct",
+      "candidate": "BeaconHS exact-version controlled-document download",
+      "requirement": "Download the authorised exact published procedure attachment with stable version identity, content disposition and access audit.",
+      "behavior": "Per-version PDF/DOCX links call a route that validates identifiers and permission/published visibility, resolves the exact version attachment, audits the access and streams it with Content-Disposition.",
+      "loci": "braedonsaunders/beaconhs@7e1f3ec12708e2d612755c41ef36599c9de24a5c :: apps/web/src/app/(app)/documents/[id]/page.tsx L1120-L1165; apps/web/src/app/(app)/documents/[id]/versions/[versionId]/download/route.ts L16-L69",
+      "reason": "Exact-version download analogue only; no Oblivion attachment ownership, Site/direct-object, malware, retention, runtime or browser parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HS-PROCEDURE-REGISTER-EXPORT",
+      "decision": "direct",
+      "candidate": "BeaconHS controlled-document register CSV export",
+      "requirement": "Export an authorised, bounded and audit-recorded procedure register with safe CSV encoding and current review/status fields.",
+      "behavior": "The document-register export applies filters, ordering and a row cap, records an audit event, and returns title, key, category, status and review fields through a formula-injection-hardened RFC4180-style CSV utility.",
+      "loci": "braedonsaunders/beaconhs@7e1f3ec12708e2d612755c41ef36599c9de24a5c :: apps/web/src/app/(app)/documents/export.csv/route.ts L23-L120; apps/web/src/lib/csv.ts L12-L67",
+      "reason": "Bounded register-export analogue only; no Oblivion Site/role, exact field, retention, runtime or browser parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HS-WORKER-PARTICIPATION-CONSULTATION-DOWNLOAD",
+      "decision": "retain",
+      "candidate": "BeaconHS management-review records",
+      "reason": "Participants, discussion, decisions, action items and reviewed-document pins do not prove a consultation-specific downloadable artifact or governed generator.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-HS-WORKER-PARTICIPATION-MINUTES-DOWNLOAD",
+      "decision": "retain",
+      "candidate": "BeaconHS management-review records",
+      "reason": "Management-review persistence does not prove a worker-participation minutes artifact, type-specific download route or exact minutes provenance; generic document download is not inherited.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    }
+  ],
+  "collision_disclosure": {
+    "prior_target_specific_packets": 36,
+    "prior_evaluation_occurrences": 370,
+    "unique_prior_evaluated_ids": 364,
+    "unique_prior_ids_sha256": "c6541df6b40669be03c76f6d67b9d576e29034f84cc1573cc4b7824059093d09",
+    "selected_target_intersection": 0,
+    "repository_reuse": "BeaconHS was previously inspected at an older commit.",
+    "exact_behavioral_path_intersection": 0,
+    "source_reuse": "All selected target IDs and exact proposed behavior paths are fresh; retained rows receive no family or generic-document inheritance."
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 4,
+    "eligible_total": 4,
+    "completion_unproved": -4,
+    "documented_ncm": 0,
+    "product_runtime_representative_task_overall_completion": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark_direct": 389,
+    "verified_benchmark_total": 411,
+    "documented_ncm": 89,
+    "eligible_total": 500,
+    "completion_unproved": 404
+  }
+}

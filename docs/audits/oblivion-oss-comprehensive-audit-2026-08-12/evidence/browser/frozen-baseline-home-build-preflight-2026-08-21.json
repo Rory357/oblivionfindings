@@ -1,0 +1,68 @@
+{
+  "schema_version": "oblivion-frozen-browser-preflight-v1",
+  "generated_at": "2026-08-20T19:44:04.6009128Z",
+  "classification": "blocked_before_browser_no_visual_credit",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "target": {
+    "route_name": "home",
+    "route_path": "/",
+    "visual_ids": [
+      "VIS-000901",
+      "VIS-000902",
+      "VIS-000903",
+      "VIS-000904"
+    ],
+    "viewports": [
+      "1024x768",
+      "1280x800",
+      "1440x900",
+      "390x844"
+    ]
+  },
+  "source_identity": {
+    "routes/web.php": "3d8ff76702de23cb4ff6a999d61393b21c4e12e0",
+    "resources/js/pages/home.tsx": "0bba4d71a8393130fb201861d76234b243f696cd",
+    "resources/js/layouts/marketing-layout.tsx": "9444027c55b2a71762067bc3c976602fa5ea5ca3",
+    "resources/js/components/Header.tsx": "1a1c38fbcfea857b33c32354c537b9b4044afdc7",
+    "resources/js/components/Footer.tsx": "2052aa7daea69f2547998f93182fadbb6edd99f0",
+    "resources/css/app.css": "76ce1ecca5f89ba7236a39fc1129e77fa58eb352"
+  },
+  "preflight": {
+    "head_equals_audited_commit": true,
+    "application_source_drift_paths": [],
+    "public_hot_absent": true,
+    "port_8766_listener_count_before": 0,
+    "preexisting_public_build_tree_sha256": "ad8db4add4faba781a6b9b373985fa8367e6de1eeeac00b9c4e5394b9aca9a0d",
+    "preexisting_public_manifest_sha256": "3341666d30499a8d4449382641c27a96d36046d1901b709901bed2a2393ef1e2",
+    "composer_lock_sha256": "9347755dd062f866daa8b4f98f16cb2e84636fab3bf36765f649cd94d539c94c",
+    "package_lock_sha256": "38df4486f945df519512000c3b928ab204316ed8f2a5842aaf058d428eb10a6f"
+  },
+  "first_failure": {
+    "stage": "fresh exact production build",
+    "command": "npm run build",
+    "output": "vite build: 'vite' is not recognized as an internal or external command, operable program or batch file.",
+    "interpretation": "The preserved node_modules tree did not expose a runnable Vite binary. No npm repair, npm install, browser navigation, credential, session, click, form input, seed, database command, preview server, or screenshot was attempted."
+  },
+  "cleanup": {
+    "public_build_restored": true,
+    "post_restore_public_build_tree_sha256": "ad8db4add4faba781a6b9b373985fa8367e6de1eeeac00b9c4e5394b9aca9a0d",
+    "public_build_tree_restoration_verified": true,
+    "checkout_vendor_absent": true,
+    "node_modules_preserved": true,
+    "env_preserved": true,
+    "public_hot_absent": true,
+    "port_8766_listener_count_after": 0,
+    "task_php_composer_pest_vite_processes_after": 0,
+    "residual_cleanup_blocker": null,
+    "quarantined_task_created_vendor_removed": true,
+    "quarantined_task_created_vendor_removed_at": "2026-08-23T15:44:58+12:00",
+    "quarantined_task_created_vendor_removed_files": 15142,
+    "quarantined_task_created_vendor_removed_bytes": 96141567,
+    "removal_boundary": "The exact resolved task-created-vendor directory was verified inside this audit evidence root before recursive removal. The surrounding provenance directory and this record were retained."
+  },
+  "credit": {
+    "browser_started": false,
+    "visual_ids_with_new_credit": [],
+    "reason": "The exact baseline asset bundle was not produced, so no route, geometry, focus, console, or screenshot claim is available."
+  }
+}

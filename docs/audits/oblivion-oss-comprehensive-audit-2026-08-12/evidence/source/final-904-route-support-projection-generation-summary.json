@@ -1,0 +1,123 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-route-support-projection-generation-summary",
+  "generated_at": "2026-08-21T23:35:00+12:00",
+  "status": "applied_idempotent_static_only",
+  "generator": {
+    "path": "generators/apply-route-support-projection-correction-904.py",
+    "sha256": "57783534cb48293dbba286e5906cebb32ec799e5192e6e63b8571b494d359cbf",
+    "bytes": 28410
+  },
+  "inputs": {
+    "evidence/source/canonical-audit-inputs.json": {
+      "sha256": "4cfa80e83b2c146266c6cc2a7e07320baf0ec6afe059f21518d0e5a509740746"
+    },
+    "evidence/source/working-capability-manifest-904.json": {
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f"
+    },
+    "evidence/source/route-page-gap-reconciliation-904.json": {
+      "sha256": "1a237628080d225cd32cdfa173ea01737b6c9c32e51bbca183a8ec84a0b8d7be"
+    },
+    "inventory-904.json": {
+      "sha256": "80f0d84017fadd27a66256e633956cd44591b243591490c6dac4d4b81fa99f4c"
+    },
+    "02-eight-pass-coverage-ledger-904.csv": {
+      "sha256": "8bf2c90d0fba9c79a10f14aab773dcba17139e549d06732897a68d4d959df9d8"
+    },
+    "03-feature-to-benchmark-matrix-904.csv": {
+      "sha256": "9eb665837cd9f0a23018b2a78b765392e123d6d36fc5db05af3089c0e615e0db"
+    },
+    "evidence/source/final-904-task-script-generation-summary.json": {
+      "sha256": "90c8386810df9e406f799dc591dd2a1810e85bc32ae6432d650c1c297323f888"
+    },
+    "findings.json": {
+      "sha256": "c3e72e15e079aaaaf3db7a5600349038532b971869a8b38e5daed2940929f584"
+    },
+    "task-scripts/final-904/cap-site-dietary-tag-lifecycle.md": {
+      "sha256": "85cabb985a7a7f558ad99252cbaf61453753c07f48b8b0cc0455af3bec72aad5"
+    },
+    "task-scripts/final-904/cap-site-product-lifecycle.md": {
+      "sha256": "d5dcefdb48b9143bd2f18d478e31da0161e20439659ef130f82cdf27b777ef34"
+    },
+    "task-scripts/final-904/cap-site-recipe-lifecycle.md": {
+      "sha256": "700c838a1f829b780f264a2c567c87eb7af61e8d2adea143edc975ceed773951"
+    }
+  },
+  "outputs": {
+    "adjudication": {
+      "path": "evidence/source/route-support-projection-correction-904.json",
+      "sha256": "5bb4389d82f023cec82d63dd3f1b949967ec19f2745ed0c933b6996b6263be4a",
+      "bytes": 5499
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+      "bytes": 683490
+    },
+    "gap": {
+      "path": "evidence/source/route-page-gap-reconciliation-904.json",
+      "sha256": "cd5c01133d6a0bc4ca9154bfbf3eb54457cb0d382dd97e9b15ebb7bf25f2c18c",
+      "bytes": 36016
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "9b3efa1334e7a8db65c3380ccbb6c1206142196cbfd9e0bc69cecb7516e224f4",
+      "bytes": 11784079
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "1890d20026d24e0cd32be5d294ca38b463b00808cced831a804ee894ec6bf837",
+      "bytes": 1959658
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "1a5375e86ea75028c70de8d54ba7b43087d9ce301643e0dd5a9d5f84d8caae6a",
+      "bytes": 3310178
+    },
+    "task_summary": {
+      "path": "evidence/source/final-904-task-script-generation-summary.json",
+      "sha256": "5a0ac5b2b6c0b2582683ec87af963182b63a63d728394fc72ef38388db32c5a6",
+      "bytes": 176925
+    },
+    "task_cap_site_dietary_tag_lifecycle": {
+      "path": "task-scripts/final-904/cap-site-dietary-tag-lifecycle.md",
+      "sha256": "ca048f97a83331a4c23c11a9b593946914c6686ed8fddaaabcd1d0a0a448d549",
+      "bytes": 4452
+    },
+    "task_cap_site_product_lifecycle": {
+      "path": "task-scripts/final-904/cap-site-product-lifecycle.md",
+      "sha256": "9535f87f66a2f9c8ed577ea00ff93dd6db006c7707e1bb5e49e5ce877538fac0",
+      "bytes": 4482
+    },
+    "task_cap_site_recipe_lifecycle": {
+      "path": "task-scripts/final-904/cap-site-recipe-lifecycle.md",
+      "sha256": "8b859411606782940a952a28f5bff3adfe913cd08eb413d28f84dd9299cf293b",
+      "bytes": 4687
+    }
+  },
+  "checks": {
+    "route_0098_linked_to_exact_three_targets": true,
+    "route_0098_support_only_nonexclusive": true,
+    "route_0821_split_reason_exact": true,
+    "page_0252_reason_exact": true,
+    "route_inventory_partition_2994_plus_30_equals_3024": true,
+    "capability_denominator_unchanged_904": true,
+    "benchmark_counts_unchanged": true,
+    "runtime_browser_task_completion_credit_delta_zero": true
+  },
+  "required_downstream_regeneration": {
+    "order": [
+      "refresh-current-904-summaries.py",
+      "refresh-audit-dashboard-data.py",
+      "finalize-current-904-validation.py"
+    ],
+    "expected_static_counts": {
+      "accepted_routes": 2994,
+      "excluded_routes": 30,
+      "route_relations": 3076,
+      "combined_accepted_route_page": 3939,
+      "combined_route_page_denominator": 3986
+    },
+    "credit_boundary": "Regeneration reconciles static counts and hashes only; runtime, browser, task, benchmark and completion credit remain zero."
+  }
+}

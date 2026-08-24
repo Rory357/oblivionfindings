@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0",
+  "artifact": "dashboard-reconciliation-2026-08-23",
+  "generated_at": "2026-08-23T15:44:58+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "artifact_consistency_repaired_substantive_completion_blocked",
+  "independent_reviews": [
+    {
+      "agent_id": "/root/audit_gate_replay",
+      "verdict": "NO_GO_COMPLETION_OR_FREEZE"
+    },
+    {
+      "agent_id": "/root/audit_source_census",
+      "verdict": "NO_GO_SOURCE_CENSUS_CONSISTENCY"
+    },
+    {
+      "agent_id": "/root/audit_visual_evidence",
+      "verdict": "NO_GO_VISUAL_COMPLETION"
+    }
+  ],
+  "corrections": {
+    "historical_902_defaults_archived": [
+      {
+        "path": "evidence/historical/canonical-902/inventory.json",
+        "sha256": "076015a57c9368cdc737d0e8139589ba5708d0fa6bcee1d6654c2e72b4b9889a",
+        "bytes": 11766778
+      },
+      {
+        "path": "evidence/historical/canonical-902/02-eight-pass-coverage-ledger.csv",
+        "sha256": "b1082f6ebd02715b3a88123927b0189df87c70b356bf8928837eddf915ac79bf",
+        "bytes": 1957055
+      },
+      {
+        "path": "evidence/historical/canonical-902/03-feature-to-benchmark-matrix.csv",
+        "sha256": "f16d04ab2d25f30caca370bcbbb2ba504f0dd2d211b7b552018dd3bf7ec3d608",
+        "bytes": 3279256
+      },
+      {
+        "path": "evidence/historical/canonical-902/04-workflow-usability-scorecard.csv",
+        "sha256": "db680bb3a4aa46de8124cf890debc5ccd4fe2647927bf5ad87be0683bb02e3af",
+        "bytes": 1080866
+      },
+      {
+        "path": "evidence/historical/canonical-902/05-browser-visual-coverage-matrix.csv",
+        "sha256": "f0aed8a6cbc242651ef7cd702685f8c948af276b3830d4d5960ea6ece1e9f363",
+        "bytes": 8376159
+      }
+    ],
+    "canonical_904_aliases": [
+      {
+        "path": "inventory.json",
+        "sha256": "650a043efe9c324eb87bbad5d08e3d2c582278e2b3a6ce067be0a7853ebd33d1",
+        "bytes": 11785743
+      },
+      {
+        "path": "02-eight-pass-coverage-ledger.csv",
+        "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+        "bytes": 1959490
+      },
+      {
+        "path": "03-feature-to-benchmark-matrix.csv",
+        "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+        "bytes": 3312496
+      },
+      {
+        "path": "04-workflow-usability-scorecard.csv",
+        "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+        "bytes": 1082667
+      },
+      {
+        "path": "05-browser-visual-coverage-matrix.csv",
+        "sha256": "987dbdc74f3412a9fe75e801e1010de31f9df389b1eb44201aa940c137e825f0",
+        "bytes": 8483712
+      }
+    ],
+    "overlay_classifier_sync": {
+      "custom_rows": 659,
+      "custom_exact": 253,
+      "custom_inferred": 144,
+      "custom_unresolved_or_blocked": 262,
+      "primitive_rows": 477,
+      "primitive_exact": 242,
+      "primitive_unresolved": 235,
+      "explicit_primitive_trigger_rows_unchanged": 146,
+      "trigger_or_classification_changes": 134,
+      "fully_rederived_rows": 1136,
+      "runtime_credit_delta": 0
+    },
+    "visual_classification_counts": {
+      "Blocked": 497,
+      "Not safely reproducible": 4312,
+      "Observed": 2503,
+      "Source-inferred": 1441
+    },
+    "ownership_credit_delta": 0,
+    "runtime_credit_delta": 0,
+    "remediation_credit_delta": 0
+  },
+  "replayed_gates": {
+    "capabilities": "904/904 structural",
+    "benchmark_or_ncm": "500/904",
+    "tasks_executed": "0/790",
+    "journeys_all_viewports": "0/8",
+    "tests_executed": "0/867",
+    "modules_all_eight_passes": "0/25",
+    "visual_final_id": "8168/8753",
+    "material_final_id": "3948/4312",
+    "audited_baseline_visual_resample": "0/4"
+  },
+  "claim_limit": "Canonical aliases and evidence consistency only. The audit remains blocked and no product fix, runtime, browser, usability, release, or all-pass credit is awarded."
+}

@@ -1,0 +1,344 @@
+{
+  "schema_version": "1.0",
+  "artifact": "capability-denominator-901-adjudication",
+  "status": "accepted_static_identity_reconciliation_not_runtime_completion",
+  "generated_at": "2026-08-13T07:58:53.5702417+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Audit-artifact-only, read-only source adjudication. No application code, configuration, routes, tests, data, browser state, repository history, deployment, or external system was changed.",
+  "supersedes_denominator": {
+    "artifact": "working-capability-manifest-894.json",
+    "sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+    "counts": {"total": 894, "H": 784, "D": 108, "M": 2},
+    "reason": "A fresh zero-candidate route/page review proved seven reachable distinct capabilities omitted from the 894 identity register."
+  },
+  "accepted_counts": {
+    "total": 901,
+    "H": 788,
+    "D": 111,
+    "M": 2,
+    "delta": {"total": 7, "H": 4, "D": 3, "M": 0}
+  },
+  "identity_rules": [
+    "A reachable user job is counted when static evidence proves a distinct actor, aggregate/state, completion, disclosure purpose, or downstream handoff boundary.",
+    "A shared HTTP route or shared page may support multiple targets when a query discriminator, permission envelope, aggregate and output contract prove distinct jobs.",
+    "An implemented but unreachable, shadowed, no-op, generated/test-only, infrastructure, or resolver-orphan surface remains classified and mapped in the route/page disposition register but is excluded from the accepted H/D/M denominator.",
+    "Split, regrouped, and merged targets do not mechanically inherit benchmark or no-credible-match credit."
+  ],
+  "accepted_additions": [
+    {
+      "working_key": "OPS-CLIENT-FUND",
+      "id": "OPS-CLIENT-FUND",
+      "candidate_id": null,
+      "id_status": "source_stable_existing_feature_id",
+      "class": "H",
+      "canonical_module": "OPERATIONS",
+      "source_family_ids": ["OPS-CLIENT-FUND"],
+      "route_ids": ["ROUTE-1927", "ROUTE-1928", "ROUTE-1929", "ROUTE-1930", "ROUTE-1932"],
+      "page_ids": ["PAGE-0571", "PAGE-0572", "PAGE-0573", "PAGE-0604"],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientFundController.php",
+        "app/Models/ClientFund.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "identity_proof": "Owns the ClientFund register/lifecycle: create, inspect and revise the fund record under client_funds.manage. ROUTE-1931 is excluded because it completes a different ClientFundTransaction ledger-entry job."
+    },
+    {
+      "working_key": "CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "id": "CAP-OPS-CLIENT-FUND-TRANSACTIONS",
+      "candidate_id": null,
+      "id_status": "audit_assigned_stable_name",
+      "class": "H",
+      "canonical_module": "OPERATIONS",
+      "source_family_ids": ["OPS-CLIENT-FUND"],
+      "route_ids": ["ROUTE-1931"],
+      "page_ids": ["PAGE-0573", "PAGE-0604"],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientFundController.php",
+        "app/Models/ClientFundTransaction.php",
+        "app/Domain/Finance/Services/ClientFundTransactionService.php",
+        "app/Observers/ClientFundTransactionObserver.php",
+        "app/Domain/Finance/Jobs/PostClientFundJournalJob.php",
+        "app/Domain/Finance/Jobs/ReconcileUnpostedClientFundJournalsJob.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "naming_proof": "Audit-assigned after target-specific static adjudication; not claimed as a historical source spelling.",
+      "identity_proof": "Owns the ClientFundTransaction aggregate and record-transaction completion: idempotency validation, locked running-balance transition, durable recorded_by evidence, and asynchronous journal/reconciliation handoff. The stable name is audit-assigned and is not claimed as historical spelling proof."
+    },
+    {
+      "working_key": "HR-REFERENCE",
+      "id": "HR-REFERENCE",
+      "candidate_id": null,
+      "id_status": "source_stable_existing_feature_id",
+      "class": "H",
+      "canonical_module": "HR",
+      "source_family_ids": ["HR-REFERENCE"],
+      "route_ids": ["ROUTE-0095", "ROUTE-0096"],
+      "page_ids": ["PAGE-0020"],
+      "backend_anchors": [
+        "app/Http/Controllers/Careers/ReferenceController.php",
+        "app/Domain/Hr/Models/HrReferenceCheck.php",
+        "app/Domain/Hr/Notifications/ReferenceRequestNotification.php",
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "identity_proof": "An unauthenticated token-bearing external referee completes the requested-to-completed questionnaire. This actor and completion boundary is distinct from the internal CAP-HR-CANDIDATE-REFERENCES management job."
+    },
+    {
+      "working_key": "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "id": "CAP-AUTH-EMAIL-VERIFICATION-LIFECYCLE",
+      "candidate_id": null,
+      "id_status": "audit_assigned_stable_name",
+      "class": "H",
+      "canonical_module": "AUTH",
+      "source_family_ids": [
+        "PLAT-EMAIL-VERIFICATION-NOTIFICATION",
+        "PLAT-EMAIL-VERIFICATION-PROMPT",
+        "PLAT-VERIFY-EMAIL"
+      ],
+      "route_ids": ["ROUTE-0324", "ROUTE-0325", "ROUTE-0326"],
+      "page_ids": ["PAGE-0014"],
+      "backend_anchors": [
+        "config/fortify.php",
+        "app/Providers/FortifyServiceProvider.php",
+        "app/Models/User.php",
+        "vendor/laravel/fortify/src/Http/Controllers/EmailVerificationNotificationController.php",
+        "vendor/laravel/fortify/src/Http/Controllers/EmailVerificationPromptController.php",
+        "vendor/laravel/fortify/src/Http/Controllers/VerifyEmailController.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [
+        {"origin_file": "full-distinct-capability-adjudication.json", "working_key": "PLAT-EMAIL-VERIFICATION-NOTIFICATION"},
+        {"origin_file": "full-distinct-capability-adjudication.json", "working_key": "PLAT-EMAIL-VERIFICATION-PROMPT"},
+        {"origin_file": "full-distinct-capability-adjudication.json", "working_key": "PLAT-VERIFY-EMAIL"}
+      ],
+      "naming_proof": "Audit-assigned lifecycle name groups one coherent prompt-send-verify user job; not claimed as a historical source spelling.",
+      "identity_proof": "Fortify enables one coherent prompt-resend-signed-verify lifecycle and PAGE-0014 posts the resend action. Existing feature-test source exercises and encodes these routes; this audit did not execute those tests. The stable lifecycle name is audit-assigned; the missing MustVerifyEmail contract and resulting enforcement/notification bypass remain findings rather than reasons to omit the reachable job."
+    },
+    {
+      "working_key": "HR-COMPLIANCE-EXPORT",
+      "id": "HR-COMPLIANCE-EXPORT",
+      "candidate_id": null,
+      "id_status": "source_stable_existing_feature_id",
+      "class": "D",
+      "canonical_module": "HR",
+      "source_family_ids": ["HR-COMPLIANCE-EXPORT"],
+      "route_ids": ["ROUTE-1364"],
+      "page_ids": ["PAGE-0429", "PAGE-0432"],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceExportController.php",
+        "app/Domain/Hr/Models/HrStaffComplianceStatus.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "route_predicates": ["dataset=staff"],
+      "identity_proof": "Retains the source-stable primary ID for the staff compliance register CSV: hr.compliance.view actor boundary, HrStaffComplianceStatus aggregate, nine-column schema, staff-specific activator and filename."
+    },
+    {
+      "working_key": "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "id": "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+      "candidate_id": null,
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "canonical_module": "HR",
+      "source_family_ids": ["HR-COMPLIANCE-EXPORT"],
+      "route_ids": ["ROUTE-1364"],
+      "page_ids": ["PAGE-0522"],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceExportController.php",
+        "app/Models/StaffBackgroundCheck.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "route_predicates": ["dataset=vetting"],
+      "naming_proof": "Audit-assigned after target-specific dataset, permission, aggregate, page and output-contract adjudication; not claimed as a historical source spelling.",
+      "identity_proof": "Separate vetting page and hr.vetting.view boundary, StaffBackgroundCheck aggregate, seven-column schema, disclosure purpose and dataset-specific filename. The stable name is audit-assigned."
+    },
+    {
+      "working_key": "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "id": "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+      "candidate_id": null,
+      "id_status": "audit_assigned_stable_name",
+      "class": "D",
+      "canonical_module": "FLEET",
+      "source_family_ids": ["HR-COMPLIANCE-EXPORT"],
+      "route_ids": ["ROUTE-1364"],
+      "page_ids": ["PAGE-0444"],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceExportController.php",
+        "app/Domain/Hr/Models/HrDriverEligibility.php"
+      ],
+      "origin_files": ["capability-denominator-901-adjudication.json", "full-distinct-capability-adjudication.json"],
+      "absorbed_occurrences": [],
+      "route_predicates": ["dataset=drivers"],
+      "naming_proof": "Audit-assigned after target-specific dataset, permission, aggregate, page and output-contract adjudication; not claimed as a historical source spelling.",
+      "identity_proof": "Cross-module transport for the existing Fleet-owned driver-eligibility register: separate page and hr.driver.view boundary, HrDriverEligibility aggregate, licence/endorsement schema and dataset-specific filename. The stable name is audit-assigned."
+    }
+  ],
+  "existing_target_corrections": [
+    {
+      "working_key": "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION",
+      "source_family_ids": ["FLEET-CHECKLIST"],
+      "route_ids": ["ROUTE-0772", "ROUTE-0773"],
+      "page_ids": ["PAGE-0231"],
+      "backend_anchors": ["app/Http/Controllers/FleetAssets/ChecklistController.php"],
+      "reason": "Direct template index/store actions and resolver page."
+    },
+    {
+      "working_key": "CAP-FLEET-CHECKLIST-RUN-EXECUTION",
+      "source_family_ids": ["FLEET-CHECKLIST"],
+      "route_ids": ["ROUTE-0774", "ROUTE-0775"],
+      "page_ids": ["PAGE-0231", "PAGE-0232"],
+      "backend_anchors": ["app/Http/Controllers/FleetAssets/ChecklistController.php"],
+      "reason": "Direct run creation/execution actions; PAGE-0231 is an exact shared launch surface."
+    },
+    {
+      "working_key": "CAP-FLEET-DEVICE-REGISTRY-PAIRING",
+      "source_family_ids": ["FLEET-DEVICE"],
+      "route_ids": ["ROUTE-0724", "ROUTE-0725", "ROUTE-0728", "ROUTE-0730"],
+      "page_ids": ["PAGE-0217"],
+      "backend_anchors": ["app/Http/Controllers/FleetAssets/DeviceController.php"],
+      "reason": "Direct registry/show/pair/unpair actions and exact composite page."
+    },
+    {
+      "working_key": "CAP-FLEET-DEVICE-TRACKING-CONSENT",
+      "source_family_ids": ["FLEET-DEVICE"],
+      "route_ids": ["ROUTE-0726", "ROUTE-0727", "ROUTE-0729"],
+      "page_ids": ["PAGE-0217"],
+      "backend_anchors": ["app/Http/Controllers/FleetAssets/DeviceController.php"],
+      "reason": "Direct consent grant/revoke/register actions and exact shared composite page."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "source_family_ids": ["SITE-SITE-MEAL-PLAN"],
+      "route_ids": ["ROUTE-2836", "ROUTE-2837"],
+      "page_ids": ["PAGE-0899", "PAGE-0900", "PAGE-0902", "PAGE-0909"],
+      "backend_anchors": ["app/Http/Controllers/Sites/SiteMealPlanController.php"],
+      "reason": "Corrects the prior SITE-DASHBOARD lineage. markServed/unserve persist served state and reverse stock; the former dashboard routes do not perform service completion."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-PLANNING",
+      "source_family_ids": ["SITE-DASHBOARD", "SITE-SITE-MEAL-PLAN"],
+      "add_route_ids": ["ROUTE-0097"],
+      "add_page_ids": ["PAGE-0023"],
+      "add_backend_anchors": ["app/Http/Controllers/Catering/DashboardController.php"],
+      "reason": "The active Catering meal-planner workspace is an alternate planning entry. ROUTE-0098 library counts remains unresolved shared navigation evidence."
+    }
+  ],
+  "deliberate_shared_route_cases": [
+    {
+      "route_id": "ROUTE-1364",
+      "working_keys": [
+        "CAP-FLEET-DRIVER-ELIGIBILITY-REGISTER-EXPORT",
+        "CAP-HR-VETTING-CHECK-REGISTER-EXPORT",
+        "HR-COMPLIANCE-EXPORT"
+      ],
+      "reason": "One streamed CSV transport dispatches three directly activated dataset branches with different entry pages, effective permission envelopes, aggregates, disclosure purposes, output schemas and filenames."
+    }
+  ],
+  "excluded_surface_dispositions": [
+    {
+      "feature_id": "ASSET-ASSET-ASSIGNMENT",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0047", "ROUTE-0048"],
+      "reason": "Implemented legacy assignment writes have no active frontend/client activator; current asset detail only reads assignment history."
+    },
+    {
+      "feature_id": "ASSET-ASSET-INSPECTION",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0054"],
+      "reason": "Implemented legacy AssetInspection write has no active activator and is not the current FleetChecklistRun inspection job."
+    },
+    {
+      "feature_id": "ASSET-ASSET-MAINTENANCE",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0055"],
+      "reason": "Implemented legacy AssetMaintenanceLog write has no active activator and is not FleetWorkOrder."
+    },
+    {
+      "feature_id": "ASSET-ASSET-OWNERSHIP",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0056"],
+      "reason": "Implemented legacy ownership write has no active frontend/client activator."
+    },
+    {
+      "feature_id": "ASSET-ASSET-SCAN-EVENT",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0060"],
+      "reason": "Implemented scan-event route has no active scanner/client activator; the active QR resolution flow is a different target."
+    },
+    {
+      "feature_id": "MED-REFUSAL-FOLLOW-UP",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead",
+      "user_facing": false,
+      "route_ids": ["ROUTE-0404", "ROUTE-0405", "ROUTE-0406"],
+      "reason": "Backend state transitions exist, but RefusalFollowUpDialog is not imported or rendered and repository-wide frontend search found no active caller."
+    },
+    {
+      "feature_id": "DEAD-HR-COMPLIANCE-RENEWALS-EXPORT-BRANCH",
+      "classification": "Dead/unreachable",
+      "denominator_status": "excluded_dead_parameter_branch",
+      "user_facing": false,
+      "route_ids": ["ROUTE-1364"],
+      "route_predicates": ["dataset=renewals"],
+      "reason": "Controller branch exists but no frontend/client activator or branch test was found. It also emits driver data without the driver-specific permission recheck used by dataset=drivers."
+    }
+  ],
+  "source_findings_to_integrate": [
+    {
+      "subject": "email_verification_enforcement_gap",
+      "severity_candidate": "P1",
+      "evidence": "App User inherits verification methods but does not implement Illuminate Contracts Auth MustVerifyEmail; automatic Registered notification and verified middleware checks therefore bypass the user while direct feature tests still exercise prompt/resend/signed verification."
+    },
+    {
+      "subject": "compliance_export_permission_entry_mismatch",
+      "severity_candidate": "P1",
+      "evidence": "Vetting and driver pages can be reached under their specific view permissions, but ROUTE-1364 is also nested under hr.compliance.view; an unconditional visible Export control can therefore return 403 without the additional compliance permission."
+    },
+    {
+      "subject": "dead_renewals_export_driver_disclosure_boundary",
+      "severity_candidate": "P1",
+      "evidence": "The inactive dataset=renewals branch exports HrDriverEligibility data under the default hr.compliance.view check rather than the hr.driver.view check used by the active drivers branch."
+    }
+  ],
+  "proof_anchors": [
+    "routes/operations.php:1146-1159",
+    "app/Http/Controllers/Operations/ClientFundController.php:20-204",
+    "app/Domain/Finance/Services/ClientFundTransactionService.php:25-93",
+    "app/Observers/ClientFundTransactionObserver.php:11-36",
+    "routes/web.php:105-107",
+    "app/Http/Controllers/Careers/ReferenceController.php:28-85",
+    "resources/js/pages/careers/reference-questionnaire.tsx:27-125",
+    "config/fortify.php:146-155",
+    "app/Providers/FortifyServiceProvider.php:93-95",
+    "resources/js/pages/auth/verify-email.tsx:10-42",
+    "tests/Feature/Auth/EmailVerificationTest.php:8-91",
+    "tests/Feature/Auth/VerificationNotificationTest.php:7-32",
+    "routes/hr.php:281-285",
+    "app/Http/Controllers/Hr/ComplianceExportController.php:22-157",
+    "resources/js/pages/hr/compliance/index.tsx:355-356",
+    "resources/js/pages/hr/vetting/index.tsx:135-140",
+    "resources/js/pages/hr/drivers/index.tsx:137-142"
+  ],
+  "completion_boundary": {
+    "denominator_identity_complete_for_this_adjudication": true,
+    "runtime_role_execution_complete": false,
+    "benchmark_mapping_complete": false,
+    "route_page_disposition_complete": false,
+    "audit_complete": false,
+    "reason": "The accepted denominator correction is static identity work only. Full route/page disposition, target-specific benchmark/NCM mapping, representative-role browser execution and safe disposable-database validation remain separate mandatory gates."
+  }
+}

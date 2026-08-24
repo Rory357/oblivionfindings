@@ -1,0 +1,186 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-hr-webhook-ssrf-generation-summary",
+  "generated_at": "2026-08-21T20:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "HR-WEBHOOK-OUTBOUND-SSRF-01",
+  "status": "generated_open_p1_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "84f73bd34c2ff0e59551196a8a1886b4790de6eebc8f2be34b6e5978ea008491",
+      "bytes": 658762
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "579d2bde9e5f0d28ff1e912da354ec0244f6abe9eebaaf2eabf3c7ad3af2144e",
+      "bytes": 11772132
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "0ed5f04514261c0ae33b1a6e2c6af76b57e42391e288da67a88be9638cd0ea57",
+      "bytes": 1290827
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "9f01591314ab68d1b47a5b0217e982c288f66ee6424a1d82ee7901aa876e9fbf",
+      "bytes": 237667
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "4a1caf7a8dab6106c0d6c5094e265185d56f9dd2a37fdb474699a4fd8899be74",
+      "bytes": 12000
+    }
+  },
+  "source_chain": [
+    {
+      "path": "routes/hr.php",
+      "baseline_blob": "e475f4ed99c39b3c531e2a07fa00c423e68c6ee4",
+      "baseline_loci": "L1269-L1283",
+      "current_blob": "20737ca6b96df6a88527216d99db00ddf3bec4f8",
+      "current_loci": "L1331-L1345",
+      "baseline_sha256": "29a6d6f7d1f733c633995fdbbdc7bc66d3debbf4cd6073e27b66d0cd71c843fb",
+      "current_sha256": "74cea78455fa0e3e7ccd1daf9394752e6497e3a34b4c6b1f86bc6b01e45acd49"
+    },
+    {
+      "path": "app/Http/Controllers/Hr/HrWebhookController.php",
+      "baseline_blob": "e0d76f132a79d7b9aa7eea1b356a3d84b5439579",
+      "baseline_loci": "L79-L123,L143-L150",
+      "current_blob": "064a742d20a0fe8cff522d291fef41e5dfe02203",
+      "current_loci": "L76-L115,L132-L136",
+      "baseline_sha256": "8b9628da1c2380dee04a1b0d5cd16a50a360f8af7816bce3d03dd5414e701b4c",
+      "current_sha256": "d2d458462215deaec0734e0ae30995058bc4e5c95f8f73c415b6431145cbcae4"
+    },
+    {
+      "path": "app/Domain/Hr/Services/HrWebhookService.php",
+      "baseline_blob": "6884e04ad8fa8ba1a4b9a863a18d97c97650b0b3",
+      "baseline_loci": "L46-L110,L116-L156",
+      "current_blob": "db1779d70cc6a900f59f87e923fb8e74d326ae4b",
+      "current_loci": "L59-L158,L163-L210",
+      "baseline_sha256": "bb1542e805dd0fd4d04746d3bf477044e6b1430f81bfbaef8fd04ddaa4fa5715",
+      "current_sha256": "bb7da753f5723959cdb97f11093723c1103c03b86ff1344a0cd877fbef3a4fd0"
+    },
+    {
+      "path": "app/Domain/Hr/Models/HrWebhookEndpoint.php",
+      "baseline_blob": "285632d4b6a0cc891bb8611d37fe85d85c17e08f",
+      "baseline_loci": "L16-L41",
+      "current_blob": "88d3dcbe4bb19bda23c029911b0a9ba8f7498f31",
+      "current_loci": "L17-L42",
+      "baseline_sha256": "688885c56da2c2db8b8f3408bbf86b82f539ca1dfb30e46d4770da45f512c32f",
+      "current_sha256": "20529a2e87690998cf0f657f3640d6a1af45b64319303c6d6d837bd1c8171b1d"
+    },
+    {
+      "path": "app/Domain/Hr/Jobs/DeliverHrWebhookJob.php",
+      "baseline_blob": "57b59c38640e1eed8a9db7ca997f7a7fc974156f",
+      "baseline_loci": "L76-L107,L125-L136",
+      "current_blob": "96e197ee96e7cb1e75f4f0ab70a9828848ca7cdf",
+      "current_loci": "L74-L114,L130-L140",
+      "baseline_sha256": "e800aa4b48c38b7536c0694a5ea2a88e6e44f3bd0581ea866ff4aee9cac5f55d",
+      "current_sha256": "8c3000e651dd8e8009bb9d27da0e91ced467fc6df76c10757909083a4828ef15"
+    },
+    {
+      "path": "resources/js/pages/hr/settings/webhooks.tsx",
+      "baseline_blob": "c558e1e9222d97989b00e8ac1b303c5ac1ecc7e8",
+      "baseline_loci": "L111-L149,L226-L242",
+      "current_blob": "4230ff29d85b995877443488922a3441ed098340",
+      "current_loci": "L115-L153,L231-L247",
+      "baseline_sha256": "7b7c591ff59e7bfc681c59aaffbb06df95f6accab4b33ac08559fe34a1319dbc",
+      "current_sha256": "1c392a6c46b398c331ea32aab4f5780130610cd0e28fd314b4a4aef23e305674"
+    },
+    {
+      "path": "database/seeders/SeedHrPermissionsSeeder.php",
+      "baseline_blob": "2a79bc9337b2c73c1b621eaf5be0a31a1112af5c",
+      "baseline_loci": "L86-L87,L115-L138",
+      "current_blob": "0a6856db6393a631b02e09ac1f45edf14d06f718",
+      "current_loci": "L88-L89,L117-L143",
+      "baseline_sha256": "6afdf5dbbeaa941cddf913631a82f08b5327e0f312f8c2462a5c3c1412e3b2f2",
+      "current_sha256": "4865559fb73bcb4ce2dc72e7707d92780c550658a581ff7928c2b16c95280fff"
+    },
+    {
+      "path": "tests/Feature/Hr/HrWebhookDeliveryTest.php",
+      "baseline_blob": "1e33850a0525dc392a00d38bd756dd8fbe1572c4",
+      "baseline_loci": "L36-L129",
+      "current_blob": "0eae7dbdff8b60bda95499eb749832386462b39b",
+      "current_loci": "L65-L171,L227-L276",
+      "baseline_sha256": "894e325e675a949b4027033c71c4e64fa31c7ae8015d50cff195e2a2cea2f33b",
+      "current_sha256": "393730aca46cf73f0640aa23db1a8aef531398b4af6250f4856efdec57d5757d"
+    },
+    {
+      "path": "database/migrations/2026_02_18_050000_create_hr_webhooks_tables.php",
+      "baseline_blob": "53f5e4f923620377456d781f8762787143336fe0",
+      "baseline_loci": "L14",
+      "current_blob": "53f5e4f923620377456d781f8762787143336fe0",
+      "current_loci": "L14",
+      "baseline_sha256": "909711ae7cc5ae818620e3b4a1d1ddbc07090b679a9dc7467ff6af67f0791bc3",
+      "current_sha256": "909711ae7cc5ae818620e3b4a1d1ddbc07090b679a9dc7467ff6af67f0791bc3"
+    }
+  ],
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "787ab9f0d52549d12be6f7c8e48f588b5fe028a71301adbacc04a662df134dd4",
+      "bytes": 1290827
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "4183f9e1b31f3b0d787e31986f27c5bfc24992163eab9589c0d1852e5ac6ccb1",
+      "bytes": 237667
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "34e5453b4fb0a773b5ec762e862f104187090c440e5ed1ac5b596eedafecc3eb",
+      "bytes": 12000
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-human-resources-904-2026-08-21.json",
+      "sha256": "ee6d4e1174d84b66257abc248d834b7f6070232b5c20a196c0ea6548f60934e0",
+      "bytes": 7325
+    }
+  },
+  "counts": {
+    "denominator": {
+      "total": 904,
+      "H": 790,
+      "D": 111,
+      "M": 3
+    },
+    "benchmark": {
+      "eligible": 464,
+      "verified": 375,
+      "ncm": 89,
+      "unproved": 440
+    },
+    "findings": {
+      "total": 94,
+      "P0": 19,
+      "P1": 63,
+      "P2": 12
+    },
+    "finding_links": {
+      "total": 267,
+      "literal": 168,
+      "literal_targets": 136,
+      "p0_p1_literal": 82
+    },
+    "official_map": {
+      "denominator": 52,
+      "reviewed": 52,
+      "owner_boundary_rows": 27
+    }
+  },
+  "credit_boundary": {
+    "static_finding_added": 1,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "benchmark_credit_delta": 0,
+    "remediation_credit_delta": 0,
+    "completion_credit_delta": 0
+  },
+  "idempotence": "A second run validates hashes and pointer entries and performs no write."
+}

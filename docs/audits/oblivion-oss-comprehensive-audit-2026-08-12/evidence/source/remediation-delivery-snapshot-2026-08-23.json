@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-23T17:37:33+12:00",
+  "scope": "Three concrete remediation lanes run after audit expansion was stopped at the user's direction.",
+  "current_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "summary": {
+    "remediation_lanes": 3,
+    "source_ready_or_better_count": 3,
+    "runtime_verified_count": 1,
+    "runtime_pending_count": 2,
+    "branch_published_count": 0,
+    "merged_to_main_count": 0,
+    "active_background_tasks": 0,
+    "focused_tests_passed": 28,
+    "focused_assertions_passed": 121,
+    "non_failing_phpunit_warnings": 28
+  },
+  "tasks": [
+    {
+      "finding_id": "AUTH-EMAIL-VERIFY-CONTRACT-01",
+      "worktree": "<local-user>/.codex/worktrees/auth-email-verify-current-main/oblivionfindings",
+      "branch": "codex/auth-email-verify-contract-01-current-main",
+      "candidate_head": "0709a220b505ba2cc032e21d2a84caadab499458",
+      "state": "working_tree_runtime_verified_not_committed",
+      "source_ready": true,
+      "runtime_verified": true,
+      "dirty_paths": [
+        "app/Providers/EventServiceProvider.php"
+      ],
+      "bounded_fix": "Prevent the application EventServiceProvider from registering Laravel's native verification fallback a second time while retaining application listener mappings.",
+      "focused_gate": "php vendor/pestphp/pest/bin/pest --configuration=phpunit.xml --compact --stop-on-failure tests/Feature/Auth/AuthenticationTest.php tests/Feature/Auth/VerificationNotificationTest.php tests/Feature/System/UsersControllerTest.php",
+      "focused_tests_passed": 28,
+      "focused_assertions_passed": 121,
+      "non_failing_phpunit_warnings": 28,
+      "disposable_database_cleanup_confirmed": true,
+      "published": false,
+      "merged_to_main": false
+    },
+    {
+      "finding_id": "MED-ERROR-LIFECYCLE-TERMINAL-BYPASS-01",
+      "worktree": "<local-user>/.codex/worktrees/d238/oblivionfindings",
+      "branch": "codex/med-error-lifecycle-terminal-bypass-01-current-main",
+      "candidate_head": "4fa42822f60040e6fffad4f293536a931b771c5c",
+      "state": "source_ready_pending_runtime_gate",
+      "source_ready": true,
+      "runtime_verified": false,
+      "dirty_path_count": 7,
+      "bounded_fix": "Remove clients.update as a substitute for medication-error record/correct authority and add clients.update-only negative coverage across HTTP and direct service paths.",
+      "static_checks": {
+        "git_diff_check": "pass"
+      },
+      "published": false,
+      "merged_to_main": false
+    },
+    {
+      "finding_id": "FLEET-BOOKING-SITE-PRIVACY-01",
+      "worktree": "<local-user>/.codex/worktrees/2645/oblivionfindings",
+      "branch": "codex/fleet-booking-site-privacy-01-current-main",
+      "candidate_head": "7c934f9678e65200797d42f455cb2c3cdc08630f",
+      "state": "source_ready_pending_runtime_gate",
+      "source_ready": true,
+      "runtime_verified": false,
+      "dirty_path_count": 4,
+      "bounded_fix": "Use the canonical vehicle Site/policy scope, resolve direct objects before business-payload validation, preserve Site ID zero for concealed lookup, and enforce the exact action permission matrix.",
+      "static_checks": {
+        "git_diff_check": "pass",
+        "conflict_markers": 0
+      },
+      "published": false,
+      "merged_to_main": false
+    }
+  ],
+  "claim_boundary": "Runtime verification applies only to the listed AUTH working tree and focused three-file gate. Source-ready does not mean committed, published, merged, deployed, or broadly regression-tested."
+}

@@ -1,0 +1,23 @@
+{
+  "evidence_id": "BVIS-0012",
+  "captured_at": "2026-08-13T08:17:18Z",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "environment": "local Herd testing host",
+  "url": "https://oblivionfindings.test/login",
+  "classification": "Observed browser failure with exact current-source and server-log attribution",
+  "actor": "Authenticated test user; server log records userId 62. The newly seeded Clinical Lead account remains unproved in the browser.",
+  "browser_observation": "The in-app browser displays a 500 Server Error while the login surface remains visible. Retrying with the CLI-validated Clinical Lead credentials did not produce a usable signed-in page.",
+  "server_log_observation": "storage/logs/laravel.log records Illuminate\\Database\\Eloquent\\RelationNotFoundException: Call to undefined relationship [user] on model [App\\Models\\Shift]. The failure occurs while HandleInertiaRequests evaluates the global task navigation badge.",
+  "source_trace": [
+    "app/Services/Tasks/Providers/ShiftTaskProvider.php:41-46",
+    "app/Services/Tasks/Providers/ShiftTaskProvider.php:72-74",
+    "app/Models/Shift.php:145-153",
+    "app/Http/Middleware/HandleInertiaRequests.php:81-90",
+    "storage/logs/laravel.log:2026-08-13 08:17:18"
+  ],
+  "root_cause": "ShiftTaskProvider eager-loads and reads shift.user, but Shift defines the rostered-user relationship as staff().",
+  "scope": "The navigation task count is shared through authenticated Inertia responses, so one relationship-name mismatch can fail otherwise unrelated signed-in pages.",
+  "mutations": "No domain form, workflow, or download was executed. A local synthetic Clinical Lead user/profile/site fixture was created with explicit user permission; it does not prove the supported staff-creation workflow.",
+  "screenshot": null,
+  "claim_limit": "The exact 500 and current-source mismatch are proved. Clinical Lead screen access and the full set of affected routes are not claimed because the signed-in shell could not render."
+}

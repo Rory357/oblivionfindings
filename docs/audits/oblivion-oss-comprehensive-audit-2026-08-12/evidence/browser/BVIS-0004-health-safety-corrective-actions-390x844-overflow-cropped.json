@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "BVIS-0004",
+  "file": "BVIS-0004-health-safety-corrective-actions-390x844-overflow-cropped.png",
+  "route_name": "health-safety.corrective-actions.index",
+  "route_path": "health-safety/corrective-actions",
+  "viewport": "390x844",
+  "classification": "Observed finding",
+  "metrics": {
+    "clientWidth": 373,
+    "height": 844,
+    "scrollWidth": 1518,
+    "width": 390
+  },
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "width": 390,
+    "height": 620
+  },
+  "notes": "Document-level horizontal overflow measured at 1518px scroll width against 373px client width.",
+  "role": "Demo Administrator",
+  "siteScope": "not visibly selected",
+  "environmentEvidence": "owner-confirmed test/development; no visible UI build marker",
+  "auditedCommit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "deployedCommit": "not independently established"
+}

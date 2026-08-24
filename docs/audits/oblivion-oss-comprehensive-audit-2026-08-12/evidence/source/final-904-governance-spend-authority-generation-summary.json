@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-governance-spend-authority-generation-summary",
+  "generated_at": "2026-08-22T00:15:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "finding_id": "GOV-SPEND-AUTHORITY-01",
+  "status": "generated_open_p1_static_only_runtime_and_completion_blocked",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+      "bytes": 708566
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "9a5aa8790a3d681d3f24ad5cf485da02f14db538eed5e65c8308a9d15f9bcf96",
+      "bytes": 670252
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "ac693df595d4d350263eea039a1775c78d06088aba3a2bea8867a1d0e883c99f",
+      "bytes": 11781638
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "12ad928897c5f7e1f45c61c20816004d630f00636418aeaf6fb174fe6d7794c2",
+      "bytes": 1371986
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "044cd531f04f14833c9c6c190193e1f48c8d818155d7d309db3165af9b729dcd",
+      "bytes": 255781
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "12cbda8b0b113a32974b13b30dbc6b229c20feaf5696c180c19808a2da8b958e",
+      "bytes": 12816
+    },
+    "pointer": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "01283bc2a0028ddb7e5e2db8f4aeef3dc556c17b5afb87e8051d83b30f08aa6d",
+      "bytes": 16644
+    }
+  },
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "9008d693537212e58d2db84646295eb1af7a1fdf363c18d9bbdb2b63fb9f003b",
+      "bytes": 1371986
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "d50e4a61101d8ad01044ea32cb392f429f98873f430b4cf197e9c80e1e1e2738",
+      "bytes": 255781
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "adc6b10d2f6a8903b0618ed3ba35bb5451d036317c2507f21471cd32629e49ac",
+      "bytes": 12816
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-governance-spend-authority-904-2026-08-21.json",
+      "sha256": "86e1b891806c5c005ffdf192f27fd4c3346594b6f74cdfa7255915a3f7acc407",
+      "bytes": 5999
+    }
+  },
+  "counts": {
+    "findings": {
+      "total": 99,
+      "P0": 21,
+      "P1": 66,
+      "P2": 12
+    },
+    "links": {
+      "total": 278,
+      "literal": 179,
+      "literal_targets": 147,
+      "p0_p1_literal": 87
+    },
+    "official_map": {
+      "denominator": 57,
+      "reviewed": 57,
+      "owner_boundary_rows": 31
+    },
+    "benchmark": {
+      "eligible": 491,
+      "unproved": 413
+    }
+  },
+  "credit_boundary": {
+    "runtime": 0,
+    "browser": 0,
+    "remediation": 0,
+    "completion": 0
+  },
+  "idempotence": "A second run validates current outputs and pointer entries and performs no write."
+}

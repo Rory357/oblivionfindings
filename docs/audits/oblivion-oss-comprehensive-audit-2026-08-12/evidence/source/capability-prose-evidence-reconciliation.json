@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "generated_at": "2026-08-12T04:34:50.444Z",
+  "denominator_status": "blocked_provisional_projection",
+  "validation": {
+    "proposed_capabilities": 215,
+    "read_only_or_download": 3,
+    "capabilities_with_exact_controller_method": 215,
+    "controller_method_references": 1115,
+    "capabilities_with_exact_persistence_signal": 173,
+    "capabilities_with_exact_event_job_notification_candidate": 20,
+    "capabilities_with_no_source_defined_handoff": 195,
+    "generic_persisted_completion_phrases_remaining": 0,
+    "generic_next_owner_handoff_phrases_remaining": 0,
+    "runtime_executed": 0
+  }
+}

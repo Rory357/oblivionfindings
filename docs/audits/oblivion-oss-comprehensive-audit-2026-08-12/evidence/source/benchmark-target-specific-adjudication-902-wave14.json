@@ -1,0 +1,306 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave14",
+  "generated_at": "2026-08-21T08:12:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Fourteenth bounded target-specific wave: 12 current completion-unproved Finance and Privacy targets; four independently accepted direct source slices and eight conservative retained-unproved decisions.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts."
+  },
+  "source_slice_reuse_disclosure": [
+    "FIN-BANK-TRANSACTION is limited to ERPNext bank-transaction validation/status lines 13-116. ERPNext allocation/reconciliation lines 174-304 and the previously credited BigCapital MatchTransactions slice are explicitly excluded to avoid collision with FIN-BANK-RECONCILIATION and FIN-PAYMENT-MATCH.",
+    "The two Fides credits use disjoint source loci: the DSR package builder for export generation and the privacy-request endpoints for fulfilment decisions. No other target receives inherited Fides credit."
+  ],
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "6594c1f6ea03959faa6e07d54ce7fe292452a57c2e114e3465b40e8d5deb3e34"
+    }
+  },
+  "repository_snapshots": {
+    "ERPNEXT": {
+      "repo": "ERPNext",
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "624d402143e517e864b1f697ec3d7e72c58237e0",
+      "spdx": "GPL-3.0",
+      "license_locus": "license.txt",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded."
+    },
+    "PIA": {
+      "repo": "PIA",
+      "official_repository_url": "https://github.com/LINCnil/pia",
+      "commit_sha": "361d48932a311ede1353bca34ede39c3402430fc",
+      "spdx": "GPL-3.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "c05b0b2ce84cbc6457148985e2b065be862a441db1788bb036501ac8a741d1e7",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/private extensions and unpinned refs are excluded."
+    },
+    "FIDES": {
+      "repo": "Fides",
+      "official_repository_url": "https://github.com/ethyca/fides",
+      "commit_sha": "e87f3ff835af368defc1ec42dc29ec545a288585",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "edition_boundary": "Pinned src/ community repository source only; hosted services, paid/private extensions and unpinned refs are excluded."
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 4,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 8,
+    "completion_credit_recommended": 4
+  },
+  "evaluations": [
+    {
+      "working_key": "FIN-BANK-TRANSACTION",
+      "prior_status": "unproved_pending",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist and validate a bank transaction record with bounded transaction status and duplicate-reference controls.",
+      "current_source_lineage": {
+        "source_family_ids": ["FIN-BANK-TRANSACTION"],
+        "route_ids": ["ROUTE-0494", "ROUTE-0495", "ROUTE-0496"],
+        "page_ids": ["PAGE-0125"],
+        "backend_anchors": ["app/Domain/Finance/Http/Controllers/BankTransactionController.php"],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FINANCE"
+      },
+      "benchmark": {
+        "repo": "ERPNext",
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "624d402143e517e864b1f697ec3d7e72c58237e0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded.",
+        "exact_loci": [
+          {
+            "path": "erpnext/accounts/doctype/bank_transaction/bank_transaction.py",
+            "lines": "L13-L116",
+            "sha256": "94b7ef7e3ca6bbf5b263c9ab858e57986a2d22a90e6d1c8b4e56d6e734e5b88a",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/624d402143e517e864b1f697ec3d7e72c58237e0/erpnext/accounts/doctype/bank_transaction/bank_transaction.py#L13-L116"
+          }
+        ],
+        "proven_slice": "ERPNext materially persists and validates Bank Transaction currency, status and duplicate references.",
+        "parity_limits": "Only transaction validation/status is credited. Lines 174-304, allocation, reconciliation, matching, Site authority, UX and runtime parity are excluded.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@624d402143e517e864b1f697ec3d7e72c58237e0 :: erpnext/accounts/doctype/bank_transaction/bank_transaction.py :: L13-L116 :: sha256=94b7ef7e3ca6bbf5b263c9ab858e57986a2d22a90e6d1c8b4e56d6e734e5b88a"
+      ]
+    },
+    {
+      "working_key": "CAP-PRIV-DPIA-DRAFTING",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Create, persist and update a DPIA draft with structured assessment material.",
+      "current_source_lineage": {
+        "source_family_ids": ["PRIV-DPIA"],
+        "route_ids": ["ROUTE-2314", "ROUTE-2315", "ROUTE-2316", "ROUTE-2317", "ROUTE-2319", "ROUTE-2321"],
+        "page_ids": ["PAGE-0734", "PAGE-0735", "PAGE-0736"],
+        "backend_anchors": ["app/Http/Controllers/DPIAController.php"],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "PRIVACY"
+      },
+      "benchmark": {
+        "repo": "PIA",
+        "official_repository_url": "https://github.com/LINCnil/pia",
+        "commit_sha": "361d48932a311ede1353bca34ede39c3402430fc",
+        "spdx": "GPL-3.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "c05b0b2ce84cbc6457148985e2b065be862a441db1788bb036501ac8a741d1e7",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/private extensions and unpinned refs are excluded.",
+        "exact_loci": [
+          {
+            "path": "src/app/services/pia.service.ts",
+            "lines": "L178-L216,L816-L824",
+            "sha256": "a9e5f1440ae90c40a0b27c2fa8f41cd63b834b5c1acc553cac36548a54b65856",
+            "primary_source_url": "https://github.com/LINCnil/pia/blob/361d48932a311ede1353bca34ede39c3402430fc/src/app/services/pia.service.ts#L178-L216"
+          },
+          {
+            "path": "src/app/models/pia.model.ts",
+            "lines": "L3-L38",
+            "sha256": "2ab567c1939bb7f631da0bfa54f6b7c273ea49f1ce2de2c3c96300b18f9de957",
+            "primary_source_url": "https://github.com/LINCnil/pia/blob/361d48932a311ede1353bca34ede39c3402430fc/src/app/models/pia.model.ts#L3-L38"
+          }
+        ],
+        "proven_slice": "PIA creates a draft with timestamps, status, progress and structure-bound assessment material, then persists updates.",
+        "parity_limits": "Independent review/approval, Site authority, runtime and UX parity are excluded; CAP-PRIV-DPIA-REVIEW-APPROVAL remains unproved.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/LINCnil/pia@361d48932a311ede1353bca34ede39c3402430fc :: src/app/services/pia.service.ts :: L178-L216,L816-L824 :: sha256=a9e5f1440ae90c40a0b27c2fa8f41cd63b834b5c1acc553cac36548a54b65856",
+        "https://github.com/LINCnil/pia@361d48932a311ede1353bca34ede39c3402430fc :: src/app/models/pia.model.ts :: L3-L38 :: sha256=2ab567c1939bb7f631da0bfa54f6b7c273ea49f1ce2de2c3c96300b18f9de957"
+      ]
+    },
+    {
+      "working_key": "CAP-PRIV-DSR-EXPORT-PACKAGE-GENERATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Build a navigable, attachment-aware DSR export package.",
+      "current_source_lineage": {
+        "source_family_ids": ["PRIV-DATA-SUBJECT-REQUEST"],
+        "route_ids": ["ROUTE-2330"],
+        "page_ids": ["PAGE-0741"],
+        "backend_anchors": ["app/Http/Controllers/DataSubjectRequestController.php"],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "PRIVACY"
+      },
+      "benchmark": {
+        "repo": "Fides",
+        "official_repository_url": "https://github.com/ethyca/fides",
+        "commit_sha": "e87f3ff835af368defc1ec42dc29ec545a288585",
+        "spdx": "Apache-2.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "edition_boundary": "Pinned src/ community repository source only; hosted services, paid/private extensions and unpinned refs are excluded.",
+        "exact_loci": [
+          {
+            "path": "src/fides/api/service/privacy_request/dsr_package/dsr_report_builder.py",
+            "lines": "L73-L112,L505-L599",
+            "sha256": "32b181252601dbcc34049daed6125ce232447968e918b415346fc47bd7b9ac6d",
+            "primary_source_url": "https://github.com/ethyca/fides/blob/e87f3ff835af368defc1ec42dc29ec545a288585/src/fides/api/service/privacy_request/dsr_package/dsr_report_builder.py#L73-L112"
+          }
+        ],
+        "proven_slice": "Fides builds a navigable DSR ZIP with dataset pages and optional attachments and closes the package correctly.",
+        "parity_limits": "Request review, fulfilment decisions, authorization, retention, Site authority, runtime and UX parity are excluded.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/ethyca/fides@e87f3ff835af368defc1ec42dc29ec545a288585 :: src/fides/api/service/privacy_request/dsr_package/dsr_report_builder.py :: L73-L112,L505-L599 :: sha256=32b181252601dbcc34049daed6125ce232447968e918b415346fc47bd7b9ac6d"
+      ]
+    },
+    {
+      "working_key": "CAP-PRIV-DSR-FULFILLMENT-DECISION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record scoped approve or deny fulfilment decisions and actor-attributed finalization.",
+      "current_source_lineage": {
+        "source_family_ids": ["PRIV-DATA-SUBJECT-REQUEST"],
+        "route_ids": ["ROUTE-2329", "ROUTE-2332"],
+        "page_ids": ["PAGE-0741"],
+        "backend_anchors": ["app/Http/Controllers/DataSubjectRequestController.php"],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "PRIVACY"
+      },
+      "benchmark": {
+        "repo": "Fides",
+        "official_repository_url": "https://github.com/ethyca/fides",
+        "commit_sha": "e87f3ff835af368defc1ec42dc29ec545a288585",
+        "spdx": "Apache-2.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "edition_boundary": "Pinned src/ community repository source only; hosted services, paid/private extensions and unpinned refs are excluded.",
+        "exact_loci": [
+          {
+            "path": "src/fides/api/v1/endpoints/privacy_request_endpoints.py",
+            "lines": "L1089-L1164,L1770-L1804",
+            "sha256": "09f99cea4d1d2b58916d3fc2e8ab8e4f79a54623f0f6929c3e1d86ab583e5a84",
+            "primary_source_url": "https://github.com/ethyca/fides/blob/e87f3ff835af368defc1ec42dc29ec545a288585/src/fides/api/v1/endpoints/privacy_request_endpoints.py#L1089-L1164"
+          }
+        ],
+        "proven_slice": "Fides requires request-review scope, records the reviewer for approve/deny, rejects invalid state and records finalizer/time before completion.",
+        "parity_limits": "Export-package generation, Site authority, identity verification, deadlines, runtime and UX parity are excluded.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/ethyca/fides@e87f3ff835af368defc1ec42dc29ec545a288585 :: src/fides/api/v1/endpoints/privacy_request_endpoints.py :: L1089-L1164,L1770-L1804 :: sha256=09f99cea4d1d2b58916d3fc2e8ab8e4f79a54623f0f6929c3e1d86ab583e5a84"
+      ]
+    },
+    {
+      "working_key": "CAP-FIN-BANK-FEED-CONNECTION-SYNC",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern an external bank-feed provider connection and synchronization lifecycle with recovery state.",
+      "current_source_lineage": {"source_family_ids": ["FIN-BANK-FEED"], "route_ids": ["ROUTE-0481", "ROUTE-0482", "ROUTE-0483", "ROUTE-0485", "ROUTE-0486", "ROUTE-0497"], "page_ids": ["PAGE-0120"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/BankFeedController.php"], "id_status": "exact", "class": "H", "canonical_module": "FINANCE"},
+      "bounded_reason": "Import/feed handling does not prove a governed external-provider connection, synchronization state or recovery lifecycle."
+    },
+    {
+      "working_key": "CAP-FIN-CONSOLIDATION-GROUP-CONFIGURATION",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Persist and govern consolidation-group membership and configuration.",
+      "current_source_lineage": {"source_family_ids": ["FIN-CONSOLIDATION"], "route_ids": ["ROUTE-0517", "ROUTE-0518", "ROUTE-0519", "ROUTE-0520", "ROUTE-0521", "ROUTE-0522", "ROUTE-0523", "ROUTE-0694"], "page_ids": ["PAGE-0136", "PAGE-0138"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/ConsolidationController.php"], "id_status": "exact", "class": "H", "canonical_module": "FINANCE"},
+      "bounded_reason": "No inspected candidate proved a persistent consolidation-group configuration lifecycle."
+    },
+    {
+      "working_key": "CAP-FIN-CONSOLIDATION-RUNS",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Execute governed, replay-safe consolidation runs with durable run state.",
+      "current_source_lineage": {"source_family_ids": ["FIN-CONSOLIDATION"], "route_ids": ["ROUTE-0524", "ROUTE-0525", "ROUTE-0526"], "page_ids": ["PAGE-0137", "PAGE-0138"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/ConsolidationController.php"], "id_status": "exact", "class": "H", "canonical_module": "FINANCE"},
+      "bounded_reason": "On-demand reporting is not a governed, replay-safe consolidation-run lifecycle."
+    },
+    {
+      "working_key": "CAP-FIN-EFTPOS-BATCHES",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Import, reconcile and govern EFTPOS batches.",
+      "current_source_lineage": {"source_family_ids": ["FIN-EFTPOS"], "route_ids": ["ROUTE-0553", "ROUTE-0554", "ROUTE-0555", "ROUTE-0556"], "page_ids": ["PAGE-0146", "PAGE-0147"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/EftposController.php"], "id_status": "exact", "class": "H", "canonical_module": "FINANCE"},
+      "bounded_reason": "Generic POS closeout does not establish EFTPOS batch import and reconciliation."
+    },
+    {
+      "working_key": "CAP-FIN-EFTPOS-TERMINALS",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Register and govern EFTPOS terminal identity, custody and lifecycle.",
+      "current_source_lineage": {"source_family_ids": ["FIN-EFTPOS"], "route_ids": ["ROUTE-0552", "ROUTE-0557", "ROUTE-0558", "ROUTE-0559"], "page_ids": ["PAGE-0148"], "backend_anchors": ["app/Domain/Finance/Http/Controllers/EftposController.php"], "id_status": "exact", "class": "H", "canonical_module": "FINANCE"},
+      "bounded_reason": "Generic POS configuration does not establish EFTPOS terminal registration, custody or lifecycle."
+    },
+    {
+      "working_key": "CAP-PRIV-DPIA-REVIEW-APPROVAL",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Require independent DPIA review and an actor-attributed approval decision.",
+      "current_source_lineage": {"source_family_ids": ["PRIV-DPIA"], "route_ids": ["ROUTE-2318", "ROUTE-2320"], "page_ids": ["PAGE-0734", "PAGE-0735"], "backend_anchors": ["app/Http/Controllers/DPIAController.php"], "id_status": "exact", "class": "H", "canonical_module": "PRIVACY"},
+      "bounded_reason": "Status labels do not establish an independent reviewer, authorization boundary or decision audit."
+    },
+    {
+      "working_key": "CAP-PRIV-DSR-IDENTITY-DEADLINE",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern DSR identity verification and deadline/extension provenance.",
+      "current_source_lineage": {"source_family_ids": ["PRIV-DATA-SUBJECT-REQUEST"], "route_ids": ["ROUTE-2331", "ROUTE-2333"], "page_ids": ["PAGE-0741"], "backend_anchors": ["app/Http/Controllers/DataSubjectRequestController.php"], "id_status": "exact", "class": "H", "canonical_module": "PRIVACY"},
+      "bounded_reason": "Identity fields and due dates do not prove governed verification plus extension lifecycle and provenance."
+    },
+    {
+      "working_key": "CAP-PRIV-RETENTION-DELETION-EXECUTION",
+      "prior_status": "unproved",
+      "candidate_status": "retained_unproved_after_target_specific_review",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Execute retention-policy-driven deletion with durable deletion-log evidence.",
+      "current_source_lineage": {"source_family_ids": ["PRIV-DATA-DELETION-LOG"], "route_ids": ["ROUTE-2307"], "page_ids": ["PAGE-0733"], "backend_anchors": ["app/Http/Controllers/DataDeletionLogController.php"], "id_status": "exact", "class": "H", "canonical_module": "PRIVACY"},
+      "bounded_reason": "DSR erasure is not retention-policy-driven deletion with durable deletion-log evidence."
+    }
+  ],
+  "projected_delta": {
+    "verified_benchmark_direct": 4,
+    "documented_ncm_direct": 0,
+    "eligible_total": 4,
+    "completion_unproved": -4
+  }
+}

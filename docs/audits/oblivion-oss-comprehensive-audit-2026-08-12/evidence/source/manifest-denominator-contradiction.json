@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.0",
+  "artifact": "manifest-denominator-contradiction",
+  "audited_repository": "https://github.com/Rory357/oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "generated_at": "2026-08-12T20:45:00+12:00",
+  "status": "earlier_894_derivation_contradicted_corrected_894_independently_reconciled",
+  "audit_boundary": "Read-only static evidence reconciliation. No application code, configuration, routes, database data, tests, builds, deployments, commits or pushes were changed or executed by this reconciliation.",
+  "claimed_denominator": {
+    "total": 894,
+    "H": 784,
+    "D": 108,
+    "M": 2,
+    "source": "final-capability-denominator-reconciliation.json",
+    "proof_status": "original derivation contradicted; the same cardinality was later re-established independently by merging the Client and Platform RAG implementations, not by deleting Respite referral intake"
+  },
+  "current_fragment_union": {
+    "raw_rows": 916,
+    "unique_ids": 895,
+    "classes": {
+      "H": 786,
+      "D": 107,
+      "M": 2
+    },
+    "duplicate_id_groups": 21,
+    "note": "This is an intermediate fragment union, not a canonical manifest. It includes EMAR's inbound Client CSV target twice and contains inconsistent Full/Client incident normalisation."
+  },
+  "proved_contradictions": [
+    {
+      "id": "DENOM-RESPITE-REFERRAL-001",
+      "claimed_subtraction": "CAP-RESP-REFERRAL-INTAKE is a Clients/FULL duplicate",
+      "evidence": {
+        "client_source": {
+          "source_family": "CLI-RESPITE-REFERRAL",
+          "controller": "app/Http/Controllers/Respite/RespiteReferralController.php",
+          "route_ids": ["ROUTE-2417", "ROUTE-2418", "ROUTE-2419", "ROUTE-2420"],
+          "page_ids": ["PAGE-0786", "PAGE-0787"],
+          "job": "referral intake record create, show and update"
+        },
+        "full_source_nearest_row": {
+          "source_family": "RESP-RESPITE-BOOKING-REQUEST",
+          "controller": "app/Http/Controllers/Respite/RespiteBookingRequestController.php",
+          "route_ids": ["ROUTE-2421", "ROUTE-2422", "ROUTE-2423", "ROUTE-2424", "ROUTE-2425", "ROUTE-2426", "ROUTE-2427"],
+          "page_ids": ["PAGE-0614", "PAGE-0788", "PAGE-0789", "PAGE-0790"],
+          "job": "booking request intake, decision and promotion"
+        }
+      },
+      "finding": "The aggregates, controllers, state transitions and handoffs differ. No matching Full target ID or route envelope proves a duplicate. Subtracting this H row violates the prompt's distinct-user-job rule.",
+      "consequence": "The previously claimed twentieth H subtraction is unsupported. Before the independent RAG identity review, holding every other accepted arithmetic assumption constant yielded the interim 895 rather than 894."
+    },
+    {
+      "id": "DENOM-INCIDENT-NORMALISATION-002",
+      "finding": "manifest-full-global-exact-ids.json conflicts with the retained source adjudication for INC-INCIDENT.",
+      "retained_source_adjudication": {
+        "human_target": "CAP-INC-INCIDENT-REPORT-EVIDENCE",
+        "route_ids": ["ROUTE-1838", "ROUTE-1839", "ROUTE-1840", "ROUTE-1841", "ROUTE-1842", "ROUTE-1843", "ROUTE-1844", "ROUTE-1845", "ROUTE-1854"],
+        "note": "The attachment download route ROUTE-1845 was retained inside the human incident report/evidence job."
+      },
+      "conflicting_full_id_fragment": {
+        "human_target": "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+        "download_target": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD"
+      },
+      "client_source": {
+        "human_target": "CAP-INC-INCIDENT-REPORT-EVIDENCE",
+        "download_target": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+        "human_route_ids": ["ROUTE-0156", "ROUTE-0157", "ROUTE-0158", "ROUTE-1995", "ROUTE-1996", "ROUTE-1997"],
+        "download_route_ids": ["ROUTE-0159", "ROUTE-1998", "ROUTE-2260"]
+      },
+      "consequence": "Current fragments create one undeclared D-ID duplicate while failing to express the declared H identity. Static adjudication resolves the D surface into a staff download target (ROUTE-1845/0159/1998) and a distinct portal-consumption target (ROUTE-2260); the exact normalized H allocation remains unresolved and cannot be inferred by count-fitting."
+    },
+    {
+      "id": "DENOM-CLIENT-VISIT-003",
+      "finding": "The Client source candidate CAP-OPS-PORTAL-VISIT-REQUEST is not proved as an Operations-owned target.",
+      "evidence": {
+        "portal_routes": ["ROUTE-2282", "ROUTE-2283"],
+        "portal_controller": "app/Http/Controllers/Portal/FamilyDashboardController.php",
+        "route_module": "CLIENTS",
+        "retained_family_adjudication": "CLI-FAMILY-DASHBOARD was one human capability covering ROUTE-2251, ROUTE-2282 and ROUTE-2283.",
+        "distinct_staff_visit_request": {
+          "source_family": "OPS-CLIENT-VISIT-REQUEST",
+          "route_ids": ["ROUTE-2053", "ROUTE-2054", "ROUTE-2055"],
+          "canonical_target": "CAP-OPS-FAMILY-VISIT-REQUEST"
+        }
+      },
+      "consequence": "The portal submission/cancellation routes cannot be silently merged with the distinct staff approval job merely to move one H from Operations to Clients or reduce the denominator."
+    }
+  ],
+  "defensible_interim_denominator": {
+    "total": 895,
+    "H": 785,
+    "D": 108,
+    "M": 2,
+    "status": "superseded_interim_before_cross_family_rag_adjudication",
+    "derivation": "The prior 914 raw-source arithmetic minus 19 proved H overlaps: 12 Catering, six Client/HR-Operations identities, and one Incident report/evidence identity. The Respite referral subtraction is removed."
+  },
+  "independent_reconciliation": {
+    "status": "historical_895_interim_superseded_by_final_resolution_below",
+    "reviewer": "manifest_contradiction_reconcile",
+    "write_activity": "none",
+    "physical_fragment_check": {
+      "raw_rows": 916,
+      "H": 805,
+      "D": 109,
+      "M": 2,
+      "clinical_physical_rows": 146,
+      "clinical_internal_duplicates": [
+        { "id": "CAP-MED-MAR-CHART-REVIEW", "class": "H" },
+        { "id": "CAP-MED-MAR-CSV-EXPORT", "class": "D" }
+      ],
+      "raw_after_internal_clinical_dedupe": { "total": 914, "H": 804, "D": 108, "M": 2 }
+    },
+    "cross_partition_semantic_reconciliation": [
+      {
+        "capability": "portal family visit request submission and cancellation",
+        "route_ids": ["ROUTE-2282", "ROUTE-2283"],
+        "owner": "CLIENTS",
+        "id_status": "subsequently accepted as audit-assigned stable CAP-CLI-PORTAL-VISIT-REQUEST",
+        "effect": "CLIENTS 23H to 24H; OPERATIONS 73H to 72H"
+      },
+      {
+        "capability": "nested client incident report and upload",
+        "route_ids": ["ROUTE-0156", "ROUTE-0157", "ROUTE-0158", "ROUTE-1995", "ROUTE-1996", "ROUTE-1997"],
+        "owner": "INCIDENTS",
+        "identity": "alternate entry coverage of the global incident report/evidence human outcome",
+        "newer_full_target_allocation": "subsequently resolved in incident-human-target-route-allocation.json",
+        "effect": "INCIDENTS 15H to 14H"
+      },
+      {
+        "capability": "nested and portal incident attachment download",
+        "route_ids": ["ROUTE-0159", "ROUTE-1998", "ROUTE-2260"],
+        "owner": "INCIDENTS",
+        "identity": "The prior combined Client row is incorrectly grouped. Staff nested routes ROUTE-0159/1998 belong with global staff ROUTE-1845 under CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD; portal ROUTE-2260 is a distinct authorised-delegate consumption envelope under source-stable ID CLI-PORTAL-INCIDENT-ATTACHMENT, reclassified D.",
+        "id_status": "staff ID exact in current Full fragment; portal source ID stable and D reclassification source-grounded",
+        "effect": "INCIDENTS 4D to 5D"
+      },
+      {
+        "capability": "respite referral intake",
+        "route_ids": ["ROUTE-2417", "ROUTE-2418", "ROUTE-2419", "ROUTE-2420"],
+        "owner": "RESPITE",
+        "identity": "distinct from booking request intake/approval/promotion",
+        "effect": "RESPITE remains 21H and 1D"
+      }
+    ],
+    "corrected_module_overrides": {
+      "CLIENTS": { "H": 24, "D": 4, "M": 0 },
+      "OPERATIONS": { "H": 72, "D": 2, "M": 0 },
+      "INCIDENTS": { "H": 14, "D": 5, "M": 0 },
+      "RESPITE": { "H": 21, "D": 1, "M": 0 }
+    },
+    "accepted_working_total": { "total": 895, "H": 785, "D": 108, "M": 2 }
+  },
+  "benchmark_inheritance_eligibility": {
+    "status": "superseded_895_input_specific_result",
+    "denominator": 895,
+    "verified_benchmark_eligible": 187,
+    "documented_no_credible_match_eligible": 73,
+    "total_eligible": 260,
+    "target_specific_unproved": 635,
+    "eligible_percent": 29.05,
+    "formal_integrated_mapping": "superseded; 894 mapping regeneration pending",
+    "boundary": "Eligibility is not completion. A durable, internally consistent target manifest and evidence-preserving mapping artifact do not yet exist. Splits, regroupings, candidate IDs, pending rows and rejects cannot inherit mechanically."
+  },
+  "final_resolution": {
+    "status": "working_static_identity_and_cardinality_reconciled_not_audit_completion",
+    "denominator": {"total": 894, "H": 784, "D": 108, "M": 2},
+    "materialized_manifest": "working-capability-manifest-894.json",
+    "manifest_sha256": "2307e01fbe7434da395025137cff388c20667662abc623c94bb0e9b0e346e6a9",
+    "stable_id_sha256": "3eb30b2c1098654e080e1b7087ac5670da8a6d54585482810a651572afd102be",
+    "independent_delta_from_895": {
+      "capability": "Ask about an authorised client record",
+      "canonical_id": "CLI-CLIENT-RAG",
+      "absorbed_source_families": ["CLI-CLIENT-RAG", "PLAT-RAG"],
+      "route_ids": ["ROUTE-0189", "ROUTE-2040", "ROUTE-2275", "ROUTE-2342", "ROUTE-2343"],
+      "finding": "The two controllers use the same Client aggregate, vector store, snapshot, system instruction, model and answer/source outcome. Global staff selection, nested binding and client-self entry are permission/entry variants, not distinct state or completion outcomes.",
+      "count_effect": {"total": -1, "H": -1, "D": 0, "M": 0},
+      "count_fit_used": false,
+      "evidence": "rag-capability-identity-adjudication.json"
+    },
+    "important_non_equivalence": "The final 894 cardinality does not validate the superseded 894 derivation. Respite referral remains a distinct H capability; the independent reduction is the RAG identity merge.",
+    "module_correction_from_interim": {"CLIENTS": {"H": 23, "D": 4, "M": 0}},
+    "runtime_execution": 0
+  },
+  "required_next_actions": [
+    "Regenerate the benchmark mapping against working-capability-manifest-894.json and bar mechanical inheritance for merged CLI-CLIENT-RAG.",
+    "Remap the superseded 02-05 ledgers and task scripts to all 894 stable FEATURE-IDs while preserving source/runtime proof boundaries.",
+    "Complete target-level route/page enrichment; current empty arrays are unknown evidence, not proof of no route/page.",
+    "Do not claim eight-pass or representative-role completion from the stable identity register."
+  ],
+  "runtime_claims": "none"
+}

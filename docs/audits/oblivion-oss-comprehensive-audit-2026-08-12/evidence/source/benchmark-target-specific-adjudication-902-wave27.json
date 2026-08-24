@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave27",
+  "generated_at": "2026-08-21T15:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-seventh bounded target-specific wave: eight current completion-unproved Security and Devices targets; two independently accepted direct Traccar recommendations and six conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "The eight target IDs in packet order joined by LF with no terminal LF.",
+    "selection_sha256": "97b24351bd622ae479f28afbd4092972d620a1fe4c1f5436f0130dbc52f825d8",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Protocol, command, grouping and device-linkage families do not inherit each other's credit.",
+    "reuse_rule": "Traccar repository reuse from earlier waves is disclosed. Direct credit is bounded to the cited group CRUD and device-group persistence paths, including the complete resource inheritance chain."
+  },
+  "selected_target_ids": [
+    "CAP-SEC-QUECLINK-HUB-COMMANDS",
+    "CAP-SEC-QUECLINK-HUB-CONFIGURATION",
+    "CAP-SEC-QUECLINK-HUB-FRAMES-DIAGNOSTICS",
+    "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE",
+    "CAP-SEC-DEVICE-GROUP-AUTO-RULES",
+    "CAP-SEC-DEVICE-GROUP-LIFECYCLE",
+    "CAP-SEC-DEVICE-GROUP-MEMBERSHIP",
+    "CAP-SEC-DEVICE-LINKAGE"
+  ],
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "400514562630101d5b6f20761129bb30c7b0fb2ee4b76b65544e9a268a08a948"
+    }
+  },
+  "repository_snapshots": {
+    "TRACCAR": {
+      "repo": "traccar/traccar",
+      "official_repository_url": "https://github.com/traccar/traccar",
+      "commit_sha": "110bd501f6f0d70c1cef87d8e7830beaf123243e",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE.txt",
+      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "src/main/java/org/traccar/protocol/Gl200ProtocolEncoder.java", "lines": "L29-L45", "sha256": "ac8c844dc7701c10650687a2e67ccedc7b441fc433180971e35cd52a63245077"},
+        {"path": "src/main/java/org/traccar/protocol/Gl200TextProtocolDecoder.java", "lines": "L103-L136,L167-L180,L852-L927,L1694-L1768", "sha256": "4d8b484f54c94a68378e4b6650e7dd33220a7eaf27287b905b51993859b26ee4"},
+        {"path": "src/test/java/org/traccar/protocol/Gl200TextProtocolDecoderTest.java", "lines": "pinned decoder fixture tests", "sha256": "7b35fa17fc7646afb4f9673b1307c3cc572b99f1f9a9c6aad3106b18e90140ae"},
+        {"path": "src/main/java/org/traccar/model/Command.java", "lines": "L23-L74", "sha256": "334b883c8a5255c806a5947c5b863bd91d6bd3eb87a54c886ea3484246d83654"},
+        {"path": "src/main/java/org/traccar/api/BaseObjectResource.java", "lines": "L67-L75,L79-L93,L97-L149", "sha256": "acbf00a65c69b7306081ff2cd6367be73203abe217099165cdcc6b53ea5cac63"},
+        {"path": "src/main/java/org/traccar/api/SimpleObjectResource.java", "lines": "L34-L73", "sha256": "07702e7c984d6085c58b2e5541a2888d92680fbe6e54ec3b2e39fb615b8a4262"},
+        {"path": "src/main/java/org/traccar/api/resource/GroupResource.java", "lines": "L28-L34", "sha256": "c9d264f6e4d53654356383751964db32101b137fe85e5418163533d64c0347f9"},
+        {"path": "src/main/java/org/traccar/model/Group.java", "lines": "L20-L30", "sha256": "9161b8fddd894575d71d7349bc60157289a47857c07bba4b7ac4c4a44a1f2aa2"},
+        {"path": "src/main/java/org/traccar/model/GroupedModel.java", "lines": "L19-L29", "sha256": "bdc8aa0fc57873ee6628f1d15c3efef6b2681e57153707fe411adf597f8cb0ae"},
+        {"path": "src/main/java/org/traccar/model/Device.java", "lines": "L24-L56", "sha256": "2ca27dca57df70c8f9e53207b13d9764dfb0d0f3281093ae65206f851b726efa"},
+        {"path": "src/main/java/org/traccar/api/resource/DeviceResource.java", "lines": "L57-L82,L86-L145", "sha256": "8aa590b4d4f560f5b79d8f524c4240a28b9e064c3bcb08106e5c658c4ef41b1e"},
+        {"path": "src/main/java/org/traccar/model/LinkedDevice.java", "lines": "L19-L21", "sha256": "a2bd08e4bb77c596cc136759740ca8ba602487e70f9511262504a1a5e1ee6b00"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 2, "documented_ncm_direct_recommended": 0, "retained_unproved": 6, "completion_credit_recommended": 2},
+  "evaluations": [
+    {
+      "working_key": "CAP-SEC-QUECLINK-HUB-COMMANDS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern Queclink hub commands through a durable command lifecycle with bounded authority, retry or cancellation and provenance.",
+      "research_candidate": "traccar/traccar GL200 protocol command encoder and command model at pinned loci",
+      "reason": "The encoder renders position, engine-stop, engine-resume, identification and reboot wire commands, but does not establish durable command state, cancellation, retry, custody, audit or Site policy."
+    },
+    {
+      "working_key": "CAP-SEC-QUECLINK-HUB-CONFIGURATION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Read and update authenticated Queclink hub configuration with bounded scope, provisioning state and drift handling.",
+      "research_candidate": "traccar/traccar GL200 text protocol decoder at pinned loci",
+      "reason": "Recognising device sessions and acknowledgements does not establish authenticated configuration read or update, global or section scope, provisioning or drift."
+    },
+    {
+      "working_key": "CAP-SEC-QUECLINK-HUB-FRAMES-DIAGNOSTICS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Persist and authorize raw Queclink frames and diagnostics with retention and a reviewable stream.",
+      "research_candidate": "traccar/traccar GL200 decoder and decoder fixtures at pinned loci",
+      "reason": "The decoder normalises recognised positions, diagnostics and alarms, but does not establish raw-frame persistence, authorization, retention or a diagnostics stream."
+    },
+    {
+      "working_key": "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Retain unknown Queclink device intake in a durable queue with claim, reject, custody and audit behavior.",
+      "research_candidate": "traccar/traccar GL200 unknown-device session handling at pinned loci",
+      "reason": "Returning null for an unknown device session is not a durable unclaimed intake queue or claim and rejection workflow."
+    },
+    {
+      "working_key": "CAP-SEC-DEVICE-GROUP-AUTO-RULES",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Define, preview and atomically apply explainable automatic device-group membership rules.",
+      "research_candidate": "traccar/traccar grouped model at pinned locus",
+      "reason": "Persisting a group ID does not establish rule grammar, preview, atomic synchronization or explain output."
+    },
+    {
+      "working_key": "CAP-SEC-DEVICE-GROUP-LIFECYCLE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Create, list, update and delete a persisted device group under explicit permission checks with action provenance.",
+      "research_candidate": "traccar/traccar group resource CRUD inheritance chain and group model at pinned loci",
+      "evidence_loci": "traccar/traccar@110bd501f6f0d70c1cef87d8e7830beaf123243e :: src/main/java/org/traccar/api/resource/GroupResource.java :: L28-L34; src/main/java/org/traccar/api/SimpleObjectResource.java :: L34-L73; src/main/java/org/traccar/api/BaseObjectResource.java :: L67-L75,L79-L93,L97-L149; src/main/java/org/traccar/model/Group.java :: L20-L30",
+      "reason": "The group resource exposes the groups collection through the complete simple/base resource inheritance chain; create, update and delete apply permission or edit checks and action audit while the group model persists named groups. The claim is limited to authorized audited group CRUD and excludes Oblivion Site policy, UI and runtime behavior."
+    },
+    {
+      "working_key": "CAP-SEC-DEVICE-GROUP-MEMBERSHIP",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Assign or remove a persisted device-group relationship through an authorized, audited device update.",
+      "research_candidate": "traccar/traccar device resource update, device grouped-model inheritance and groupId persistence at pinned loci",
+      "evidence_loci": "traccar/traccar@110bd501f6f0d70c1cef87d8e7830beaf123243e :: src/main/java/org/traccar/api/resource/DeviceResource.java :: L57-L82; src/main/java/org/traccar/api/BaseObjectResource.java :: L97-L135; src/main/java/org/traccar/model/Device.java :: L24-L56; src/main/java/org/traccar/model/GroupedModel.java :: L19-L29",
+      "reason": "The device resource inherits the permission-checked audited update path, Device extends GroupedModel and GroupedModel persists groupId. This supports stored device-group assignment or removal only; it does not establish a dedicated membership API, group-target validation, Site policy, UI or runtime behavior."
+    },
+    {
+      "working_key": "CAP-SEC-DEVICE-LINKAGE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Create and remove typed device or asset links with authorization, relationship validation and provenance.",
+      "research_candidate": "traccar/traccar device link query and linked-device model at pinned loci",
+      "reason": "Permission-filtered linked-device reads and an alias of stored device records do not establish typed relationship create, delete, provenance or atomic unlinking."
+    }
+  ],
+  "collision_disclosure": {
+    "target_keys": "All eight targets were completion-unproved with zero credit before Wave 27; exact target-key collision with materialized Waves 4-24 is zero.",
+    "source_paths": "Traccar is reused at repository level from Waves 4 and 9, but those waves cite PositionResource, CommandResource and report paths. The Wave 27 direct source paths have zero exact-path collision and no source-family inheritance is allowed.",
+    "prior_waves": "Materialized Waves 23 and 24 and carried Waves 25 and 26 are target-disjoint from this Security and Devices packet."
+  },
+  "count_delta": {"verified_benchmark_direct": 2, "documented_ncm_direct": 0, "eligible_total": 2, "completion_unproved": -2},
+  "post_wave_totals": {"verified_benchmark": 358, "documented_ncm": 89, "eligible": 447, "completion_unproved": 455}
+}

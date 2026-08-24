@@ -1,0 +1,175 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave5",
+  "generated_at": "2026-08-13T15:20:00+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Fifth bounded target-specific wave: 12 independently researched direct material matches, with no inherited family credit.",
+  "methodology": {
+    "credit_rule": "Only target-specific official repositories pinned to immutable commits and exact source loci proving a material same-target slice receive verified credit.",
+    "licence_rule": "Only the pinned GPL-3.0 ERPNext and AGPL-3.0 FleetOps community source is credited; hosted services and private extensions are excluded.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layout.",
+    "runtime_boundary": "No application tests, browsers, databases, queues, jobs, deployments, Git history or product state were changed for this research wave."
+  },
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "6362545bf14cfeccf6b2d0f351d063317410fa2777476375795a087322e809d0"
+    }
+  },
+  "repository_snapshots": {
+    "https://github.com/frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca": {
+      "url": "https://github.com/frappe/erpnext",
+      "commit_sha": "c6d08979d3ffab119d1523ee2bdea2c8115a8bca",
+      "licence": "GPL-3.0"
+    },
+    "https://github.com/fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2": {
+      "url": "https://github.com/fleetbase/fleetops",
+      "commit_sha": "fa37e7899b78e3cbe2f839e818561ae4c40189c2",
+      "licence": "AGPL-3.0"
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_recommended": 12,
+    "documented_ncm_recommended": 0,
+    "completion_credit_recommended": 12
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-ASSET-FIXED-ASSET-DEPRECIATION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised asset manager can calculate scheduled depreciation for eligible fixed assets at an effective date, post balanced accounting entries, link those entries to the schedule, and update the asset's book status.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"ASSETS","source_family_ids":["ASSET-FIXED-ASSET"],"route_ids":["ROUTE-0572"],"page_ids":[],"backend_anchors":["app/Domain/Finance/Http/Controllers/FixedAssetController.php"]},
+      "evidence_loci": [
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/doctype/asset/asset.py :: L137-L200",
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/doctype/asset_depreciation_schedule/deppreciation_schedule_controller.py :: L26-L90",
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/doctype/asset/depreciation.py :: L34-L102,L154-L274"
+      ],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/assets/doctype/asset/asset.py:L137-L200","erpnext/assets/doctype/asset_depreciation_schedule/deppreciation_schedule_controller.py:L26-L90","erpnext/assets/doctype/asset/depreciation.py:L34-L102,L154-L274"],"proven_slice":"Creates and regenerates asset depreciation schedules, selects eligible due rows, posts linked debit and credit journal entries, and refreshes asset status.","parity_limits":"Does not prove Oblivion calculation methods, organisation scope, permissions, retry UX, audit display or runtime results.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-ASSET-FIXED-ASSET-DISPOSAL",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised asset manager can sell or scrap an eligible fixed asset on a valid effective date, account for depreciation and disposal gain or loss, persist the disposal state and date, and support reversal or restoration.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"ASSETS","source_family_ids":["ASSET-FIXED-ASSET"],"route_ids":["ROUTE-0569"],"page_ids":["PAGE-0152"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FixedAssetController.php"]},
+      "evidence_loci": [
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/doctype/sales_invoice/services/fixed_assets.py :: L21-L67,L81-L118",
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/doctype/asset/depreciation.py :: L337-L416,L587-L638"
+      ],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/doctype/sales_invoice/services/fixed_assets.py:L21-L67,L81-L118","erpnext/assets/doctype/asset/depreciation.py:L337-L416,L587-L638"],"proven_slice":"Validates sale and scrap eligibility, depreciates to disposal date, records sold status, posts disposal journals and calculates gain or loss.","parity_limits":"Does not prove Oblivion's single disposal form, exact proceeds fields, authorisation, provenance or runtime recovery.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-ASSET-FIXED-ASSET-REGISTER",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised users can maintain and inspect fixed-asset identity, purchase, category, location, depreciation and current-book-value information in a filterable register.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"ASSETS","source_family_ids":["ASSET-FIXED-ASSET"],"route_ids":["ROUTE-0565","ROUTE-0566","ROUTE-0567","ROUTE-0568","ROUTE-0570","ROUTE-0571","ROUTE-0619"],"page_ids":["PAGE-0151","PAGE-0152"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FixedAssetController.php"]},
+      "evidence_loci": [
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/doctype/asset/asset.py :: L38-L200",
+        "frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/assets/report/fixed_asset_register/fixed_asset_register.py :: L18-L106"
+      ],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/assets/doctype/asset/asset.py:L38-L200","erpnext/assets/report/fixed_asset_register/fixed_asset_register.py:L18-L106"],"proven_slice":"Persists fixed-asset identity, purchase, location, ownership, depreciation and status fields and produces a filtered register with cost and current value.","parity_limits":"Does not prove Oblivion linked operational data, NZ account choices, authorisation, site scope or runtime acceptance.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-AGED-PAYABLES",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can produce aged payables from supplier invoices and ledger activity with invoiced, paid, debit-note and outstanding amounts in configurable ageing buckets.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0682"],"page_ids":["PAGE-0191"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/accounts_payable/accounts_payable.py :: L4-L12","frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/accounts_receivable/accounts_receivable.py :: L117-L165,L318-L354,L740-L772"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/accounts_payable/accounts_payable.py:L4-L12","erpnext/accounts/report/accounts_receivable/accounts_receivable.py:L117-L165,L318-L354,L740-L772"],"proven_slice":"Runs a payable-mode outstanding-invoice engine and allocates supplier balances into configurable ageing ranges.","parity_limits":"Does not prove Oblivion report layout, default buckets, scope, ledger equivalence, exports, permissions or runtime correctness.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-AGED-RECEIVABLES",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can produce aged receivables from customer invoices and ledger activity with invoiced, paid, credit-note and outstanding amounts in configurable ageing buckets.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0683"],"page_ids":["PAGE-0192"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/accounts_receivable/accounts_receivable.py :: L22-L61,L117-L165,L318-L354,L740-L772"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/accounts_receivable/accounts_receivable.py:L22-L61,L117-L165,L318-L354,L740-L772"],"proven_slice":"Builds customer voucher balances, calculates outstanding after payments and credits and assigns configurable age ranges.","parity_limits":"Does not prove Oblivion client model, layout, scope, permissions, exports or runtime correctness.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-BALANCE-SHEET",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can generate a period-based balance sheet presenting assets, liabilities, equity, opening anomalies, totals and summary output.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0684"],"page_ids":["PAGE-0193"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/balance_sheet/balance_sheet.py :: L29-L235"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/balance_sheet/balance_sheet.py:L29-L235"],"proven_slice":"Builds asset, liability and equity period data, provisional profit or loss, opening-balance anomalies and summary output.","parity_limits":"Does not prove Oblivion account mapping, defaults, permissions, NZ interpretation or runtime totals.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-CASH-FLOW",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can generate a period cash-flow statement separating operating, investing and financing movement with net cash and summary output.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0687"],"page_ids":["PAGE-0195"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/cash_flow/cash_flow.py :: L35-L224"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/cash_flow/cash_flow.py:L35-L224"],"proven_slice":"Derives net result and groups cash effects into operating, investing and financing sections with summary data.","parity_limits":"Does not prove Oblivion method choices, ledger mappings, permissions, presentation or runtime totals.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-PROFIT-LOSS",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can generate a profit-and-loss statement for selected periods with income, expenses, net result, totals and summary output.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0681","ROUTE-0689"],"page_ids":["PAGE-0197"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/profit_and_loss_statement/profit_and_loss_statement.py :: L29-L93"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/profit_and_loss_statement/profit_and_loss_statement.py:L29-L93"],"proven_slice":"Loads income and expense data, calculates net profit or loss and returns tabular, chart and summary views.","parity_limits":"Does not prove Oblivion classification, date defaults, permissions, display or runtime totals.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-TRIAL-BALANCE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised finance user can generate a trial balance for a valid fiscal date range with opening, period and closing debit and credit values by account and balanced totals.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-FINANCIAL-REPORT"],"route_ids":["ROUTE-0690"],"page_ids":["PAGE-0198"],"backend_anchors":["app/Domain/Finance/Http/Controllers/FinancialReportController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/accounts/report/trial_balance/trial_balance.py :: L21-L68,L327-L430"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/accounts/report/trial_balance/trial_balance.py:L21-L68,L327-L430"],"proven_slice":"Validates fiscal/date filters, calculates opening, transaction and closing debit/credit values, parent totals and a total row.","parity_limits":"Does not prove Oblivion currency, hierarchy, scope, permissions, UI or runtime balancing.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FIN-PURCHASE-ORDER-BILL-CONVERSION",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised accounts-payable user can convert a submitted purchase order into a draft supplier bill, retaining supplier and source-order links and only remaining billable lines.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FINANCE","source_family_ids":["FIN-PURCHASE-ORDER"],"route_ids":["ROUTE-0658"],"page_ids":["PAGE-0184"],"backend_anchors":["app/Domain/Finance/Http/Controllers/PurchaseOrderController.php"]},
+      "evidence_loci": ["frappe/erpnext@c6d08979d3ffab119d1523ee2bdea2c8115a8bca :: erpnext/buying/doctype/purchase_order/mapper.py :: L96-L196"],
+      "benchmark": {"official_repository_url":"https://github.com/frappe/erpnext","commit_sha":"c6d08979d3ffab119d1523ee2bdea2c8115a8bca","source_loci":["erpnext/buying/doctype/purchase_order/mapper.py:L96-L196"],"proven_slice":"Validates a submitted purchase order, maps it to a supplier invoice, preserves source-line references and excludes fully billed rows.","parity_limits":"Does not prove Oblivion status, GST, funding/cost-centre copying, route permission or idempotency.","licence":{"spdx":"GPL-3.0","edition_boundary":"Pinned community source only; hosted and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FLEET-DEVICE-REGISTRY-PAIRING",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised fleet user can maintain tracking-device records, attach a selected device to a vehicle, detach it again, and receive explicit failure outcomes.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FLEET","source_family_ids":["FLEET-DEVICE"],"route_ids":["ROUTE-0724","ROUTE-0725","ROUTE-0728","ROUTE-0730"],"page_ids":["PAGE-0217"],"backend_anchors":["app/Http/Controllers/FleetAssets/DeviceController.php"]},
+      "evidence_loci": ["fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2 :: server/src/Http/Controllers/Api/v1/DeviceController.php :: L23-L212","fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2 :: server/src/Models/VehicleDevice.php :: L10-L46,L77-L115"],
+      "benchmark": {"official_repository_url":"https://github.com/fleetbase/fleetops","commit_sha":"fa37e7899b78e3cbe2f839e818561ae4c40189c2","source_loci":["server/src/Http/Controllers/Api/v1/DeviceController.php:L23-L212","server/src/Models/VehicleDevice.php:L10-L46,L77-L115"],"proven_slice":"Implements device CRUD and vehicle attach/detach with explicit not-found and failure handling and persistent vehicle-device identity.","parity_limits":"Does not prove Oblivion one-active-link, custody/consent, audit, canonical registry, permissions or runtime UI.","licence":{"spdx":"AGPL-3.0","edition_boundary":"Pinned community source only; hosted services and private extensions excluded."}}
+    },
+    {
+      "working_key": "CAP-FLEET-TRIP-PLAYBACK",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised fleet user can retrieve ordered historical positions for a vehicle and bounded period, display the route, and replay it with progress and navigation controls.",
+      "current_source_lineage": {"id_status":"exact","class":"H","canonical_module":"FLEET","source_family_ids":["FLEET-FLEET-TRIP"],"route_ids":["ROUTE-0832","ROUTE-0833","ROUTE-0847","ROUTE-0850"],"page_ids":["PAGE-0259"],"backend_anchors":["app/Http/Controllers/Fleet/FleetTripController.php","resources/js/pages/fleet-assets/trips/playback.tsx"]},
+      "evidence_loci": ["fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2 :: addon/components/positions-replay.js :: L20-L40,L77-L166,L201-L370","fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2 :: addon/components/positions-replay.hbs :: L55-L76,L120-L167","fleetbase/fleetops@fa37e7899b78e3cbe2f839e818561ae4c40189c2 :: addon/services/position-playback.js :: L18-L30,L44-L103,L106-L168,L171-L231,L257-L300"],
+      "benchmark": {"official_repository_url":"https://github.com/fleetbase/fleetops","commit_sha":"fa37e7899b78e3cbe2f839e818561ae4c40189c2","source_loci":["addon/components/positions-replay.js:L20-L40,L77-L166,L201-L370","addon/components/positions-replay.hbs:L55-L76,L120-L167","addon/services/position-playback.js:L18-L30,L44-L103,L106-L168,L171-L231,L257-L300"],"proven_slice":"Queries ordered historical positions, draws a map trail, calculates route metrics and supplies play, pause, stop, step, speed, jump and progress behavior.","parity_limits":"Does not prove Oblivion trip bounds, consent exclusion, point cap, authorisation, audit event or current UI.","licence":{"spdx":"AGPL-3.0","edition_boundary":"Pinned community source only; hosted services and private extensions excluded."}}
+    }
+  ],
+  "integrity": {
+    "selected_targets_were_unproved_at_recheck": true,
+    "selected_targets_absent_from_waves_1_to_4": true,
+    "all_current_ids_exact": true,
+    "all_have_current_route_lineage": true,
+    "all_have_current_backend_lineage": true,
+    "all_upstream_repositories_official": true,
+    "all_upstream_refs_immutable_commits": true,
+    "weak_analogies_rejected": true,
+    "paid_only_evidence_used": false,
+    "files_modified_by_research_agent": false
+  }
+}

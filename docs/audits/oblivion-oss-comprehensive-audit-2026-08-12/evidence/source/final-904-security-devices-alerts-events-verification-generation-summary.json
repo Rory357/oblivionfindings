@@ -1,0 +1,105 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-security-devices-alerts-events-verification-generation-summary",
+  "generated_at": "2026-08-22T01:25:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "current_main_static_cross_check": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "status": "existing_p0_verification_failure_recorded_no_new_finding_zero_runtime_credit",
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+      "bytes": 683490
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
+      "bytes": 674511
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "e193306f8b748485ae0e4d7e1cb9d5da9f8c6f652b8ea9911b9a87b9d954b5d8",
+      "bytes": 11785664
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "715faa7c011101aa1389697004aa647e5084450c257fdb9299018c37e4af6c2b",
+      "bytes": 1389121
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "941c556f4506673ab06b4673194289855e33830ad4276b57e0e59f20a4b324ca",
+      "bytes": 259474
+    },
+    "visual": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "707885a83264c8e2ab3f92898578a2b20ba3e8a2ccdb3ece17156d8c0774c293",
+      "bytes": 8377597
+    },
+    "pointer": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "d30661d99ae5919347d9dc2b65a97e89eaa49fee2f621d1965b084de4a0307ba",
+      "bytes": 20433
+    }
+  },
+  "outputs": {
+    "findings": {
+      "path": "findings.json",
+      "sha256": "b5b2db96be0aced376178fe778076b231c25e5ecb12b9c084e422bf61afdfe7c",
+      "bytes": 1392400
+    },
+    "reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "33ad4da6375f67339c5c37a858bba91ba1903ef28d6dbf70f28e9252878b6b13",
+      "bytes": 261302
+    },
+    "visual": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "0345bf86094320e154e76c01153c2242b097fcdeeab3d4661033fa2ae4bb94ef",
+      "bytes": 8377606
+    },
+    "pass8": {
+      "path": "evidence/source/pass8-security-devices-904-2026-08-21.json",
+      "sha256": "97732c04a5a4c02d1b35c1e5bca0718128fdb38c614d3baa4b2a367a186163b8",
+      "bytes": 4622
+    }
+  },
+  "counts": {
+    "findings": {
+      "total": 100,
+      "P0": 21,
+      "P1": 67,
+      "P2": 12
+    },
+    "remediation": {
+      "open": 51,
+      "in_progress": 17,
+      "fixed_pending_verification": 30,
+      "verified": 2
+    },
+    "links": {
+      "total": 282,
+      "literal": 183,
+      "literal_targets": 150
+    },
+    "benchmark": {
+      "eligible": 500,
+      "unproved": 404
+    }
+  },
+  "downstream_refresh": {
+    "required_order": [
+      "generators/refresh-current-904-summaries.py",
+      "generators/refresh-audit-dashboard-data.py",
+      "generators/finalize-current-904-validation.py"
+    ]
+  },
+  "credit_boundary": {
+    "runtime": 0,
+    "browser": 0,
+    "benchmark": 0,
+    "remediation_completion": 0,
+    "overall_completion": 0
+  },
+  "idempotence": "A successful immediate second run before downstream regeneration validates all direct outputs and pointer records without writing. Later downstream summary refresh intentionally rewrites findings and supersedes this direct-output equality; partial failure is stop-only."
+}

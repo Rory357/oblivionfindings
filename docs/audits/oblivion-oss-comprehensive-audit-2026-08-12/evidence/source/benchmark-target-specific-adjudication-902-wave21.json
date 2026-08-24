@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave21",
+  "generated_at": "2026-08-21T13:50:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-first bounded target-specific wave: eight current completion-unproved eMAR targets; three direct OpenEMR inventory recommendations and five conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "39db9d65319aaf060646a7dc036ba3c2ce8c8744b09517a14b3cee2409c2f380",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Generic inventory primitives do not inherit controlled-drug, pharmacy-order or self-administration credit.",
+    "reuse_rule": "Every cited source path has zero prior evidence-source path hits. Reuse within retained rows is explanatory only and no repository- or family-level inference is allowed."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "92c721f8f5d1ee0636a28c6b0eb406dc80863906792630338a5e866ab88134d8"
+    }
+  },
+  "repository_snapshots": {
+    "OPENEMR": {
+      "repo": "openemr/openemr",
+      "official_repository_url": "https://github.com/openemr/openemr",
+      "commit_sha": "312b5d042f7fa49cc78ebed041155fba339a991c",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {"path": "src/Services/DrugSalesService.php", "lines": "L207-L263,L271-L380,L401-L465", "sha256": "c74e379a362777a40d8e2a3e767b8ef111df18f46c8cf1609ecb46fbd9216ec9"},
+        {"path": "interface/drugs/drug_inventory.php", "lines": "L19-L31,L93-L103,L161-L176,L409-L426", "sha256": "6274e2f466498e32988224ba283702f17ed6e6e11f4959cf21934df41365a23a"},
+        {"path": "interface/drugs/destroy_lot.php", "lines": "L29-L31,L78-L101", "sha256": "8c25ef448cab5fbf774bbb408fec7a5ebf9a3b5b233427503412e60e348e9dc3"},
+        {"path": "interface/reports/destroyed_drugs_report.php", "lines": "L32-L102,L205-L214", "sha256": "27cd984829f63314562639a34313b86e6a7aea8a061ca3bc09eaa22eeaa45502"},
+        {"path": "interface/reports/inventory_transactions.php", "lines": "L143-L161,L273-L276,L377-L412", "sha256": "39d0a18b91cbdf40917769ad65973ea09230c91e006aaed1aa270029927ff9be"},
+        {"path": "interface/drugs/dispense_drug.php", "lines": "L55-L87", "sha256": "b5160876dd0a5e77f380de78909611051be67b0e304a20d0d84b9d0986fbbcc5"},
+        {"path": "src/Services/MedicationPatientIssueService.php", "lines": "L17-L90", "sha256": "0aa9721ba69f1ed86b6d0289fea38496cbfba356ec58af942af5ab842744cd07"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 3, "documented_ncm_direct_recommended": 0, "retained_unproved": 5, "completion_credit_recommended": 3},
+  "evaluations": [
+    {
+      "working_key": "CAP-MED-STOCK-CONTROL",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Control medication inventory by location and lot with authorised receipt, transfer, adjustment and consumption actions plus bounded on-hand checks.",
+      "research_candidate": "openemr/openemr inventory service and drug-inventory surface at pinned loci",
+      "evidence_loci": "openemr/openemr@312b5d042f7fa49cc78ebed041155fba339a991c :: src/Services/DrugSalesService.php :: L207-L263,L271-L380,L401-L465; interface/drugs/drug_inventory.php :: L19-L31,L93-L103,L161-L176,L409-L426",
+      "reason": "Authorised inventory roles view active lots and on-hand quantities by warehouse/facility and perform purchase, transfer, adjustment and consumption actions. Dispense validates a patient-bound encounter, excludes destroyed, empty and expired lots, rejects insufficient stock and persists lot/sale provenance. This does not infer controlled-drug, Site-policy, concurrency or runtime parity."
+    },
+    {
+      "working_key": "CAP-MED-DESTRUCTION-REGISTER",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record authorised medicine-lot destruction with date, method, witness and notes and expose a bounded destruction register.",
+      "research_candidate": "openemr/openemr lot-destruction command and destroyed-drugs report at pinned loci",
+      "evidence_loci": "openemr/openemr@312b5d042f7fa49cc78ebed041155fba339a991c :: interface/drugs/destroy_lot.php :: L29-L31,L78-L101; interface/reports/destroyed_drugs_report.php :: L32-L102,L205-L214",
+      "reason": "Drug-admin authority plus CSRF gates a lot-destruction update retaining destruction date, method, witness and notes; a date-bounded register queries and displays destroyed lots and those provenance fields. This does not infer controlled-drug rules, independent witness authority, immutable audit or runtime parity."
+    },
+    {
+      "working_key": "CAP-MED-OPERATIONAL-REPORT",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Provide an authorised medication inventory-operations report with transaction categories, provenance filters and export.",
+      "research_candidate": "openemr/openemr inventory-transactions report at pinned locus",
+      "evidence_loci": "openemr/openemr@312b5d042f7fa49cc78ebed041155fba339a991c :: interface/reports/inventory_transactions.php :: L143-L161,L273-L276,L377-L412",
+      "reason": "Report authority gates date-bounded inventory operations, filters sale, distribution, transfer and adjustment categories, joins transaction, product, lot, warehouse, patient, encounter and distributor provenance, and provides CSV export. This is an inventory-operations report only, not MAR-round or application-runtime proof."
+    },
+    {
+      "working_key": "CAP-MED-PHARMACY-ORDER-LIFECYCLE",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Govern pharmacy-order authoring and state progression through supplier handoff, acknowledgement, dispense, delivery and failure recovery.",
+      "research_candidate": "openemr/openemr dispense and inventory sources at pinned loci",
+      "reason": "An ACL-gated dispense can link a supplied prescription to inventory and sale handling, but it does not establish pharmacy-order authoring, supplier acknowledgement, delivery state, failure/retry or a complete order lifecycle."
+    },
+    {
+      "working_key": "CAP-MED-CD-REGISTER-BALANCE",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Maintain a legally attributable controlled-drug running balance with signed custody provenance.",
+      "research_candidate": "openemr/openemr generic lot and on-hand sources at pinned loci",
+      "reason": "Generic lots, on-hand quantities and insufficiency checks do not establish controlled-substance classification, a legal register, signed running balance or custody/witness provenance."
+    },
+    {
+      "working_key": "CAP-MED-CD-DISCREPANCY-CLOSURE",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Investigate and close controlled-drug discrepancies with detected and explained quantities, accountable review and reopen provenance.",
+      "research_candidate": "openemr/openemr generic inventory adjustment and reporting sources at pinned loci",
+      "reason": "Generic inventory adjustments and transaction reporting do not create a discrepancy case, assigned investigation, reviewed explanation, closure or reopen lifecycle."
+    },
+    {
+      "working_key": "CAP-MED-CD-LOSS-REPORTING",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Record, classify and escalate a controlled-drug loss through immutable reporting and final decision provenance.",
+      "research_candidate": "openemr/openemr generic possible-destruction notification at pinned loci",
+      "reason": "Detection of expired or small lots and a generic possible-destruction email do not establish controlled-drug loss classification, authority, escalation, immutable report or final decision."
+    },
+    {
+      "working_key": "CAP-MED-SELF-ADMIN-ASSESSMENT",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Assess and govern self-administration competency, risks, authorisation, review, expiry and revocation with eMAR enforcement.",
+      "research_candidate": "openemr/openemr patient medication-issue service at pinned locus",
+      "reason": "Generic patient medication-issue create/update can retain request intent, usage category and adherence source, but does not establish self-administration assessment, competency/risk evidence, authorisation, review, expiry, revocation or eMAR enforcement."
+    }
+  ],
+  "count_delta": {"verified_benchmark_direct": 3, "documented_ncm_direct": 0, "eligible_total": 3, "completion_unproved": -3},
+  "post_wave_totals": {"verified_benchmark": 348, "documented_ncm": 89, "eligible": 437, "completion_unproved": 465}
+}

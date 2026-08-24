@@ -1,0 +1,447 @@
+{
+  "schema_version": "1.0",
+  "artifact": "visual-final-id-ownership-904-wave1",
+  "generated_at": "2026-08-21T17:40:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_final_id_lineage_only_runtime_unchanged",
+  "audit_boundary": "Audit visual-to-final-ID lineage only. No source, runtime, browser observation, screenshot, classification, data, test, usability or completion credit changed.",
+  "inputs": {
+    "base_visual_matrix": {
+      "path": "05-browser-visual-coverage-matrix.csv",
+      "sha256": "f0aed8a6cbc242651ef7cd702685f8c948af276b3830d4d5960ea6ece1e9f363"
+    },
+    "manifest_904": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f"
+    },
+    "inventory_904": {
+      "path": "inventory-904.json",
+      "sha256": "40cb6916140b5e88fa2049b1185285d9497e2011064cd04cdc53eafd48223035"
+    },
+    "route_page_904": {
+      "path": "evidence/source/route-page-gap-reconciliation-904.json",
+      "sha256": "1a237628080d225cd32cdfa173ea01737b6c9c32e51bbca183a8ec84a0b8d7be"
+    }
+  },
+  "reviews": {
+    "existing_25_row_packet": {
+      "verdict": "GO",
+      "selected_ids_sha256": "976d40691e3157dc9b0b1985bbe48f8c8e275dca5fa4f2aa33fe53ec4d59ebd7",
+      "promoted_ids_sha256": "75090f8c641e07c5ee0f4da951e14ea8500ecfe3dbf9cb36cfa717c269560516",
+      "assignment_sha256": "ea63e35f9cc05d6e359949b219291754290f21094fd36a1bdf7333410a099d78",
+      "proof_map_sha256": "c60642dbc3e535aa062ab87646dfb8af54559f0a7acadae46cb7bcc3d3780544",
+      "retained_ids_sha256": "3bc77d5a2599cb413a65ecde395c2b0eb8eadda2716201942986ee94617c9222",
+      "rejection_map_sha256": "41bfd6abbe3b0d393ab2f3dd891f3d88fce1f21e9646f233ce6b79b589f4c1ef"
+    },
+    "medical_904_packet": {
+      "selected_ids_sha256": "e3faa527694426d753717f21455fd75275a0308404a62372f709d717f006b812",
+      "promoted_ids_sha256": "edf3f6be3582e005c2b4b6d7366ec32b13ddaae9c462822767a29445b95db715",
+      "assignment_sha256": "8a5ca513c92ddfee38b8e8c0316b4e1c6a55e2c13d4e4f6a48f83d8121683fba",
+      "retained_ids_sha256": "3cf487eabc37428ed06032066f384e0d9ae0ca62611663056e07a0670c523619",
+      "verdict": "GO_independent_replay_exact_single_owner_route_sets"
+    }
+  },
+  "promotions": [
+    {
+      "visual_id": "VIS-001929",
+      "target": "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API",
+      "status": "safe_route_exact_route_owner_page_anchor_rejected",
+      "route_ids": [
+        "ROUTE-0381"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-MED-SHIFT-MEDICATION-SNAPSHOT-API"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Observed",
+      "pattern_type": "safe-route-template"
+    },
+    {
+      "visual_id": "VIS-002295",
+      "target": "CAP-OPS-TIMESHEET-MANAGER-REVIEW",
+      "status": "safe_route_exact_route_owner_page_anchor_rejected",
+      "route_ids": [
+        "ROUTE-2234"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-OPS-TIMESHEET-MANAGER-REVIEW"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Observed",
+      "pattern_type": "safe-route-template"
+    },
+    {
+      "visual_id": "VIS-014306",
+      "target": "CAP-INC-INCIDENT-AUTHOR",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-1838",
+        "ROUTE-1840",
+        "ROUTE-1854"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-INC-INCIDENT-AUTHOR",
+          "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+          "CAP-INC-INCIDENT-FOLLOWUP",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+        ],
+        [
+          "CAP-INC-INCIDENT-AUTHOR",
+          "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+          "CAP-INC-INCIDENT-FOLLOWUP",
+          "CAP-INC-INCIDENT-REVIEW-CLOSURE"
+        ],
+        [
+          "CAP-INC-INCIDENT-AUTHOR"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-014384",
+      "target": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "status": "material_state_named_route_set_exact_ownership",
+      "route_ids": [
+        "ROUTE-0169",
+        "ROUTE-2013"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ],
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-016171",
+      "target": "CAP-HR-BENEFITS-PLAN-ADMINISTRATION",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-1322",
+        "ROUTE-1325"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-HR-BENEFITS-ENROLLMENT",
+          "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+        ],
+        [
+          "CAP-HR-BENEFITS-PLAN-ADMINISTRATION"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-016365",
+      "target": "CAP-HR-IMPORT-EXPORT-TEMPLATE",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-1482",
+        "ROUTE-1485"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT",
+          "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT",
+          "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+        ],
+        [
+          "CAP-HR-IMPORT-EXPORT-TEMPLATE"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-017850",
+      "target": "CAP-SITE-SITE-VENDOR-LIFECYCLE",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2891",
+        "ROUTE-2892"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-018652",
+      "target": "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2504",
+        "ROUTE-2505",
+        "ROUTE-2509",
+        "ROUTE-2514",
+        "ROUTE-2520",
+        "ROUTE-2522",
+        "ROUTE-2523"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-INC-SAFEGUARDING-ACTION-PLAN",
+          "CAP-INC-SAFEGUARDING-EVIDENCE-DOWNLOAD",
+          "CAP-INC-SAFEGUARDING-EVIDENCE-MANAGEMENT",
+          "CAP-INC-SAFEGUARDING-EXTERNAL-REPORT",
+          "CAP-INC-SAFEGUARDING-INVESTIGATION",
+          "CAP-INC-SAFEGUARDING-RISK-ASSESSMENT",
+          "CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ],
+        [
+          "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-018685",
+      "target": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "status": "material_state_named_route_set_exact_ownership",
+      "route_ids": [
+        "ROUTE-0168",
+        "ROUTE-2012"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ],
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-018689",
+      "target": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "status": "material_state_named_route_set_exact_ownership",
+      "route_ids": [
+        "ROUTE-0169",
+        "ROUTE-2013"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ],
+        [
+          "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_no_manifest_lineage",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-020352",
+      "target": "CAP-OPS-ROSTERING-PLANNING",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2143",
+        "ROUTE-2144",
+        "ROUTE-2145"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-OPS-ROSTERING-PLANNING"
+        ],
+        [
+          "CAP-OPS-ROSTERING-PLANNING",
+          "CAP-OPS-SHIFT-PLANNING-PUBLISH"
+        ],
+        [
+          "CAP-OPS-ROSTERING-PLANNING",
+          "CAP-OPS-SHIFT-PLANNING-PUBLISH"
+        ]
+      ],
+      "prior_status": "unresolved_split_source_family",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-020878",
+      "target": "CAP-SET-ROLE-ASSIGNMENTS",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616",
+        "ROUTE-2628"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS",
+          "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+        ],
+        [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-020880",
+      "target": "CAP-SET-ROLE-ASSIGNMENTS",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2615",
+        "ROUTE-2616",
+        "ROUTE-2629"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS",
+          "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+        ],
+        [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-021129",
+      "target": "CAP-SITE-SITE-VENDOR-LIFECYCLE",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2889",
+        "ROUTE-2890",
+        "ROUTE-2891",
+        "ROUTE-2892"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    },
+    {
+      "visual_id": "VIS-021131",
+      "target": "CAP-SITE-SITE-VENDOR-LIFECYCLE",
+      "status": "material_state_all_routes_exact_intersection",
+      "route_ids": [
+        "ROUTE-2888",
+        "ROUTE-2889",
+        "ROUTE-2890",
+        "ROUTE-2891",
+        "ROUTE-2892"
+      ],
+      "route_owner_sets": [
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ],
+        [
+          "CAP-SITE-SITE-VENDOR-LIFECYCLE"
+        ]
+      ],
+      "prior_status": "unresolved_split_family_page_ambiguous",
+      "classification": "Not safely reproducible",
+      "pattern_type": "material-state-applicability"
+    }
+  ],
+  "retained_unresolved": {
+    "existing_packet": [
+      "VIS-020351",
+      "VIS-016731",
+      "VIS-020354",
+      "VIS-017469",
+      "VIS-020877",
+      "VIS-017476",
+      "VIS-020883",
+      "VIS-017492",
+      "VIS-015792",
+      "VIS-019707",
+      "VIS-017025",
+      "VIS-020565",
+      "VIS-002153"
+    ],
+    "medical_two_owner": [
+      "VIS-014386",
+      "VIS-018686"
+    ],
+    "medical_three_owner": [
+      "VIS-018687",
+      "VIS-018688"
+    ],
+    "reason": "Retained rows have no unique all-route owner and require decomposition; no source-family/page inheritance is allowed."
+  },
+  "claim_limit": "Final-ID lineage only; all classification/runtime/browser/screenshot fields are preserved byte-for-field."
+}

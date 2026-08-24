@@ -1,0 +1,81 @@
+# CAP-SEC-QUECLINK-HUB-CONFIGURATION-SAFETY: Queclink configuration and resident safety profiles
+
+- Projection status: **Provisional route-derived capability; accepted denominator blocked**
+- Actor/job owner: Actor satisfying exact route middleware `auth`, `permission:securityDevices.viewAny`, `permission:securityDevices.integrations.manage`
+- Owning module: Security and devices
+- Legacy family: `SEC-QUECLINK-HUB`
+- Audited source: `081ef198f9f992f224e8c0c9fba33df33dde40be`
+- Validation: **Blocked—static source-specific script; not runtime-executed or independently semantically validated**
+- Benchmark: Pass 3 pending separate capability-level adjudication
+
+## Start condition and entry
+
+Start at `security-devices/integrations/queclink/provisioning` (`security-devices.integrations.queclink.provisioning`). Route existence is exact; visibility and access are unexecuted.
+
+## Goal and completion state
+
+Complete only the exact routed mutation(s) and verify only source-defined persistence/response evidence.
+
+## Prerequisites
+
+- Actor satisfying exact route middleware `auth`, `permission:securityDevices.viewAny`, `permission:securityDevices.integrations.manage`.
+- Exact middleware atoms: `web`, `auth`, `permission:securityDevices.viewAny`, `permission:securityDevices.integrations.manage`.
+- Required route-bound objects/relationships must exist; site, ownership, privacy, parent binding and direct-object denial are unexecuted unless explicitly shown in the method evidence below.
+- A resettable synthetic prerequisite record is required; this read-only audit mutated nothing.
+
+## Ordered task and decisions
+
+1. Enter through `GET|HEAD security-devices/integrations/queclink/provisioning` (`security-devices.integrations.queclink.provisioning`); the route is exact, but menu visibility and runtime access were not executed.
+2. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/{section}` (`security-devices.integrations.queclink.configuration.section`, action `updateSectionConfiguration`). Source category: **updated/revised**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:610-616`; FormRequest `app/Http/Requests/Queclink/UpdateSectionRequest.php:16`; `command`, `auto_unlock_pin`, `pin`, `mode`, `reboot_interval`, `reboot_time`, `report_before_reboot`, `unit`, `send_failure_timeout`, `sign`, `hour_offset`, `minute_offset`, `daylight_saving`, `utc_time`, `sensor_enable`, `non_movement_duration`, `movement_duration`, `movement_threshold`, `rest_send_interval`, `report_mode`, `safe_check`, `location_ignore`, `mask`, `slot`, `longitude`, `latitude`, `radius`, `bluetooth_name`, `discoverable_mode`, `discoverable_time`, `advertising_interval`, `advertising_data_type`, `enable`, `beacon_id_model`, `append_mask`, `scan_interval`, `beacon_accessory_model`, `mac_list`, `send_interval`, `lost_times`, `alarm_scan_interval`, `start_index`, `end_index`, `entries`, `phone_numbers`, `number_filter`, `phone_number_start`, `phone_number_end`, `max_download_retry`, `download_timeout_minutes`, `download_protocol`, `report_enable`, `update_interval_hours`, `download_url`, `extended_status_report`, `identifier_number`, `configuration_name`, `configuration_version`, `digital_signature`.
+3. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/{section}/read` (`security-devices.integrations.queclink.configuration.section.read`, action `readConfigurationSection`). Source category: **mutation outcome source gap (readConfigurationSection)**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:393-411`; no exact validation fields extracted.
+4. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/global` (`security-devices.integrations.queclink.configuration.global`, action `updateGlobalConfiguration`). Source category: **updated/revised**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:446-478`; `device_name`.
+5. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/read` (`security-devices.integrations.queclink.configuration.read`, action `readConfiguration`). Source category: **mutation outcome source gap (readConfiguration)**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:370-391`; `section`.
+6. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/resident-safety-profile` (`security-devices.integrations.queclink.configuration.resident-safety-profile`, action `applyResidentSafetyProfile`). Source category: **mutation outcome source gap (applyResidentSafetyProfile)**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:480-491`; no exact validation fields extracted.
+7. Invoke only the owning control for `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/server` (`security-devices.integrations.queclink.configuration.server`, action `updateServerConfiguration`). Source category: **updated/revised**; controller `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:413-444`; `report_mode`.
+
+## Source-applicable states and transitions
+
+- **updated/revised** is applicable only to `updateSectionConfiguration` / `ROUTE-2574` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:610`; it is not runtime-observed.
+- **mutation outcome source gap (readConfigurationSection)** is applicable only to `readConfigurationSection` / `ROUTE-2575` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:393`; it is not runtime-observed.
+- **updated/revised** is applicable only to `updateGlobalConfiguration` / `ROUTE-2576` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:446`; it is not runtime-observed.
+- **mutation outcome source gap (readConfiguration)** is applicable only to `readConfiguration` / `ROUTE-2577` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:370`; it is not runtime-observed.
+- **mutation outcome source gap (applyResidentSafetyProfile)** is applicable only to `applyResidentSafetyProfile` / `ROUTE-2578` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:480`; it is not runtime-observed.
+- **updated/revised** is applicable only to `updateServerConfiguration` / `ROUTE-2579` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:413`; it is not runtime-observed.
+- **information presented** is applicable only to `provisioningString` / `ROUTE-2588` at `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:911`; it is not runtime-observed.
+- No mapped render/action page exists; presentation states are not applicable from current evidence.
+
+## Validation and source-visible errors
+
+- `ROUTE-2574` / `updateSectionConfiguration`: FormRequest `app/Http/Requests/Queclink/UpdateSectionRequest.php:16`; fields `command`, `auto_unlock_pin`, `pin`, `mode`, `reboot_interval`, `reboot_time`, `report_before_reboot`, `unit`, `send_failure_timeout`, `sign`, `hour_offset`, `minute_offset`, `daylight_saving`, `utc_time`, `sensor_enable`, `non_movement_duration`, `movement_duration`, `movement_threshold`, `rest_send_interval`, `report_mode`, `safe_check`, `location_ignore`, `mask`, `slot`, `longitude`, `latitude`, `radius`, `bluetooth_name`, `discoverable_mode`, `discoverable_time`, `advertising_interval`, `advertising_data_type`, `enable`, `beacon_id_model`, `append_mask`, `scan_interval`, `beacon_accessory_model`, `mac_list`, `send_interval`, `lost_times`, `alarm_scan_interval`, `start_index`, `end_index`, `entries`, `phone_numbers`, `number_filter`, `phone_number_start`, `phone_number_end`, `max_download_retry`, `download_timeout_minutes`, `download_protocol`, `report_enable`, `update_interval_hours`, `download_url`, `extended_status_report`, `identifier_number`, `configuration_name`, `configuration_version`, `digital_signature`.
+- `ROUTE-2575` / `readConfigurationSection`: success app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:410 `return back()->with('success', "{$code} configuration read queued.");`; failure app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:404 `return back()->withErrors(['section' => $e->getMessage()]);`.
+- `ROUTE-2576` / `updateGlobalConfiguration`: fields `device_name`; success app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:477 `return back()->with('success', 'Global tracking settings update queued.');`.
+- `ROUTE-2577` / `readConfiguration`: fields `section`; success app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:390 `return back()->with('success', 'Configuration read queued — it will be sent on the device\'s next frame.');`; failure app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:385 `return back()->withErrors(['section' => $e->getMessage()]);`.
+- `ROUTE-2578` / `applyResidentSafetyProfile`: success app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:490 `return back()->with('success', 'Resident safety profile queued.');`.
+- `ROUTE-2579` / `updateServerConfiguration`: fields `report_mode`; success app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:443 `return back()->with('success', 'Server registration update queued.');`.
+
+## Failure and recovery paths
+
+- `readConfigurationSection`: app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:404 `return back()->withErrors(['section' => $e->getMessage()]);`.
+- `readConfiguration`: app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:385 `return back()->withErrors(['section' => $e->getMessage()]);`.
+
+## Completion evidence and next handoff
+
+- Completion evidence is limited to exact extracted source signals: no persistence call extracted; responses app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:615 `return $this->queueSectionConfiguration($request, $queclinkDevice, $builder, $section, $request->validated());`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:404 `return back()->withErrors(['section' => $e->getMessage()]);`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:410 `return back()->with('success', "{$code} configuration read queued.");`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:477 `return back()->with('success', 'Global tracking settings update queued.');`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:385 `return back()->withErrors(['section' => $e->getMessage()]);`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:390 `return back()->with('success', 'Configuration read queued — it will be sent on the device\'s next frame.');`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:490 `return back()->with('success', 'Resident safety profile queued.');`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:420 `return $this->queueSectionConfiguration($request, $queclinkDevice, $builder, 'server', $request->all());`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:443 `return back()->with('success', 'Server registration update queued.');`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:920 `return response()->json(['error' => 'Set the public hostname under Listener settings first.'], 422);`; app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:945 `return response()->json([`. Runtime persistence and user comprehension were not executed.
+- No source-defined downstream handoff/event/job/notification was extracted from the assigned methods; no next owner or worklist is invented.
+
+## Route/action evidence
+
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/{section}` — `security-devices.integrations.queclink.configuration.section` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@updateSectionConfiguration` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:610` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/{section}/read` — `security-devices.integrations.queclink.configuration.section.read` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@readConfigurationSection` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:393` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/global` — `security-devices.integrations.queclink.configuration.global` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@updateGlobalConfiguration` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:446` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/read` — `security-devices.integrations.queclink.configuration.read` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@readConfiguration` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:370` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/resident-safety-profile` — `security-devices.integrations.queclink.configuration.resident-safety-profile` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@applyResidentSafetyProfile` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:480` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `POST security-devices/integrations/queclink/devices/{queclinkDevice}/configuration/server` — `security-devices.integrations.queclink.configuration.server` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@updateServerConfiguration` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:413` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+- `GET|HEAD security-devices/integrations/queclink/provisioning` — `security-devices.integrations.queclink.provisioning` — `App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController@provisioningString` — `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php:911` — middleware `web, auth, permission:securityDevices.viewAny, permission:securityDevices.integrations.manage`
+
+## Source anchors and limits
+
+- Backend anchor: `app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php`.
+- Exact render/action page relationships: none mapped.
+- Capability basis: Separated from sibling routes by user goal and completion boundary, with the listed route permission boundary; controller ownership and URI prefix alone were not treated as capability identity.
+- No task success, accessibility, recovery, notification delivery, handoff ownership, or comprehension is claimed. Independent review remains blocked.

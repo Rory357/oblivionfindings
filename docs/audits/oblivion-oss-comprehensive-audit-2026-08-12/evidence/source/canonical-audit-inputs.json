@@ -1,0 +1,556 @@
+{
+  "schema_version": "1.0",
+  "artifact": "canonical-audit-inputs",
+  "generated_at": "2026-08-23T16:32:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "active_904_static_denominator_runtime_and_completion_blocked",
+  "active_denominator": {
+    "total": 904,
+    "H": 790,
+    "D": 111,
+    "M": 3
+  },
+  "artifacts": {
+    "denominator_adjudication": {
+      "path": "evidence/source/canonical-denominator-904-adjudication.json",
+      "sha256": "60e98d2af1b48a95c38c61b51e49b0cafb33e083e276986c881de1d83a91fe90",
+      "bytes": 8098
+    },
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+      "bytes": 683490
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
+      "bytes": 674511
+    },
+    "route_page_reconciliation": {
+      "path": "evidence/source/route-page-gap-reconciliation-904.json",
+      "sha256": "cd5c01133d6a0bc4ca9154bfbf3eb54457cb0d382dd97e9b15ebb7bf25f2c18c",
+      "bytes": 36016
+    },
+    "inventory": {
+      "path": "inventory.json",
+      "sha256": "8fd94c22aea29c6d82253e0dd15603dbd6d39fbe68328b20ca025662e48f63b8",
+      "bytes": 11885342
+    },
+    "eight_pass_ledger": {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+      "bytes": 1959490
+    },
+    "benchmark_matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+      "bytes": 3312496
+    },
+    "task_scorecard": {
+      "path": "04-workflow-usability-scorecard.csv",
+      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "bytes": 1082667
+    },
+    "task_generation_summary": {
+      "path": "evidence/source/final-904-task-script-generation-summary.json",
+      "sha256": "5a0ac5b2b6c0b2582683ec87af963182b63a63d728394fc72ef38388db32c5a6",
+      "bytes": 176925
+    },
+    "visual_matrix": {
+      "path": "05-browser-visual-coverage-matrix.csv",
+      "sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+      "bytes": 8489292
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "9aed3e7149b49004011b43a13fc2e6f5498b07fa198adcd2bd3434f02ae644a8",
+      "bytes": 1392668
+    },
+    "generation_summary": {
+      "path": "evidence/source/canonical-denominator-904-generation-summary.json",
+      "sha256": "a143352e12808ee67c1eef2b81d948888adbc95e0ff94215170dc6b1602fcaad",
+      "bytes": 4557
+    },
+    "visual_ownership_adjudication": {
+      "path": "evidence/source/visual-final-id-ownership-904-wave1.json",
+      "sha256": "268ee4c752d8fe216716248272881f0d7ed5d8c008e12a6995d62a4442a289a9",
+      "bytes": 13772
+    },
+    "visual_generation_summary": {
+      "path": "evidence/source/final-904-visual-link-generation-summary.json",
+      "sha256": "a54111b954bde8db34b9499a60fe535bfe3981b61c69752bb2a0e85838d8d382",
+      "bytes": 4979
+    },
+    "benchmark_wave32": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave32.json",
+      "sha256": "b39b4fb2797b3767d713bb838debf24cf698aa32cf7851031bdaf252d57205d3",
+      "bytes": 12877
+    },
+    "benchmark_wave32_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave32-generation-summary.json",
+      "sha256": "7c9cb3a0da84840de65f1a3d0635ce5c041a18f45a19e7d4f3b0a23808a5a98e",
+      "bytes": 1561
+    },
+    "completion_report": {
+      "path": "evidence/source/completion-gate-report.json",
+      "sha256": "f70c776416391263fcba7899d46b0edf1e4051bf4b666dde82111a3d8959c30e",
+      "bytes": 16368
+    },
+    "current_summary_generation_report": {
+      "path": "evidence/source/current-904-summary-generation-report.json",
+      "sha256": "47c2362f5424c7fdf391b547e311267b40b2c5fa7382343241c37c987b61bef9",
+      "bytes": 5357
+    },
+    "validation_report": {
+      "path": "evidence/source/validation-report.json",
+      "sha256": "00989bf66a903f90f549263f58c88feb62616d7eef0402bade4fd68c98a1afc7",
+      "bytes": 24393
+    },
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "7e4ad296c31bd1c9a911bece7d2f88fca08059f7dc16ff686f27248846418789",
+      "bytes": 237444
+    },
+    "overlay_trigger_classification": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "60b02298132846b6d27db9fc08d981f925fbe4d72890553551b4d915a033fa9b",
+      "bytes": 1156860
+    },
+    "overlay_trigger_wave1": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave1.json",
+      "sha256": "206d8754719d8c51fdc79e5db6c7700facda97992a7adfdc5aee6c6aff458d09",
+      "bytes": 9355
+    },
+    "benchmark_wave33": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave33.json",
+      "sha256": "da4d25aa1e1989bd149c58a60a71fc739a38a728a0ec34fed58a2ced6c4e587c",
+      "bytes": 13087
+    },
+    "benchmark_wave33_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave33-generation-summary.json",
+      "sha256": "4d6b55b579eb31b5a0c2dd98d1ddff026a020ce0fa0d1649b15fa57cfea7cb1c",
+      "bytes": 1561
+    },
+    "finding_link_reconciliation": {
+      "path": "evidence/source/finding-link-reconciliation.json",
+      "sha256": "33ad4da6375f67339c5c37a858bba91ba1903ef28d6dbf70f28e9252878b6b13",
+      "bytes": 261302
+    },
+    "official_nz_finding_proposition_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "ce9970b5adb892a2fae8161a7317b9fa6b09b797234b189ac51af0686db149c8",
+      "bytes": 12979
+    },
+    "med_reader_site_concealment_generation_summary": {
+      "path": "evidence/source/final-904-med-reader-site-concealment-generation-summary.json",
+      "sha256": "4aca32d3ec4ded34305fe52edb1bea1bc592e808242b97fb6dee5a07b0076c61",
+      "bytes": 6284
+    },
+    "deployed_public_login_resample": {
+      "path": "evidence/browser/deployed-public-login-resample-2026-08-21.json",
+      "sha256": "3de8a0082d32133ad8cb9a36e21b319360d6844fc2c05888b7375fdc45306570",
+      "bytes": 5140
+    },
+    "visual_wave904_03": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave03.json",
+      "sha256": "175f2aee9fc9ca9c9a00d093aa6c2df92773083831f2aa4107117f780d679a47",
+      "bytes": 37113
+    },
+    "overlay_trigger_wave2": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave2.json",
+      "sha256": "1c711045c5041076876d1ff3056b6122e907ab7e988f145be0c6c25a66831d67",
+      "bytes": 9560
+    },
+    "benchmark_wave34": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave34.json",
+      "sha256": "c050378f4897dd9ed7a6d19b3d9338b2d20aae20adba12d8b85518c5714e4f08",
+      "bytes": 15025
+    },
+    "benchmark_wave34_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave34-generation-summary.json",
+      "sha256": "2312d172a4f491d83df1f83dac80d7ded79547fcc18a6779db8bfbcfeff1097a",
+      "bytes": 1561
+    },
+    "pass8_human_resources": {
+      "path": "evidence/source/pass8-human-resources-904-2026-08-21.json",
+      "sha256": "ee6d4e1174d84b66257abc248d834b7f6070232b5c20a196c0ea6548f60934e0",
+      "bytes": 7325
+    },
+    "hr_webhook_ssrf_generation_summary": {
+      "path": "evidence/source/final-904-hr-webhook-ssrf-generation-summary.json",
+      "sha256": "f1f68dac3b6de272a6a1702c37c5ec9463b86765aa01fd9ed3400b7bdd233200",
+      "bytes": 7492
+    },
+    "pass8_health_and_clinical": {
+      "path": "evidence/source/pass8-health-and-clinical-904-2026-08-21.json",
+      "sha256": "107e2cdf42766fa7f1aa18e45d66d341245f66574ede4997d7d395d790417e6e",
+      "bytes": 8131
+    },
+    "clinical_protocol_scheduling_generation_summary": {
+      "path": "evidence/source/final-904-clinical-protocol-scheduling-generation-summary.json",
+      "sha256": "db96b21eced0c277ec134c46003d926dacae34aa701fbacc91660dbe2c55a76f",
+      "bytes": 8020
+    },
+    "benchmark_wave35": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave35.json",
+      "sha256": "4b46b2a38660e22b967a5690f84afb43636499d47c87787e3d4cc9bfd43c84de",
+      "bytes": 16796
+    },
+    "benchmark_wave35_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave35-generation-summary.json",
+      "sha256": "2ee0a8c1e17ce8516ddebd12042776e64ab02e76b8c5eaf96dfc33a507a9e0a2",
+      "bytes": 1757
+    },
+    "visual_wave904_04": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave04.json",
+      "sha256": "ca2ee2e2c283ba242eea8ebd05a23eedfb69a5e9c3f7b41da275205b3457fc53",
+      "bytes": 8272
+    },
+    "visual_wave904_05": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave05.json",
+      "sha256": "d6216348faf79f2fefaa32090929ed0002980b651214fcc2619607d64487ec91",
+      "bytes": 8262
+    },
+    "overlay_trigger_wave3": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave3.json",
+      "sha256": "1677c2919ad82f97cf0bc0baba81330ce1a6fb978e13f6bb07e2f859ae196903",
+      "bytes": 7986
+    },
+    "overlay_trigger_wave4": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave4.json",
+      "sha256": "54f620e9a8fd0d75dd9e845cf21b4ad4abc7da2ac258cbe5f81caeabd82e1ae3",
+      "bytes": 7859
+    },
+    "visual_wave04_05_overlay3_4_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave04-05-overlay3-4-generation-summary.json",
+      "sha256": "a35e5d5992abc1d861a864323232f2d1705a138a35f8ee1c4812074627a61215",
+      "bytes": 1775
+    },
+    "visual_wave904_06": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave06.json",
+      "sha256": "580e1c824e8d358b6a33d75b13d563e78b720c83b4d0e15eda9332c98ded20c8",
+      "bytes": 8213
+    },
+    "overlay_trigger_wave5": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave5.json",
+      "sha256": "b35ba68a234ec81fd9aa600f2b966e759c8da307c7c1350fa736c84ba8d883b7",
+      "bytes": 8024
+    },
+    "visual_wave06_overlay5_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave06-overlay5-generation-summary.json",
+      "sha256": "e829aad59145826e957513d1dc891200d07b8f891165118139bf99c47eac8cbf",
+      "bytes": 1347
+    },
+    "pass8_fleet": {
+      "path": "evidence/source/pass8-fleet-904-2026-08-21.json",
+      "sha256": "149ae1bde10819d0982a8c6f81920b864e3d0d804472a46a4aa98f574181ef4b",
+      "bytes": 5451
+    },
+    "fleet_booking_site_privacy_generation_summary": {
+      "path": "evidence/source/final-904-fleet-booking-site-privacy-generation-summary.json",
+      "sha256": "4d57afbfdf92e373c33692a02ed4941efea1ef5bbbfa39b4179349edf7a04512",
+      "bytes": 5525
+    },
+    "benchmark_wave36": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave36.json",
+      "sha256": "89795e374b766ebd53a39b97d1b1093466b879ea7e1c593bcf465ab2c333367e",
+      "bytes": 9015
+    },
+    "benchmark_wave36_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave36-generation-summary.json",
+      "sha256": "3fb30a3ad4f0ff4dd84545480fb42a4a9dd6c599ee9cba734c3cae80ecab9f50",
+      "bytes": 1756
+    },
+    "pass8_operations": {
+      "path": "evidence/source/pass8-operations-904-2026-08-21.json",
+      "sha256": "5ac9b55ccffb447e1efb6b081d5d28d5f02b1ff71612e4e954c7931c976a9300",
+      "bytes": 6029
+    },
+    "operations_dashboard_site_privacy_generation_summary": {
+      "path": "evidence/source/final-904-operations-dashboard-site-privacy-generation-summary.json",
+      "sha256": "7a4ba8c9a994b92f56047ded7c06253ab27871c7f56ccf64586f0f29595f7ab5",
+      "bytes": 6312
+    },
+    "visual_wave904_07": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave07.json",
+      "sha256": "f1e864e1b1b08989f5abd9bb0acc667ee97120748d5fe2489a6a2df89539ba86",
+      "bytes": 8887
+    },
+    "overlay_trigger_wave6": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave6.json",
+      "sha256": "1a8433f527db05b00ea2bf1a1a5eac0d066c4078d0f7b3701cabd80b0b225f2b",
+      "bytes": 8058
+    },
+    "visual_wave07_overlay6_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave07-overlay6-generation-summary.json",
+      "sha256": "bff90191ab8f8a148b7495e04378a09f68981c96b455a41a1be552313f9ba607",
+      "bytes": 1347
+    },
+    "benchmark_wave37": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave37.json",
+      "sha256": "d3eb8e3698b7fe9d914889fd5b971b926ba483843318bb008b86068f05a03296",
+      "bytes": 14118
+    },
+    "benchmark_wave37_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave37-generation-summary.json",
+      "sha256": "81d34629d5328c76db63980103cac37b473c25963c2034077a8efe49217b895a",
+      "bytes": 1844
+    },
+    "visual_wave904_08": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave08.json",
+      "sha256": "cd07ffdd18be0dc36820a6dbc94ba5f39ecce44534c64a1a6fb528b222d963e4",
+      "bytes": 8618
+    },
+    "overlay_trigger_wave7": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave7.json",
+      "sha256": "a93b5d64dfe3aac8331d4117ac9bcdf46577993c92f1ed8ea85a7540897932d2",
+      "bytes": 9332
+    },
+    "visual_wave08_overlay7_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave08-overlay7-generation-summary.json",
+      "sha256": "b8a0313067300f60fad7271537043f4a89a4be111298c7916898902d0ade3ef4",
+      "bytes": 1347
+    },
+    "primitive_overlay_delegation_wave1": {
+      "path": "evidence/source/primitive-overlay-delegation-adjudication-904-wave1.json",
+      "sha256": "55e7bec8d214dd909983d8f199edf87c762c1ea03dc9e59b5c99bded0b019c35",
+      "bytes": 27423
+    },
+    "primitive_overlay_delegation_wave1_generation_summary": {
+      "path": "evidence/source/primitive-overlay-delegation-wave1-generation-summary.json",
+      "sha256": "c201b4d35899834ab3c3b7551d1a506577bec9581ba7113d473953c2340449c3",
+      "bytes": 1070
+    },
+    "benchmark_wave38": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave38.json",
+      "sha256": "b53b2bc97d11d73539eed7170787af7756e14c86aaf509677ad4446a86579497",
+      "bytes": 14675
+    },
+    "benchmark_wave38_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave38-generation-summary.json",
+      "sha256": "8a627f3af0c9b60a5ef76c57758c2f71c903a02a331514f3664edbc22b2dc34f",
+      "bytes": 1844
+    },
+    "pass8_health_safety_procedure_approval": {
+      "path": "evidence/source/pass8-health-safety-procedure-approval-904-2026-08-21.json",
+      "sha256": "098d533852fc89ba96f23dcd5d83d4036a9e869acb0c6756a08e5d18a3c53bf7",
+      "bytes": 6035
+    },
+    "health_safety_procedure_approval_generation_summary": {
+      "path": "evidence/source/final-904-health-safety-procedure-approval-generation-summary.json",
+      "sha256": "70d0e8d3c663980d2f6c97f8f87b81d0d9c73ebbc4507191b625193eef40fb58",
+      "bytes": 3211
+    },
+    "benchmark_wave39": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave39.json",
+      "sha256": "c20dabb25e037985cae6b0aef3c93345f0c2d1e16ae37489d0d8a7db0ac86bda",
+      "bytes": 14419
+    },
+    "benchmark_wave39_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave39-generation-summary.json",
+      "sha256": "3aa6588f5b86052e1b07dc9441799fe4a78562fea2df2bf9acf7fac12fbf08d4",
+      "bytes": 2223
+    },
+    "pass8_governance_spend_authority": {
+      "path": "evidence/source/pass8-governance-spend-authority-904-2026-08-21.json",
+      "sha256": "86e1b891806c5c005ffdf192f27fd4c3346594b6f74cdfa7255915a3f7acc407",
+      "bytes": 5999
+    },
+    "governance_spend_authority_generation_summary": {
+      "path": "evidence/source/final-904-governance-spend-authority-generation-summary.json",
+      "sha256": "7c37026dd65b4665b5a2f7b5e62b7d1c452ebfee1dcea8d466223a0553283be3",
+      "bytes": 3187
+    },
+    "visual_wave904_09": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave09.json",
+      "sha256": "c4c84e5e27f0eeb472075ee3295236628541f5aab6b9c1644575eef528223ff9",
+      "bytes": 8831
+    },
+    "overlay_trigger_wave8": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave8.json",
+      "sha256": "1bbac405622088bcfe5b35e8ca8f923fec55e3bb39e77dd90357188f688f3b27",
+      "bytes": 9301
+    },
+    "visual_wave09_overlay8_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave09-overlay8-generation-summary.json",
+      "sha256": "41cf6da8da19460ab37e72eb8caa966e184b9dc4efab04ae07d4c5bbe9511b7d",
+      "bytes": 1347
+    },
+    "benchmark_wave40": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave40.json",
+      "sha256": "9af1e4e17f8de0c4677808d3aacb0840e52d05cc59eabf613a1c24702dd6064f",
+      "bytes": 14913
+    },
+    "benchmark_wave40_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave40-generation-summary.json",
+      "sha256": "b4ea41f871b18d8247e6e9b2852df965949196d40cdb571a363d1f96bc73bef9",
+      "bytes": 2311
+    },
+    "pass8_finance_quote_conversion": {
+      "path": "evidence/source/pass8-finance-quote-conversion-904-2026-08-21.json",
+      "sha256": "c030de31f129a4335955e70e8b2f52bc9100d1f964e7b5723965c93dcfe04d4b",
+      "bytes": 6109
+    },
+    "finance_quote_conversion_generation_summary": {
+      "path": "evidence/source/final-904-finance-quote-conversion-generation-summary.json",
+      "sha256": "524f033bdb37884793ff1d01c08b0032b9b8cf24ce1d2dc186cd49888272b386",
+      "bytes": 3185
+    },
+    "visual_wave904_10": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave10.json",
+      "sha256": "a019d1ca8c7976ce18e024e2f24774710bcda17503c74cbb287899df24acfa84",
+      "bytes": 101469
+    },
+    "overlay_trigger_wave9": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave9.json",
+      "sha256": "cf11eedae81524315a811972326b7753b9a7281217a668198ebd7f4c2d792afe",
+      "bytes": 13424
+    },
+    "visual_wave10_overlay9_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave10-overlay9-generation-summary.json",
+      "sha256": "69fb41e5d45ad9e19cab7fe4b1c9c2fb321a49bd2e5229e07138b26851156a4d",
+      "bytes": 1726
+    },
+    "route_support_projection_correction": {
+      "path": "evidence/source/route-support-projection-correction-904.json",
+      "sha256": "5bb4389d82f023cec82d63dd3f1b949967ec19f2745ed0c933b6996b6263be4a",
+      "bytes": 5499
+    },
+    "route_support_projection_generation_summary": {
+      "path": "evidence/source/final-904-route-support-projection-generation-summary.json",
+      "sha256": "d531e7419fc36ec4f57290b0a1d8658e26c818735f2dd5cc527739864ec98539",
+      "bytes": 5022
+    },
+    "benchmark_wave41": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave41.json",
+      "sha256": "31727e92f7148570c0d0cf1cc31100ed149611b9736fef4d98097b2879e30b42",
+      "bytes": 16345
+    },
+    "benchmark_wave41_generation_summary": {
+      "path": "evidence/source/final-904-benchmark-wave41-generation-summary.json",
+      "sha256": "0fe8d8ed585c8eb2c08464a48120fcdd8f4cf779db80526402f39120d7e34e8c",
+      "bytes": 2849
+    },
+    "pass8_security_devices": {
+      "path": "evidence/source/pass8-security-devices-904-2026-08-21.json",
+      "sha256": "97732c04a5a4c02d1b35c1e5bca0718128fdb38c614d3baa4b2a367a186163b8",
+      "bytes": 4622
+    },
+    "security_devices_alerts_events_verification_generation_summary": {
+      "path": "evidence/source/final-904-security-devices-alerts-events-verification-generation-summary.json",
+      "sha256": "9ea5f3893b7f28e68696d0ebb48f34f643b0390e99e3094b80afb5da7e782c24",
+      "bytes": 3574
+    },
+    "visual_wave904_11": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave11.json",
+      "sha256": "21f4719cbcdfc46b2b9638b5e04f0220e98f06dc21eb00cb412699b002544116",
+      "bytes": 116514
+    },
+    "overlay_trigger_wave10": {
+      "path": "evidence/source/overlay-trigger-adjudication-904-wave10.json",
+      "sha256": "eeec4d1fa003ffeb6ab86305049603d9dff62302cacbaac71cfb23e3c719ba2f",
+      "bytes": 15003
+    },
+    "visual_wave11_overlay10_generation_summary": {
+      "path": "evidence/source/final-904-visual-wave11-overlay10-generation-summary.json",
+      "sha256": "1b2f00b4656c1ff01bcae994055f56ddd6dda3ca87ee84b45cd7ef8ea90afcc6",
+      "bytes": 2082
+    },
+    "dashboard_reconciliation": {
+      "path": "evidence/source/dashboard-reconciliation-2026-08-23.json",
+      "sha256": "5411f1defedd75833ba730148e7804aa1476a93af9f04452ad4c13eeec5b35a1",
+      "bytes": 3925
+    },
+    "csv_semantic_validation": {
+      "path": "evidence/source/csv-semantic-validation.json",
+      "sha256": "2898522c01128e98b1ef6942932dec0c2542b4951c4c7a48f0239278bcc55643",
+      "bytes": 5291
+    },
+    "frozen_baseline_home_build_preflight": {
+      "path": "evidence/browser/frozen-baseline-home-build-preflight-2026-08-21.json",
+      "sha256": "8b230e304bf3accf3bf458154f2ad93f08c760c2eb4bc7f99012cabbd909ceae",
+      "bytes": 3263
+    },
+    "visual_wave904_12": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave12.json",
+      "sha256": "f1e98397c192571d2299c11d74f451a8758a44565438338f90171f307d0c005e",
+      "bytes": 25254
+    },
+    "route_page_source_provenance_reconciliation": {
+      "path": "evidence/source/route-page-source-provenance-reconciliation-2026-08-23.json",
+      "sha256": "a670f10adf4d1a4d2c84f360fa3fdd566fa85e4a04877058312a96a7a0f08563",
+      "bytes": 7134
+    },
+    "remediation_delivery_snapshot": {
+      "path": "evidence/source/remediation-delivery-snapshot-2026-08-23.json",
+      "sha256": "8947654aa9155c5adf8a4e8534ea00fbf2e32d9fcce8064d86bf83af75dd13a8",
+      "bytes": 3555
+    }
+  },
+  "historical_denominator": {
+    "total": 902,
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+      "bytes": 706424
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c",
+      "bytes": 667824
+    },
+    "route_page_reconciliation": {
+      "path": "evidence/source/route-page-gap-reconciliation-902.json",
+      "sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb",
+      "bytes": 36290
+    }
+  },
+  "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "runtime_credit_delta": 0,
+  "visual_counts": {
+    "assigned": 8168,
+    "total": 8753,
+    "unresolved": 585,
+    "material_assigned": 3948,
+    "material_total": 4312,
+    "material_unresolved": 364,
+    "runtime_credit_delta": 0,
+    "rows": 8753,
+    "assigned_final_feature_id": 8168,
+    "unresolved_final_feature_id": 585,
+    "unique_assigned_final_feature_ids": 774,
+    "classification_counts": {
+      "Observed": 2503,
+      "Not safely reproducible": 4312,
+      "Source-inferred": 1441,
+      "Blocked": 497
+    }
+  },
+  "versioned_904_mirrors": {
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "8fd94c22aea29c6d82253e0dd15603dbd6d39fbe68328b20ca025662e48f63b8",
+      "bytes": 11885342
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+      "bytes": 1959490
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+      "bytes": 3312496
+    },
+    "scorecard": {
+      "path": "04-workflow-usability-scorecard-904.csv",
+      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "bytes": 1082667
+    },
+    "visual": {
+      "path": "05-browser-visual-coverage-matrix-904.csv",
+      "sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+      "bytes": 8489292
+    }
+  }
+}

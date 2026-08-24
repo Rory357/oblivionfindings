@@ -1,0 +1,226 @@
+{
+  "schema_version": "2.0",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "review_scope": "Fresh static reconciliation of the canonical 902 audit bundle after route/page disposition, benchmark, ledger, task and visual regeneration",
+  "status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "denominator": {
+    "accepted_total": 902,
+    "human_ui": 788,
+    "download_or_api": 111,
+    "machine_ingress": 3,
+    "superseded_894_base": 894,
+    "source_adjudicated_additions": 7,
+    "source_families": 595,
+    "route_references": 3024,
+    "unique_pages": 962,
+    "arithmetic_validated": true,
+    "working_manifest": "working-capability-manifest-902.json",
+    "working_manifest_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "working_manifest_unique_stable_ids": 902,
+    "stable_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 5,
+      "audit_assigned": 16
+    },
+    "accepted_route_enrichment": {
+      "targets": 901,
+      "relations": 3065,
+      "accepted_unique": 2985,
+      "excluded": 39,
+      "total": 3024,
+      "percent": 98.71
+    },
+    "accepted_page_enrichment": {
+      "targets": 756,
+      "relations": 1526,
+      "accepted_unique": 945,
+      "excluded": 17,
+      "total": 962,
+      "percent": 98.23
+    },
+    "backend_enrichment": {
+      "targets": 729,
+      "relations": 828,
+      "unique_anchors": 469
+    },
+    "full_static_surface_disposition": {
+      "routes": "3024/3024",
+      "pages": "962/962"
+    },
+    "durable_working_target_manifest_materialized": true
+  },
+  "artifact_integration": {
+    "inventory": {
+      "rows": 902,
+      "status": "canonical-static-register-current"
+    },
+    "02_eight_pass_coverage_ledger": {
+      "rows": 902,
+      "status": "canonical-structural-current"
+    },
+    "03_feature_benchmark_matrix": {
+      "rows": 902,
+      "mapped": 451,
+      "blocked": 451,
+      "status": "canonical-structural-current-substantive-coverage-blocked"
+    },
+    "04_workflow_usability_scorecard": {
+      "rows": 788,
+      "measured_scores": 0,
+      "runtime_executed": 0,
+      "status": "canonical-structural-current-runtime-blocked"
+    },
+    "05_browser_visual_matrix": {
+      "rows": 8753,
+      "final_id_assigned": 8153,
+      "unresolved": 600,
+      "status": "partial-final-id-linkage"
+    },
+    "task_scripts_final_902": {
+      "files": 788,
+      "nul_files": 0,
+      "runtime_executed": 0,
+      "status": "canonical-structural-current-runtime-blocked"
+    },
+    "browser_representative_role_pass": {
+      "roles_sampled": 11,
+      "canonical_tasks_completed": 0,
+      "status": "bounded-read-only-sample-not-completion"
+    }
+  },
+  "superseded_projection": {
+    "inventory_rows": 740,
+    "human_rows": 677,
+    "status": "evidence-only-not-canonical",
+    "location": "inventory.json superseded_feature_projection"
+  },
+  "current_visual_state_reconciliation": {
+    "rows": 8753,
+    "assigned_to_final_id": 8153,
+    "unresolved": 600,
+    "assigned_unique_final_ids": 771,
+    "final_ids_with_any_visual_lineage": 834,
+    "classification_counts": {
+      "Blocked": 547,
+      "Not safely reproducible": 4312,
+      "Observed": 2503,
+      "Source-inferred": 1391
+    },
+    "material_state_rows": 4312,
+    "material_state_final_id_assigned": 3935,
+    "material_state_unresolved": 377,
+    "material_state_unique_final_ids": 713,
+    "runtime_executed": 0
+  },
+  "benchmark_reconciliation": {
+    "catalogue_projects": 97,
+    "prompt_listed_metadata_dispositions": 97,
+    "prompt_listed_substantively_triaged": 97,
+    "prompt_listed_substantive_triage_incomplete": 0,
+    "supplemental_projects": 1,
+    "final_targets_with_completion_credit": 451,
+    "verified_benchmark": 362,
+    "verified_direct": 340,
+    "verified_rename": 22,
+    "documented_no_credible_match": 89,
+    "documented_ncm_direct": 82,
+    "documented_ncm_rename": 7,
+    "completion_unproved": 451,
+    "mapping_artifact": "benchmark-final-902-mapping.json",
+    "mapping_sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c"
+  },
+  "finding_reconciliation": {
+    "findings": 92,
+    "p0": 18,
+    "p1": 62,
+    "p2": 12,
+    "links": 258,
+    "literal_exact_current_links": 159,
+    "literal_exact_current_targets": 131,
+    "explicitly_re_adjudicated_findings": [
+      "ARCH-P0-A",
+      "AUTH-EMAIL-VERIFY-CONTRACT-01",
+      "CATER-SCOPE-003",
+      "CATER-STOCK-002",
+      "CLIN-SCHEDULE-01",
+      "CLIN-SITE-01",
+      "CTRL-RBAC-001",
+      "CTRL-SIGNAL-002",
+      "FIN-DONOR-FUND-01",
+      "FIN-EFTPOS-SETTLEMENT-01",
+      "FIN-FIXED-ASSET-DEPRECIATION-01",
+      "FIN-INSIGHTS-DIRECT-OBJECT-01",
+      "FIN-PAYMENT-ALLOCATION-01",
+      "FLEET-MED-WITNESS-01",
+      "FLEET-TRANSPORT-01",
+      "GOV-RESOLUTION-QUORUM-01",
+      "HR-COMPLIANCE-EXPORT-PERMISSION-01",
+      "HR-COMPLIANCE-RENEWALS-DISCLOSURE-01",
+      "HS-ASSURANCE-01",
+      "HS-CLOSE-01",
+      "HS-NOTIFIABLE-01",
+      "HS-SITE-01",
+      "INCIDENT-RECOVERY-01",
+      "INTEG-WEBHOOK-001",
+      "MED-ADMIN-CORRECTION-API-BYPASS-01",
+      "MED-CD-VOID-REVERSAL-01",
+      "MED-COMP-01",
+      "MED-ERROR-LIFECYCLE-TERMINAL-BYPASS-01",
+      "MED-ORDER-ERASURE-01",
+      "MED-OVERRIDE-01",
+      "MED-RBAC-01",
+      "MED-SCOPE-01",
+      "MED-VERIFY-01",
+      "PRIV-DSR-01",
+      "PRIV-DSR-LIFECYCLE-01",
+      "PRIV-EVID-01",
+      "PRIV-STATEMENT-01",
+      "RESP-EVIDENCE-01",
+      "RESP-SCOPE-01",
+      "RESP-STATE-01",
+      "RETENTION-EXEC-01",
+      "SAFE-EVID-01",
+      "SAFE-NESTED-01",
+      "SAFE-SENSITIVITY-01",
+      "SAFE-TERMINAL-SYNC-01",
+      "SEC-UNIFI-TLS-01",
+      "SITE-RBAC-001",
+      "TASK-RBAC-001",
+      "TASK-WATCH-002",
+      "VIS-DEPLOYED-DRIFT-01",
+      "VIS-MOBILE-NAV-01",
+      "VIS-RESPONSIVE-OVERFLOW-01",
+      "WF-HR-PROFILE-SITE-PRIVACY"
+    ],
+    "p0_p1_with_core_required_fields": 80,
+    "p0_p1_with_exact_final_feature_id": 80,
+    "p0_p1_without_exact_final_feature_id": 0,
+    "findings_with_exact_final_feature_id": 92,
+    "findings_without_exact_final_feature_id": 0,
+    "final_link_coverage_established": true,
+    "definition_boundary": "Literal stable-ID equality is not runtime or target-outcome validation."
+  },
+  "retained_audit_reproducibility_generators": {
+    "inventory": "generators/rebuild-canonical-inventory-register.py",
+    "ledgers": "generators/rebuild-final-902-ledgers.py",
+    "tasks": "generators/rebuild-final-902-task-scripts.ps1",
+    "visual_links": "generators/rebuild-final-902-visual-links.py",
+    "findings": "generators/append-three-902-findings.py",
+    "summary_sync": "generators/sync-current-902-summaries.py"
+  },
+  "runtime_blockers": {
+    "representative_actor_classes_executed": "12/12 bounded actor-entry samples; no canonical task completion, denied-state, recovery or handoff credit",
+    "common_or_safety_critical_journeys_all_viewports": "0/8",
+    "executable_specs_run": "0/867",
+    "deployed_build_identity": "0/1",
+    "representative_mutation_or_recovery_proof": 0,
+    "audit_wide_tests_executed": "0/867 (focused disposable-MySQL remediation suites exist, but the complete audit-wide test denominator has not been run as one controlled gate)"
+  },
+  "remaining_reconciliation_order": [
+    "Complete 451 target-specific benchmark/NCM decisions.",
+    "Resolve 600 visual and 377 material-state final-ID links.",
+    "Retain target-specific finding validation and runtime reproduction boundaries despite complete literal current-ID linkage.",
+    "Expand the bounded 12-role entry sample into canonical task execution using resettable fixtures; retain the observed eMAR mobile overflow as an open finding.",
+    "Execute task, failure, recovery, handoff and required viewport validation."
+  ]
+}

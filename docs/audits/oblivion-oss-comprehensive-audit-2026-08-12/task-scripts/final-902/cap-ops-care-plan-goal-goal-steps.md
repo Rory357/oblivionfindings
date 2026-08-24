@@ -1,0 +1,70 @@
+# CAP-OPS-CARE-PLAN-GOAL-GOAL-STEPS — Care Plan Goal Goal Steps
+
+Status: **Blocked — source-derived final-ID script; representative-role execution and independent task validation not performed.**
+
+## Evidence boundary
+
+- Capability: `CAP-OPS-CARE-PLAN-GOAL-GOAL-STEPS`
+- Canonical module: `OPERATIONS`
+- ID provenance: `exact`
+- Source families: `OPS-CARE-PLAN-GOAL`
+- Route scope: target-supported exact/shared relation retained in the working manifest; not necessarily exclusive ownership
+- Route evidence: `ROUTE-1912`, `ROUTE-1913`, `ROUTE-1914`, `ROUTE-1915`, `ROUTE-1918`, `ROUTE-1919`, `ROUTE-1920`, `ROUTE-1921`
+- Route names: `operations.care_plans.goals.destroy`, `operations.care_plans.goals.progress`, `operations.care_plans.goals.show`, `operations.care_plans.goals.steps.destroy`, `operations.care_plans.goals.steps.store`, `operations.care_plans.goals.steps.update`, `operations.care_plans.goals.store`, `operations.care_plans.goals.update`
+- Route paths: `operations/care-plans/{carePlan}/goals`, `operations/care-plans/{carePlan}/goals/{goal}`, `operations/care-plans/{carePlan}/goals/{goal}/progress`, `operations/care-plans/{carePlan}/goals/{goal}/steps`, `operations/care-plans/{carePlan}/goals/{goal}/steps/{step}`
+- Page scope: no accepted-target page relation retained for this final target
+- Page evidence: Not enriched.
+- Target-supported route actions: `destroy`, `destroyStep`, `show`, `store`, `storeStep`, `update`, `updateProgress`, `updateStep`
+- Other accepted IDs sharing retained routes: No other accepted working IDs share these retained route relations.
+- Backend anchors: `app/Http/Controllers/Operations/CarePlanGoalController.php`
+- Exact working-ID findings: No exact working-ID finding link is currently established.
+
+Blank or source-family-envelope evidence must not be read as proof that this capability has no route/page or that every family route belongs exclusively to it.
+
+## Representative task
+
+Actor: Authorised operations practitioner, scheduler or frontline worker
+
+Goal: Complete **Care Plan Goal Goal Steps** on the authoritative record, then verify an unambiguous persisted outcome, actor/time provenance, downstream effect and next accountable owner or terminal state.
+
+Prerequisites:
+
+- A non-production representative account with the documented global/site/ownership scope.
+- A resettable synthetic record in the correct prerequisite state.
+- Target authorization evidence. Exact route permission atoms where enriched: `care_plans.update`
+- Known wrong-site, wrong-parent and wrong-record fixtures for denial checks.
+
+Steps:
+
+1. Enter through an authorised route/page for this final capability. Do not assume a retained shared relation is an exclusive entry or ownership claim.
+2. Confirm the actor, site, parent/child relation, owning record and prerequisite state before disclosing or changing data.
+3. Perform only the action(s) evidenced for this capability; do not infer a split target's action from the entire source-family envelope.
+4. Verify the authoritative persisted state and immutable/auditable actor, effective time and source provenance. A rendered page, toast or HTTP success alone is not completion.
+5. Verify the next owner, notification/outbox/reporting effect or terminal outcome, then exercise the documented correction/retry path where safe.
+
+## Required error and recovery checks
+
+- Wrong site, person, parent or nested child: deny before disclosure or side effect.
+- Invalid input: retain safe input, bind messages to fields and preserve authoritative state.
+- Stale, concurrent or replayed action: at most one effect; expose the current state and a safe retry/review path.
+- Background or integration failure: retain visible queued/failed evidence, stable source identity and authorised replay/reconciliation.
+- Correction/reversal: preserve prior provenance and re-check authorization and state.
+
+## Current ease scores
+
+All ten current scores are **Not measured**. Under the audit rubric, numeric 0 means blocked, misleading, inaccessible or missing; it is therefore not used as a substitute for absent representative-user measurement.
+
+| Dimension | Score |
+|---|---:|
+| Discoverability | Not measured |
+| Comprehension | Not measured |
+| Learnability | Not measured |
+| Efficiency | Not measured |
+| Error prevention | Not measured |
+| Recovery | Not measured |
+| Accessibility | Not measured |
+| Safety and trust | Not measured |
+| Consistency | Not measured |
+| Cross-module continuity | Not measured |
+
+Target scores are not assigned until the task is executed and independently reviewed. No ease or completion claim is made.

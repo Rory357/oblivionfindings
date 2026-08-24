@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave5",
+  "generated_at": "2026-08-21T22:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Static source trigger pairing only. Runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "selection_sha256": "0a5e481ac5e1c3f251f92a24c33b9288d441bf6a44d7c4e2a2d5e1177f35684f",
+    "exclusion_count": 40,
+    "exclusion_sha256": "50f668c96a466532e2b199ba99dc2d8b42d4a091dd29b671a7e05a5bf9dc14f8",
+    "independent_proof_tuple_sha256": "88910b30bcfdd5e3eef38755ef2e5bae3d02f01396fffe04ffa91396286f02e2",
+    "independent_source_map_sha256": "beb0ce09b7f5c34bb58ab3cc8264bbc51acd1890e7c409e2d153bef21d5d791c",
+    "verdict": "GO_10_exact_static_trigger_pairings"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/operations/rostering/index.tsx",
+      "line": 2926,
+      "symbol": "CreateShiftDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/rostering/index.tsx",
+        "source_sha256": "27d0280eb6149689a4b374acb250223e4e984e9db56c9d5bcb0ab837a1dd486d",
+        "state_identifier": "createOpen",
+        "setter": "setCreateOpen",
+        "static_chain": "state 588; openCreateShift 1894; setter 1913; trigger 769; open 2927",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/shift-notes/Index.tsx",
+      "line": 301,
+      "symbol": "NoteWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/shift-notes/Index.tsx",
+        "source_sha256": "deef1255373645c77faa0e79118fe7de608772da0e71297a910f4262f8dd3568",
+        "state_identifier": "wizardOpen",
+        "setter": "setWizardOpen",
+        "static_chain": "state 60; openNew 164; setter 166; trigger 294; open 302",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/shifts/components/create-shift-dialog.tsx",
+      "line": 1637,
+      "symbol": "OverrideConfirmationDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/shifts/components/create-shift-dialog.tsx",
+        "source_sha256": "7bc46250935cbd61a60e547f3109e2d80b45739d621dd89100010bda241c06b1",
+        "state_identifier": "overrideOpen",
+        "setter": "setOverrideOpen",
+        "static_chain": "state 528; handleSubmit 776; setter 792; form trigger 902; open 1638",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/shifts/index.tsx",
+      "line": 844,
+      "symbol": "CreateShiftDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/shifts/index.tsx",
+        "source_sha256": "c5a21e407b1efd369547c7eced7ba4cca6b6caaf4eaa4e03a0797ba8162ead3f",
+        "state_identifier": "createOpen",
+        "setter": "setCreateOpen",
+        "static_chain": "state 186; openCreate 220; setter 222; trigger 218; open 845",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/operations/timesheets/index.tsx",
+      "line": 822,
+      "symbol": "CreateTimesheetDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/operations/timesheets/index.tsx",
+        "source_sha256": "57f1a586e42ca4392e8362ce96e6a8532f0aa1c5cd88ffebc7d2b55782e69a83",
+        "state_identifier": "createOpen",
+        "setter": "setCreateOpen",
+        "static_chain": "state 439; callback/setter 567-569; trigger 222; open 823",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/privacy/dashboard.tsx",
+      "line": 336,
+      "symbol": "PrivacyActionModal",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/privacy/dashboard.tsx",
+        "source_sha256": "35f9c3ed5bbcd076485706ed0b893028d61b84ab116c05e85cc0c9d573940862",
+        "state_identifier": "rowAction",
+        "setter": "setRowAction",
+        "static_chain": "state 94; destructive action/setter 168; bind/open 336",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/sites/meal-planner/_calendar-grid.tsx",
+      "line": 1340,
+      "symbol": "ResidentEditDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/sites/meal-planner/_calendar-grid.tsx",
+        "source_sha256": "a5e94f1675f3300030c1b546b8bf1c64dd8760cff7fe6b8b4cb88f77d66f8ce0",
+        "state_identifier": "editResident",
+        "setter": "setEditResident",
+        "static_chain": "state 955; callback/setter 1209; trigger 521; bind 1339",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/sites/meal-planner/_calendar-grid.tsx",
+      "line": 1343,
+      "symbol": "MoveMealDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/sites/meal-planner/_calendar-grid.tsx",
+        "source_sha256": "a5e94f1675f3300030c1b546b8bf1c64dd8760cff7fe6b8b4cb88f77d66f8ce0",
+        "state_identifier": "moveTarget",
+        "setter": "setMoveTarget",
+        "static_chain": "state 956; selector 251; trigger 265; handler/setter 1029-1036; bind 1342",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/sites/meal-planner/index.tsx",
+      "line": 583,
+      "symbol": "SpendReportDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/sites/meal-planner/index.tsx",
+        "source_sha256": "7708fd1411ec1b4499669592cc933595256f318fd4361528bfe3aa622883773b",
+        "state_identifier": "spendOpen",
+        "setter": "setSpendOpen",
+        "static_chain": "state 94; callback/setter 446; trigger 1131; bind 583",
+        "credit_boundary": "static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/sites/show.tsx",
+      "line": 4507,
+      "symbol": "SiteGeofenceDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/sites/show.tsx",
+        "source_sha256": "95901651849efd4a5e71132c05b6e8af97b8d1b0628f2d67f84bbf68b45a99e9",
+        "state_identifier": "siteGeofenceOpen",
+        "setter": "setSiteGeofenceOpen",
+        "static_chain": "state 990; callback/setter 1774-1775; trigger 115; open 4514",
+        "credit_boundary": "static pairing only"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 203,
+    "source_inferred_not_exactly_paired": 183,
+    "unresolved_or_blocked": 273,
+    "same_scope_state_handler": 184,
+    "internal_state_trigger_candidate": 183,
+    "controlled_without_resolved_activator": 256,
+    "generic_unresolved": 271,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208,
+    "primitive_unresolved": 269
+  }
+}

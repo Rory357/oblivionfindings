@@ -1,0 +1,319 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-24T14:27:18+12:00",
+  "scope": "Git integration and audit-artifact publication evidence only.",
+  "audited_source": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "published_origin_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+  "reviewed_local_application_main": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "local_application_commits_ahead": 57,
+  "local_application_changed_paths": 490,
+  "local_application_tracked_clean_before_audit_commit": true,
+  "application_commits": [
+    {
+      "commit": "cfe4dbf71ace4cc079cbd53eee024d4d85c5854e",
+      "subject": "fix(settings): align system user summary counts"
+    },
+    {
+      "commit": "d2b755b4f86edea319d1a3b683af125b68b421a6",
+      "subject": "fix(my-day): contain responsive staff header"
+    },
+    {
+      "commit": "c9e9fd6781f9104468defa3e2a6505f29374dec5",
+      "subject": "fix(control-room): clarify settings controls"
+    },
+    {
+      "commit": "8645607117580988daa4ad0ed882d90a114cdfc4",
+      "subject": "fix(ui): normalize responsive page hero density"
+    },
+    {
+      "commit": "c84f9358a22bd7e0a0410cc7195b99560f4ea9aa",
+      "subject": "fix(health-safety): contain corrective action layout"
+    },
+    {
+      "commit": "712a015a01b7294f56e7d3b3cb38aa7a4bce72d9",
+      "subject": "fix(clinical): preserve unknown assurance evidence"
+    },
+    {
+      "commit": "4ee771b83412182bf9f8a299579df772f295df1a",
+      "subject": "fix(navigation): harden mobile menu accessibility"
+    },
+    {
+      "commit": "dcc2914650b7ee2cb81fdf453beb2ffb4239bf00",
+      "subject": "fix(ui): restore overlay focus safely"
+    },
+    {
+      "commit": "ee24b29a59bc1b0e23d616bbfc89678da3d25d14",
+      "subject": "fix(finance): harden fixed asset depreciation"
+    },
+    {
+      "commit": "1e40d0e852ee82cc178944e6bba0e110dcd780f8",
+      "subject": "fix(finance): harden donor fund accounting"
+    },
+    {
+      "commit": "e128b2403e7c6c9bb7bf857321b93f9a7c938958",
+      "subject": "fix(finance): complete GST return lifecycle"
+    },
+    {
+      "commit": "363cfe0f1c07c4ebfae8c0dadef9b82f638c349d",
+      "subject": "fix(finance): harden quote conversion"
+    },
+    {
+      "commit": "90619e9a1999793573a88d512b9d138412bfa054",
+      "subject": "fix(finance): quarantine unsupported consolidation"
+    },
+    {
+      "commit": "e31d6d72729a42a8ba4f36303ce9099fb0479c1e",
+      "subject": "fix(governance): harden nested governance workflows"
+    },
+    {
+      "commit": "3fac16b114b26f87602f28f9a478772d7ff992d2",
+      "subject": "fix(payroll): bind leave replay sources"
+    },
+    {
+      "commit": "9efca71765b59031117c4bbb513116e7a9309104",
+      "subject": "fix(emar): enforce medication order verification"
+    },
+    {
+      "commit": "35a5241b5eb057a82637f576b20ddf1fbd42fe9e",
+      "subject": "fix(workforce): segment fatigue by local work time"
+    },
+    {
+      "commit": "28244de706fe38504e76861743de52cee843d9b5",
+      "subject": "fix(consent): govern consent evidence files"
+    },
+    {
+      "commit": "77bda7d83e9864e1b9973ec9cb4ead3e3e9ccda3",
+      "subject": "fix(workforce): govern availability lifecycle"
+    },
+    {
+      "commit": "618baa94b31c952e29559de5cc7a6b327131f0f8",
+      "subject": "fix(sites): govern checklist failure risk"
+    },
+    {
+      "commit": "5b0462b5afdd73b4271a34db57c3e31507023eb1",
+      "subject": "fix(auth): complete email verification lifecycle"
+    },
+    {
+      "commit": "d25f68c7ebd5d87aeb4a27520c1c6b5c80f1f8b4",
+      "subject": "fix(auth): restore verification notifications"
+    },
+    {
+      "commit": "798e3403b0f12d30fe1a071c4bc44cf6420c3ba2",
+      "subject": "fix(respite): govern state transitions"
+    },
+    {
+      "commit": "8f122d98d868ea279e26bdfca069d9b57b6a071a",
+      "subject": "fix(respite): seal evidence pack manifests"
+    },
+    {
+      "commit": "1bf3af5cdd21718526de0e52431a6bf775104af6",
+      "subject": "fix(governance): enforce spend approval authority"
+    },
+    {
+      "commit": "bac929a31b37f637f37ff67cbf0d0a204aec8e83",
+      "subject": "fix(finance): harden recurring journal posting"
+    },
+    {
+      "commit": "b045eec4f60745c5de22f1268dcad016312e53ab",
+      "subject": "fix(finance): harden settlement lifecycle"
+    },
+    {
+      "commit": "0143a4cbee254d152d57fdc9a12ad7c41cede4c8",
+      "subject": "fix(operations): bind funding claims to delivery"
+    },
+    {
+      "commit": "9399016bc956d94e1d58d29b96bac3ee7dd1b717",
+      "subject": "fix(finance): harden fixed asset disposal"
+    },
+    {
+      "commit": "7e53950b982ee7be61f0f6f948fee896813a692b",
+      "subject": "Implement Site-scoped NZS assurance evidence"
+    },
+    {
+      "commit": "9116b48e86466232fb94bf1aec91704dc07d403b",
+      "subject": "fix(incidents): recover interrupted reports"
+    },
+    {
+      "commit": "651ea613294129a6872c2b1e4c551d0e7f8efbc7",
+      "subject": "fix(integration): reconcile UI assurance contracts"
+    },
+    {
+      "commit": "663c74d255118e612211b999855829a4992f4e38",
+      "subject": "fix: scope fleet vehicle bookings by Site"
+    },
+    {
+      "commit": "5743dd6ee0634b89ef3068e4d4cd01e8283d489a",
+      "subject": "fix(fleet): enforce booking Site privacy"
+    },
+    {
+      "commit": "61b6723c5f49e949c0d699e4ebb9a4d347a50492",
+      "subject": "fix(hr): converge employee identity links"
+    },
+    {
+      "commit": "9c1049ad41812d5c24d4813bd8b9ed575160b5dd",
+      "subject": "fix: scope timesheet client reassignment"
+    },
+    {
+      "commit": "4385b55d566b276013ce15218193865d2cc2f1b9",
+      "subject": "fix: clear stale manual timesheet snapshots"
+    },
+    {
+      "commit": "984e430fb44d5de16cfb7e0c9ae0f601cc9d4345",
+      "subject": "fix(workforce): harden timesheet client reassignment"
+    },
+    {
+      "commit": "d90c4d5589cf9800e5dfdee5e5b50e79fe04eac6",
+      "subject": "fix(security-devices): scope alerts by event custody"
+    },
+    {
+      "commit": "8a016dc5bfd2ce52c6b7e21a576cb239aaf0b64b",
+      "subject": "fix(security-devices): verify alert event custody scope"
+    },
+    {
+      "commit": "1d6877772f208626d7dc48ebd13818005ef30d72",
+      "subject": "Fix Operations dashboard Site privacy"
+    },
+    {
+      "commit": "48066b700f6d7ca7404d267e6c1994d129b2f785",
+      "subject": "fix(operations): verify dashboard activity Site privacy"
+    },
+    {
+      "commit": "ed75c612f06368e4b0c3d4f05aaa70dec7cec89f",
+      "subject": "fix(clinical): govern protocol scheduling"
+    },
+    {
+      "commit": "c9a3b244c684b2dc94ad91332c50f7d01969a0a7",
+      "subject": "fix(hr): enforce compliance export permissions"
+    },
+    {
+      "commit": "442416a4bfaf18ec2a18e48f56faa74126dfe957",
+      "subject": "fix(hr): conceal compliance renewal exports"
+    },
+    {
+      "commit": "bf5ae87d2f9313e1e5c08fa981960d5f51ea75a5",
+      "subject": "fix(hr): constrain webhook destinations"
+    },
+    {
+      "commit": "981b8cf4ad36b913a7c59f7b9705fa58816230b3",
+      "subject": "fix(safeguarding): govern concern sensitivity"
+    },
+    {
+      "commit": "71915591f80a1b8261d4f2b67fce9ad8d7c41a56",
+      "subject": "fix(security): persist provider health attempts"
+    },
+    {
+      "commit": "78715282dd337a36f31f4b186a55efa1e03cd478",
+      "subject": "fix(security): govern device field ownership"
+    },
+    {
+      "commit": "ba5348925893473f33f6c6f953761391f9a4ff33",
+      "subject": "fix(sites): enforce profile action permissions"
+    },
+    {
+      "commit": "7b73d037ca849fd9dea55d8e8f690514817cdd62",
+      "subject": "fix(health-safety): govern notifiable event decisions"
+    },
+    {
+      "commit": "443b2e2298dfb2042833f2a228393ee4fcb39eca",
+      "subject": "Enforce medication order discontinuation lifecycle"
+    },
+    {
+      "commit": "a7e7b1d41d5e2c1a0edce41c0a92af3504ab7fad",
+      "subject": "Fix medication order cessation boundaries"
+    },
+    {
+      "commit": "55c40636a578e0b1b863ce06a08427ccb7bbcba5",
+      "subject": "fix(emar): preserve medication cessation history"
+    },
+    {
+      "commit": "8d10f2de61bcc0d0dff1b4424352ad631d96b530",
+      "subject": "fix(privacy): harden retention execution"
+    },
+    {
+      "commit": "9a14d542ee3775f9833bf0db3652bfdd4ebb7951",
+      "subject": "fix(workforce): bind forced attendance endings"
+    },
+    {
+      "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "subject": "fix(integration): reconcile combined remediation contracts"
+    }
+  ],
+  "branch_reconciliation": {
+    "local_branches": 295,
+    "registered_worktrees": 128,
+    "tips_ancestor_of_local_main": 194,
+    "tips_not_ancestor_of_local_main": 101,
+    "non_ancestor_patch_equivalent": 53,
+    "non_ancestor_patch_positive": 48,
+    "completed_mappings_already_resolved_into_main": 4,
+    "red_source_only_superseded_or_unproved": 44,
+    "potentially_completed_and_still_missing": 0,
+    "dirty_worktrees": 27,
+    "dirty_product_candidate_worktrees": 23,
+    "artifact_or_tool_only_dirty_worktrees": 4,
+    "staged_entries_across_dirty_worktrees": 0
+  },
+  "completed_mappings_already_on_main": [
+    {
+      "branch": "codex/hs-assurance-01-b11a",
+      "candidate": "d1585344665443ab7177e04d2742fc63e7b79b2c",
+      "main_commit": "8ba099fc12719d18b0b8f10eea2f0656e823195c",
+      "resolution": "same-subject same-16-path integration"
+    },
+    {
+      "branch": "codex/hr-compliance-renewals-disclosure-01-current-main",
+      "candidate": "8f31cc95c84541fc5f140bff13f52a30d1bea494",
+      "main_commit": "442416a4bfaf18ec2a18e48f56faa74126dfe957",
+      "resolution": "empty after conflict resolution; patch already represented"
+    },
+    {
+      "branch": "codex/wf-attendance-forced-end-site-current-main",
+      "candidate": "71c75ce62e45e382e0c2877650a000b448cf9057",
+      "main_commit": "9a14d542ee3775f9833bf0db3652bfdd4ebb7951",
+      "resolution": "empty after conflict resolution; patch already represented"
+    },
+    {
+      "branch": "codex/wf-email-identity-convergence-current-main",
+      "candidate": "f58b898476ea2874cfe4a5740b9a3e974e59bb52",
+      "main_commit": "61b6723c5f49e949c0d699e4ebb9a4d347a50492",
+      "resolution": "empty after conflict resolution; patch already represented"
+    }
+  ],
+  "authoritative_exclusion_examples": [
+    {
+      "category": "source_or_static_only",
+      "refs": [
+        "codex/gov-spend-authority-01-current-main@6c56fd85",
+        "codex/fin-gl-recurring-01-current-main@4a8e7bf1",
+        "codex/fin-settlement-01-current-main@aeb2b6db",
+        "codex/fund-bind-01-current-main@53149104",
+        "codex/fin-fixed-asset-disposal-01-current-main@90765ff7"
+      ]
+    },
+    {
+      "category": "runtime_red_or_residual",
+      "refs": [
+        "codex/priv-dsr-01-current-main@d531d9a0",
+        "codex/fin-payment-match-01-f869@c3f4339e",
+        "codex/med-error-lifecycle-terminal-bypass-01-current-main@4fa42822",
+        "codex/med-rbac-01-current-main-reconstruction@efdf9139",
+        "codex/nzs-assurance-01-current-main@6ec2691b"
+      ]
+    },
+    {
+      "category": "no_retained_completion_evidence",
+      "refs": [
+        "codex/vis-overlay-focus-01-current-main@2a4337a5",
+        "codex/hr-profile-site-privacy-candidate-20260821@d89886bc"
+      ]
+    }
+  ],
+  "publication": {
+    "application_commit_created_by_this_step": false,
+    "audit_bundle_commit_pending_when_generated": true,
+    "pushed": false,
+    "combined_mysql_gate_claimed": false,
+    "deployed_browser_release_claimed": false
+  },
+  "claim_limit": "The reviewed local application base is distinct from published origin/main and from the immutable audited source. Branch presence, source review, merge, runtime verification, deployment, and audit-wide completion remain separate claims."
+}

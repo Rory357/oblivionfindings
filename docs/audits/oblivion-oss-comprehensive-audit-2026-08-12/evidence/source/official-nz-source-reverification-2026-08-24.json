@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "artifact": "official-nz-source-reverification-2026-08-24",
+  "status": "current_primary_source_identity_reverification_only",
+  "generated_at": "2026-08-24T05:04:10+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Read-only currentness and source-identity revalidation. This does not establish legal, clinical, security, certification, implementation or product-compliance conclusions.",
+  "method": "Re-opened or searched the six authoritative primary-source identities on 2026-08-24. Recorded only current publication identity, version/date signals and the narrow proposition boundary visible in the authority's own current material.",
+  "sources": [
+    {
+      "id": "NZ-HIPC-2020-R3A",
+      "authority": "Office of the Privacy Commissioner New Zealand",
+      "canonical_url": "https://www.privacy.org.nz/privacy-principles/codes-of-practice/hipc2020/",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current HIPC page states that Amendment No 2 reflects IPP3A and that the amended Code is in force from 1 May 2026.",
+      "boundary": "The source establishes the current privacy-code text and notice context; it does not decide Oblivion applicability, exceptions, data classification or implementation design.",
+      "result": "current_identity_confirmed"
+    },
+    {
+      "id": "NZ-HISO-10029-2022",
+      "authority": "Health New Zealand / Health Information Standards Organisation",
+      "canonical_url": "https://www.healthnz.govt.nz/health-professionals/guidance-standards/topic/digital-technologies/cyber-security-hub/health-security-frameworks",
+      "publication_url": "https://static.info.content.health.nz/docs/HISO/HISO%2010029%20Health%20Information%20Security%20Framework.pdf",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current Health New Zealand page still lists HISO 10029:2022 and separately lists 2025 supplier guidance; the page reports a 21 May 2026 update.",
+      "boundary": "The framework supplies a security-control context only. It does not prove system scope, conformity, certification, risk acceptance or that a specific Oblivion control is mandatory.",
+      "result": "current_identity_confirmed"
+    },
+    {
+      "id": "NZ-FHIR-BASE-3.1.0",
+      "authority": "HL7 New Zealand",
+      "canonical_url": "https://fhir.org.nz/ig/base/index.html",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current published NZ Base Implementation Guide identifies release 3.1.0 as active from 24 July 2026 and describes reusable New Zealand FHIR artefacts.",
+      "boundary": "NZ Base does not itself define complete conformance requirements or require particular resources, profiles, extensions or interactions for Oblivion.",
+      "result": "current_identity_confirmed"
+    },
+    {
+      "id": "NZ-NZS-8134-2021",
+      "authority": "New Zealand Ministry of Health",
+      "canonical_url": "https://www.health.govt.nz/regulation-legislation/certification-of-health-care-services/services-standard",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current Ministry page states that NZS 8134:2021 has applied since 28 February 2022, uses a modular certification framework and was updated on 11 February 2026.",
+      "boundary": "Applicability is service- and certification-scope dependent; the page does not certify a provider or prescribe a specific Oblivion workflow or control.",
+      "result": "current_identity_confirmed"
+    },
+    {
+      "id": "NZ-HDC-CODE",
+      "authority": "Health and Disability Commissioner New Zealand",
+      "canonical_url": "https://www.hdc.org.nz/your-rights/about-the-code/code-of-health-and-disability-services-consumers-rights/",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current HDC page continues to publish the full Code, including Right 4 service-quality duties and Right 7 informed-choice, presumed-competence, consent and refusal provisions.",
+      "boundary": "The Code provides rights and provider-duty context; actual authority, competence, exceptions and product workflow design require case-specific specialist decisions.",
+      "result": "current_identity_confirmed"
+    },
+    {
+      "id": "NZ-WORKSAFE-HSWA",
+      "authority": "WorkSafe New Zealand",
+      "canonical_url": "https://www.worksafe.govt.nz/notifications/what-events-need-to-be-notified/",
+      "reverified_on": "2026-08-24",
+      "current_signal": "The current WorkSafe guidance continues to define notifiable events as specified work-related deaths, injuries or illnesses, or incidents, with prompt notification, site-preservation and record obligations for serious events.",
+      "boundary": "The guidance does not prescribe Oblivion's classifier, lifecycle, RBAC, Site-scope or evidence model, and work-relatedness remains a factual and specialist decision.",
+      "result": "current_identity_confirmed"
+    }
+  ],
+  "counts": {
+    "required_source_identities": 6,
+    "reverified_current_identities": 6,
+    "coverage_percent": 100.0,
+    "product_compliance_claims_awarded": 0
+  },
+  "completion_credit": "Source-identity/currentness gate only. No runtime, legal-assurance, clinical-assurance, security-assurance, feature, module or remediation credit is awarded."
+}

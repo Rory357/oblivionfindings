@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-12T04:30:41.534Z",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "blocked_not_accepted",
+  "projection": {
+    "total": 740,
+    "human": 677,
+    "nonhuman": 63
+  },
+  "exact_static_sets": {
+    "routes": "3024/3024 exact once",
+    "pages": "962/962 mapped primary/shared"
+  },
+  "unadjudicated": {
+    "legacy_families": 154,
+    "routes": 894,
+    "normalized_groups": 470
+  },
+  "newly_reclassified": [
+    {
+      "feature_id": "ASSET-ASSET",
+      "evidence": "DELETE-only legacy asset route; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-ASSIGNMENT",
+      "evidence": "Legacy asset assignment routes; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-GEOFENCE",
+      "evidence": "Legacy asset geofence routes; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-INSPECTION",
+      "evidence": "Legacy asset inspection action; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-MAINTENANCE",
+      "evidence": "Legacy asset maintenance action; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-OWNERSHIP",
+      "evidence": "Legacy asset ownership action; no GET, mapped page, or production frontend activator found."
+    },
+    {
+      "feature_id": "ASSET-ASSET-SCAN-EVENT",
+      "evidence": "Legacy scan-event action; QR redirect does not invoke or log this route and no other production activator was found."
+    },
+    {
+      "feature_id": "RESP-CLIENT-RESPITE-ALLOCATION",
+      "evidence": "Mapped profile tab is read-only; no production frontend activator for the allocation mutator was found."
+    },
+    {
+      "feature_id": "OPS-SHIFT-INCIDENT",
+      "evidence": "Frontend posts a different URI; the canonical route has no matching production activator."
+    }
+  ],
+  "machine_ingress_already_nonhuman": [
+    "PLAT-WEBHOOK-RECEIVER",
+    "SEC-ASSET-TELEMETRY-INGEST"
+  ],
+  "runtime_tasks_executed": 0
+}

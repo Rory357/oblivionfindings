@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-benchmark-wave41-generation-summary",
+  "generated_at": "2026-08-22T01:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "inputs": {
+    "wave41": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave41.json",
+      "sha256": "31727e92f7148570c0d0cf1cc31100ed149611b9736fef4d98097b2879e30b42",
+      "bytes": 16345
+    }
+  },
+  "outputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
+      "bytes": 674511
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "e193306f8b748485ae0e4d7e1cb9d5da9f8c6f652b8ea9911b9a87b9d954b5d8",
+      "bytes": 11785664
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+      "bytes": 1959490
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+      "bytes": 3312496
+    }
+  },
+  "mapping_tuple_hashes": {
+    "full": "10f8192974d60d5b6391fd066675380df7535e4a7d09077b1874f753e3fc66e3",
+    "eligible": "20ec9411ebac0f3e8b33be1a154d27c9031762c2366c580ad484d24ac6c894f1"
+  },
+  "proof_hashes": {
+    "selection": "7546c09bad476fcd6b209d21a2d9bd2ee518bcb221f3a8f72ba7b2e3e48b60c8",
+    "evaluations": "90a6054a66a68ef34c14320ca0309bdf677d677e86eafc05c5a9f7c75f7d7cdf",
+    "source_registry": "9e85c6c7f821b44e89b70d006bcf764de7386b1e5e682fed0eb62871464a97f7",
+    "source_paths": "f2afe45f1a80dcdc88bbe32269885bd9795c18b50bf3b7ff7551c760fa45e453",
+    "prior_unique_ids": "c6541df6b40669be03c76f6d67b9d576e29034f84cc1573cc4b7824059093d09"
+  },
+  "counts": {
+    "denominator": 904,
+    "direct": 389,
+    "rename": 22,
+    "verified": 411,
+    "ncm": 89,
+    "eligible": 500,
+    "completion_unproved": 404
+  },
+  "downstream_refresh": {
+    "required_order": [
+      "generators/refresh-current-904-summaries.py",
+      "generators/refresh-audit-dashboard-data.py",
+      "generators/finalize-current-904-validation.py"
+    ],
+    "expected_boundary": {
+      "denominator": 904,
+      "direct": 389,
+      "rename": 22,
+      "verified": 411,
+      "ncm": 89,
+      "eligible": 500,
+      "completion_unproved": 404
+    },
+    "credit_boundary": "No product, runtime, browser, representative-task, release or overall-audit completion credit."
+  },
+  "validation": {
+    "selected": 8,
+    "direct": 4,
+    "retained": 4,
+    "benchmark_p3_completion_credit_delta": 4,
+    "product_runtime_representative_task_overall_completion_delta": 0,
+    "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE"
+  }
+}

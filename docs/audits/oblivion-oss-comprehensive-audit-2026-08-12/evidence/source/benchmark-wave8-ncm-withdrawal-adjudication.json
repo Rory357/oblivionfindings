@@ -1,0 +1,112 @@
+{
+  "schema_version": "1.0",
+  "artifact": "benchmark-wave8-ncm-withdrawal-adjudication",
+  "generated_at": "2026-08-21T00:00:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "two_wave8_ncm_credits_withdrawn_pending_fresh_target_specific_adjudication",
+  "audit_boundary": "This correction changes benchmark-completion credit only. It preserves the historical Wave-8 evidence file, does not auto-credit omitted candidates, and does not claim application runtime, usability, authorization, Site, privacy, clinical, regulatory, or overall audit completion.",
+  "review_source": {
+    "thread_id": "019ffe66-05d3-7b20-a140-73a773143191",
+    "review_kind": "read_only_adversarial_waves_4_to_8_evidence_quality_audit",
+    "reviewed_at": "2026-08-14T06:52:45+00:00",
+    "source_locus_replay_sha256": "714ef9a2aabd69d8dffe77b14e199f4498587c5bcbbc6a050ec9bf176eb96496",
+    "licence_replay_sha256": "9efa5977b070e52d4a7dc974ecc509dee8789b431e75227047bd0510425d7213",
+    "candidate_proof_sha256": "1c7422c5e823edbc74c15c9dc650c601f9fa8d30d581127f8e53f7e051813029",
+    "selected_key_sha256": "405cb8db02b4dfc3f07d55b54d0b7ed582bd5e5a1bd4c3a0f448dc99b4b61111",
+    "normalized_replacement_tuple_sha256": "e2a8bd5b704427318ab8dcd8f1fd23ab9dec7049cab2b452058682dd3cf2bf60"
+  },
+  "input_pins": {
+    "wave8": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-902-wave8.json",
+      "file_sha256": "ba191214a4f2e7d453aa3867d267e8f1cd72eb6354d0e1fea459f69f3b185b8c"
+    },
+    "benchmark_register": {
+      "path": "06-open-source-benchmark-register.csv",
+      "file_sha256": "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe"
+    }
+  },
+  "withdrawals": [
+    {
+      "working_key": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "prior_wave8_status": "documented_ncm_direct",
+      "replacement": {
+        "status": "unproved",
+        "completion_credit": false,
+        "inheritance_method": "none_no_strict_inheritance_basis",
+        "prior_outcome": null,
+        "source_units": [],
+        "evidence_loci": []
+      },
+      "reason": "The Wave-8 NCM omitted a catalogue candidate directly related to clinical form and encounter processing. The omission makes the NCM corpus incomplete; the candidate does not itself prove the required authorised behaviour or ABC register, so no direct credit replaces the withdrawn NCM.",
+      "omitted_candidate": {
+        "official_repository_url": "https://github.com/openmrs/openmrs-esm-form-engine-lib",
+        "commit_sha": "b7a344d184b2002dc0babbcb5bba1d37d29ea51b",
+        "spdx": "MPL-2.0",
+        "edition_boundary": "Pinned repository-root community source only; hosted services, private extensions, downstream distributions and unpinned branches are excluded.",
+        "exact_loci": [
+          {
+            "path": "src/processors/encounter/encounter-form-processor.ts",
+            "lines": "L127-L247",
+            "sha256": "fcdf7aeb8d54b922471a7ab53b2b69cc798053247376c2ea519e81e125ccde0e"
+          }
+        ],
+        "licence_path": "LICENSE.txt",
+        "licence_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+        "proven_slice": "Patient and encounter form persistence with partial-success handling.",
+        "parity_limits": "Does not prove an authorised person-filterable behaviour or ABC register, risk and review state, trends, support-plan context, or unrelated-person concealment."
+      },
+      "replacement_tuple": "CAP-CLIN-BEHAVIOUR-REGISTER|unproved|false|none_no_strict_inheritance_basis||"
+    },
+    {
+      "working_key": "CAP-CR-EVIDENCE-PACK-ASSEMBLY",
+      "prior_wave8_status": "documented_ncm_direct",
+      "replacement": {
+        "status": "unproved",
+        "completion_credit": false,
+        "inheritance_method": "none_no_strict_inheritance_basis",
+        "prior_outcome": null,
+        "source_units": [],
+        "evidence_loci": []
+      },
+      "reason": "The Wave-8 NCM omitted the benchmark catalogue's explicit same-target Frigate relation. The omission makes the NCM corpus incomplete; Frigate does not prove the complete immutable evidence-pack boundary, so no direct credit replaces the withdrawn NCM.",
+      "omitted_candidate": {
+        "official_repository_url": "https://github.com/blakeblackshear/frigate",
+        "commit_sha": "c75611b4dfc2da6e3acaf68410f3d32a75917626",
+        "spdx": "MIT",
+        "edition_boundary": "Pinned repository-root community source only; hosted services, private extensions, downstream distributions and unpinned branches are excluded.",
+        "exact_loci": [
+          {
+            "path": "frigate/api/review.py",
+            "lines": "L45-L157,L675-L703",
+            "sha256": "a70c94e3ae65741a1d2c16306f0b5572bba22213f146342541502b80a8314f43"
+          },
+          {
+            "path": "frigate/api/export.py",
+            "lines": "L296-L376,L461-L505,L538-L567",
+            "sha256": "4d87fce7166186cd285d40360ab0e01d75e801eff5440a8431cdeb1b88f7bea2"
+          }
+        ],
+        "licence_path": "LICENSE",
+        "licence_sha256": "490bc07296c07845f0c5d0db6760da37e4c21258d0e6e1cfa500ce04bebf1983",
+        "proven_slice": "Camera-filtered review and case ZIP download.",
+        "parity_limits": "Does not prove alert binding, selected immutable versions, a manifest with hashes and provenance, redaction decisions, failure and retry state, download authorisation, or download audit."
+      },
+      "replacement_tuple": "CAP-CR-EVIDENCE-PACK-ASSEMBLY|unproved|false|none_no_strict_inheritance_basis||"
+    }
+  ],
+  "counter_effect": {
+    "before": {
+      "verified_benchmark": 331,
+      "documented_no_credible_match": 91,
+      "eligible": 422,
+      "completion_unproved": 480
+    },
+    "after": {
+      "verified_benchmark": 331,
+      "documented_no_credible_match": 89,
+      "eligible": 420,
+      "completion_unproved": 482
+    }
+  },
+  "completion_statement": "Both targets require fresh target-specific benchmark or bounded No Credible Match adjudication before completion credit can be restored."
+}

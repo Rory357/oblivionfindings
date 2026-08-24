@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "artifact": "route-page-gap-reconciliation-902-generation-summary",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_surface_refresh_runtime_and_completion_blocked",
+  "audit_boundary": "Audit artifacts only; no application code, configuration, routes, pages, tests, browser state, data, deployment, or Git history changed.",
+  "inputs": {
+    "gap_901_sha256": "e04eacf0587ac2b24c5f3dde2edebba39a7dc2ce37329c5a3fc55cd4cfb52468",
+    "manifest_902_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9"
+  },
+  "counts": {
+    "accepted_feature_ids": 902,
+    "H": 788,
+    "D": 111,
+    "M": 3,
+    "route_inventory": 3024,
+    "accepted_routes": 2985,
+    "excluded_surface_routes": 39,
+    "page_inventory": 962,
+    "accepted_pages": 945,
+    "excluded_surface_pages": 17
+  },
+  "outputs": {
+    "gap_reconciliation": "route-page-gap-reconciliation-902.json",
+    "gap_reconciliation_sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb",
+    "coverage_sha256": "538af31f8bb1c0675c315f43d315c284aee578b687f119601c297cb09e765eba"
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "Accepted FEATURE-ID registration and static route/page disposition are not runtime, role, error, recovery, handoff, viewport, test, or product-completion proof."
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-904-wave33",
+  "generated_at": "2026-08-21T18:45:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eight current completion-unproved medication targets independently reviewed; one target-specific direct comparator and seven retained-unproved decisions after two independent scope downgrades.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "Comparator source evidence only. No Oblivion product, runtime, browser, representative-task or release credit.",
+    "no_copy_rule": "Behavioural evidence only; no source, schema, UI or wording is copied.",
+    "selection_preimage_rule": "Packet-order target IDs joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "52b8d116cf143162b874925c09242627efc65f1d1563d1dacc38dc7869fbaa65",
+    "independent_review_verdict": "NO_GO_as_proposed_GO_after_generic_audit_and_generic_skill_scope_downgrades"
+  },
+  "selected_target_ids": [
+    "CAP-MED-AUDIT-RAW-CSV-EXPORT",
+    "CAP-MED-AUDIT-RAW-LOG-REVIEW",
+    "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+    "CAP-MED-CLIENT-MEDICAL-PROFILE",
+    "CAP-MED-MAR-CSV-EXPORT",
+    "CAP-MED-PDF-MAR-CHART",
+    "CAP-MED-PRESCRIPTION-COUNTERSIGN",
+    "CAP-MED-STAFF-COMPETENCY-REGISTER"
+  ],
+  "input_pins": {
+    "benchmark_final_904_before_wave": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "f65df41d0fbf64b0250dd7377ad80b405405e2c91fed0461f2c46cc483d19f35",
+      "bytes": 655054
+    }
+  },
+  "repository_snapshots": {
+    "OPENEMR": {
+      "repo": "openemr/openemr",
+      "official_repository_url": "https://github.com/openemr/openemr",
+      "commit_sha": "7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2",
+      "parent_sha": "9092b746aaf4934795be5fed325464a2c19f7d4b",
+      "root_tree_sha": "b43c18c44501bef40af6fb5fad834877346a8bdf",
+      "repository_root_licence": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE",
+          "git_blob_sha": "94a9ed024d3859793618152ea559a168bbcbb5e2",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "path": "composer.json",
+          "git_blob_sha": "0f345f5ac4f85a7fb6526085536972fd0f8cdb8f",
+          "sha256": "cee7ba8d4eb7f27b183a57b08aba7ddaaef1586573721cdafb1ac61589c6d32c"
+        },
+        {
+          "path": "Documentation/api/STANDARD_API.md",
+          "git_blob_sha": "fe5d1ca93c89cb133de6956ae54ec982000b4711",
+          "sha256": "8a73644bc81fd6fb376c5d509414f83483d79c2c0038d9d2814cea98f846a3f6"
+        },
+        {
+          "path": "src/RestControllers/ConditionRestController.php",
+          "git_blob_sha": "1d8ff0193e23ed6da95be9bcad9d898a2084a3c1",
+          "sha256": "37d1185cac9e89b94cbf86ab45ef2c54ab8f193e6bef3ef4b5d22dd303d63d71"
+        },
+        {
+          "path": "src/Services/ConditionService.php",
+          "git_blob_sha": "08790230207229177870b22fe6fcc0bbc4a71440",
+          "sha256": "a9b51246818744bd0bb932ae444344171cad864d1e9a332b32fb6d45d16402af"
+        },
+        {
+          "path": "interface/logview/logview.php",
+          "git_blob_sha": "0d0a755c5003bd845af0c65bf38d0e506a577411",
+          "sha256": "3e6edcf5690b32916a0c33269c9446239450d3a20258664484609d4c4de8ab2b"
+        },
+        {
+          "path": "src/RestControllers/PatientRestController.php",
+          "git_blob_sha": "057b4619aaa9836b0399ad536c5baf086fae38a5",
+          "sha256": "14945e42a9c2616af41033a05854f1923198d7f08ff0d50b82c5e761986ada61"
+        },
+        {
+          "path": "src/Services/PatientService.php",
+          "git_blob_sha": "ddd09796e5bd8a650648556ecdf22fba9173dae9",
+          "sha256": "80ade7253efb4df61bc3799b3a830bb82c8bad93060ca9e6f312a12e8c93748d"
+        },
+        {
+          "path": "interface/reports/prescriptions_report.php",
+          "git_blob_sha": "f7a94e617dc0e587a17b27a45eaf238313e977a9",
+          "sha256": "161b0f2862b80eae62c42db9bc22099c92613c18e99b017d9e4cc5e4d0f8f692"
+        },
+        {
+          "path": "interface/patient_file/report/patient_report.php",
+          "git_blob_sha": "6eb80aec15e14a860720b37d6fcebdfba7f39eca",
+          "sha256": "22808d4eb7c6d68c9d74e8970a769a00168d2bf777e1f8dd55ca4efca1350111"
+        },
+        {
+          "path": "src/RestControllers/PrescriptionRestController.php",
+          "git_blob_sha": "6366cc15a0a73bac0611cdcf6201738c04632ee0",
+          "sha256": "346396f0e8f55298b1e778cd40ecbb6b06da4d37c9ffb46a95e6525fbe5009e6"
+        },
+        {
+          "path": "src/Services/PrescriptionService.php",
+          "git_blob_sha": "fd5586fe61093b7609a6c17137c6a2cc60cf7701",
+          "sha256": "9bf8f5b00c4a29e63f7b4512ff4167813e34332323a91837d1027bae0a826db0"
+        }
+      ]
+    },
+    "FRAPPE_HRMS": {
+      "repo": "frappe/hrms",
+      "official_repository_url": "https://github.com/frappe/hrms",
+      "commit_sha": "51c2d3bde2d2797ad929eaeef27311c64d5a1b33",
+      "parent_sha": "1dff2c5acba6a074842cc6bcc1bdea1eff585227",
+      "root_tree_sha": "031668094179f3a85686fff19e547f86f939aa4b",
+      "repository_root_licence": "GPL-3.0-only",
+      "files": [
+        {
+          "path": "license.txt",
+          "git_blob_sha": "a238a97b060d8bf487880f88de6114e795f9fba4",
+          "sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea"
+        },
+        {
+          "path": "hrms/hr/doctype/employee_skill_map/employee_skill_map.json",
+          "git_blob_sha": "03fd8e6194ad32b188ea1c40f18852d475519dc2",
+          "sha256": "333971590f04346514fa97d411291fe9cb3421155a3973142ca1ad9eda848b8a"
+        },
+        {
+          "path": "hrms/hr/doctype/employee_skill/employee_skill.json",
+          "git_blob_sha": "3af1e2aa11c6ee4ba8e943d4f49178d953c8acc6",
+          "sha256": "ee7f4c67de737355c3e28bdcda837dd731c3fe9b80da8aafbaaacd2c2f35d9c4"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "direct": 1,
+    "retained_unproved": 7,
+    "documented_ncm": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-MED-AUDIT-RAW-CSV-EXPORT",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Logs Viewer",
+      "neutral_requirement": "Export authorised, filter-bounded raw medication-audit rows as explicit CSV with stable columns and provenance.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: interface/logview/logview.php :: L29-L35,L98-L218,L251-L343,L347-L448",
+      "reason": "The authorised filterable viewer has no CSV, download or export contract and is not medication-scoped."
+    },
+    {
+      "working_key": "CAP-MED-AUDIT-RAW-LOG-REVIEW",
+      "candidate_status": "retained_unproved_after_independent_scope_review",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Logs Viewer",
+      "neutral_requirement": "Give an authorised medication-audit reviewer a filterable raw medication-event view with actor, patient, event and provenance evidence.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: interface/logview/logview.php :: L29-L35,L98-L218,L251-L343,L347-L448",
+      "reason": "Independent review found the viewer is generic and the cited file contains no medication, prescription, dispensation, drug, eMAR or MAR filter. Generic audit review cannot inherit credit for this medication-scoped final ID."
+    },
+    {
+      "working_key": "CAP-MED-CLIENT-MEDICAL-CONDITION-LIFECYCLE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "research_candidate": "OpenEMR Medical Problem Standard API",
+      "neutral_requirement": "Create, retrieve, update and delete a patient medical condition with validation and authoritative patient association.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: Documentation/api/STANDARD_API.md :: L125-L151; src/RestControllers/ConditionRestController.php :: L35-L43,L74-L78,L190-L193,L225-L230,L269-L305; src/Services/ConditionService.php :: L121-L194,L205-L240,L251-L283,L294-L314",
+      "reason": "The official endpoint catalogue declares Medical Problem CRUD; the pinned controller and service validate and persist patient-linked create, read, update and delete operations. Oblivion Site/direct-object concealment, correction provenance and runtime remain unproved."
+    },
+    {
+      "working_key": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Patient resource",
+      "neutral_requirement": "Retrieve and update a distinct authoritative client-medical-profile singleton with its medical field contract and provenance.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: src/RestControllers/PatientRestController.php :: L255-L331; src/Services/PatientService.php :: L251-L297,L307-L356",
+      "reason": "A general patient resource does not prove the distinct medical-profile singleton or its medical-field envelope."
+    },
+    {
+      "working_key": "CAP-MED-MAR-CSV-EXPORT",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Prescriptions and Dispensations report",
+      "neutral_requirement": "Export one client's medication-administration record as CSV with stable administration outcome and provenance columns.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: interface/reports/prescriptions_report.php :: L28-L40,L47-L64,L77-L96,L108-L184,L199-L345",
+      "reason": "Prescription and dispensation reporting is not a MAR administration-event CSV export."
+    },
+    {
+      "working_key": "CAP-MED-PDF-MAR-CHART",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Patient Report PDF",
+      "neutral_requirement": "Generate a governed PDF MAR chart with scheduled and actual administrations, omissions, actor and time evidence.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: interface/patient_file/report/patient_report.php :: L41-L53,L108-L361,L546-L598",
+      "reason": "A selectable generic patient-report PDF is not a medication-administration chart."
+    },
+    {
+      "working_key": "CAP-MED-PRESCRIPTION-COUNTERSIGN",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "research_candidate": "OpenEMR Prescription Standard API",
+      "neutral_requirement": "Record an independent authorised second practitioner's prescription countersignature with actor, time and attestation evidence.",
+      "evidence_loci": "openemr/openemr@7e67e2677ca18c3fe0bc70d9de58a3b506d64ac2 :: src/RestControllers/PrescriptionRestController.php :: L35-L157; src/Services/PrescriptionService.php :: L56-L338,L381-L470",
+      "reason": "The prescription lifecycle contains no countersign, co-sign, attestation or second-sign behavior."
+    },
+    {
+      "working_key": "CAP-MED-STAFF-COMPETENCY-REGISTER",
+      "candidate_status": "retained_unproved_after_independent_scope_review",
+      "completion_credit_recommended": false,
+      "research_candidate": "Frappe HRMS Employee Skill Map",
+      "neutral_requirement": "Maintain a medication-specific per-staff competency register with assessor, expiry, unsupervised-administration and controlled-witness evidence.",
+      "evidence_loci": "frappe/hrms@51c2d3bde2d2797ad929eaeef27311c64d5a1b33 :: hrms/hr/doctype/employee_skill_map/employee_skill_map.json :: L7-L58,L65-L105; hrms/hr/doctype/employee_skill/employee_skill.json :: L7-L48",
+      "reason": "Independent review found only generic skills and proficiency: no medication, controlled-drug, witness, assessor or expiry semantics. Generic HR skills cannot inherit this medication-specific final ID."
+    }
+  ],
+  "collision_disclosure": {
+    "prior_materialized_wave_packets": 27,
+    "prior_evaluation_occurrences": 286,
+    "prior_unique_evaluated_ids": 280,
+    "prior_unique_id_set_sha256": "4cf2bac2f3502c7ff595536d6dde1d5ee2ff73276c244d699765aad54f021f7b",
+    "prior_packet_name_set_sha256": "70b4b612e9f40383ad0f7f58f5559d66181ad1f6e2f50793f2de4496e4436419",
+    "selected_target_intersection": 0,
+    "source_reuse": "HRMS skill-map and older OpenEMR prescription sources were separately assessed for these final IDs and retained without inherited credit. Repository and adjacent-source reuse never transfers target credit."
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 1,
+    "eligible_total": 1,
+    "completion_unproved": -1,
+    "documented_ncm": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark_direct": 345,
+    "verified_benchmark_total": 367,
+    "documented_ncm": 89,
+    "eligible_total": 456,
+    "completion_unproved": 448
+  }
+}

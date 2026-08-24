@@ -1,0 +1,112 @@
+{
+  "schema_version": "1.1",
+  "artifact": "final-904-visual-link-generation-summary",
+  "generated_at": "2026-08-23T16:32:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "partial_final_id_linkage_observations_preserved_runtime_coverage_unchanged",
+  "audit_boundary": "Audit artifacts only; no application code, configuration, data, tests, browser state, deployment or Git history changed.",
+  "inputs": {
+    "visual_matrix_input_sha256": "f0aed8a6cbc242651ef7cd702685f8c948af276b3830d4d5960ea6ece1e9f363",
+    "manifest_904_sha256": "ffca48609deab9a8938105c857786594a9a5431c31efe329ef4288da6165358f",
+    "inventory_904_sha256": "40cb6916140b5e88fa2049b1185285d9497e2011064cd04cdc53eafd48223035",
+    "route_page_904_sha256": "1a237628080d225cd32cdfa173ea01737b6c9c32e51bbca183a8ec84a0b8d7be",
+    "adjudication_sha256": "268ee4c752d8fe216716248272881f0d7ed5d8c008e12a6995d62a4442a289a9",
+    "overlay_classifier_sha256": "60b02298132846b6d27db9fc08d981f925fbe4d72890553551b4d915a033fa9b"
+  },
+  "counts": {
+    "rows": 8753,
+    "unique_visual_ids": 8753,
+    "assigned_final_feature_id": 8168,
+    "unresolved_final_feature_id": 585,
+    "unique_assigned_final_feature_ids": 774,
+    "material_state_rows": 4312,
+    "material_state_assigned": 3948,
+    "material_state_unresolved": 364,
+    "status_counts": {
+      "component_callback_exact_route_action": 44,
+      "component_overlay_exact_route_actions": 58,
+      "custom_component_exact_route_actions": 57,
+      "exact_working_key": 3497,
+      "global_exact_page": 227,
+      "global_exact_route": 109,
+      "global_exact_route_page": 353,
+      "hero_component_exact_route_actions": 21,
+      "material_state_all_routes_exact_intersection": 11,
+      "material_state_combined_route_actions_exact": 119,
+      "material_state_exact_route_action": 125,
+      "material_state_named_route_set_exact_ownership": 69,
+      "safe_route_exact_route_owner_page_anchor_rejected": 3,
+      "source_family_one_to_one": 1546,
+      "split_family_exact_page": 770,
+      "split_family_exact_route": 61,
+      "split_family_exact_route_page": 1086,
+      "split_family_global_exact_page": 5,
+      "split_family_global_exact_route": 1,
+      "split_family_global_exact_route_page": 6,
+      "unresolved_no_manifest_lineage": 250,
+      "unresolved_split_family_page_ambiguous": 246,
+      "unresolved_split_source_family": 89
+    },
+    "classification_counts": {
+      "Blocked": 497,
+      "Not safely reproducible": 4312,
+      "Observed": 2503,
+      "Source-inferred": 1441
+    },
+    "pattern_type_counts": {
+      "hero/custom-usage": 85,
+      "hero/pagehero-call-site": 521,
+      "hero/wrapper-reference": 50,
+      "material-state-applicability": 4312,
+      "navigation-overlay": 1,
+      "overlay/custom-usage": 659,
+      "overlay/primitive-root": 477,
+      "overlay/primitive-trigger": 146,
+      "page/component": 1880,
+      "safe-route-template": 622
+    }
+  },
+  "outputs": {
+    "matrix": "05-browser-visual-coverage-matrix-904.csv",
+    "matrix_sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+    "semantic_tuple_sha256": "5aba32b52bb309e5a3d9be34ca15e69b4dc85cd7327e61c5a8fbe533577b8097",
+    "semantic_tuple_algorithm": "Current row order; UTF-8; LF/no trailing LF; visual_id US legacy_feature_id US feature_id US working_feature_ids US feature_link_status US feature_link_evidence"
+  },
+  "wave1": {
+    "promoted": 15,
+    "retained_unresolved_reviewed": 17,
+    "unique_promoted_targets": 10,
+    "assignment_sha256": "f1eca7f0521a59220466405cede1385c8097aae05fac25f7686af4df87e83aea",
+    "proof_map_sha256": "391bf30214757106020bd3406e7ce12bda43017b20e97e174e124d7ca79ebb4d",
+    "claim_limit": "Final-ID lineage only. No row classification, browser/runtime observation, screenshot, material execution, usability or completion credit changed."
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "585 visual rows and 364 material-state rows remain without an exact final ID; runtime visual requirements remain incomplete."
+  },
+  "overlay_classifier_sync": {
+    "custom_rows": 659,
+    "custom_exact": 253,
+    "custom_inferred": 144,
+    "custom_unresolved_or_blocked": 262,
+    "primitive_rows": 477,
+    "primitive_exact": 242,
+    "primitive_unresolved": 235,
+    "explicit_primitive_trigger_rows_unchanged": 146,
+    "trigger_or_classification_changes": 134,
+    "fully_rederived_rows": 1136,
+    "runtime_credit_delta": 0
+  },
+  "wave12": {
+    "adjudication": {
+      "path": "evidence/source/visual-final-id-adjudication-904-wave12.json",
+      "sha256": "f1e98397c192571d2299c11d74f451a8758a44565438338f90171f307d0c005e",
+      "bytes": 25254
+    },
+    "reviewed_rows": 20,
+    "promoted": 0,
+    "material_rows": 0,
+    "generic_blockers_replaced": 20,
+    "claim_limit": "Exact final-ID ownership blockers only. No browser, runtime, material-state execution, usability or completion credit changed."
+  }
+}

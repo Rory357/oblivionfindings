@@ -1,0 +1,646 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave8",
+  "generated_at": "2026-08-13T22:46:33+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eighth bounded target-specific wave: 12 independently researched current unique ordinary-unproved targets, with no inherited family credit.",
+  "methodology": {
+    "credit_rule": "Only target-specific official repository-native source pinned to an immutable commit, with exact loci proving a material same-target slice or a bounded multi-repository NCM, receives completion credit.",
+    "licence_rule": "Only cited community source is credited; hosted, paid-plan, enterprise, private and unpinned behavior is excluded.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or Git state was changed."
+  },
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "571e6a78bf34d5542168c32ab015f35e802933f4ac4cdb3188f047e93ca23511"
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 10,
+    "documented_ncm_direct_recommended": 2,
+    "completion_credit_recommended": 12
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Present an authorised person-filterable behaviour register with occurrence, behaviour definition, severity/risk, actor, support-plan context, action/review state and trends without unrelated-person disclosure.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL",
+        "source_family_ids": [
+          "CLIN-HEALTH-CLINICAL-DASHBOARD"
+        ],
+        "route_ids": [
+          "ROUTE-1057"
+        ],
+        "page_ids": [
+          "PAGE-0339"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+        ]
+      },
+      "search_terms": [
+        "behaviour support event register ABC antecedent behaviour consequence risk review open source health record"
+      ],
+      "evidence_loci": [
+        "openemr/openemr@a6321a3e2978e62472dbb6c721b680ca2d65b592 :: src/Controllers/Interface/Forms/Observation/ObservationController.php :: L180-L225,L242-L354",
+        "openmrs/openmrs-core@8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e :: api/src/main/java/org/openmrs/Obs.java :: L41-L67,L95-L171,L180-L235",
+        "openmrs/openmrs-core@8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e :: api/src/main/java/org/openmrs/Encounter.java :: L47-L112"
+      ],
+      "rejected_repositories": [
+        {
+          "official_repository_url": "https://github.com/openemr/openemr",
+          "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned GPL-3.0 OpenEMR repository-native source only; hosted services, private extensions and unpinned branches are excluded.",
+          "source_loci": [
+            "src/Controllers/Interface/Forms/Observation/ObservationController.php:L180-L225,L242-L354"
+          ],
+          "reason": "Generic patient/encounter observation listing and transaction-backed recording do not establish a behaviour register, support-plan context, ABC structure, risk or review state."
+        },
+        {
+          "official_repository_url": "https://github.com/openmrs/openmrs-core",
+          "commit_sha": "8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e",
+          "spdx": "MPL-2.0",
+          "edition_boundary": "Pinned MPL-2.0 OpenMRS community core only, subject to its Healthcare Disclaimer; hosted services, private extensions and unpinned branches are excluded.",
+          "source_loci": [
+            "api/src/main/java/org/openmrs/Obs.java:L41-L67,L95-L171,L180-L235",
+            "api/src/main/java/org/openmrs/Encounter.java:L47-L112"
+          ],
+          "reason": "Generic coded observations and encounters can store concepts but do not establish the behaviour-register actor job, support-plan/risk workflow, review state or completion."
+        }
+      ],
+      "bounded_ncm_reason": "The inspected official health-record repositories prove generic observations, not the exact behaviour-register capability and completion boundary. This is bounded to the inspected corpus."
+    },
+    {
+      "working_key": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised clinician can record and retrieve a person-linked clinical event with time, type, location, provider and correction/void provenance.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL",
+        "source_family_ids": [
+          "CLIN-HEALTH-CLINICAL-DASHBOARD"
+        ],
+        "route_ids": [
+          "ROUTE-1063",
+          "ROUTE-1064"
+        ],
+        "page_ids": [
+          "PAGE-0347",
+          "PAGE-0351"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+        ]
+      },
+      "evidence_loci": [
+        "openmrs/openmrs-core@8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e :: api/src/main/java/org/openmrs/Encounter.java :: L47-L112,L136-L188,L478-L488,L579-L621",
+        "openmrs/openmrs-core@8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e :: api/src/main/java/org/openmrs/api/EncounterService.java :: L51-L82,L111-L181,L204-L226",
+        "openmrs/openmrs-core@8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e :: api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java :: L69-L101,L106-L173,L216-L236,L264-L274,L315-L324,L415-L491"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "8bb5c2e9e36ab8fb09f0053786bc0f040775cc1e",
+        "source_loci": [
+          "api/src/main/java/org/openmrs/Encounter.java:L47-L112,L136-L188,L478-L488,L579-L621",
+          "api/src/main/java/org/openmrs/api/EncounterService.java:L51-L82,L111-L181,L204-L226",
+          "api/src/main/java/org/openmrs/api/impl/EncounterServiceImpl.java:L69-L101,L106-L173,L216-L236,L264-L274,L315-L324,L415-L491"
+        ],
+        "proven_slice": "Models a patient interaction with time, patient, location, type, visit and providers; permission-gates add/edit/view, saves transactionally and supports filtered retrieval plus reasoned void/unvoid.",
+        "parity_limits": "An encounter is not necessarily an adverse clinical event; severity, on-call escalation, follow-up and Oblivion site/direct-object rules remain unproved.",
+        "licence": {
+          "spdx": "MPL-2.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised reviewer can apply ordered event-state transitions with actor, cause and timeline evidence and configure an ordered wait-based escalation rule.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL",
+        "source_family_ids": [
+          "CLIN-HEALTH-CLINICAL-DASHBOARD"
+        ],
+        "route_ids": [
+          "ROUTE-1065",
+          "ROUTE-1066",
+          "ROUTE-1067"
+        ],
+        "page_ids": [
+          "PAGE-0347",
+          "PAGE-0351"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+        ]
+      },
+      "evidence_loci": [
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/AlertStateTimeline.ts :: L35-L86,L268-L323,L380-L490,L511-L568",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Server/Services/AlertStateTimelineService.ts :: L63-L215,L306-L461,L494-L524",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/OnCallDutyPolicyEscalationRule.ts :: L23-L75,L158-L236,L243-L323,L457-L494"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/OneUptime/oneuptime",
+        "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee",
+        "source_loci": [
+          "Common/Models/DatabaseModels/AlertStateTimeline.ts:L35-L86,L268-L323,L380-L490,L511-L568",
+          "Common/Server/Services/AlertStateTimelineService.ts:L63-L215,L306-L461,L494-L524",
+          "Common/Models/DatabaseModels/OnCallDutyPolicyEscalationRule.ts:L23-L75,L158-L236,L243-L323,L457-L494"
+        ],
+        "proven_slice": "Community source permission-gates alert state timelines, validates referenced state scope, rejects duplicate or backward transitions, records actor/root cause, updates current state and models ordered wait-based escalation-rule configuration.",
+        "parity_limits": "Paid-plan execution-timeline evidence is excluded. This does not prove clinical review/sign-off, escalation execution or delivery, acknowledgement, follow-up prerequisites, client records, Oblivion site boundaries or runtime behavior.",
+        "licence": {
+          "spdx": "Apache-2.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CLIN-FRONTLINE-OBSERVATION-RECORDING",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised worker can record an observation for the correct person and encounter context with validated data, actor/person/time provenance and atomic rollback on failure.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL",
+        "source_family_ids": [
+          "CLIN-CLIENT-CLINICAL",
+          "CLIN-SHIFT-CLINICAL"
+        ],
+        "route_ids": [
+          "ROUTE-0144",
+          "ROUTE-0145",
+          "ROUTE-2716",
+          "ROUTE-2717"
+        ],
+        "page_ids": [
+          "PAGE-0541",
+          "PAGE-0708"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/ClientClinicalController.php",
+          "app/Http/Controllers/Clinical/ShiftClinicalController.php"
+        ]
+      },
+      "evidence_loci": [
+        "openemr/openemr@a6321a3e2978e62472dbb6c721b680ca2d65b592 :: src/Controllers/Interface/Forms/Observation/ObservationController.php :: L75-L139,L242-L280,L283-L354"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "source_loci": [
+          "src/Controllers/Interface/Forms/Observation/ObservationController.php:L75-L139,L242-L280,L283-L354"
+        ],
+        "proven_slice": "Checks form permission and CSRF, binds patient, encounter and authenticated provider, prevents an observation ID crossing patients, validates data and writes parent/sub-observations in a transaction with rollback.",
+        "parity_limits": "Does not prove Oblivion shift schedule, site access, direct-object policy, offline idempotency, observation taxonomy or worker UI.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CR-ALERT-COLLABORATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised operators can list, add and revise alert discussion entries only through the supplied visible alert, retaining author, time, visibility and notification provenance without disclosing a hidden parent.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-DISCUSSION"
+        ],
+        "route_ids": [
+          "ROUTE-0222",
+          "ROUTE-0223",
+          "ROUTE-0253",
+          "ROUTE-0254"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomDiscussionController.php"
+        ]
+      },
+      "evidence_loci": [
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/controllers/work_packages/activities_tab_controller.rb :: L42-L45,L132-L162,L199-L201,L235-L250,L295-L315",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/services/work_packages/activities_tab/comment_service.rb :: L31-L83"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/opf/openproject",
+        "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f",
+        "source_loci": [
+          "app/controllers/work_packages/activities_tab_controller.rb:L42-L45,L132-L162,L199-L201,L235-L250,L295-L315",
+          "app/services/work_packages/activities_tab/comment_service.rb:L31-L83"
+        ],
+        "proven_slice": "Resolves a visible work package, authorises the activity action, creates or updates a journal comment, limits accepted fields, sanitises internal mentions, controls notifications and restricts journal lookup to the owning work package.",
+        "parity_limits": "Does not prove Oblivion alert/site ownership, child resolution, discussion deletion, privacy classification, Laravel audit events or runtime behavior. Enterprise-only internal-comment availability is excluded.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CR-ALERT-TASKS",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised operators can create and update alert tasks within the owning alert, retaining status, assignee, due-date and history evidence without cross-alert mutation.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-TASK"
+        ],
+        "route_ids": [
+          "ROUTE-0234",
+          "ROUTE-0235",
+          "ROUTE-0236",
+          "ROUTE-0316",
+          "ROUTE-0317",
+          "ROUTE-0318"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php"
+        ]
+      },
+      "evidence_loci": [
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/models/work_package.rb :: L57-L67,L87-L110,L140-L148,L181-L203",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/services/work_packages/create_service.rb :: L31-L81,L84-L110"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/opf/openproject",
+        "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f",
+        "source_loci": [
+          "app/models/work_package.rb:L57-L67,L87-L110,L140-L148,L181-L203",
+          "app/services/work_packages/create_service.rb:L31-L81,L84-L110"
+        ],
+        "proven_slice": "A work package belongs to project, type, status and author, may have assignee and watchers, and is created through contract-backed attribute validation with related scheduling and ancestor updates.",
+        "parity_limits": "Project work packages are not safety-alert tasks; no Oblivion alert parent, task ordering API, site boundary, notification contract or runtime behavior is proved.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CR-ALERT-TIME-TRACKING",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised operators can record time against the correct alert, with own-versus-other permission, membership, duplicate-active-timer prevention and actor/time provenance.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-TIME-ENTRY"
+        ],
+        "route_ids": [
+          "ROUTE-0237",
+          "ROUTE-0238",
+          "ROUTE-0239",
+          "ROUTE-0319",
+          "ROUTE-0320"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomTimeEntryController.php"
+        ]
+      },
+      "evidence_loci": [
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: modules/costs/app/contracts/time_entries/create_contract.rb :: L29-L67",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: modules/costs/app/services/time_entries/create_service.rb :: L29-L54"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/opf/openproject",
+        "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f",
+        "source_loci": [
+          "modules/costs/app/contracts/time_entries/create_contract.rb:L29-L67",
+          "modules/costs/app/services/time_entries/create_service.rb:L29-L54"
+        ],
+        "proven_slice": "Validates whether the actor may log time for self or others, checks project membership and work-package permission, rejects duplicate ongoing entries, persists the result and emits a creation event.",
+        "parity_limits": "Does not prove alert/site ownership, explicit stop behavior, duration rules, audit events or safety-response reporting.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CR-ALERT-WATCHERS",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised operators can list, add and remove watchers only for a visible owning alert while separating self-watch from watcher-management authority and hiding unavailable identities.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-WATCHER"
+        ],
+        "route_ids": [
+          "ROUTE-0242",
+          "ROUTE-0243",
+          "ROUTE-0244",
+          "ROUTE-0245"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomWatcherController.php"
+        ]
+      },
+      "evidence_loci": [
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/controllers/watchers_controller.rb :: L31-L68",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: lib/api/v3/work_packages/watchers_api.rb :: L34-L110"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/opf/openproject",
+        "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f",
+        "source_loci": [
+          "app/controllers/watchers_controller.rb:L31-L68",
+          "lib/api/v3/work_packages/watchers_api.rb:L34-L110"
+        ],
+        "proven_slice": "Resolves a visible watched object, distinguishes self-watch from watcher-management permissions, restricts candidates to visible non-locked principals and creates or removes watchers with safe not-found behavior.",
+        "parity_limits": "Does not prove Oblivion alert/site ownership, notification delivery, audit events or site-scoped user search.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-CR-EVIDENCE-PACK-ASSEMBLY",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Assemble an authorised alert-scoped evidence pack from selected immutable versions with manifest, hashes, provenance, redaction decisions, generation state, failure/retry, download authorisation and download audit.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-EVIDENCE"
+        ],
+        "route_ids": [
+          "ROUTE-0226",
+          "ROUTE-0227",
+          "ROUTE-0260",
+          "ROUTE-0262",
+          "ROUTE-0263"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php"
+        ]
+      },
+      "search_terms": [
+        "alert evidence pack assembly manifest hash immutable attachment versions export audit"
+      ],
+      "evidence_loci": [
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/contracts/attachments/create_contract.rb :: L31-L97",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/services/attachments/create_service.rb :: L31-L89",
+        "opf/openproject@0d46ea5d912e32f877537c59d8ab016b0c3e168f :: app/models/work_package.rb :: L195-L203",
+        "mayan-edms/Mayan-EDMS@8da13ee7e49fa23d24ab49906bf9cf6bfe3f44e9 :: mayan/apps/documents/api_views/document_file_api_views.py :: L93-L116",
+        "mayan-edms/Mayan-EDMS@8da13ee7e49fa23d24ab49906bf9cf6bfe3f44e9 :: mayan/apps/documents/api_views/document_version_api_views.py :: L54-L73",
+        "mayan-edms/Mayan-EDMS@8da13ee7e49fa23d24ab49906bf9cf6bfe3f44e9 :: mayan/apps/events/views/export_views.py :: L20-L48,L70-L107"
+      ],
+      "rejected_repositories": [
+        {
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "0d46ea5d912e32f877537c59d8ab016b0c3e168f",
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Pinned GPL-3.0 OpenProject Community source only; Enterprise add-ons, hosted behavior, private extensions and unpinned branches are excluded.",
+          "source_loci": [
+            "app/contracts/attachments/create_contract.rb:L31-L97",
+            "app/services/attachments/create_service.rb:L31-L89",
+            "app/models/work_package.rb:L195-L203"
+          ],
+          "reason": "Proves authorised attachment creation, type allow-listing, a container mutex, journal refresh and notification, not an immutable alert pack with manifest, hashes, redaction snapshot and pack completion."
+        },
+        {
+          "official_repository_url": "https://github.com/mayan-edms/Mayan-EDMS",
+          "commit_sha": "8da13ee7e49fa23d24ab49906bf9cf6bfe3f44e9",
+          "spdx": "Apache-2.0",
+          "edition_boundary": "Pinned Apache-2.0 Mayan EDMS repository-native community source only; hosted services, private extensions and unpinned branches are excluded.",
+          "source_loci": [
+            "mayan/apps/documents/api_views/document_file_api_views.py:L93-L116",
+            "mayan/apps/documents/api_views/document_version_api_views.py:L54-L73",
+            "mayan/apps/events/views/export_views.py:L20-L48,L70-L107"
+          ],
+          "reason": "Proves permission-gated file download, version export and queued event-list export, not one alert/case evidence-pack assembly with frozen versions, manifest, hashes, redaction and pack-level completion."
+        }
+      ],
+      "bounded_ncm_reason": "The two inspected official repositories do not prove the same alert-scoped immutable assembly, manifest, provenance and downloadable completion boundary. This is bounded to the inspected corpus, not a global absence claim."
+    },
+    {
+      "working_key": "CAP-CR-PLAYBOOK-RUN",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised actor can launch a versioned playbook with validated inputs and retain run state, timestamps, outputs, failures, cancellation and relaunch provenance.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-PLAYBOOK"
+        ],
+        "route_ids": [
+          "ROUTE-0230",
+          "ROUTE-0231",
+          "ROUTE-0232"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php"
+        ]
+      },
+      "evidence_loci": [
+        "ansible/awx@7242fe89ae247ef874f187d245b5925e570ae46f :: awx_collection/plugins/modules/workflow_launch.py :: L151-L198",
+        "ansible/awx@7242fe89ae247ef874f187d245b5925e570ae46f :: awx/main/models/unified_jobs.py :: L82-L99,L882-L953,L968-L1034,L1361-L1385,L1494-L1543",
+        "ansible/awx@7242fe89ae247ef874f187d245b5925e570ae46f :: awx/api/serializers.py :: L4786-L4880"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/ansible/awx",
+        "commit_sha": "7242fe89ae247ef874f187d245b5925e570ae46f",
+        "source_loci": [
+          "awx_collection/plugins/modules/workflow_launch.py:L151-L198",
+          "awx/main/models/unified_jobs.py:L82-L99,L882-L953,L968-L1034,L1361-L1385,L1494-L1543",
+          "awx/api/serializers.py:L4786-L4880"
+        ],
+        "proven_slice": "Resolves a workflow template, validates allowed prompts and required inventory/variables, submits a launch, retains job identity/status and terminal timestamps, records launch prompts for relaunch and supports transaction-aware cancellation with a failure explanation.",
+        "parity_limits": "Automation workflows are not human safety playbooks; no Oblivion alert/site ownership, acknowledgement checklist, clinical decision or manual-step evidence is proved.",
+        "licence": {
+          "spdx": "Apache-2.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-MED-PRESCRIPTION-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised prescriber can create, retrieve and reasonedly deactivate a patient prescription while preserving structured medication identity and modification provenance.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "EMAR",
+        "source_family_ids": [
+          "MED-EMAR"
+        ],
+        "route_ids": [
+          "ROUTE-0395",
+          "ROUTE-0396",
+          "ROUTE-0397",
+          "ROUTE-0398"
+        ],
+        "page_ids": [
+          "PAGE-0075",
+          "PAGE-0101"
+        ],
+        "backend_anchors": []
+      },
+      "evidence_loci": [
+        "openemr/openemr@a6321a3e2978e62472dbb6c721b680ca2d65b592 :: src/RestControllers/PrescriptionRestController.php :: L35-L68,L70-L101,L103-L157",
+        "openemr/openemr@a6321a3e2978e62472dbb6c721b680ca2d65b592 :: src/Services/PrescriptionService.php :: L375-L449,L451-L471"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/openemr/openemr",
+        "commit_sha": "a6321a3e2978e62472dbb6c721b680ca2d65b592",
+        "source_loci": [
+          "src/RestControllers/PrescriptionRestController.php:L35-L68,L70-L101,L103-L157",
+          "src/Services/PrescriptionService.php:L375-L449,L451-L471"
+        ],
+        "proven_slice": "Authenticated endpoints create, retrieve, list and soft-delete prescriptions; creation validates required patient/drug fields and deletion marks the row inactive with modification time instead of erasing it.",
+        "parity_limits": "Does not prove a revision endpoint, prescriber registration, countersign, pharmacy handoff, site/direct-object controls or Oblivion audit UI.",
+        "licence": {
+          "spdx": "GPL-3.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    },
+    {
+      "working_key": "CAP-MED-WORKER-SCHEDULED-DOSE-RECORD",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised worker can persist a medication-administration result bound to patient, order, performer, time, dose, route, status/reason and notes.",
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "EMAR",
+        "source_family_ids": [
+          "MED-WORKER-MEDS"
+        ],
+        "route_ids": [
+          "ROUTE-1881"
+        ],
+        "page_ids": [
+          "PAGE-0536",
+          "PAGE-0537"
+        ],
+        "backend_anchors": []
+      },
+      "evidence_loci": [
+        "Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0 :: api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java :: L19-L59,L89-L197",
+        "Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0 :: api/src/main/java/org/openmrs/module/fhir2/apiext/dao/impl/FhirMedicationAdministrationDaoImpl.java :: L40-L58",
+        "Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0 :: api/src/main/java/org/openmrs/module/fhir2/apiext/translators/impl/MedicationAdministrationTranslatorImpl.java :: L67-L125,L131-L202"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+        "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+        "source_loci": [
+          "api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java:L19-L59,L89-L197",
+          "api/src/main/java/org/openmrs/module/fhir2/apiext/dao/impl/FhirMedicationAdministrationDaoImpl.java:L40-L58",
+          "api/src/main/java/org/openmrs/module/fhir2/apiext/translators/impl/MedicationAdministrationTranslatorImpl.java:L67-L125,L131-L202"
+        ],
+        "proven_slice": "Represents administration with patient, encounter, performer, order, status/reason, time, dose, units, route and notes; permission-gates persistence and translates those fields to and from FHIR MedicationAdministration.",
+        "parity_limits": "Does not prove scheduled-window selection, five-rights checks, site/direct-object denial, offline idempotency, stock effects, incident generation or worker UI.",
+        "licence": {
+          "spdx": "MPL-2.0",
+          "edition_boundary": "Only the cited repository-native community source at the pinned immutable commit is credited; hosted, commercial, enterprise, private and unpinned behavior is excluded."
+        }
+      }
+    }
+  ],
+  "projected_counts_after_application": {
+    "denominator": 902,
+    "verified_benchmark": {
+      "direct": 254,
+      "strict_one_to_one_rename": 22,
+      "total": 276
+    },
+    "documented_no_credible_match": {
+      "direct": 79,
+      "strict_one_to_one_rename": 7,
+      "total": 86
+    },
+    "eligible_total": 362,
+    "completion_unproved_total": 540,
+    "eligible_percentage": 40.133
+  },
+  "integrity": {
+    "selected_target_count": 12,
+    "selected_targets_unique": true,
+    "selected_targets_current_in_manifest": true,
+    "selected_targets_were_ordinary_unproved_at_recheck": true,
+    "all_upstream_repositories_official": true,
+    "all_upstream_refs_immutable_commits": true,
+    "licence_and_edition_screening_complete": true,
+    "family_credit_inherited": false,
+    "paid_only_evidence_used": false,
+    "files_modified_by_research_agents": false,
+    "independent_review": "Adversarial read-only review removed OneUptime Growth-plan execution-timeline evidence and narrowed the credited clinical event slice to community state-transition and escalation-rule configuration."
+  }
+}

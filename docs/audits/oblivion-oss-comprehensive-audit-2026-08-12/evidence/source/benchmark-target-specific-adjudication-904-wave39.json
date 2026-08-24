@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-904-wave39",
+  "generated_at": "2026-08-22T00:05:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eight current Governance/HR policy completion-unproved targets independently reviewed; seven bounded direct decisions and one retained-unproved decision.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "Comparator evidence changes benchmark P3 mapping completion_credit only; Oblivion product, runtime, browser, representative-task, release and overall-audit completion deltas remain zero.",
+    "no_copy_rule": "Behavioural evidence only; no source, schema, UI, assets or wording is copied.",
+    "selection_preimage_rule": "Packet-order IDs joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "3a74c7297f38ca56b6fa75f2ac89692d3804b016ac57bacb52e6402ebdd3da99",
+    "evaluation_proof_rule": "Packet-order evaluation objects; JSON sorted keys, compact separators; LF join without terminal LF; UTF-8 without BOM.",
+    "evaluation_proof_sha256": "90c0cb1dc68ed205a6f0422799690e77eafa0333221837e97f73f4765286982b",
+    "source_registry_rule": "Source file objects sorted by path; JSON sorted keys, compact separators; LF join without terminal LF; UTF-8 without BOM.",
+    "source_registry_sha256": "e2c31ae6741532db334de2c48aa8073506e36f43023b9ec054ea4312ad4a5e69",
+    "independent_review_verdict": "GO_7_direct_1_retained_after_correcting_api_sha256_and_bounding_hr_analogues"
+  },
+  "selected_target_ids": [
+    "CAP-GOV-POLICY-AUTHORING-VERSIONING",
+    "CAP-GOV-POLICY-APPROVAL",
+    "CAP-GOV-POLICY-INDIVIDUAL-ATTESTATION",
+    "CAP-GOV-POLICY-ATTESTATION-OVERSIGHT",
+    "CAP-HR-POLICY-LIFECYCLE",
+    "CAP-HR-POLICY-VERSIONS",
+    "CAP-HR-POLICY-ATTESTATION-EMPLOYEE",
+    "CAP-HR-POLICY-ATTESTATION-OVERSIGHT"
+  ],
+  "input_pins": {
+    "benchmark_final_904_before_wave": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "dcda86ed2a6a4328ddc2ba23780641afd2daafe860d310c3c89218ffa8a07458",
+      "bytes": 667365
+    },
+    "canonical_pointer_before_wave": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "332aa1dce635c4c98c2677dadb3bf4b8890631e9a3bc0a93bbc745b68ce74f9a",
+      "bytes": 16178
+    }
+  },
+  "repository_snapshots": {
+    "MOODLE": {
+      "repo": "moodle/moodle",
+      "url": "https://github.com/moodle/moodle",
+      "commit": "6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb",
+      "tree": "7bf240a29b14e4a4384eb8aad186204695641751",
+      "parent": "fd4de0edf5fe50cfd6e98f8aa2e7dcc9f6b10bd6",
+      "committer_date": "2026-08-18T16:04:03Z",
+      "subject": "weekly release 5.3dev",
+      "default_branch": "main",
+      "repository_root_licence": "GNU GPL v3-or-later",
+      "edition_boundary": "Official Moodle community core only; MoodleCloud, partner services, proprietary plugins/themes and out-of-tree integrations excluded."
+    }
+  },
+  "verified_files": [
+    {
+      "repo": "moodle/moodle",
+      "path": "COPYING.txt",
+      "blob": "94a9ed024d3859793618152ea559a168bbcbb5e2",
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "loci": "L1-L20"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/classes/api.php",
+      "blob": "6c257b8f00934cea74541e4e0408deffe90f2280",
+      "bytes": 44163,
+      "sha256": "267a030491ce77cf4f17d3b403995db6addc6b6da38eee7cd2926041211fea8b",
+      "loci": "L88-L174,L229-L257,L369-L566,L668-L817,L921-L1064"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/classes/acceptances_table.php",
+      "blob": "15ac140f2f297fdc8ca1e4171e4e05e28db0b288",
+      "bytes": 24919,
+      "sha256": "0752f9aaef983bdee5986a6737f9127b5920af78287d138314ba526808f89a27",
+      "loci": "L45-L126,L173-L239,L531-L560"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/db/install.xml",
+      "blob": "b5eefedd6664e749d9bcb486c243b63e22f8dc63",
+      "bytes": 6159,
+      "sha256": "9cc0f7ba0b600c121fdef5aacf3a22ead340eaa12b2d914cd94013e13772d5b1",
+      "loci": "L8-L60"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/db/access.php",
+      "blob": "1b2aa617890f267346c1bdf21127dcd6a781a8bc",
+      "bytes": 1729,
+      "sha256": "cb0b1af653a9df0fa2b994c14c77be06140df1d858336a1ac4a22f8427fe249d",
+      "loci": "L28-L60"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/settings.php",
+      "blob": "78aa6b2f67f9e8ca62cf085e94f4916f8e495387",
+      "bytes": 1810,
+      "sha256": "4e3fd907e4cd0757c1b5ebc3db4565f3edca6ebe7d711b0b7a63e1af6e3a9213",
+      "loci": "L32-L50"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/editpolicydoc.php",
+      "blob": "4a9f9ac342b67936144af5a3f76219fd3cb45178",
+      "bytes": 6499,
+      "sha256": "5269977543b1c242b14bbf7ac57f8a8b438f3d0f5d2aae869159f237cf70aaa7",
+      "loci": "L32-L42,L45-L113,L132-L180"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/acceptances.php",
+      "blob": "dbf0dc929bdcdcc5de382016ebeded2edab53dd2",
+      "bytes": 2671,
+      "sha256": "032a3f5c04a310e39033c74e6e4813ffb1d5a2ef5cd6b6cf73372d122f4c5022",
+      "loci": "L31-L58"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/classes/external/set_acceptances_status.php",
+      "blob": "01caae7ee206e91140441706c251eaae7d0892ea",
+      "bytes": 5875,
+      "sha256": "554289fc88fe9bdc8a339fa35758b69ab1fc062522efb5f715f0ae1138ad9c44",
+      "loci": "L44-L56,L64-L136"
+    },
+    {
+      "repo": "moodle/moodle",
+      "path": "public/admin/tool/policy/classes/external/get_user_acceptances.php",
+      "blob": "ba3f2541689a3ec638d3c23a1c0a95f2f2ac8d6b",
+      "bytes": 8516,
+      "sha256": "ceab4fadc9a2a1a3530408987dc29ab78d9f0c96665e704e6508aec0a6aae441",
+      "loci": "L46-L130,L142-L168"
+    }
+  ],
+  "counts": {
+    "evaluated": 8,
+    "direct": 7,
+    "retained_unproved": 1,
+    "documented_ncm": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-GOV-POLICY-AUTHORING-VERSIONING",
+      "status": "direct",
+      "candidate": "Moodle policy document lifecycle",
+      "requirement": "Author and version a governed policy with durable current, draft and archived revision states under explicit management authority.",
+      "behavior": "Policy identities own managed content revisions; authorised managers create, edit, activate, inactivate, restore drafts and delete eligible drafts while prior current versions are archived.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/classes/api.php L88-L174,L369-L566; editpolicydoc.php L32-L42,L45-L113,L132-L180; db/install.xml L8-L41; db/access.php L46-L60",
+      "reason": "Policy authoring/versioning comparator only; no Oblivion Site, role, approval-separation, notification, UI or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-POLICY-APPROVAL",
+      "status": "retain",
+      "candidate": "Moodle policy activation",
+      "reason": "Managed activation does not preserve a distinct approval decision, approver/time, rationale or author-versus-approver separation for a submitted version.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-GOV-POLICY-INDIVIDUAL-ATTESTATION",
+      "status": "direct",
+      "candidate": "Moodle policy acceptance",
+      "requirement": "Record an authenticated individual's accept or decline response against an exact applicable policy version with durable actor, language and time evidence.",
+      "behavior": "Applicable policy versions receive per-user accept/decline status bound to version, user and language with created/modified timestamps and a unique version-user key.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/classes/api.php L668-L817,L921-L1064; classes/external/set_acceptances_status.php L44-L56,L64-L136; classes/external/get_user_acceptances.php L46-L130,L142-L168; db/install.xml L43-L60; db/access.php L28-L44",
+      "reason": "Exact-version user attestation only; no Oblivion policy assignment, Site, employee or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-POLICY-ATTESTATION-OVERSIGHT",
+      "status": "direct",
+      "candidate": "Moodle policy acceptance report",
+      "requirement": "Permit authorised oversight of accepted, declined and missing policy responses across users and versions, including bounded export.",
+      "behavior": "Capability-gated acceptance reporting filters and exports per-user policy/version response states and missing responses with modifier evidence.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/settings.php L32-L50; db/access.php L54-L60; acceptances.php L31-L58; classes/acceptances_table.php L45-L126,L173-L239,L531-L560; classes/api.php L88-L174",
+      "reason": "Governance response oversight only; no Oblivion board denominator, Site, role or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HR-POLICY-LIFECYCLE",
+      "status": "direct",
+      "candidate": "Moodle workforce-policy lifecycle analogue",
+      "requirement": "Manage a workforce-policy analogue through authored draft, active, inactive and archived states while retaining its version history.",
+      "behavior": "Authorised policy managers create, edit, activate, inactivate, archive, restore as draft and delete eligible draft policy records.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/classes/api.php L369-L566; editpolicydoc.php L32-L42,L97-L113,L132-L180; db/access.php L46-L52",
+      "reason": "Authenticated-site-user workforce analogue only, not an Oblivion employee-policy aggregate, Site assignment or HR authority contract.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HR-POLICY-VERSIONS",
+      "status": "direct",
+      "candidate": "Moodle policy revision register analogue",
+      "requirement": "Retain multiple timestamped workforce-policy analogue revisions under a stable policy identity with current, draft and archived classification and editor evidence.",
+      "behavior": "A stable policy identity owns multiple version rows with status, timestamps and last-editor identity; managed transitions preserve prior versions and guard draft deletion.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/classes/api.php L88-L174,L229-L257,L369-L566; db/install.xml L8-L41",
+      "reason": "Version register analogue only; no Oblivion HR record ownership, Site, UI or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HR-POLICY-ATTESTATION-EMPLOYEE",
+      "status": "direct",
+      "candidate": "Moodle authenticated-user policy attestation analogue",
+      "requirement": "Let an authenticated workforce-user analogue attest to an exact current policy version with durable accepted or declined evidence.",
+      "behavior": "An authenticated user responds to the applicable exact version and persists accepted/declined state, actor, language and timestamps.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/classes/api.php L668-L817,L921-L1037; classes/external/set_acceptances_status.php L44-L56,L64-L136; db/install.xml L43-L60",
+      "reason": "Authenticated-user workforce analogue only; no Oblivion employee-profile linkage, Site assignment or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-HR-POLICY-ATTESTATION-OVERSIGHT",
+      "status": "direct",
+      "candidate": "Moodle workforce-attestation oversight analogue",
+      "requirement": "Allow an authorised workforce-policy overseer analogue to filter, inspect and download aggregate and per-user policy response state.",
+      "behavior": "Capability-gated pages and tables expose policy/version acceptance, decline and missing-response status across users with export support.",
+      "loci": "moodle/moodle@6216fe4ed19a5a3c88c0951d1647e9f2d626bcbb :: public/admin/tool/policy/settings.php L32-L50; acceptances.php L31-L58; classes/acceptances_table.php L45-L126,L173-L239,L531-L560; classes/external/get_user_acceptances.php L46-L130,L142-L168",
+      "reason": "Workforce-user oversight analogue only; no Oblivion HR Site, employee denominator, role or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    }
+  ],
+  "collision_disclosure": {
+    "materialized_target_specific_packets": 34,
+    "prior_evaluation_occurrences": 354,
+    "unique_prior_evaluated_ids": 348,
+    "unique_prior_ids_sha256": "9877e8ccd82a27fe53bf5c32d9cc2ef72bb10aec6545956151a14bba5bce54aa",
+    "selected_target_intersection": 0,
+    "prior_moodle_mentions": 0,
+    "prior_moodle_behavioral_path_intersection": 0,
+    "source_reuse": "The same pinned Moodle policy subsystem supports separately bounded Governance and HR analogue rows; every row carries its own neutral requirement, locus subset and parity limit, with no family inheritance."
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 7,
+    "eligible_total": 7,
+    "completion_unproved": -7,
+    "documented_ncm": 0,
+    "product_runtime_representative_task_overall_completion": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark_direct": 380,
+    "verified_benchmark_total": 402,
+    "documented_ncm": 89,
+    "eligible_total": 491,
+    "completion_unproved": 413
+  }
+}

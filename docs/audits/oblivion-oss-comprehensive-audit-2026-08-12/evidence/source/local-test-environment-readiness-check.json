@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "local-test-environment-readiness-check",
+  "generated_at": "2026-08-13T16:21:16.2596849+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "status": "BLOCKED_NOT_ISOLATED",
+  "scope": "Read-only inspection of the local PHPUnit/Pest database boundary before deciding whether any executable test could run safely.",
+  "source_files": [
+    {
+      "path": ".env",
+      "sha256": "d99baf8d4cedcc1472eb548016db7c6360367f2b7e6d8721c44602a5fca3f913",
+      "content_recorded": false
+    },
+    {
+      "path": ".env.testing",
+      "sha256": "9d19273c16c4197b79d98fed10a0e820c6858dcb6f222e7ec75249b368e95c14",
+      "content_recorded": false
+    },
+    {
+      "path": "phpunit.xml",
+      "sha256": "d798f63ec56ecfb7917f6bb3284e9ac7ff40944594a43a7805b6def7058d72a5"
+    },
+    {
+      "path": "tests/Pest.php",
+      "sha256": "963d0446ee5595698d1110f85818af1435423fe37c5cd3a4146717e42564a45f"
+    },
+    {
+      "path": "app/Console/Commands/PrepareTestingSchema.php",
+      "sha256": "677df9974ce430138e4aab34c3dc84781ba44e72798fefe87836874916c501cd"
+    }
+  ],
+  "observations": {
+    "phpunit_app_environment": "testing",
+    "database_driver": "mysql",
+    "test_database_configured": true,
+    "test_database_name_matches_default_env_database_name": true,
+    "feature_and_integration_suites_use_refresh_database": true,
+    "prepare_schema_command_calls_database_wipe": true,
+    "mail_transport_is_non_delivery_array": true,
+    "queue_connection_is_synchronous": true,
+    "session_and_cache_are_non_persistent_array_drivers": true
+  },
+  "decision": {
+    "tests_executed": 0,
+    "test_denominator": 867,
+    "safe_to_run_current_suite": false,
+    "reason": "The configured test database is not distinct from the checkout's default database name, while the suites use database-refresh behavior and the supplied schema preparation command performs a wipe. The read-only audit cannot prove that running the suite would avoid changing or deleting checkout data.",
+    "minimum_input": "Provide or approve a separate disposable database/schema with credentials supplied only through secure runtime configuration, confirm it is not used by the development application, and authorise the test run against that isolated target.",
+    "prohibited_shortcut": "Do not run testing:prepare-schema, migrate:fresh, db:wipe or the test suite against the currently configured shared database name."
+  },
+  "secret_boundary": {
+    "environment_file_values_recorded": false,
+    "credentials_recorded": false,
+    "database_host_or_username_recorded": false
+  },
+  "mutation_boundary": {
+    "commands_executed": [
+      "git status --short --branch",
+      "git rev-parse HEAD",
+      "read-only source and configuration inspection",
+      "SHA-256 hashing of the inspected files"
+    ],
+    "application_or_database_commands_executed": false,
+    "files_changed_outside_audit_directory": false
+  }
+}

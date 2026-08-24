@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-benchmark-wave32-generation-summary",
+  "generated_at": "2026-08-21T17:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "inputs": {
+    "wave32": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave32.json",
+      "sha256": "b39b4fb2797b3767d713bb838debf24cf698aa32cf7851031bdaf252d57205d3",
+      "bytes": 12877
+    }
+  },
+  "outputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "f65df41d0fbf64b0250dd7377ad80b405405e2c91fed0461f2c46cc483d19f35",
+      "bytes": 655054
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "40cb6916140b5e88fa2049b1185285d9497e2011064cd04cdc53eafd48223035",
+      "bytes": 11769152
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "770183987f03e8667168cb052727f7363928801e6c716ce0b05c52f8700d4c2d",
+      "bytes": 1960843
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "a3ce910bd7787a0ca9bbfb8e10cf4104964fb6993d60aae20505c4932e066ed1",
+      "bytes": 3288564
+    }
+  },
+  "counts": {
+    "denominator": 904,
+    "direct": 344,
+    "rename": 22,
+    "verified": 366,
+    "ncm": 89,
+    "eligible": 455,
+    "completion_unproved": 449
+  },
+  "validation": {
+    "selected": 8,
+    "direct": 4,
+    "retained": 4,
+    "runtime_credit_delta": 0,
+    "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE"
+  }
+}

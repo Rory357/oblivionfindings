@@ -1,0 +1,202 @@
+{
+  "schema_version": "1.0",
+  "artifact": "incident-human-target-route-allocation",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_semantic_allocation_runtime_unverified",
+  "audit_boundary": "Read-only static source reconciliation. No application code, configuration, routes, database data, tests, builds, browser state, deployments, commits or pushes were changed or executed.",
+  "canonical_module": "INCIDENTS",
+  "human_targets": [
+    {
+      "id": "CAP-INC-INCIDENT-AUTHOR",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT", "CLI-CLIENT-INCIDENT"],
+      "action_route_ids": ["ROUTE-1839", "ROUTE-1841", "ROUTE-1854"],
+      "shared_host_route_ids": ["ROUTE-1838", "ROUTE-1840"],
+      "semantic_alias_route_ids": ["ROUTE-0156", "ROUTE-0157", "ROUTE-1995", "ROUTE-1996"],
+      "primary_page_ids": ["PAGE-0526", "PAGE-0527", "PAGE-0588"],
+      "support_entry_page_ids": ["PAGE-0371", "PAGE-0377", "PAGE-0546", "PAGE-0556", "PAGE-0609"],
+      "backend_anchors": ["app/Http/Controllers/IncidentController.php@index|create|store|show|update", "app/Http/Controllers/ClientIncidentController.php@index|store", "app/Models/ClientIncident.php", "app/Policies/ClientIncidentPolicy.php"],
+      "job_boundary": "Create, resume, view and edit the ClientIncident record; drafts are the editable authoring state.",
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT", "CLI-CLIENT-INCIDENT"],
+      "action_route_ids": ["ROUTE-1842", "ROUTE-1843", "ROUTE-1844"],
+      "shared_host_route_ids": ["ROUTE-1838", "ROUTE-1840"],
+      "semantic_alias_route_ids": ["ROUTE-0158", "ROUTE-1997"],
+      "primary_page_ids": ["PAGE-0526", "PAGE-0527"],
+      "backend_anchors": ["app/Http/Controllers/IncidentController.php@uploadAttachment|removeAttachment|updateAttachment", "app/Http/Controllers/ClientIncidentController.php@uploadAttachment", "app/Models/ClientIncidentAttachment.php", "resources/js/components/incidents/incident-detail-dialog.tsx"],
+      "job_boundary": "Upload/remove draft evidence and manage attachment portal disclosure using ClientIncidentAttachment, draft-only mutation rules and incidents.portal.manage.",
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT"],
+      "action_route_ids": ["ROUTE-1846", "ROUTE-1851", "ROUTE-1852", "ROUTE-1853"],
+      "shared_host_route_ids": ["ROUTE-1838", "ROUTE-1840"],
+      "primary_page_ids": ["PAGE-0526", "PAGE-0527"],
+      "support_entry_page_ids": ["PAGE-0588"],
+      "backend_anchors": ["app/Http/Controllers/IncidentController.php@submit|review|close|reopen", "app/Policies/ClientIncidentPolicy.php@submit|review|close|reopen", "resources/js/components/incidents/incident-detail-dialog.tsx"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-INCIDENT-FOLLOWUP",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT-FOLLOWUP"],
+      "action_route_ids": ["ROUTE-1848", "ROUTE-1849", "ROUTE-1850"],
+      "shared_host_route_ids": ["ROUTE-1838", "ROUTE-1840"],
+      "primary_page_ids": ["PAGE-0526", "PAGE-0527"],
+      "backend_anchors": ["app/Http/Controllers/IncidentFollowupController.php", "app/Models/IncidentFollowup.php", "resources/js/components/incidents/incident-detail-dialog.tsx"],
+      "proof_status": "source_supported",
+      "activation_gap": "ROUTE-1849 has no exact current edit activator located; create and complete are activated."
+    },
+    {
+      "id": "CAP-INC-INCIDENT-REPORT",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT-REPORT"],
+      "action_route_ids": ["ROUTE-2350"],
+      "primary_page_ids": ["PAGE-0750"],
+      "backend_anchors": ["app/Http/Controllers/IncidentReportController.php@index", "resources/js/pages/reports/incidents.tsx"],
+      "job_boundary": "Open and configure the incident reporting view; CSV delivery is a separate D target.",
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-INCIDENT-TEMPLATE-LIFECYCLE",
+      "class": "H",
+      "source_family_ids": ["INC-INCIDENT-TEMPLATE"],
+      "action_route_ids": ["ROUTE-1855", "ROUTE-1856", "ROUTE-1857", "ROUTE-1858", "ROUTE-1859"],
+      "primary_page_ids": ["PAGE-0528", "PAGE-0529"],
+      "backend_anchors": ["app/Http/Controllers/IncidentTemplateController.php", "app/Models/IncidentTemplate.php"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-ACTION-PLAN",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-ACTION-PLAN"],
+      "action_route_ids": ["ROUTE-2506", "ROUTE-2507", "ROUTE-2508"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingActionPlanController.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported",
+      "activation_gap": "ROUTE-2507 has no exact current general edit activator located; create and complete are activated."
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-EVIDENCE-MANAGEMENT",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-ATTACHMENT"],
+      "action_route_ids": ["ROUTE-2510", "ROUTE-2511"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingAttachmentController.php@store|destroy", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "job_boundary": "Upload/remove evidence and label it sensitive; download is a separate D target.",
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-CONCERN-INTAKE",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-CONCERN"],
+      "action_route_ids": ["ROUTE-2503", "ROUTE-2524"],
+      "shared_host_route_ids": ["ROUTE-2502"],
+      "primary_page_ids": ["PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingConcernController.php@create|store", "resources/js/components/safeguarding/raise-wizard.tsx"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-TRIAGE-OWNERSHIP",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-CONCERN"],
+      "action_route_ids": ["ROUTE-2505", "ROUTE-2509", "ROUTE-2514", "ROUTE-2520", "ROUTE-2522", "ROUTE-2523"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingConcernController.php@index|show|update|assign|edit|setSensitivity|markSubjectInformed|triage", "app/Policies/SafeguardingConcernPolicy.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported",
+      "activation_gap": "ROUTE-2505 and redirect ROUTE-2514 lack a distinct current edit pane; assignment, triage, sensitivity and subject-informed actions are activated."
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-CONCERN"],
+      "action_route_ids": ["ROUTE-2513", "ROUTE-2521"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingConcernController.php@close|updateStatus", "app/Services/Safeguarding/SafeguardingLifecycle.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-EXTERNAL-REPORT",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-EXTERNAL-REPORT"],
+      "action_route_ids": ["ROUTE-2515", "ROUTE-2516"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingExternalReportController.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-INVESTIGATION",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-INVESTIGATION"],
+      "action_route_ids": ["ROUTE-2517", "ROUTE-2518"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingInvestigationController.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported"
+    },
+    {
+      "id": "CAP-INC-SAFEGUARDING-RISK-ASSESSMENT",
+      "class": "H",
+      "source_family_ids": ["INC-SAFEGUARDING-RISK-ASSESSMENT"],
+      "action_route_ids": ["ROUTE-2519"],
+      "shared_host_route_ids": ["ROUTE-2502", "ROUTE-2504"],
+      "primary_page_ids": ["PAGE-0812", "PAGE-0813"],
+      "backend_anchors": ["app/Http/Controllers/SafeguardingRiskAssessmentController.php", "resources/js/components/safeguarding/concern-dialog.tsx"],
+      "proof_status": "source_supported"
+    }
+  ],
+  "non_human_or_cross_module_route_dispositions": [
+    {
+      "route_ids": ["ROUTE-1845", "ROUTE-0159", "ROUTE-1998"],
+      "target_id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+      "class": "D",
+      "reason": "All three staff routes authorize the same ClientIncidentAttachment against the ClientIncident view policy and stream the same private-file outcome."
+    },
+    {
+      "route_ids": ["ROUTE-2260"],
+      "target_id": "CLI-PORTAL-INCIDENT-ATTACHMENT",
+      "class": "D",
+      "reason": "Portal disclosure has a distinct actor, reviewed/visible incident requirement, attachment visibility check and client-section access boundary."
+    },
+    {
+      "route_ids": ["ROUTE-1847"],
+      "target_id": "CAP-HS-CORRECTIVE-ACTION-DELIVERY-CLOSURE",
+      "class": "H",
+      "canonical_module": "HEALTH_SAFETY",
+      "disposition": "alternate_entry_only",
+      "reason": "Creates the same HsCorrectiveAction through HsCorrectiveActionService; the incident detail delegates governance to the H&S register.",
+      "count_effect": 0
+    },
+    {
+      "route_ids": ["ROUTE-2719"],
+      "candidate_alias_target_id": "CAP-INC-INCIDENT-AUTHOR",
+      "class": "H",
+      "disposition": "static_semantic_alias_reachability_unproved",
+      "reason": "ShiftIncidentController creates/submits the same ClientIncident aggregate, but PAGE-0708 posts /operations/shifts/{id}/incidents while the registered route is /shifts/{shift}/incidents.",
+      "count_effect_if_repaired": 0
+    },
+    {"route_ids": ["ROUTE-2512"], "target_id": "CAP-INC-SAFEGUARDING-EVIDENCE-DOWNLOAD", "class": "D"},
+    {"route_ids": ["ROUTE-2351"], "target_id": "CAP-INC-INCIDENT-REPORT-EXPORT", "class": "D"}
+  ],
+  "validation": {
+    "incident_h_targets": 6,
+    "safeguarding_h_targets": 8,
+    "total_h_targets": 14,
+    "unique_h_ids": 14,
+    "valid": true,
+    "shared_page_boundary": "PAGE-0526/PAGE-0527 and PAGE-0812/PAGE-0813 are shared render hosts. Action panes live under resources/js/components, outside the current resources/js/pages page-ID census, so page mappings are supported hosts rather than exclusive ownership claims.",
+    "activation_gaps": ["ROUTE-0158", "ROUTE-1997", "ROUTE-1849", "ROUTE-2505", "ROUTE-2507", "ROUTE-2514", "ROUTE-2719"],
+    "runtime_execution": 0
+  }
+}

@@ -1,0 +1,901 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave12",
+  "generated_at": "2026-08-14T14:24:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twelfth bounded target-specific wave: 12 current unique completion-unproved targets; eight material direct slices and four bounded NCM decisions.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts."
+  },
+  "source_slice_reuse_disclosure": [
+    "No target-key reuse. CARE booking is intentionally shared by three distinct rows; Sahana incident material is shared by three incident rows; OpenMRS/OpenProject slices appeared against other keys in earlier waves. Every row uses independent current manifest lineage and receives no source-family inheritance."
+  ],
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "788f0f78cb8a9fb31257c6fffed60b468c687bcaf8757acc2e8494d653ab5d9d"
+    }
+  },
+  "repository_snapshots": {
+    "CARE": {
+      "repo": "CARE",
+      "official_repository_url": "https://github.com/ohcnetwork/care",
+      "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+      "spdx": "MIT",
+      "license_locus": "LICENSE",
+      "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    },
+    "SAHANA": {
+      "repo": "Sahana Eden",
+      "official_repository_url": "https://github.com/sahana/eden",
+      "commit_sha": "0e55ecf7ed780b7ad659e70398b56260c41de021",
+      "spdx": "MIT",
+      "license_locus": "LICENSE",
+      "license_sha256": "7c662d47bb673fa88d2b75f0f1859fb65dc16c41e7ecd749612024070c1cd06b",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    },
+    "OPENMRS": {
+      "repo": "OpenMRS Core",
+      "official_repository_url": "https://github.com/openmrs/openmrs-core",
+      "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    },
+    "OPENPROJECT": {
+      "repo": "OpenProject",
+      "official_repository_url": "https://github.com/opf/openproject",
+      "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "publiccode.yml:L55",
+      "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    },
+    "ORCA": {
+      "repo": "ORCA",
+      "official_repository_url": "https://github.com/SanteonNL/orca",
+      "commit_sha": "b6654fe63d3cbdfab9f9790b24e2ab2003498418",
+      "spdx": "GPL-3.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    },
+    "HRMS": {
+      "repo": "Frappe HRMS",
+      "official_repository_url": "https://github.com/frappe/hrms",
+      "commit_sha": "450f6ca52c5386020a1023b2f24e4af0ab20521e",
+      "spdx": "GPL-3.0",
+      "license_locus": "license.txt",
+      "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+      "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only."
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 8,
+    "documented_ncm_direct_recommended": 4,
+    "completion_credit_recommended": 12
+  },
+  "selected_keys_sha256": "c583554302f8bce2e00ae5d8f7a5a4d93c0bb134eec6862347f5d0a61cfdf0bf",
+  "selected_lineage_tuple_sha256": "58bb2e9868a46191fa7c5046607b2b6133ce1c370d2b3ba9129d1e9da215955b",
+  "evaluations": [
+    {
+      "working_key": "CAP-CLIN-FRONTLINE-EVENT-RECORDING",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record an authorised patient/encounter observation with encounter time, location, type and clinical data.",
+      "current_product_loci": [
+        "ShiftClinicalController.php:L132-L179,L185-L192",
+        "ClientClinicalController.php:L84-L103"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "CLIN-CLIENT-CLINICAL",
+          "CLIN-SHIFT-CLINICAL"
+        ],
+        "route_ids": [
+          "ROUTE-0143",
+          "ROUTE-2715"
+        ],
+        "page_ids": [
+          "PAGE-0708"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/ClientClinicalController.php",
+          "app/Http/Controllers/Clinical/ShiftClinicalController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL"
+      },
+      "benchmark": {
+        "repo": "OpenMRS Core",
+        "official_repository_url": "https://github.com/openmrs/openmrs-core",
+        "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+        "spdx": "MPL-2.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "api/src/main/java/org/openmrs/Encounter.java",
+            "lines": "L47-L112",
+            "sha256": "e71ddeb81e0adc1fc648548667a60dcdd6b4c219ddb31ea599a06068eca09a76",
+            "primary_source_url": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/Encounter.java"
+          },
+          {
+            "path": "api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java",
+            "lines": "L103-L130",
+            "sha256": "9d44ea8ce2d68c8591279404d599a0e10bbb1806b3a06d17b8b1546e770acb1e",
+            "primary_source_url": "https://github.com/openmrs/openmrs-core/blob/6c1b124b30b5df1df6d1939fd629cea1ea002a4e/api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java"
+          }
+        ],
+        "proven_slice": "OpenMRS provides encounter structure plus validated observation persistence.",
+        "parity_limits": "No Oblivion shift/Site policy, event taxonomy, attachment, escalation or runtime proof.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/openmrs/openmrs-core@6c1b124b30b5df1df6d1939fd629cea1ea002a4e :: api/src/main/java/org/openmrs/Encounter.java :: L47-L112 :: sha256=e71ddeb81e0adc1fc648548667a60dcdd6b4c219ddb31ea599a06068eca09a76",
+        "https://github.com/openmrs/openmrs-core@6c1b124b30b5df1df6d1939fd629cea1ea002a4e :: api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java :: L103-L130 :: sha256=9d44ea8ce2d68c8591279404d599a0e10bbb1806b3a06d17b8b1546e770acb1e"
+      ]
+    },
+    {
+      "working_key": "CAP-INC-INCIDENT-REPORT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Provide a structured, filterable incident register with occurrence, reporter, location, type, description and closure state.",
+      "current_product_loci": [
+        "IncidentReportController.php:L12-L100"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "INC-INCIDENT-REPORT"
+        ],
+        "route_ids": [
+          "ROUTE-2350"
+        ],
+        "page_ids": [
+          "PAGE-0750"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/IncidentReportController.php@index",
+          "resources/js/pages/reports/incidents.tsx"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS"
+      },
+      "benchmark": {
+        "repo": "Sahana Eden",
+        "official_repository_url": "https://github.com/sahana/eden",
+        "commit_sha": "0e55ecf7ed780b7ad659e70398b56260c41de021",
+        "spdx": "MIT",
+        "license_locus": "LICENSE",
+        "license_sha256": "7c662d47bb673fa88d2b75f0f1859fb65dc16c41e7ecd749612024070c1cd06b",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "modules/s3db/event.py",
+            "lines": "L2083-L2123,L2141-L2207",
+            "sha256": "b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30",
+            "primary_source_url": "https://github.com/sahana/eden/blob/0e55ecf7ed780b7ad659e70398b56260c41de021/modules/s3db/event.py"
+          }
+        ],
+        "proven_slice": "Sahana defines and exposes a structured incident-report register with those material fields and state.",
+        "parity_limits": "No Oblivion CSV, client/Site privacy, direct-object or runtime parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/sahana/eden@0e55ecf7ed780b7ad659e70398b56260c41de021 :: modules/s3db/event.py :: L2083-L2123,L2141-L2207 :: sha256=b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30"
+      ]
+    },
+    {
+      "working_key": "CAP-RESP-BOOKING-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Bind a client/patient booking to a resource slot, bounded time, actor and explicit state.",
+      "current_product_loci": [
+        "RespiteBookingController.php:L56-L147,L161-L283"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "RESP-RESPITE-BOOKING",
+          "RESP-ROUTE-RESPITE-BOOKINGS-INDEX"
+        ],
+        "route_ids": [
+          "ROUTE-2364",
+          "ROUTE-2365",
+          "ROUTE-2366",
+          "ROUTE-2367",
+          "ROUTE-2368",
+          "ROUTE-2369"
+        ],
+        "page_ids": [
+          "PAGE-0754",
+          "PAGE-0755",
+          "PAGE-0756"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Respite/RespiteBookingController.php",
+          "routes/*.php closure"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "RESPITE"
+      },
+      "benchmark": {
+        "repo": "CARE",
+        "official_repository_url": "https://github.com/ohcnetwork/care",
+        "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+        "spdx": "MIT",
+        "license_locus": "LICENSE",
+        "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "care/emr/models/scheduling/booking.py",
+            "lines": "L9-L50",
+            "sha256": "f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215",
+            "primary_source_url": "https://github.com/ohcnetwork/care/blob/e926b6491e5640f9ab5f758c1e556b59cc6b729f/care/emr/models/scheduling/booking.py"
+          }
+        ],
+        "proven_slice": "CARE persists booking subject, resource, time, actor, status and optional encounter linkage.",
+        "parity_limits": "No funding, agreement, readiness, recurrence, collision or Oblivion transition proof.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/ohcnetwork/care@e926b6491e5640f9ab5f758c1e556b59cc6b729f :: care/emr/models/scheduling/booking.py :: L9-L50 :: sha256=f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215"
+      ]
+    },
+    {
+      "working_key": "CAP-RESP-RESOURCE-ALLOCATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Represent a schedulable resource, bounded time and allocation count.",
+      "current_product_loci": [
+        "RespiteResourceAllocationController.php:L37-L57",
+        "ClientRespiteAllocationController.php:L11-L69"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "RESP-CLIENT-RESPITE-ALLOCATION",
+          "RESP-RESPITE-RESOURCE-ALLOCATION"
+        ],
+        "route_ids": [
+          "ROUTE-2361",
+          "ROUTE-2362",
+          "ROUTE-2363",
+          "ROUTE-2428",
+          "ROUTE-2429",
+          "ROUTE-2430"
+        ],
+        "page_ids": [
+          "PAGE-0791"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Respite/ClientRespiteAllocationController.php",
+          "app/Http/Controllers/Respite/RespiteResourceAllocationController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "RESPITE"
+      },
+      "benchmark": {
+        "repo": "CARE",
+        "official_repository_url": "https://github.com/ohcnetwork/care",
+        "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+        "spdx": "MIT",
+        "license_locus": "LICENSE",
+        "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "care/emr/models/scheduling/booking.py",
+            "lines": "L9-L18",
+            "sha256": "f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215",
+            "primary_source_url": "https://github.com/ohcnetwork/care/blob/e926b6491e5640f9ab5f758c1e556b59cc6b729f/care/emr/models/scheduling/booking.py"
+          }
+        ],
+        "proven_slice": "CARE binds bookings to a schedulable resource and bounded time with allocation quantity.",
+        "parity_limits": "No booking ownership, collision prevention, Site scope or resource workflow proof.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/ohcnetwork/care@e926b6491e5640f9ab5f758c1e556b59cc6b729f :: care/emr/models/scheduling/booking.py :: L9-L18 :: sha256=f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215"
+      ]
+    },
+    {
+      "working_key": "CAP-RESP-STAY-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist a stay/encounter with status history, period, facility, booking, location and discharge advice.",
+      "current_product_loci": [
+        "RespiteStayController.php:L40-L69,L91-L155,L198-L241,L609-L645"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "RESP-RESPITE-STAY",
+          "RESP-ROUTE-RESPITE-STAYS-INDEX"
+        ],
+        "route_ids": [
+          "ROUTE-2442",
+          "ROUTE-2443",
+          "ROUTE-2444",
+          "ROUTE-2445",
+          "ROUTE-2446",
+          "ROUTE-2450",
+          "ROUTE-2452"
+        ],
+        "page_ids": [
+          "PAGE-0798",
+          "PAGE-0799"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Respite/RespiteStayController.php",
+          "routes/*.php closure"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "RESPITE"
+      },
+      "benchmark": {
+        "repo": "CARE",
+        "official_repository_url": "https://github.com/ohcnetwork/care",
+        "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+        "spdx": "MIT",
+        "license_locus": "LICENSE",
+        "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "care/emr/models/encounter.py",
+            "lines": "L11-L37",
+            "sha256": "4ae86d2ce4920e060b9ffac2bc4da10adc9cd9869f455b878a074a7af04d8561",
+            "primary_source_url": "https://github.com/ohcnetwork/care/blob/e926b6491e5640f9ab5f758c1e556b59cc6b729f/care/emr/models/encounter.py"
+          }
+        ],
+        "proven_slice": "CARE's encounter model materially represents those stay lifecycle elements.",
+        "parity_limits": "No respite admission/discharge gates, medication reconciliation, incidents, bed holds or Site policy.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/ohcnetwork/care@e926b6491e5640f9ab5f758c1e556b59cc6b729f :: care/emr/models/encounter.py :: L11-L37 :: sha256=4ae86d2ce4920e060b9ffac2bc4da10adc9cd9869f455b878a074a7af04d8561"
+      ]
+    },
+    {
+      "working_key": "CAP-RESP-PROCEDURE-RUN-EXECUTION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Execute owner/requester-authorised procedure tasks through explicit state transitions with stable parent linkage.",
+      "current_product_loci": [
+        "RespiteProcedureRunController.php:L62-L121,L143-L200,L312-L340"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "RESP-RESPITE-PROCEDURE-RUN"
+        ],
+        "route_ids": [
+          "ROUTE-2401",
+          "ROUTE-2403",
+          "ROUTE-2404",
+          "ROUTE-2405",
+          "ROUTE-2407",
+          "ROUTE-2410"
+        ],
+        "page_ids": [
+          "PAGE-0779",
+          "PAGE-0780",
+          "PAGE-0782"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Respite/RespiteProcedureRunController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "RESPITE"
+      },
+      "benchmark": {
+        "repo": "ORCA",
+        "official_repository_url": "https://github.com/SanteonNL/orca",
+        "commit_sha": "b6654fe63d3cbdfab9f9790b24e2ab2003498418",
+        "spdx": "GPL-3.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "orchestrator/careplanservice/handle_updatetask.go",
+            "lines": "L124-L166,L226-L261",
+            "sha256": "6e73d1d91ff7a18bd38047b81689ed7045d49a3d4fb77ffb151c6e24a21128c7",
+            "primary_source_url": "https://github.com/SanteonNL/orca/blob/b6654fe63d3cbdfab9f9790b24e2ab2003498418/orchestrator/careplanservice/handle_updatetask.go"
+          }
+        ],
+        "proven_slice": "ORCA checks task ownership/requester relationships and applies governed task transitions.",
+        "parity_limits": "No procedure templates, required-task completion gate, escalation or product terminal-state parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/SanteonNL/orca@b6654fe63d3cbdfab9f9790b24e2ab2003498418 :: orchestrator/careplanservice/handle_updatetask.go :: L124-L166,L226-L261 :: sha256=6e73d1d91ff7a18bd38047b81689ed7045d49a3d4fb77ffb151c6e24a21128c7"
+      ]
+    },
+    {
+      "working_key": "CAP-DAY-MY-CALENDAR",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Resolve the signed-in user to an active employee and show employee-specific active shift assignments and times.",
+      "current_product_loci": [
+        "MyCalendarController.php:L16-L35,L39-L153"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "DAY-MY-CALENDAR"
+        ],
+        "route_ids": [
+          "ROUTE-1882",
+          "ROUTE-1883"
+        ],
+        "page_ids": [
+          "PAGE-0540",
+          "PAGE-0542"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/MyCalendarController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FRONTLINE"
+      },
+      "benchmark": {
+        "repo": "Frappe HRMS",
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "450f6ca52c5386020a1023b2f24e4af0ab20521e",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "hrms/api/__init__.py",
+            "lines": "L41-L59,L92-L96,L319-L342",
+            "sha256": "61e4adba8852721c27fa0a5773684be3250b759e67dde9c47c7756374374d905",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/450f6ca52c5386020a1023b2f24e4af0ab20521e/hrms/api/__init__.py"
+          }
+        ],
+        "proven_slice": "Frappe HRMS materially proves employee resolution and employee-specific active shift assignment retrieval.",
+        "parity_limits": "No Oblivion calendar joins, date parser, Site access, privacy or worker UX.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@450f6ca52c5386020a1023b2f24e4af0ab20521e :: hrms/api/__init__.py :: L41-L59,L92-L96,L319-L342 :: sha256=61e4adba8852721c27fa0a5773684be3250b759e67dde9c47c7756374374d905"
+      ]
+    },
+    {
+      "working_key": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Expose task identity, dates, status and assignee through permission-governed read and update surfaces.",
+      "current_product_loci": [
+        "AllTasksController.php:L34-L115,L218-L310,L381-L429"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "DAY-ALL-TASKS"
+        ],
+        "route_ids": [
+          "ROUTE-2971",
+          "ROUTE-2972",
+          "ROUTE-2973",
+          "ROUTE-2974",
+          "ROUTE-2975",
+          "ROUTE-2976",
+          "ROUTE-2977",
+          "ROUTE-2979"
+        ],
+        "page_ids": [
+          "PAGE-0956",
+          "PAGE-0958",
+          "PAGE-0959"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/AllTasksController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FRONTLINE"
+      },
+      "benchmark": {
+        "repo": "OpenProject",
+        "official_repository_url": "https://github.com/opf/openproject",
+        "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+        "spdx": "GPL-3.0-or-later",
+        "license_locus": "publiccode.yml:L55",
+        "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+        "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+        "exact_loci": [
+          {
+            "path": "lib/api/v3/work_packages/work_package_representer.rb",
+            "lines": "L362-L376,L468-L470,L504-L510,L560-L578",
+            "sha256": "2c26dea717d1e659d99fea4fa5923b3046048cdd11f77bc227e06ef5d9cc66dd",
+            "primary_source_url": "https://github.com/opf/openproject/blob/d5fa0433dce7f3edd48d0120736ac844fe3748d9/lib/api/v3/work_packages/work_package_representer.rb"
+          },
+          {
+            "path": "app/contracts/work_packages/update_contract.rb",
+            "lines": "L31-L42,L62-L80",
+            "sha256": "8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467",
+            "primary_source_url": "https://github.com/opf/openproject/blob/d5fa0433dce7f3edd48d0120736ac844fe3748d9/app/contracts/work_packages/update_contract.rb"
+          }
+        ],
+        "proven_slice": "OpenProject materially represents those task fields and permission-governed update checks.",
+        "parity_limits": "No Oblivion aggregation, provider visibility, watcher/split, CSV or Site/privacy parity.",
+        "p6_caveats": "Benchmark-only behavior; do not copy source, schema, labels, layouts or product wording."
+      },
+      "evidence_loci": [
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: lib/api/v3/work_packages/work_package_representer.rb :: L362-L376,L468-L470,L504-L510,L560-L578 :: sha256=2c26dea717d1e659d99fea4fa5923b3046048cdd11f77bc227e06ef5d9cc66dd",
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/contracts/work_packages/update_contract.rb :: L31-L42,L62-L80 :: sha256=8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467"
+      ]
+    },
+    {
+      "working_key": "CAP-CLIN-HEALTH-MONITORING-OVERSIGHT",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Provide a permitted multi-client health-monitoring rollup and response projection.",
+      "current_product_loci": [
+        "HealthClinicalDashboardController.php:L235-L250"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "CLIN-HEALTH-CLINICAL-DASHBOARD"
+        ],
+        "route_ids": [
+          "ROUTE-1068"
+        ],
+        "page_ids": [
+          "PAGE-0352"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL"
+      },
+      "evidence_loci": [
+        "https://github.com/ohcnetwork/care@e926b6491e5640f9ab5f758c1e556b59cc6b729f :: care/emr/models/observation.py :: L6-L48 :: sha256=571e82ad8b3b59af7d3c208e5b60cfec9f5e22d0999c3b49acdd0a3be20e4474",
+        "https://github.com/openmrs/openmrs-core@6c1b124b30b5df1df6d1939fd629cea1ea002a4e :: api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java :: L103-L148 :: sha256=9d44ea8ce2d68c8591279404d599a0e10bbb1806b3a06d17b8b1546e770acb1e"
+      ],
+      "rejected_repositories": [
+        {
+          "repo": "CARE",
+          "official_repository_url": "https://github.com/ohcnetwork/care",
+          "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+          "spdx": "MIT",
+          "license_locus": "LICENSE",
+          "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "care/emr/models/observation.py:L6-L48"
+          ],
+          "exact_loci": [
+            {
+              "path": "care/emr/models/observation.py",
+              "lines": "L6-L48",
+              "sha256": "571e82ad8b3b59af7d3c208e5b60cfec9f5e22d0999c3b49acdd0a3be20e4474"
+            }
+          ],
+          "reason": "Persists individual observations but not a permitted multi-client oversight rollup."
+        },
+        {
+          "repo": "OpenMRS Core",
+          "official_repository_url": "https://github.com/openmrs/openmrs-core",
+          "commit_sha": "6c1b124b30b5df1df6d1939fd629cea1ea002a4e",
+          "spdx": "MPL-2.0",
+          "license_locus": "LICENSE",
+          "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java:L103-L148"
+          ],
+          "exact_loci": [
+            {
+              "path": "api/src/main/java/org/openmrs/api/impl/ObsServiceImpl.java",
+              "lines": "L103-L148",
+              "sha256": "9d44ea8ce2d68c8591279404d599a0e10bbb1806b3a06d17b8b1546e770acb1e"
+            }
+          ],
+          "reason": "Persists individual observations but not monitoring oversight or response projection."
+        }
+      ],
+      "bounded_ncm_reason": "The inspected official health-record repositories prove individual observations, not the exact multi-client monitoring capability. This conclusion is bounded to the inspected corpus."
+    },
+    {
+      "working_key": "CAP-CLIN-PROTOCOL-DEFINITION-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Govern protocol authoring, revision, activation and retirement.",
+      "current_product_loci": [
+        "HealthClinicalProtocolController.php:L22-L129"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "CLIN-HEALTH-CLINICAL-PROTOCOL"
+        ],
+        "route_ids": [
+          "ROUTE-1071",
+          "ROUTE-1072",
+          "ROUTE-1073",
+          "ROUTE-1074",
+          "ROUTE-1075",
+          "ROUTE-1076"
+        ],
+        "page_ids": [
+          "PAGE-0344",
+          "PAGE-0354",
+          "PAGE-0356",
+          "PAGE-0357",
+          "PAGE-0358"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CLINICAL"
+      },
+      "evidence_loci": [
+        "https://github.com/ohcnetwork/care@e926b6491e5640f9ab5f758c1e556b59cc6b729f :: care/emr/models/scheduling/booking.py :: L9-L50 :: sha256=f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215",
+        "https://github.com/SanteonNL/orca@b6654fe63d3cbdfab9f9790b24e2ab2003498418 :: orchestrator/careplanservice/handle_createtask.go :: L29-L75,L117-L188 :: sha256=2b30c5bab70f8687f0a56e92dfdd2fd5ae84076ac9ecb807a4b15c820a659152"
+      ],
+      "rejected_repositories": [
+        {
+          "repo": "CARE",
+          "official_repository_url": "https://github.com/ohcnetwork/care",
+          "commit_sha": "e926b6491e5640f9ab5f758c1e556b59cc6b729f",
+          "spdx": "MIT",
+          "license_locus": "LICENSE",
+          "license_sha256": "b4185b46e22c62a37566cd953336dc92a8b836f3d750a4cf0788e05b79260d7b",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "care/emr/models/scheduling/booking.py:L9-L50"
+          ],
+          "exact_loci": [
+            {
+              "path": "care/emr/models/scheduling/booking.py",
+              "lines": "L9-L50",
+              "sha256": "f4c69c0d035717797b847ba1a4ab6f9a20957ebc7466a5b26f158e9b0bcc0215"
+            }
+          ],
+          "reason": "Booking scheduling does not prove protocol authoring or revision."
+        },
+        {
+          "repo": "ORCA",
+          "official_repository_url": "https://github.com/SanteonNL/orca",
+          "commit_sha": "b6654fe63d3cbdfab9f9790b24e2ab2003498418",
+          "spdx": "GPL-3.0",
+          "license_locus": "LICENSE",
+          "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "orchestrator/careplanservice/handle_createtask.go:L29-L75,L117-L188"
+          ],
+          "exact_loci": [
+            {
+              "path": "orchestrator/careplanservice/handle_createtask.go",
+              "lines": "L29-L75,L117-L188",
+              "sha256": "2b30c5bab70f8687f0a56e92dfdd2fd5ae84076ac9ecb807a4b15c820a659152"
+            }
+          ],
+          "reason": "Care-plan task creation does not establish governed protocol lifecycle."
+        }
+      ],
+      "bounded_ncm_reason": "The inspected booking and task sources do not prove governed protocol definition, revision and activation. This conclusion is bounded to the inspected corpus."
+    },
+    {
+      "working_key": "CAP-INC-INCIDENT-FOLLOWUP",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Provide an incident-owned follow-up lifecycle with accountable immutable completion.",
+      "current_product_loci": [
+        "IncidentFollowupController.php:L13-L158"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "INC-INCIDENT-FOLLOWUP"
+        ],
+        "route_ids": [
+          "ROUTE-1838",
+          "ROUTE-1840",
+          "ROUTE-1848",
+          "ROUTE-1849",
+          "ROUTE-1850"
+        ],
+        "page_ids": [
+          "PAGE-0526",
+          "PAGE-0527"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/IncidentFollowupController.php",
+          "app/Models/IncidentFollowup.php",
+          "resources/js/components/incidents/incident-detail-dialog.tsx"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS"
+      },
+      "evidence_loci": [
+        "https://github.com/sahana/eden@0e55ecf7ed780b7ad659e70398b56260c41de021 :: modules/s3db/event.py :: L2066-L2123,L2165-L2208 :: sha256=b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30",
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/contracts/work_packages/update_contract.rb :: L31-L42,L62-L80 :: sha256=8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467",
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/services/work_packages/update_service.rb :: L31-L55,L57-L75 :: sha256=d1fbeff98e8ef5825fa86094c892de7a4cc2cca5927c68ae799ad5d83792509a"
+      ],
+      "rejected_repositories": [
+        {
+          "repo": "Sahana Eden",
+          "official_repository_url": "https://github.com/sahana/eden",
+          "commit_sha": "0e55ecf7ed780b7ad659e70398b56260c41de021",
+          "spdx": "MIT",
+          "license_locus": "LICENSE",
+          "license_sha256": "7c662d47bb673fa88d2b75f0f1859fb65dc16c41e7ecd749612024070c1cd06b",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "modules/s3db/event.py:L2066-L2123,L2165-L2208"
+          ],
+          "exact_loci": [
+            {
+              "path": "modules/s3db/event.py",
+              "lines": "L2066-L2123,L2165-L2208",
+              "sha256": "b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30"
+            }
+          ],
+          "reason": "Incident reports do not establish a follow-up lifecycle."
+        },
+        {
+          "repo": "OpenProject",
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+          "spdx": "GPL-3.0-or-later",
+          "license_locus": "publiccode.yml:L55",
+          "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "app/contracts/work_packages/update_contract.rb:L31-L42,L62-L80"
+          ],
+          "exact_loci": [
+            {
+              "path": "app/contracts/work_packages/update_contract.rb",
+              "lines": "L31-L42,L62-L80",
+              "sha256": "8fa1c09c9e4db094d613aa57bf689642e6de9bb18a9c3d9b41b4440b1e3e2467"
+            }
+          ],
+          "reason": "Generic work-package updates do not prove incident-owned immutable completion."
+        },
+        {
+          "repo": "OpenProject",
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+          "spdx": "GPL-3.0-or-later",
+          "license_locus": "publiccode.yml:L55",
+          "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "app/services/work_packages/update_service.rb:L31-L55,L57-L75"
+          ],
+          "exact_loci": [
+            {
+              "path": "app/services/work_packages/update_service.rb",
+              "lines": "L31-L55,L57-L75",
+              "sha256": "d1fbeff98e8ef5825fa86094c892de7a4cc2cca5927c68ae799ad5d83792509a"
+            }
+          ],
+          "reason": "Generic update execution does not prove incident follow-up ownership and closure."
+        }
+      ],
+      "bounded_ncm_reason": "Sahana has reports and OpenProject has generic updates; neither proves the exact incident follow-up completion boundary. This conclusion is bounded to the inspected corpus."
+    },
+    {
+      "working_key": "CAP-INC-INCIDENT-TEMPLATE-LIFECYCLE",
+      "prior_status": "unproved",
+      "candidate_status": "documented_ncm_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Govern an administrator-only reusable incident-template definition lifecycle.",
+      "current_product_loci": [
+        "IncidentTemplateController.php:L10-L77",
+        "IncidentTemplate.php:L8-L29"
+      ],
+      "current_source_lineage": {
+        "source_family_ids": [
+          "INC-INCIDENT-TEMPLATE"
+        ],
+        "route_ids": [
+          "ROUTE-1855",
+          "ROUTE-1856",
+          "ROUTE-1857",
+          "ROUTE-1858",
+          "ROUTE-1859"
+        ],
+        "page_ids": [
+          "PAGE-0528",
+          "PAGE-0529"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/IncidentTemplateController.php",
+          "app/Models/IncidentTemplate.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS"
+      },
+      "evidence_loci": [
+        "https://github.com/sahana/eden@0e55ecf7ed780b7ad659e70398b56260c41de021 :: modules/s3db/event.py :: L1063-L1170 :: sha256=b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30",
+        "https://github.com/opf/openproject@d5fa0433dce7f3edd48d0120736ac844fe3748d9 :: app/models/work_package.rb :: L57-L64,L103-L110,L274-L281,L308-L312 :: sha256=fe6207cbd7edc33fdcbfce9e7da247c6bcf20bbbb0f7e33c8d4150abfb7aefa7"
+      ],
+      "rejected_repositories": [
+        {
+          "repo": "Sahana Eden",
+          "official_repository_url": "https://github.com/sahana/eden",
+          "commit_sha": "0e55ecf7ed780b7ad659e70398b56260c41de021",
+          "spdx": "MIT",
+          "license_locus": "LICENSE",
+          "license_sha256": "7c662d47bb673fa88d2b75f0f1859fb65dc16c41e7ecd749612024070c1cd06b",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "modules/s3db/event.py:L1063-L1170"
+          ],
+          "exact_loci": [
+            {
+              "path": "modules/s3db/event.py",
+              "lines": "L1063-L1170",
+              "sha256": "b4da113acd83dd0853dbfdfc4ae57d7c6f0fd4ded7532e70052c49637be02a30"
+            }
+          ],
+          "reason": "Incident classification does not prove template lifecycle."
+        },
+        {
+          "repo": "OpenProject",
+          "official_repository_url": "https://github.com/opf/openproject",
+          "commit_sha": "d5fa0433dce7f3edd48d0120736ac844fe3748d9",
+          "spdx": "GPL-3.0-or-later",
+          "license_locus": "publiccode.yml:L55",
+          "license_sha256": "3802de5be385f9de812523fbd963f2e1a7f9abbc41c0f525e1103bc6b9255da5",
+          "edition_boundary": "Pinned official community repository source only; hosted services, paid/Enterprise/private extensions and unpinned refs are excluded. GPL/MPL source is behavioural evidence only.",
+          "source_loci": [
+            "app/models/work_package.rb:L57-L64,L103-L110,L274-L281,L308-L312"
+          ],
+          "exact_loci": [
+            {
+              "path": "app/models/work_package.rb",
+              "lines": "L57-L64,L103-L110,L274-L281,L308-L312",
+              "sha256": "fe6207cbd7edc33fdcbfce9e7da247c6bcf20bbbb0f7e33c8d4150abfb7aefa7"
+            }
+          ],
+          "reason": "Generic work-package configuration does not prove reusable incident-template governance."
+        }
+      ],
+      "bounded_ncm_reason": "Classification and generic work-package configuration do not establish an administrator-only incident-template lifecycle. This conclusion is bounded to the inspected corpus."
+    }
+  ],
+  "projected_delta": {
+    "verified_benchmark_direct": 8,
+    "documented_ncm_direct": 4,
+    "eligible_total": 12,
+    "completion_unproved": -12
+  }
+}

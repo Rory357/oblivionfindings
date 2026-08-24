@@ -1,0 +1,428 @@
+{
+  "manifest_chunk": "CLINICAL",
+  "counts": {
+    "source_touches": 23,
+    "H": 20,
+    "D": 3,
+    "unique": 23
+  },
+  "targets": [
+    {
+      "id": "CAP-CLIN-CLIENT-ABC-BEHAVIOUR-RECORD",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-BEHAVIOUR-ABC"
+      ],
+      "route_ids": [
+        "ROUTE-0132",
+        "ROUTE-0133",
+        "ROUTE-0134",
+        "ROUTE-0135",
+        "ROUTE-0136"
+      ],
+      "page_ids": [
+        "PAGE-0345"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/BehaviourAbcController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-BOWEL-CHART",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-BOWEL-CHART"
+      ],
+      "route_ids": [
+        "ROUTE-1979",
+        "ROUTE-1980",
+        "ROUTE-1981",
+        "ROUTE-1982"
+      ],
+      "page_ids": [
+        "PAGE-0608"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/ClientBowelChartController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-FLUID-CHART",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-FLUID-CHART"
+      ],
+      "route_ids": [
+        "ROUTE-1983",
+        "ROUTE-1984",
+        "ROUTE-1985",
+        "ROUTE-1986"
+      ],
+      "page_ids": [
+        "PAGE-0608"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/ClientFluidChartController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-SEIZURE-CHART",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-SEIZURE-CHART"
+      ],
+      "route_ids": [
+        "ROUTE-1987",
+        "ROUTE-1988",
+        "ROUTE-1989",
+        "ROUTE-1990"
+      ],
+      "page_ids": [
+        "PAGE-0608"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/ClientSeizureChartController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-SLEEP-CHART",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-SLEEP-CHART"
+      ],
+      "route_ids": [
+        "ROUTE-1991",
+        "ROUTE-1992",
+        "ROUTE-1993",
+        "ROUTE-1994"
+      ],
+      "page_ids": [
+        "PAGE-0541",
+        "PAGE-0608"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/ClientSleepChartController.php"
+    },
+    {
+      "id": "CAP-CLIN-FRONTLINE-OBSERVATION-RECORDING",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-CLINICAL",
+        "CLIN-SHIFT-CLINICAL"
+      ],
+      "route_ids": [
+        "ROUTE-0144",
+        "ROUTE-0145",
+        "ROUTE-2716",
+        "ROUTE-2717"
+      ],
+      "page_ids": [
+        "PAGE-0541",
+        "PAGE-0708"
+      ],
+      "backend_anchor": [
+        "app/Http/Controllers/Clinical/ClientClinicalController.php",
+        "app/Http/Controllers/Clinical/ShiftClinicalController.php"
+      ]
+    },
+    {
+      "id": "CAP-CLIN-FRONTLINE-EVENT-RECORDING",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-CLIENT-CLINICAL",
+        "CLIN-SHIFT-CLINICAL"
+      ],
+      "route_ids": [
+        "ROUTE-0143",
+        "ROUTE-2715"
+      ],
+      "page_ids": [
+        "PAGE-0708"
+      ],
+      "backend_anchor": [
+        "app/Http/Controllers/Clinical/ClientClinicalController.php",
+        "app/Http/Controllers/Clinical/ShiftClinicalController.php"
+      ]
+    },
+    {
+      "id": "CAP-GOV-CLINICAL-INDICATOR-OVERSIGHT",
+      "class": "H",
+      "canonical_module": "GOVERNANCE",
+      "source_family_ids": [
+        "CLIN-CLINICAL-GOVERNANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0897",
+        "ROUTE-0900"
+      ],
+      "page_ids": [
+        "PAGE-0277",
+        "PAGE-0278",
+        "PAGE-0279"
+      ],
+      "backend_anchor": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php"
+    },
+    {
+      "id": "CAP-GOV-CLINICAL-MANUAL-INDICATOR-API",
+      "class": "D",
+      "canonical_module": "GOVERNANCE",
+      "source_family_ids": [
+        "CLIN-CLINICAL-GOVERNANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0898"
+      ],
+      "page_ids": [
+        "PAGE-0277",
+        "PAGE-0278",
+        "PAGE-0279"
+      ],
+      "backend_anchor": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php"
+    },
+    {
+      "id": "CAP-GOV-CLINICAL-MANUAL-SNAPSHOT-API",
+      "class": "D",
+      "canonical_module": "GOVERNANCE",
+      "source_family_ids": [
+        "CLIN-CLINICAL-GOVERNANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0899"
+      ],
+      "page_ids": [
+        "PAGE-0277",
+        "PAGE-0278",
+        "PAGE-0279"
+      ],
+      "backend_anchor": "app/Domain/Governance/Http/Controllers/ClinicalGovernanceController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-SUMMARY",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL"
+      ],
+      "route_ids": [
+        "ROUTE-1060"
+      ],
+      "page_ids": [
+        "PAGE-0341"
+      ],
+      "backend_anchor": "app/Http/Controllers/HealthClinical/HealthClinicalController.php"
+    },
+    {
+      "id": "CAP-CLIN-CLIENT-TRENDS",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-CLIENT-TRENDS"
+      ],
+      "route_ids": [
+        "ROUTE-1061"
+      ],
+      "page_ids": [
+        "PAGE-0342",
+        "PAGE-0350"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalClientTrendsController.php"
+    },
+    {
+      "id": "CAP-CLIN-MODULE-DASHBOARD",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1054"
+      ],
+      "page_ids": [
+        "PAGE-0353"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-ASSESSMENT-REGISTER",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1055",
+        "ROUTE-1056"
+      ],
+      "page_ids": [
+        "PAGE-0338",
+        "PAGE-0346"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1057"
+      ],
+      "page_ids": [
+        "PAGE-0339"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1058"
+      ],
+      "page_ids": [
+        "PAGE-0340"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-RECORD-WIZARD-CONTEXT-API",
+      "class": "D",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1059",
+        "ROUTE-1062"
+      ],
+      "page_ids": [
+        "PAGE-0349"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1063",
+        "ROUTE-1064"
+      ],
+      "page_ids": [
+        "PAGE-0347",
+        "PAGE-0351"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1065",
+        "ROUTE-1066",
+        "ROUTE-1067"
+      ],
+      "page_ids": [
+        "PAGE-0347",
+        "PAGE-0351"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-HEALTH-MONITORING-OVERSIGHT",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1068"
+      ],
+      "page_ids": [
+        "PAGE-0352"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1069",
+        "ROUTE-1070"
+      ],
+      "page_ids": [
+        "PAGE-0348",
+        "PAGE-0355"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-POPULATION-TRENDS",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1077"
+      ],
+      "page_ids": [
+        "PAGE-0350",
+        "PAGE-0359"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php"
+    },
+    {
+      "id": "CAP-CLIN-PROTOCOL-DEFINITION-LIFECYCLE",
+      "class": "H",
+      "canonical_module": "CLINICAL",
+      "source_family_ids": [
+        "CLIN-HEALTH-CLINICAL-PROTOCOL"
+      ],
+      "route_ids": [
+        "ROUTE-1071",
+        "ROUTE-1072",
+        "ROUTE-1073",
+        "ROUTE-1074",
+        "ROUTE-1075",
+        "ROUTE-1076"
+      ],
+      "page_ids": [
+        "PAGE-0344",
+        "PAGE-0354",
+        "PAGE-0356",
+        "PAGE-0357",
+        "PAGE-0358"
+      ],
+      "backend_anchor": "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php"
+    }
+  ],
+  "integrity": {
+    "route_count": 55,
+    "route_residual": 0,
+    "canonical_allocation": {
+      "CLINICAL": {
+        "H": 19,
+        "D": 1
+      },
+      "GOVERNANCE": {
+        "H": 1,
+        "D": 2
+      }
+    }
+  }
+}

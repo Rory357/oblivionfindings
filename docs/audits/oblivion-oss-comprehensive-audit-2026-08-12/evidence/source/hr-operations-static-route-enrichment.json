@@ -1,0 +1,4635 @@
+{
+  "artifact": "hr-operations-static-route-enrichment",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "validated_static_source_lineage_runtime_unverified",
+  "proof_boundary": "Exact static route/page/controller lineage reconstructed from the audited canonical target manifest, retained source-family adjudication, current inventory, direct target projection and action/page-evidence split allocation. This does not prove route reachability, authorization, persisted outcomes, representative-role behavior, or browser workflow completion. Page IDs are included only where a retained direct target relationship, one-to-one source family, or route-backed page-evidence relation exists.",
+  "summary": {
+    "modules": {
+      "HR": {
+        "targets": 151,
+        "targets_with_route_ids": 151,
+        "targets_with_page_ids": 87,
+        "targets_with_backend_anchors": 151
+      },
+      "OPERATIONS": {
+        "targets": 74,
+        "targets_with_route_ids": 74,
+        "targets_with_page_ids": 50,
+        "targets_with_backend_anchors": 74
+      }
+    },
+    "targets": 225,
+    "targets_with_route_ids": 225,
+    "targets_with_page_ids": 137,
+    "targets_with_backend_anchors": 225,
+    "route_relations": 916,
+    "unique_route_ids": 916,
+    "page_relations": 335,
+    "unique_page_ids": 292,
+    "backend_anchor_relations": 239,
+    "unique_backend_anchors": 130,
+    "unresolved_targets": 0,
+    "validation_errors": 0
+  },
+  "targets": {
+    "CAP-HR-ANNOUNCEMENT-ACKNOWLEDGEMENT-TRACKING": {
+      "source_family_ids": [
+        "HR-ANNOUNCEMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1262",
+        "ROUTE-1263",
+        "ROUTE-1265",
+        "ROUTE-1266",
+        "ROUTE-1267",
+        "ROUTE-1270",
+        "ROUTE-1274"
+      ],
+      "page_ids": [
+        "PAGE-0454"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AnnouncementController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ANNOUNCEMENT-AUTHORING-PUBLICATION": {
+      "source_family_ids": [
+        "HR-ANNOUNCEMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1256",
+        "ROUTE-1257",
+        "ROUTE-1258",
+        "ROUTE-1259",
+        "ROUTE-1260",
+        "ROUTE-1261",
+        "ROUTE-1264",
+        "ROUTE-1268",
+        "ROUTE-1269",
+        "ROUTE-1271",
+        "ROUTE-1272",
+        "ROUTE-1273"
+      ],
+      "page_ids": [
+        "PAGE-0402",
+        "PAGE-0403"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AnnouncementController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-APPROVAL-CHAIN-CONFIG": {
+      "source_family_ids": [
+        "HR-APPROVAL"
+      ],
+      "route_ids": [
+        "ROUTE-1276",
+        "ROUTE-1277"
+      ],
+      "page_ids": [
+        "PAGE-0404"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ApprovalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-APPROVAL-INSTANCE-DECISION": {
+      "source_family_ids": [
+        "HR-APPROVAL"
+      ],
+      "route_ids": [
+        "ROUTE-1275",
+        "ROUTE-1278"
+      ],
+      "page_ids": [
+        "PAGE-0405"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ApprovalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ASSET-CUSTODY": {
+      "source_family_ids": [
+        "HR-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-1283",
+        "ROUTE-1289",
+        "ROUTE-1294"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AssetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ASSET-DOCUMENTS-IDENTIFICATION": {
+      "source_family_ids": [
+        "HR-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-1284",
+        "ROUTE-1286",
+        "ROUTE-1291",
+        "ROUTE-1292",
+        "ROUTE-1295"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AssetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ASSET-REGISTER-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-1279",
+        "ROUTE-1280",
+        "ROUTE-1281",
+        "ROUTE-1282",
+        "ROUTE-1285",
+        "ROUTE-1287",
+        "ROUTE-1288",
+        "ROUTE-1290",
+        "ROUTE-1293"
+      ],
+      "page_ids": [
+        "PAGE-0406",
+        "PAGE-0407"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AssetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-AUTOMATION-RULES": {
+      "source_family_ids": [
+        "HR-HR-AUTOMATION"
+      ],
+      "route_ids": [
+        "ROUTE-1736",
+        "ROUTE-1737",
+        "ROUTE-1738",
+        "ROUTE-1739",
+        "ROUTE-1740"
+      ],
+      "page_ids": [
+        "PAGE-0511"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrAutomationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-BENEFITS-ENROLLMENT": {
+      "source_family_ids": [
+        "HR-BENEFITS"
+      ],
+      "route_ids": [
+        "ROUTE-1323",
+        "ROUTE-1324"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/BenefitsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-BENEFITS-PLAN-ADMINISTRATION": {
+      "source_family_ids": [
+        "HR-BENEFITS"
+      ],
+      "route_ids": [
+        "ROUTE-1325",
+        "ROUTE-1326",
+        "ROUTE-1327"
+      ],
+      "page_ids": [
+        "PAGE-0416"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/BenefitsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CALENDAR-EVENT-MANAGEMENT": {
+      "source_family_ids": [
+        "HR-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-1297",
+        "ROUTE-1298",
+        "ROUTE-1299",
+        "ROUTE-1300",
+        "ROUTE-1301",
+        "ROUTE-1302"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CalendarController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CALENDAR-FEED": {
+      "source_family_ids": [
+        "HR-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-1304"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CalendarController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CALENDAR-PARTICIPATION": {
+      "source_family_ids": [
+        "HR-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-1303"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CalendarController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-APPLICATION-PROGRESSION": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1668",
+        "ROUTE-1672",
+        "ROUTE-1673"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-CANDIDATE-POOL": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1675",
+        "ROUTE-1676",
+        "ROUTE-1677",
+        "ROUTE-1678",
+        "ROUTE-1679",
+        "ROUTE-1680",
+        "ROUTE-1681",
+        "ROUTE-1683",
+        "ROUTE-1684",
+        "ROUTE-1685",
+        "ROUTE-1716",
+        "ROUTE-1717"
+      ],
+      "page_ids": [
+        "PAGE-0410",
+        "PAGE-0411"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-COMMUNICATIONS": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1682",
+        "ROUTE-1686",
+        "ROUTE-1687"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-INTERVIEWS": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1669",
+        "ROUTE-1689",
+        "ROUTE-1690"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-OFFERS-HIRE": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1670",
+        "ROUTE-1706",
+        "ROUTE-1707",
+        "ROUTE-1708",
+        "ROUTE-1709",
+        "ROUTE-1710",
+        "ROUTE-1711",
+        "ROUTE-1712",
+        "ROUTE-1713",
+        "ROUTE-1714"
+      ],
+      "page_ids": [
+        "PAGE-0409"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CANDIDATE-REFERENCES": {
+      "source_family_ids": [
+        "HR-CANDIDATE"
+      ],
+      "route_ids": [
+        "ROUTE-1671",
+        "ROUTE-1715"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CandidateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CAREERS-PUBLIC-APPLICATION": {
+      "source_family_ids": [
+        "HR-CAREERS-CAREER-PORTAL",
+        "HR-CONTROLLERS-CAREER-PORTAL",
+        "HR-ROUTE-CAREERS-SHOW"
+      ],
+      "route_ids": [
+        "ROUTE-0088",
+        "ROUTE-0089",
+        "ROUTE-0090",
+        "ROUTE-0091",
+        "ROUTE-0092"
+      ],
+      "page_ids": [
+        "PAGE-0016",
+        "PAGE-0017",
+        "PAGE-0018"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/CareerPortalController.php",
+        "app/Http/Controllers/Careers/CareerPortalController.php",
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CAREERS-PUBLIC-OFFER-RESPONSE": {
+      "source_family_ids": [
+        "HR-CAREERS-CAREER-PORTAL",
+        "HR-CONTROLLERS-CAREER-PORTAL"
+      ],
+      "route_ids": [
+        "ROUTE-0093",
+        "ROUTE-0094"
+      ],
+      "page_ids": [
+        "PAGE-0019"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Careers/CareerPortalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CASE-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-HR-CASE"
+      ],
+      "route_ids": [
+        "ROUTE-1305",
+        "ROUTE-1306",
+        "ROUTE-1307",
+        "ROUTE-1308",
+        "ROUTE-1309",
+        "ROUTE-1314"
+      ],
+      "page_ids": [
+        "PAGE-0412",
+        "PAGE-0413"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrCaseController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CASE-TIMELINE": {
+      "source_family_ids": [
+        "HR-HR-CASE"
+      ],
+      "route_ids": [
+        "ROUTE-1312",
+        "ROUTE-1313"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrCaseController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPENSATION-REVIEW-CYCLE": {
+      "source_family_ids": [
+        "HR-COMPENSATION"
+      ],
+      "route_ids": [
+        "ROUTE-1343",
+        "ROUTE-1344",
+        "ROUTE-1345",
+        "ROUTE-1346",
+        "ROUTE-1347",
+        "ROUTE-1348",
+        "ROUTE-1349",
+        "ROUTE-1350"
+      ],
+      "page_ids": [
+        "PAGE-0423",
+        "PAGE-0424"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CompensationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPENSATION-STRUCTURE-HISTORY": {
+      "source_family_ids": [
+        "HR-COMPENSATION"
+      ],
+      "route_ids": [
+        "ROUTE-1318",
+        "ROUTE-1319",
+        "ROUTE-1320",
+        "ROUTE-1321",
+        "ROUTE-1341",
+        "ROUTE-1342",
+        "ROUTE-1351"
+      ],
+      "page_ids": [
+        "PAGE-0414",
+        "PAGE-0421",
+        "PAGE-0422",
+        "PAGE-0425"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CompensationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPETENCY-ASSESSMENT": {
+      "source_family_ids": [
+        "HR-COMPETENCY"
+      ],
+      "route_ids": [
+        "ROUTE-1617",
+        "ROUTE-1618",
+        "ROUTE-1619"
+      ],
+      "page_ids": [
+        "PAGE-0490",
+        "PAGE-0492"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CompetencyController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPETENCY-DEFINITIONS": {
+      "source_family_ids": [
+        "HR-COMPETENCY"
+      ],
+      "route_ids": [
+        "ROUTE-1613",
+        "ROUTE-1614",
+        "ROUTE-1615",
+        "ROUTE-1616"
+      ],
+      "page_ids": [
+        "PAGE-0491"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CompetencyController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPETENCY-EVIDENCE-SIGNOFF": {
+      "source_family_ids": [
+        "HR-COMPETENCY"
+      ],
+      "route_ids": [
+        "ROUTE-1620",
+        "ROUTE-1621",
+        "ROUTE-1622"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CompetencyController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPLIANCE-MATRIX-ASSIGNMENT": {
+      "source_family_ids": [
+        "HR-COMPLIANCE-MATRIX"
+      ],
+      "route_ids": [
+        "ROUTE-1365",
+        "ROUTE-1366"
+      ],
+      "page_ids": [
+        "PAGE-0433"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceMatrixController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPLIANCE-MATRIX-REQUIREMENTS": {
+      "source_family_ids": [
+        "HR-COMPLIANCE-MATRIX"
+      ],
+      "route_ids": [
+        "ROUTE-1369",
+        "ROUTE-1370",
+        "ROUTE-1371"
+      ],
+      "page_ids": [
+        "PAGE-0430"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceMatrixController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPLIANCE-RECORDS-EXEMPTIONS": {
+      "source_family_ids": [
+        "HR-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-1352",
+        "ROUTE-1353",
+        "ROUTE-1354",
+        "ROUTE-1355",
+        "ROUTE-1372",
+        "ROUTE-1373",
+        "ROUTE-1374",
+        "ROUTE-1375",
+        "ROUTE-1376"
+      ],
+      "page_ids": [
+        "PAGE-0427",
+        "PAGE-0428",
+        "PAGE-0429",
+        "PAGE-0430",
+        "PAGE-0431",
+        "PAGE-0432",
+        "PAGE-0434"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-COMPLIANCE-RENEWAL-OVERSIGHT": {
+      "source_family_ids": [
+        "HR-COMPLIANCE"
+      ],
+      "route_ids": [
+        "ROUTE-1356",
+        "ROUTE-1367",
+        "ROUTE-1368"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CONTROLLERS-PERFORMANCE-REVIEW-GOALS-APPROVAL": {
+      "source_family_ids": [
+        "HR-CONTROLLERS-PERFORMANCE-REVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-0965",
+        "ROUTE-0969"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/PerformanceReviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CONTROLLERS-PERFORMANCE-REVIEW-MANAGER-ASSESSMENT": {
+      "source_family_ids": [
+        "HR-CONTROLLERS-PERFORMANCE-REVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-0966",
+        "ROUTE-0968",
+        "ROUTE-0970"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/PerformanceReviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-CONTROLLERS-PERFORMANCE-REVIEW-SETUP-SELF-ASSESSMENT": {
+      "source_family_ids": [
+        "HR-CONTROLLERS-PERFORMANCE-REVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-0961",
+        "ROUTE-0962",
+        "ROUTE-0963",
+        "ROUTE-0964",
+        "ROUTE-0967",
+        "ROUTE-0971"
+      ],
+      "page_ids": [
+        "PAGE-0303",
+        "PAGE-0304",
+        "PAGE-0305",
+        "PAGE-0306"
+      ],
+      "backend_anchors": [
+        "app/Domain/Governance/Http/Controllers/PerformanceReviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EMPLOYEE-PROFILE-ACCOUNT": {
+      "source_family_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-STAFF"
+      ],
+      "route_ids": [
+        "ROUTE-1609"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/EmployeeProfileController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-EMPLOYEE-PROFILE",
+        "HR-STAFF"
+      ],
+      "route_ids": [
+        "ROUTE-1598",
+        "ROUTE-1599",
+        "ROUTE-1602",
+        "ROUTE-1610",
+        "ROUTE-1611"
+      ],
+      "page_ids": [
+        "PAGE-0448"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/EmployeeProfileController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ESIGNATURE-REQUEST-MANAGEMENT": {
+      "source_family_ids": [
+        "HR-ESIGNATURE"
+      ],
+      "route_ids": [
+        "ROUTE-1753",
+        "ROUTE-1754",
+        "ROUTE-1756",
+        "ROUTE-1757",
+        "ROUTE-1758"
+      ],
+      "page_ids": [
+        "PAGE-0436",
+        "PAGE-0514"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ESignatureController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ESIGNATURE-SIGNER": {
+      "source_family_ids": [
+        "HR-ESIGNATURE"
+      ],
+      "route_ids": [
+        "ROUTE-1750",
+        "ROUTE-1751",
+        "ROUTE-1752",
+        "ROUTE-1755"
+      ],
+      "page_ids": [
+        "PAGE-0515"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ESignatureController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EXIT-INTERVIEW-CASE": {
+      "source_family_ids": [
+        "HR-EXIT-INTERVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-1427",
+        "ROUTE-1428",
+        "ROUTE-1429",
+        "ROUTE-1430"
+      ],
+      "page_ids": [
+        "PAGE-0450",
+        "PAGE-0451"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ExitInterviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EXIT-INTERVIEW-TRENDS": {
+      "source_family_ids": [
+        "HR-EXIT-INTERVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-1431"
+      ],
+      "page_ids": [
+        "PAGE-0452"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ExitInterviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EXPENSE-AUTHOR-SUBMIT": {
+      "source_family_ids": [
+        "HR-EXPENSE"
+      ],
+      "route_ids": [
+        "ROUTE-1332",
+        "ROUTE-1333",
+        "ROUTE-1335",
+        "ROUTE-1338",
+        "ROUTE-1340"
+      ],
+      "page_ids": [
+        "PAGE-0418",
+        "PAGE-0420"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ExpenseController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EXPENSE-PAYMENT": {
+      "source_family_ids": [
+        "HR-EXPENSE"
+      ],
+      "route_ids": [
+        "ROUTE-1336"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ExpenseController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-EXPENSE-REVIEW": {
+      "source_family_ids": [
+        "HR-EXPENSE"
+      ],
+      "route_ids": [
+        "ROUTE-1331",
+        "ROUTE-1334",
+        "ROUTE-1337",
+        "ROUTE-1339"
+      ],
+      "page_ids": [
+        "PAGE-0419"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ExpenseController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-FEED-CONVERSATIONS": {
+      "source_family_ids": [
+        "HR-FEED"
+      ],
+      "route_ids": [
+        "ROUTE-1432",
+        "ROUTE-1433",
+        "ROUTE-1434",
+        "ROUTE-1439",
+        "ROUTE-1440",
+        "ROUTE-1441"
+      ],
+      "page_ids": [
+        "PAGE-0453",
+        "PAGE-0454"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/FeedController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-FEED-KUDOS": {
+      "source_family_ids": [
+        "HR-FEED"
+      ],
+      "route_ids": [
+        "ROUTE-1435",
+        "ROUTE-1436",
+        "ROUTE-1437",
+        "ROUTE-1438"
+      ],
+      "page_ids": [
+        "PAGE-0454"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/FeedController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-FEEDBACK-BULK-SUMMARY": {
+      "source_family_ids": [
+        "HR-FEEDBACK"
+      ],
+      "route_ids": [
+        "ROUTE-1448",
+        "ROUTE-1451"
+      ],
+      "page_ids": [
+        "PAGE-0457"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/FeedbackController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-FEEDBACK-REQUEST-RESPONSE": {
+      "source_family_ids": [
+        "HR-FEEDBACK"
+      ],
+      "route_ids": [
+        "ROUTE-1442",
+        "ROUTE-1443",
+        "ROUTE-1444",
+        "ROUTE-1445",
+        "ROUTE-1446",
+        "ROUTE-1447",
+        "ROUTE-1449",
+        "ROUTE-1450"
+      ],
+      "page_ids": [
+        "PAGE-0455",
+        "PAGE-0456"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/FeedbackController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-FEEDBACK-TEMPLATES": {
+      "source_family_ids": [
+        "HR-FEEDBACK"
+      ],
+      "route_ids": [
+        "ROUTE-1452",
+        "ROUTE-1453",
+        "ROUTE-1454"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/FeedbackController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-GOAL-CHECKINS-PROGRESS": {
+      "source_family_ids": [
+        "HR-GOAL"
+      ],
+      "route_ids": [
+        "ROUTE-1460",
+        "ROUTE-1464",
+        "ROUTE-1521"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/GoalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-GOAL-CYCLE-CLOSE-ROLLOVER": {
+      "source_family_ids": [
+        "HR-GOAL-CYCLE"
+      ],
+      "route_ids": [
+        "ROUTE-1470",
+        "ROUTE-1471"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/GoalCycleController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-GOAL-CYCLE-CONFIGURATION": {
+      "source_family_ids": [
+        "HR-GOAL-CYCLE"
+      ],
+      "route_ids": [
+        "ROUTE-1467",
+        "ROUTE-1468",
+        "ROUTE-1469"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/GoalCycleController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-GOAL-GOAL-KEY-RESULTS": {
+      "source_family_ids": [
+        "HR-GOAL"
+      ],
+      "route_ids": [
+        "ROUTE-1455",
+        "ROUTE-1456",
+        "ROUTE-1457",
+        "ROUTE-1458",
+        "ROUTE-1459",
+        "ROUTE-1461",
+        "ROUTE-1462",
+        "ROUTE-1463",
+        "ROUTE-1465",
+        "ROUTE-1466",
+        "ROUTE-1476",
+        "ROUTE-1477",
+        "ROUTE-1478"
+      ],
+      "page_ids": [
+        "PAGE-0458",
+        "PAGE-0459"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/GoalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-COMPLIANCE": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0006"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-EMPLOYEES": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0007",
+        "ROUTE-0008"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-LEAVE": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0009",
+        "ROUTE-0010"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-PAYROLL": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0011"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-POSITIONS": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0012"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-API-TIME": {
+      "source_family_ids": [
+        "HR-HR-API"
+      ],
+      "route_ids": [
+        "ROUTE-0013"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Api/HrApiController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-DOCUMENT-GENERATION-PREVIEW": {
+      "source_family_ids": [
+        "HR-HR-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1405",
+        "ROUTE-1419"
+      ],
+      "page_ids": [
+        "PAGE-0436"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrDocumentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-DOCUMENT-LIBRARY": {
+      "source_family_ids": [
+        "HR-HR-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1395",
+        "ROUTE-1396",
+        "ROUTE-1397",
+        "ROUTE-1398",
+        "ROUTE-1399",
+        "ROUTE-1400",
+        "ROUTE-1401",
+        "ROUTE-1402",
+        "ROUTE-1403",
+        "ROUTE-1404",
+        "ROUTE-1406",
+        "ROUTE-1426"
+      ],
+      "page_ids": [
+        "PAGE-0436",
+        "PAGE-0438",
+        "PAGE-0443"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrDocumentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-DOCUMENT-PROFILE-DOCUMENTS": {
+      "source_family_ids": [
+        "HR-HR-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1603",
+        "ROUTE-1604",
+        "ROUTE-1605",
+        "ROUTE-1606",
+        "ROUTE-1607"
+      ],
+      "page_ids": [
+        "PAGE-0446"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrDocumentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-DOCUMENT-TEMPLATES": {
+      "source_family_ids": [
+        "HR-HR-DOCUMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1420",
+        "ROUTE-1421",
+        "ROUTE-1422",
+        "ROUTE-1423",
+        "ROUTE-1424",
+        "ROUTE-1425"
+      ],
+      "page_ids": [
+        "PAGE-0435",
+        "PAGE-0436",
+        "PAGE-0437",
+        "PAGE-0442"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrDocumentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-PERFORMANCE-REVIEW-PROBATION": {
+      "source_family_ids": [
+        "HR-HR-PERFORMANCE-REVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-1637",
+        "ROUTE-1638"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PerformanceReviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-PERFORMANCE-REVIEW-REVIEW-CYCLE": {
+      "source_family_ids": [
+        "HR-HR-PERFORMANCE-REVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-1639",
+        "ROUTE-1640",
+        "ROUTE-1641",
+        "ROUTE-1642",
+        "ROUTE-1643",
+        "ROUTE-1644",
+        "ROUTE-1645",
+        "ROUTE-1646",
+        "ROUTE-1647",
+        "ROUTE-1648",
+        "ROUTE-1649"
+      ],
+      "page_ids": [
+        "PAGE-0497",
+        "PAGE-0498"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PerformanceReviewController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-HR-REPORT-EXPORT": {
+      "source_family_ids": [
+        "HR-HR-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1722",
+        "ROUTE-1723",
+        "ROUTE-1724"
+      ],
+      "page_ids": [
+        "PAGE-0509"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ICAL-FEED": {
+      "source_family_ids": [
+        "HR-ICAL"
+      ],
+      "route_ids": [
+        "ROUTE-1480"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ICalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ICAL-TOKEN": {
+      "source_family_ids": [
+        "HR-ICAL"
+      ],
+      "route_ids": [
+        "ROUTE-1481"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ICalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-IMPORT-EXPORT-EMPLOYEE-EXPORT": {
+      "source_family_ids": [
+        "HR-IMPORT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1483"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ImportExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-IMPORT-EXPORT-EMPLOYEE-IMPORT": {
+      "source_family_ids": [
+        "HR-IMPORT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1484"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ImportExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-IMPORT-EXPORT-TEMPLATE": {
+      "source_family_ids": [
+        "HR-IMPORT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1485"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ImportExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-LEAVE-BALANCES": {
+      "source_family_ids": [
+        "HR-LEAVE"
+      ],
+      "route_ids": [
+        "ROUTE-1493",
+        "ROUTE-1494",
+        "ROUTE-1495",
+        "ROUTE-1496"
+      ],
+      "page_ids": [
+        "PAGE-0462"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/LeaveController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-LEAVE-BULK-ESCALATION": {
+      "source_family_ids": [
+        "HR-LEAVE"
+      ],
+      "route_ids": [
+        "ROUTE-1497",
+        "ROUTE-1498",
+        "ROUTE-1500"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/LeaveController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-LEAVE-REPORT": {
+      "source_family_ids": [
+        "HR-LEAVE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1507"
+      ],
+      "page_ids": [
+        "PAGE-0465"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/LeaveReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-LEAVE-REPORT-EXPORT": {
+      "source_family_ids": [
+        "HR-LEAVE-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1508"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/LeaveReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-LEAVE-REQUEST-DECISION": {
+      "source_family_ids": [
+        "HR-LEAVE"
+      ],
+      "route_ids": [
+        "ROUTE-1487",
+        "ROUTE-1488",
+        "ROUTE-1489",
+        "ROUTE-1490",
+        "ROUTE-1491",
+        "ROUTE-1492",
+        "ROUTE-1499",
+        "ROUTE-1501",
+        "ROUTE-1506"
+      ],
+      "page_ids": [
+        "PAGE-0464",
+        "PAGE-0466"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/LeaveController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-DOCUMENTS-POLICIES": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1513",
+        "ROUTE-1514",
+        "ROUTE-1515",
+        "ROUTE-1535",
+        "ROUTE-1536"
+      ],
+      "page_ids": [
+        "PAGE-0469",
+        "PAGE-0476"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-EXPENSES": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1516",
+        "ROUTE-1517",
+        "ROUTE-1518"
+      ],
+      "page_ids": [
+        "PAGE-0470"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-GOALS": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1519",
+        "ROUTE-1520"
+      ],
+      "page_ids": [
+        "PAGE-0471"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-HOME-DIRECTORY-BENEFITS": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1509",
+        "ROUTE-1510",
+        "ROUTE-1512"
+      ],
+      "page_ids": [
+        "PAGE-0467",
+        "PAGE-0468",
+        "PAGE-0472"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-KUDOS": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1522",
+        "ROUTE-1523",
+        "ROUTE-1524",
+        "ROUTE-1541"
+      ],
+      "page_ids": [
+        "PAGE-0479"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-LEAVE": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1525",
+        "ROUTE-1526",
+        "ROUTE-1527",
+        "ROUTE-1528"
+      ],
+      "page_ids": [
+        "PAGE-0473"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-ONBOARDING-TRAINING": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1529",
+        "ROUTE-1548"
+      ],
+      "page_ids": [
+        "PAGE-0482"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-ONE-REVIEWS": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1530",
+        "ROUTE-1531",
+        "ROUTE-1539",
+        "ROUTE-1540"
+      ],
+      "page_ids": [
+        "PAGE-0474",
+        "PAGE-0478"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-PROFILE": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1537",
+        "ROUTE-1538"
+      ],
+      "page_ids": [
+        "PAGE-0477"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-SURVEYS": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1542",
+        "ROUTE-1543"
+      ],
+      "page_ids": [
+        "PAGE-0480"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-MY-HR-TIME-CALENDAR": {
+      "source_family_ids": [
+        "HR-MY-HR"
+      ],
+      "route_ids": [
+        "ROUTE-1511",
+        "ROUTE-1544",
+        "ROUTE-1545",
+        "ROUTE-1546",
+        "ROUTE-1547"
+      ],
+      "page_ids": [
+        "PAGE-0481"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/MyHrController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-OFFBOARDING-CASE": {
+      "source_family_ids": [
+        "HR-OFFBOARDING"
+      ],
+      "route_ids": [
+        "ROUTE-1549",
+        "ROUTE-1550",
+        "ROUTE-1551",
+        "ROUTE-1552"
+      ],
+      "page_ids": [
+        "PAGE-0483",
+        "PAGE-0484"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OffboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-OFFBOARDING-TASK": {
+      "source_family_ids": [
+        "HR-OFFBOARDING"
+      ],
+      "route_ids": [
+        "ROUTE-1553"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OffboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ONBOARDING-CHECKLIST-CASE": {
+      "source_family_ids": [
+        "HR-ONBOARDING"
+      ],
+      "route_ids": [
+        "ROUTE-1554",
+        "ROUTE-1555",
+        "ROUTE-1556",
+        "ROUTE-1557",
+        "ROUTE-1558",
+        "ROUTE-1559",
+        "ROUTE-1560",
+        "ROUTE-1561",
+        "ROUTE-1564",
+        "ROUTE-1565",
+        "ROUTE-1573"
+      ],
+      "page_ids": [
+        "PAGE-0485",
+        "PAGE-0486"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OnboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ONBOARDING-EMAIL": {
+      "source_family_ids": [
+        "HR-ONBOARDING-EMAIL",
+        "HR-ROUTE-HR-ONBOARDING-EMAILS-INDEX",
+        "HR-ROUTE-HR-ONBOARDING-EMAILS-LOG",
+        "HR-ROUTE-HR-ONBOARDING-EMAILS-PREVIEW"
+      ],
+      "route_ids": [
+        "ROUTE-1566",
+        "ROUTE-1567",
+        "ROUTE-1568",
+        "ROUTE-1569",
+        "ROUTE-1570",
+        "ROUTE-1571",
+        "ROUTE-1572"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OnboardingEmailController.php",
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ONBOARDING-TASKS": {
+      "source_family_ids": [
+        "HR-ONBOARDING"
+      ],
+      "route_ids": [
+        "ROUTE-1562",
+        "ROUTE-1563",
+        "ROUTE-1574",
+        "ROUTE-1575",
+        "ROUTE-1576",
+        "ROUTE-1577",
+        "ROUTE-1578"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OnboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-ONBOARDING-TEMPLATES": {
+      "source_family_ids": [
+        "HR-ONBOARDING"
+      ],
+      "route_ids": [
+        "ROUTE-1579",
+        "ROUTE-1580",
+        "ROUTE-1581",
+        "ROUTE-1582"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OnboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYROLL-EXPORT-EXPORT-PROFILES": {
+      "source_family_ids": [
+        "HR-PAYROLL-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1586",
+        "ROUTE-1587",
+        "ROUTE-1588"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayrollExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYROLL-EXPORT-RUNS-PAYMENT": {
+      "source_family_ids": [
+        "HR-PAYROLL-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1585",
+        "ROUTE-1593",
+        "ROUTE-1594",
+        "ROUTE-1595",
+        "ROUTE-1596",
+        "ROUTE-1597"
+      ],
+      "page_ids": [
+        "PAGE-0487"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayrollExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYSLIP-ADMIN": {
+      "source_family_ids": [
+        "HR-PAYSLIP"
+      ],
+      "route_ids": [
+        "ROUTE-1589",
+        "ROUTE-1590",
+        "ROUTE-1592"
+      ],
+      "page_ids": [
+        "PAGE-0488",
+        "PAGE-0489"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayslipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYSLIP-ADMIN-DOWNLOAD": {
+      "source_family_ids": [
+        "HR-PAYSLIP"
+      ],
+      "route_ids": [
+        "ROUTE-1591"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayslipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYSLIP-SELF": {
+      "source_family_ids": [
+        "HR-PAYSLIP"
+      ],
+      "route_ids": [
+        "ROUTE-1532",
+        "ROUTE-1533"
+      ],
+      "page_ids": [
+        "PAGE-0475",
+        "PAGE-0488"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayslipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PAYSLIP-SELF-DOWNLOAD": {
+      "source_family_ids": [
+        "HR-PAYSLIP"
+      ],
+      "route_ids": [
+        "ROUTE-1534"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PayslipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PERFORMANCE-EXPORT": {
+      "source_family_ids": [
+        "HR-PERFORMANCE-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-1623"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PerformanceHubController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PERFORMANCE-HUB": {
+      "source_family_ids": [
+        "HR-PERFORMANCE-HUB"
+      ],
+      "route_ids": [
+        "ROUTE-1612"
+      ],
+      "page_ids": [
+        "PAGE-0493"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PerformanceHubController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PIP-MILESTONES-EVIDENCE": {
+      "source_family_ids": [
+        "HR-PIP"
+      ],
+      "route_ids": [
+        "ROUTE-1631",
+        "ROUTE-1633",
+        "ROUTE-1634",
+        "ROUTE-1635",
+        "ROUTE-1636"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-PIP-PLAN-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-PIP"
+      ],
+      "route_ids": [
+        "ROUTE-1624",
+        "ROUTE-1625",
+        "ROUTE-1626",
+        "ROUTE-1627",
+        "ROUTE-1628",
+        "ROUTE-1629",
+        "ROUTE-1630",
+        "ROUTE-1632"
+      ],
+      "page_ids": [
+        "PAGE-0494",
+        "PAGE-0495",
+        "PAGE-0496"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PipController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-POLICY-ATTESTATION-EMPLOYEE": {
+      "source_family_ids": [
+        "HR-POLICY-ATTESTATION"
+      ],
+      "route_ids": [
+        "ROUTE-1412"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PolicyAttestationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-POLICY-ATTESTATION-OVERSIGHT": {
+      "source_family_ids": [
+        "HR-POLICY-ATTESTATION"
+      ],
+      "route_ids": [
+        "ROUTE-1417"
+      ],
+      "page_ids": [
+        "PAGE-0439"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PolicyAttestationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-POLICY-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-POLICY"
+      ],
+      "route_ids": [
+        "ROUTE-1407",
+        "ROUTE-1408",
+        "ROUTE-1409",
+        "ROUTE-1410",
+        "ROUTE-1411",
+        "ROUTE-1413",
+        "ROUTE-1414",
+        "ROUTE-1418"
+      ],
+      "page_ids": [
+        "PAGE-0440",
+        "PAGE-0441"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PolicyController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-POLICY-VERSIONS": {
+      "source_family_ids": [
+        "HR-POLICY"
+      ],
+      "route_ids": [
+        "ROUTE-1415",
+        "ROUTE-1416"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PolicyController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-RECRUITMENT-EXPORT": {
+      "source_family_ids": [
+        "HR-RECRUITMENT-EXPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1688"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/RecruitmentExportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-RECRUITMENT-JOB-APPROVAL": {
+      "source_family_ids": [
+        "HR-RECRUITMENT-JOB"
+      ],
+      "route_ids": [
+        "ROUTE-1694",
+        "ROUTE-1697",
+        "ROUTE-1698"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/RecruitmentJobController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-RECRUITMENT-JOB-AUTHOR-PUBLISH": {
+      "source_family_ids": [
+        "HR-RECRUITMENT-JOB"
+      ],
+      "route_ids": [
+        "ROUTE-1692",
+        "ROUTE-1693",
+        "ROUTE-1695",
+        "ROUTE-1696",
+        "ROUTE-1699",
+        "ROUTE-1700"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/RecruitmentJobController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-REPORT-BUILDER-DEFINITION": {
+      "source_family_ids": [
+        "HR-REPORT-BUILDER"
+      ],
+      "route_ids": [
+        "ROUTE-1719",
+        "ROUTE-1720",
+        "ROUTE-1721"
+      ],
+      "page_ids": [
+        "PAGE-0506"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ReportBuilderController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-REPORT-BUILDER-SAVED-LIBRARY": {
+      "source_family_ids": [
+        "HR-REPORT-BUILDER"
+      ],
+      "route_ids": [
+        "ROUTE-1726",
+        "ROUTE-1727",
+        "ROUTE-1728",
+        "ROUTE-1729"
+      ],
+      "page_ids": [
+        "PAGE-0508"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ReportBuilderController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-REPORT-BUILDER-SCHEDULE": {
+      "source_family_ids": [
+        "HR-REPORT-BUILDER"
+      ],
+      "route_ids": [
+        "ROUTE-1730"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ReportBuilderController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-REPORT-CATALOG-RUN": {
+      "source_family_ids": [
+        "HR-HR-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1718",
+        "ROUTE-1725"
+      ],
+      "page_ids": [
+        "PAGE-0507",
+        "PAGE-0509"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-REPORT-SUBSCRIPTIONS": {
+      "source_family_ids": [
+        "HR-HR-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-1731",
+        "ROUTE-1732",
+        "ROUTE-1733"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-SKILLS-ASSESSMENT-MATRIX": {
+      "source_family_ids": [
+        "HR-ROUTE-TRAINING-MATRIX",
+        "HR-SKILLS"
+      ],
+      "route_ids": [
+        "ROUTE-1652",
+        "ROUTE-1653",
+        "ROUTE-3007"
+      ],
+      "page_ids": [
+        "PAGE-0501"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/SkillsController.php",
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-SKILLS-CATALOG": {
+      "source_family_ids": [
+        "HR-SKILLS"
+      ],
+      "route_ids": [
+        "ROUTE-1650",
+        "ROUTE-1651"
+      ],
+      "page_ids": [
+        "PAGE-0500"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/SkillsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-STAFF-OPERATIONAL-PROFILE": {
+      "source_family_ids": [
+        "HR-STAFF"
+      ],
+      "route_ids": [
+        "ROUTE-2916",
+        "ROUTE-2918",
+        "ROUTE-2931"
+      ],
+      "page_ids": [
+        "PAGE-0072",
+        "PAGE-0367",
+        "PAGE-0375",
+        "PAGE-0639",
+        "PAGE-0640",
+        "PAGE-0946",
+        "PAGE-0947"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/StaffController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-STAFF-TIMELINE-VIEW": {
+      "source_family_ids": [
+        "CLI-TIMELINE",
+        "CLI-TIMELINE-INTERACTION",
+        "HR-STAFF"
+      ],
+      "route_ids": [
+        "ROUTE-2934"
+      ],
+      "page_ids": [
+        "PAGE-0961"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/TimelineController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-SUCCESSION-CANDIDATES": {
+      "source_family_ids": [
+        "HR-SUCCESSION"
+      ],
+      "route_ids": [
+        "ROUTE-1764",
+        "ROUTE-1765",
+        "ROUTE-1766",
+        "ROUTE-1767"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/SuccessionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-SUCCESSION-PLANS": {
+      "source_family_ids": [
+        "HR-SUCCESSION"
+      ],
+      "route_ids": [
+        "ROUTE-1759",
+        "ROUTE-1760",
+        "ROUTE-1761",
+        "ROUTE-1762",
+        "ROUTE-1763",
+        "ROUTE-1768"
+      ],
+      "page_ids": [
+        "PAGE-0516",
+        "PAGE-0517"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/SuccessionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-SUPERVISION-NOTE-ACKNOWLEDGEMENT": {
+      "source_family_ids": [
+        "HR-SUPERVISION"
+      ],
+      "route_ids": [
+        "ROUTE-1654",
+        "ROUTE-1655",
+        "ROUTE-1656",
+        "ROUTE-1657",
+        "ROUTE-1658",
+        "ROUTE-1659"
+      ],
+      "page_ids": [
+        "PAGE-0499"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/SupervisionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TIME-TRACKING-CLOCKING": {
+      "source_family_ids": [
+        "HR-TIME-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-1774",
+        "ROUTE-1775",
+        "ROUTE-1776"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TimeTrackingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TIME-TRACKING-ENTRY-CORRECTIONS": {
+      "source_family_ids": [
+        "HR-TIME-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-1777",
+        "ROUTE-1778",
+        "ROUTE-1779",
+        "ROUTE-1780",
+        "ROUTE-1781",
+        "ROUTE-1782"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TimeTrackingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TIME-TRACKING-OVERSIGHT-REPORTING": {
+      "source_family_ids": [
+        "HR-TIME-TRACKING"
+      ],
+      "route_ids": [
+        "ROUTE-1773",
+        "ROUTE-1783",
+        "ROUTE-1784",
+        "ROUTE-1785"
+      ],
+      "page_ids": [
+        "PAGE-0518"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TimeTrackingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TRAINING-ASSIGNMENT-COMPLETION": {
+      "source_family_ids": [
+        "HR-TRAINING"
+      ],
+      "route_ids": [
+        "ROUTE-1787",
+        "ROUTE-1788",
+        "ROUTE-1789",
+        "ROUTE-1790",
+        "ROUTE-1800",
+        "ROUTE-1801",
+        "ROUTE-1802",
+        "ROUTE-1804"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TrainingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TRAINING-CLAIMS-EXPORT": {
+      "source_family_ids": [
+        "HR-TRAINING"
+      ],
+      "route_ids": [
+        "ROUTE-1792",
+        "ROUTE-1803"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TrainingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-TRAINING-COURSE-SESSION-CATALOG": {
+      "source_family_ids": [
+        "HR-TRAINING"
+      ],
+      "route_ids": [
+        "ROUTE-1786",
+        "ROUTE-1791",
+        "ROUTE-1793",
+        "ROUTE-1794",
+        "ROUTE-1795",
+        "ROUTE-1796",
+        "ROUTE-1797",
+        "ROUTE-1798",
+        "ROUTE-1799",
+        "ROUTE-1805",
+        "ROUTE-1806"
+      ],
+      "page_ids": [
+        "PAGE-0519"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/TrainingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-VETTING-CHECK-LIFECYCLE": {
+      "source_family_ids": [
+        "HR-STAFF-BACKGROUND-CHECK",
+        "HR-VETTING"
+      ],
+      "route_ids": [
+        "ROUTE-1377",
+        "ROUTE-1378",
+        "ROUTE-1379",
+        "ROUTE-1380",
+        "ROUTE-1381",
+        "ROUTE-1382",
+        "ROUTE-1383",
+        "ROUTE-1384",
+        "ROUTE-1385",
+        "ROUTE-1386",
+        "ROUTE-2924",
+        "ROUTE-2925",
+        "ROUTE-2926",
+        "ROUTE-2935",
+        "ROUTE-2936",
+        "ROUTE-2937",
+        "ROUTE-2938",
+        "ROUTE-2939",
+        "ROUTE-2940"
+      ],
+      "page_ids": [
+        "PAGE-0427",
+        "PAGE-0428",
+        "PAGE-0430",
+        "PAGE-0431",
+        "PAGE-0520",
+        "PAGE-0521",
+        "PAGE-0522",
+        "PAGE-0523"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/VettingController.php",
+        "app/Http/Controllers/Staff/StaffBackgroundCheckController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WEBHOOK-DELIVERY-RETRY": {
+      "source_family_ids": [
+        "HR-HR-WEBHOOK"
+      ],
+      "route_ids": [
+        "ROUTE-1749"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrWebhookController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WEBHOOK-ENDPOINTS": {
+      "source_family_ids": [
+        "HR-HR-WEBHOOK"
+      ],
+      "route_ids": [
+        "ROUTE-1745",
+        "ROUTE-1746",
+        "ROUTE-1747",
+        "ROUTE-1748"
+      ],
+      "page_ids": [
+        "PAGE-0513"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HrWebhookController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WELLBEING-ACTION-PLANS": {
+      "source_family_ids": [
+        "HR-WELLBEING"
+      ],
+      "route_ids": [
+        "ROUTE-1808",
+        "ROUTE-1809",
+        "ROUTE-1810",
+        "ROUTE-1811",
+        "ROUTE-1812",
+        "ROUTE-1825"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/WellbeingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WELLBEING-CHECKINS-SIGNALS": {
+      "source_family_ids": [
+        "HR-WELLBEING"
+      ],
+      "route_ids": [
+        "ROUTE-1807",
+        "ROUTE-1813",
+        "ROUTE-1814",
+        "ROUTE-1815",
+        "ROUTE-1817",
+        "ROUTE-1818",
+        "ROUTE-1819",
+        "ROUTE-1820"
+      ],
+      "page_ids": [
+        "PAGE-0524"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/WellbeingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WELLBEING-EAP-REFERRALS": {
+      "source_family_ids": [
+        "HR-WELLBEING"
+      ],
+      "route_ids": [
+        "ROUTE-1816"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/WellbeingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-HR-WELLBEING-SURVEYS": {
+      "source_family_ids": [
+        "HR-WELLBEING"
+      ],
+      "route_ids": [
+        "ROUTE-1821",
+        "ROUTE-1822",
+        "ROUTE-1823",
+        "ROUTE-1824",
+        "ROUTE-1826",
+        "ROUTE-1827",
+        "ROUTE-1828",
+        "ROUTE-1829",
+        "ROUTE-1830",
+        "ROUTE-1831",
+        "ROUTE-1832"
+      ],
+      "page_ids": [
+        "PAGE-0525"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/WellbeingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-ATTENDANCE-BREAKS": {
+      "source_family_ids": [
+        "OPS-ATTENDANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0066",
+        "ROUTE-0067"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/AttendanceController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-ATTENDANCE-CLOCK-SESSION": {
+      "source_family_ids": [
+        "OPS-ATTENDANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0065",
+        "ROUTE-0068",
+        "ROUTE-0069",
+        "ROUTE-0072",
+        "ROUTE-0073"
+      ],
+      "page_ids": [
+        "PAGE-0002",
+        "PAGE-0003",
+        "PAGE-0004",
+        "PAGE-0005",
+        "PAGE-0006",
+        "PAGE-0638",
+        "PAGE-0645",
+        "PAGE-0646",
+        "PAGE-0647"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/AttendanceController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-AUTOSCHEDULE-SUGGESTIONS": {
+      "source_family_ids": [
+        "OPS-ROSTER-SUGGESTION"
+      ],
+      "route_ids": [
+        "ROUTE-2156",
+        "ROUTE-2157",
+        "ROUTE-2158",
+        "ROUTE-2159",
+        "ROUTE-2160"
+      ],
+      "page_ids": [
+        "PAGE-0673"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/RosterSuggestionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CARE-PLAN-AUTHORING": {
+      "source_family_ids": [
+        "OPS-CARE-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-1905",
+        "ROUTE-1906",
+        "ROUTE-1907",
+        "ROUTE-1908",
+        "ROUTE-1909",
+        "ROUTE-1911",
+        "ROUTE-1922",
+        "ROUTE-1926"
+      ],
+      "page_ids": [
+        "PAGE-0567",
+        "PAGE-0568",
+        "PAGE-0569",
+        "PAGE-0570",
+        "PAGE-0597",
+        "PAGE-0598",
+        "PAGE-0607"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CarePlanController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CARE-PLAN-GOAL-GOAL-STEPS": {
+      "source_family_ids": [
+        "OPS-CARE-PLAN-GOAL"
+      ],
+      "route_ids": [
+        "ROUTE-1912",
+        "ROUTE-1913",
+        "ROUTE-1914",
+        "ROUTE-1915",
+        "ROUTE-1918",
+        "ROUTE-1919",
+        "ROUTE-1920",
+        "ROUTE-1921"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CarePlanGoalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CARE-PLAN-GOAL-HURDLES": {
+      "source_family_ids": [
+        "OPS-CARE-PLAN-GOAL"
+      ],
+      "route_ids": [
+        "ROUTE-1916",
+        "ROUTE-1917"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CarePlanGoalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CARE-PLAN-REVIEW-CYCLE": {
+      "source_family_ids": [
+        "OPS-CARE-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-1910",
+        "ROUTE-1925"
+      ],
+      "page_ids": [
+        "PAGE-0598"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CarePlanController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CARE-PLAN-SIGNOFF": {
+      "source_family_ids": [
+        "OPS-CARE-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-1923",
+        "ROUTE-1924"
+      ],
+      "page_ids": [
+        "PAGE-0598"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CarePlanController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-CALENDAR": {
+      "source_family_ids": [
+        "OPS-CALENDAR",
+        "OPS-ROUTE-CLIENT-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-1946"
+      ],
+      "page_ids": [
+        "PAGE-0577"
+      ],
+      "backend_anchors": [
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-EXCURSION": {
+      "source_family_ids": [
+        "OPS-CLIENT-LEAVE-EXCURSION"
+      ],
+      "route_ids": [
+        "ROUTE-1970",
+        "ROUTE-1971",
+        "ROUTE-1972"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientLeaveExcursionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-LEAVE-BLOCK": {
+      "source_family_ids": [
+        "OPS-CLIENT-LEAVE-EXCURSION"
+      ],
+      "route_ids": [
+        "ROUTE-1999",
+        "ROUTE-2000",
+        "ROUTE-2001"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientLeaveExcursionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-LOCATION-PANIC": {
+      "source_family_ids": [
+        "OPS-CLIENT"
+      ],
+      "route_ids": [
+        "ROUTE-2002",
+        "ROUTE-2003",
+        "ROUTE-2004"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-NOTE": {
+      "source_family_ids": [
+        "CLI-CLIENT-NOTE",
+        "OPS-CLIENT-DAILY-NOTE",
+        "OPS-PROGRESS-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-0181",
+        "ROUTE-0182",
+        "ROUTE-1956",
+        "ROUTE-1957",
+        "ROUTE-1958",
+        "ROUTE-1959",
+        "ROUTE-1960",
+        "ROUTE-1961",
+        "ROUTE-1962",
+        "ROUTE-2024",
+        "ROUTE-2025"
+      ],
+      "page_ids": [
+        "PAGE-0584",
+        "PAGE-0585",
+        "PAGE-0601",
+        "PAGE-0617"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientNoteController.php",
+        "app/Http/Controllers/Operations/ClientDailyNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-NOTE-REVIEW": {
+      "source_family_ids": [
+        "OPS-PROGRESS-NOTE",
+        "OPS-REVIEW-QUEUE"
+      ],
+      "route_ids": [
+        "ROUTE-2140"
+      ],
+      "page_ids": [
+        "PAGE-0668"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ReviewQueueController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-ONBOARDING-WORKFLOW": {
+      "source_family_ids": [
+        "OPS-CLIENT-ONBOARDING-WORKFLOW"
+      ],
+      "route_ids": [
+        "ROUTE-2026",
+        "ROUTE-2120",
+        "ROUTE-2121",
+        "ROUTE-2122",
+        "ROUTE-2123",
+        "ROUTE-2124",
+        "ROUTE-2125",
+        "ROUTE-2126"
+      ],
+      "page_ids": [
+        "PAGE-0660",
+        "PAGE-0661",
+        "PAGE-0662"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientOnboardingWorkflowController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-PHOTOS-GALLERY": {
+      "source_family_ids": [
+        "OPS-CLIENT"
+      ],
+      "route_ids": [
+        "ROUTE-0184",
+        "ROUTE-0185",
+        "ROUTE-1975",
+        "ROUTE-1976",
+        "ROUTE-2034",
+        "ROUTE-2035"
+      ],
+      "page_ids": [
+        "PAGE-0611"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CLIENT-RECORD-LIFECYCLE": {
+      "source_family_ids": [
+        "CLI-CLIENT-ONBOARDING",
+        "CLI-FRONTEND-CLIENTS",
+        "OPS-CLIENT"
+      ],
+      "route_ids": [
+        "ROUTE-0122",
+        "ROUTE-0123",
+        "ROUTE-0125",
+        "ROUTE-0126",
+        "ROUTE-0152",
+        "ROUTE-0183",
+        "ROUTE-0200",
+        "ROUTE-1933",
+        "ROUTE-1934",
+        "ROUTE-1935",
+        "ROUTE-1936",
+        "ROUTE-1937",
+        "ROUTE-1969",
+        "ROUTE-2027",
+        "ROUTE-2039",
+        "ROUTE-2041",
+        "ROUTE-2056"
+      ],
+      "page_ids": [
+        "PAGE-0031",
+        "PAGE-0033",
+        "PAGE-0036",
+        "PAGE-0073",
+        "PAGE-0074",
+        "PAGE-0077",
+        "PAGE-0078",
+        "PAGE-0343",
+        "PAGE-0367",
+        "PAGE-0375",
+        "PAGE-0384",
+        "PAGE-0545",
+        "PAGE-0546",
+        "PAGE-0554",
+        "PAGE-0555",
+        "PAGE-0574",
+        "PAGE-0582",
+        "PAGE-0583",
+        "PAGE-0587",
+        "PAGE-0589",
+        "PAGE-0593",
+        "PAGE-0595",
+        "PAGE-0597",
+        "PAGE-0599",
+        "PAGE-0600",
+        "PAGE-0603",
+        "PAGE-0608",
+        "PAGE-0610",
+        "PAGE-0613",
+        "PAGE-0618",
+        "PAGE-0637",
+        "PAGE-0638",
+        "PAGE-0639",
+        "PAGE-0640",
+        "PAGE-0678",
+        "PAGE-0687",
+        "PAGE-0688",
+        "PAGE-0694",
+        "PAGE-0703",
+        "PAGE-0707",
+        "PAGE-0864",
+        "PAGE-0878",
+        "PAGE-0932"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientController.php",
+        "app/Http/Controllers/ClientOnboardingController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CONSENT-REQUEST": {
+      "source_family_ids": [
+        "CLI-CONSENT-REQUEST-PORTAL",
+        "OPS-CONSENT-REQUEST"
+      ],
+      "route_ids": [
+        "ROUTE-1948",
+        "ROUTE-1949",
+        "ROUTE-1950",
+        "ROUTE-1951",
+        "ROUTE-1952",
+        "ROUTE-2248",
+        "ROUTE-2249",
+        "ROUTE-2250"
+      ],
+      "page_ids": [
+        "PAGE-0578",
+        "PAGE-0579",
+        "PAGE-0580",
+        "PAGE-0714"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ConsentRequestController.php",
+        "app/Http/Controllers/Portal/ConsentRequestPortalController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CONVERSATIONS": {
+      "source_family_ids": [
+        "CLI-PORTAL-MESSAGE",
+        "OPS-CLIENT-FAMILY-CHAT",
+        "OPS-MESSAGE"
+      ],
+      "route_ids": [
+        "ROUTE-1973",
+        "ROUTE-1974",
+        "ROUTE-2097",
+        "ROUTE-2098",
+        "ROUTE-2099",
+        "ROUTE-2100",
+        "ROUTE-2101",
+        "ROUTE-2102",
+        "ROUTE-2103",
+        "ROUTE-2104",
+        "ROUTE-2105",
+        "ROUTE-2263",
+        "ROUTE-2264",
+        "ROUTE-2265",
+        "ROUTE-2266",
+        "ROUTE-2267",
+        "ROUTE-2268",
+        "ROUTE-2269",
+        "ROUTE-2270"
+      ],
+      "page_ids": [
+        "PAGE-0653",
+        "PAGE-0723"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientFamilyChatController.php",
+        "app/Http/Controllers/Operations/MessageController.php",
+        "app/Http/Controllers/Portal/PortalMessageController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-COVERAGE-RESPONSE": {
+      "source_family_ids": [
+        "OPS-COVERAGE-GAP",
+        "OPS-COVERAGE-RESERVATION"
+      ],
+      "route_ids": [
+        "ROUTE-2057",
+        "ROUTE-2147",
+        "ROUTE-2148",
+        "ROUTE-2149"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/CoverageGapController.php",
+        "app/Http/Controllers/CoverageReservationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CUSTOM-FORM-DEFINITION": {
+      "source_family_ids": [
+        "OPS-CUSTOM-FORM"
+      ],
+      "route_ids": [
+        "ROUTE-2067",
+        "ROUTE-2068",
+        "ROUTE-2069",
+        "ROUTE-2070",
+        "ROUTE-2071",
+        "ROUTE-2074"
+      ],
+      "page_ids": [
+        "PAGE-0625",
+        "PAGE-0626",
+        "PAGE-0627",
+        "PAGE-0628"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CustomFormController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-CUSTOM-FORM-SUBMISSION": {
+      "source_family_ids": [
+        "OPS-CUSTOM-FORM"
+      ],
+      "route_ids": [
+        "ROUTE-2072",
+        "ROUTE-2073"
+      ],
+      "page_ids": [
+        "PAGE-0629"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CustomFormController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-EVV-SESSION": {
+      "source_family_ids": [
+        "OPS-EVV"
+      ],
+      "route_ids": [
+        "ROUTE-2061",
+        "ROUTE-2062"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/EvvController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-EVV-VERIFICATION": {
+      "source_family_ids": [
+        "OPS-EVV"
+      ],
+      "route_ids": [
+        "ROUTE-2058",
+        "ROUTE-2059",
+        "ROUTE-2060"
+      ],
+      "page_ids": [
+        "PAGE-0620",
+        "PAGE-0621"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/EvvController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-FAMILY-NOTE-SHIFT-HANDOFF": {
+      "source_family_ids": [
+        "CLI-FAMILY-NOTE",
+        "OPS-ATTENDANCE"
+      ],
+      "route_ids": [
+        "ROUTE-0153"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/FamilyNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-clients-source-final.json",
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-FAMILY-VISIT-REQUEST": {
+      "source_family_ids": [
+        "OPS-CLIENT-VISIT-REQUEST"
+      ],
+      "route_ids": [
+        "ROUTE-2053",
+        "ROUTE-2054",
+        "ROUTE-2055"
+      ],
+      "page_ids": [
+        "PAGE-0619"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientVisitRequestController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-FUNDING-CLAIM-LIFECYCLE": {
+      "source_family_ids": [
+        "OPS-FUNDING-CLAIM"
+      ],
+      "route_ids": [
+        "ROUTE-2076",
+        "ROUTE-2077",
+        "ROUTE-2078",
+        "ROUTE-2079",
+        "ROUTE-2080",
+        "ROUTE-2081"
+      ],
+      "page_ids": [
+        "PAGE-0630",
+        "PAGE-0631",
+        "PAGE-0632"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/FundingClaimController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-HANDOVER": {
+      "source_family_ids": [
+        "OPS-HANDOVER"
+      ],
+      "route_ids": [
+        "ROUTE-2087",
+        "ROUTE-2088",
+        "ROUTE-2089",
+        "ROUTE-2090",
+        "ROUTE-2091",
+        "ROUTE-2092",
+        "ROUTE-2203"
+      ],
+      "page_ids": [
+        "PAGE-0636",
+        "PAGE-0638",
+        "PAGE-0640",
+        "PAGE-0641",
+        "PAGE-0642",
+        "PAGE-0643",
+        "PAGE-0644",
+        "PAGE-0645",
+        "PAGE-0646",
+        "PAGE-0647",
+        "PAGE-0648",
+        "PAGE-0649",
+        "PAGE-0650"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/HandoverController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-JOB-BOARD-CLAIM": {
+      "source_family_ids": [
+        "OPS-JOB-BOARD"
+      ],
+      "route_ids": [
+        "ROUTE-2093",
+        "ROUTE-2095",
+        "ROUTE-2096"
+      ],
+      "page_ids": [
+        "PAGE-0652"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/JobBoardController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-JOB-BOARD-POSITION": {
+      "source_family_ids": [
+        "OPS-JOB-BOARD"
+      ],
+      "route_ids": [
+        "ROUTE-2094",
+        "ROUTE-2204"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/JobBoardController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-MILEAGE-CLAIM-LIFECYCLE": {
+      "source_family_ids": [
+        "OPS-MILEAGE-CLAIM"
+      ],
+      "route_ids": [
+        "ROUTE-2106",
+        "ROUTE-2107",
+        "ROUTE-2108",
+        "ROUTE-2109",
+        "ROUTE-2110"
+      ],
+      "page_ids": [
+        "PAGE-0654",
+        "PAGE-0655"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/MileageClaimController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-MY-DAY-ALERT-ACTIONS": {
+      "source_family_ids": [
+        "OPS-MY-DAY-ACTIONS"
+      ],
+      "route_ids": [
+        "ROUTE-1885",
+        "ROUTE-1886"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-MY-DAY-SHIFT-TASK-COMPLETION": {
+      "source_family_ids": [
+        "OPS-MY-DAY-ACTIONS",
+        "OPS-SHIFT-TASK"
+      ],
+      "route_ids": [
+        "ROUTE-1893",
+        "ROUTE-2211"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php",
+        "app/Http/Controllers/ShiftTaskController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-MY-DAY-TIMESHEET": {
+      "source_family_ids": [
+        "OPS-MY-DAY-ACTIONS",
+        "OPS-TIMESHEET"
+      ],
+      "route_ids": [
+        "ROUTE-1894",
+        "ROUTE-1895"
+      ],
+      "page_ids": [
+        "PAGE-0541"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/MyDayActionsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-QUALIFICATION-DEFINITIONS": {
+      "source_family_ids": [
+        "OPS-QUALIFICATION-MATCH"
+      ],
+      "route_ids": [
+        "ROUTE-2131",
+        "ROUTE-2132",
+        "ROUTE-2133",
+        "ROUTE-2134"
+      ],
+      "page_ids": [
+        "PAGE-0664"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/QualificationMatchController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-QUALIFICATION-SHIFT-MATCH": {
+      "source_family_ids": [
+        "OPS-QUALIFICATION-MATCH"
+      ],
+      "route_ids": [
+        "ROUTE-2135"
+      ],
+      "page_ids": [
+        "PAGE-0663"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/QualificationMatchController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-RESPITE-HANDOVER-ACKNOWLEDGEMENT": {
+      "source_family_ids": [
+        "OPS-RESPITE-HANDOVER-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2398",
+        "ROUTE-2400"
+      ],
+      "page_ids": [
+        "PAGE-0776"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteHandoverNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-RESPITE-HANDOVER-AUTHORING": {
+      "source_family_ids": [
+        "OPS-RESPITE-HANDOVER-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2394",
+        "ROUTE-2395",
+        "ROUTE-2396",
+        "ROUTE-2397",
+        "ROUTE-2399",
+        "ROUTE-2453"
+      ],
+      "page_ids": [
+        "PAGE-0772",
+        "PAGE-0773",
+        "PAGE-0774",
+        "PAGE-0775"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Respite/RespiteHandoverNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-ROSTER-TEMPLATE-DEFINITION": {
+      "source_family_ids": [
+        "OPS-ROSTER-TEMPLATE",
+        "OPS-ROUTE-OPERATIONS-ROSTERING-TEMPLATES-INDEX"
+      ],
+      "route_ids": [
+        "ROUTE-2161",
+        "ROUTE-2162",
+        "ROUTE-2163",
+        "ROUTE-2164",
+        "ROUTE-2165",
+        "ROUTE-2166"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/RosterTemplateController.php",
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-ROSTERING-PLANNING": {
+      "source_family_ids": [
+        "OPS-ROSTERING"
+      ],
+      "route_ids": [
+        "ROUTE-2141",
+        "ROUTE-2142",
+        "ROUTE-2146"
+      ],
+      "page_ids": [
+        "PAGE-0669",
+        "PAGE-0670"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/RosteringController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-ROSTERING-PUBLISH": {
+      "source_family_ids": [
+        "OPS-ROSTERING"
+      ],
+      "route_ids": [
+        "ROUTE-2150",
+        "ROUTE-2151",
+        "ROUTE-2152",
+        "ROUTE-2153",
+        "ROUTE-2154",
+        "ROUTE-2155"
+      ],
+      "page_ids": [
+        "PAGE-0671",
+        "PAGE-0672"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/RosteringController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SERVICE-AGREEMENT-DESIGN-RATES": {
+      "source_family_ids": [
+        "OPS-SERVICE-AGREEMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2169",
+        "ROUTE-2170",
+        "ROUTE-2172",
+        "ROUTE-2173",
+        "ROUTE-2174",
+        "ROUTE-2176",
+        "ROUTE-2178",
+        "ROUTE-2179",
+        "ROUTE-2184"
+      ],
+      "page_ids": [
+        "PAGE-0674",
+        "PAGE-0675",
+        "PAGE-0676",
+        "PAGE-0677"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ServiceAgreementController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SERVICE-AGREEMENT-STATE-CLOSURE": {
+      "source_family_ids": [
+        "OPS-SERVICE-AGREEMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2171",
+        "ROUTE-2177",
+        "ROUTE-2180",
+        "ROUTE-2183"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ServiceAgreementController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SERVICE-AGREEMENT-SUBMISSION-DECISION": {
+      "source_family_ids": [
+        "OPS-SERVICE-AGREEMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2175",
+        "ROUTE-2181",
+        "ROUTE-2182"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ServiceAgreementController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-EXECUTION-RECOVERY": {
+      "source_family_ids": [
+        "OPS-SHIFT"
+      ],
+      "route_ids": [
+        "ROUTE-2198",
+        "ROUTE-2200",
+        "ROUTE-2207",
+        "ROUTE-2210"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ShiftController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-NOTE-AUTHORING": {
+      "source_family_ids": [
+        "OPS-SHIFT-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2185",
+        "ROUTE-2186",
+        "ROUTE-2187"
+      ],
+      "page_ids": [
+        "PAGE-0680",
+        "PAGE-0682",
+        "PAGE-0686"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ShiftNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-NOTE-REVIEW": {
+      "source_family_ids": [
+        "OPS-SHIFT-NOTE"
+      ],
+      "route_ids": [
+        "ROUTE-2188",
+        "ROUTE-2189",
+        "ROUTE-2190"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ShiftNoteController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-PLANNING-PUBLISH": {
+      "source_family_ids": [
+        "OPS-SHIFT"
+      ],
+      "route_ids": [
+        "ROUTE-2191",
+        "ROUTE-2192",
+        "ROUTE-2193",
+        "ROUTE-2194",
+        "ROUTE-2201",
+        "ROUTE-2202",
+        "ROUTE-2205",
+        "ROUTE-2206",
+        "ROUTE-2213",
+        "ROUTE-2214"
+      ],
+      "page_ids": [
+        "PAGE-0614",
+        "PAGE-0638",
+        "PAGE-0639",
+        "PAGE-0640",
+        "PAGE-0687",
+        "PAGE-0688",
+        "PAGE-0689",
+        "PAGE-0690",
+        "PAGE-0691",
+        "PAGE-0692",
+        "PAGE-0693",
+        "PAGE-0695",
+        "PAGE-0696",
+        "PAGE-0697",
+        "PAGE-0698",
+        "PAGE-0699",
+        "PAGE-0700",
+        "PAGE-0701",
+        "PAGE-0702",
+        "PAGE-0703",
+        "PAGE-0704",
+        "PAGE-0707",
+        "PAGE-0708"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ShiftController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-SERIES-LIFECYCLE": {
+      "source_family_ids": [
+        "OPS-SHIFT-SERIES"
+      ],
+      "route_ids": [
+        "ROUTE-2215",
+        "ROUTE-2216",
+        "ROUTE-2217",
+        "ROUTE-2218"
+      ],
+      "page_ids": [
+        "PAGE-0705",
+        "PAGE-0706"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ShiftSeriesController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-SHIFT-STAFFING-COVER": {
+      "source_family_ids": [
+        "OPS-SHIFT"
+      ],
+      "route_ids": [
+        "ROUTE-2195",
+        "ROUTE-2196",
+        "ROUTE-2197",
+        "ROUTE-2199",
+        "ROUTE-2208",
+        "ROUTE-2209",
+        "ROUTE-2212"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ShiftController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-STAFF-AVAILABILITY": {
+      "source_family_ids": [
+        "OPS-ROUTE-OPERATIONS-AVAILABILITY-INDEX",
+        "OPS-STAFF-AVAILABILITY"
+      ],
+      "route_ids": [
+        "ROUTE-1899",
+        "ROUTE-2921",
+        "ROUTE-2922",
+        "ROUTE-2923"
+      ],
+      "page_ids": [
+        "PAGE-0944"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/StaffAvailabilityController.php",
+        "routes/*.php closure"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-STAFF-TIME-OFF": {
+      "source_family_ids": [
+        "OPS-STAFF-TIME-OFF"
+      ],
+      "route_ids": [
+        "ROUTE-2167",
+        "ROUTE-2168"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/StaffTimeOffController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-TIMESHEET-ARCHIVE-PAYROLL": {
+      "source_family_ids": [
+        "OPS-TIMESHEET"
+      ],
+      "route_ids": [
+        "ROUTE-2226",
+        "ROUTE-2229",
+        "ROUTE-2233",
+        "ROUTE-2239"
+      ],
+      "page_ids": [
+        "PAGE-0711"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/TimesheetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT": {
+      "source_family_ids": [
+        "OPS-TIMESHEET"
+      ],
+      "route_ids": [
+        "ROUTE-2221",
+        "ROUTE-2222",
+        "ROUTE-2223",
+        "ROUTE-2224",
+        "ROUTE-2227",
+        "ROUTE-2230",
+        "ROUTE-2232"
+      ],
+      "page_ids": [
+        "PAGE-0545",
+        "PAGE-0546",
+        "PAGE-0555",
+        "PAGE-0709",
+        "PAGE-0710"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/TimesheetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "CAP-OPS-TIMESHEET-MANAGER-REVIEW": {
+      "source_family_ids": [
+        "OPS-TIMESHEET"
+      ],
+      "route_ids": [
+        "ROUTE-2225",
+        "ROUTE-2228",
+        "ROUTE-2231",
+        "ROUTE-2235",
+        "ROUTE-2236",
+        "ROUTE-2237"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/TimesheetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-ANALYTICS-DASHBOARD": {
+      "source_family_ids": [
+        "HR-ANALYTICS-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1255"
+      ],
+      "page_ids": [
+        "PAGE-0401"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AnalyticsDashboardController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-AUDIT": {
+      "source_family_ids": [
+        "HR-AUDIT"
+      ],
+      "route_ids": [
+        "ROUTE-1734",
+        "ROUTE-1735"
+      ],
+      "page_ids": [
+        "PAGE-0510"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/AuditController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-BONUS": {
+      "source_family_ids": [
+        "HR-BONUS"
+      ],
+      "route_ids": [
+        "ROUTE-1328",
+        "ROUTE-1329",
+        "ROUTE-1330"
+      ],
+      "page_ids": [
+        "PAGE-0417"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/BonusController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-COMPLIANCE-CALENDAR": {
+      "source_family_ids": [
+        "HR-COMPLIANCE-CALENDAR"
+      ],
+      "route_ids": [
+        "ROUTE-1357"
+      ],
+      "page_ids": [
+        "PAGE-0426",
+        "PAGE-0427",
+        "PAGE-0428",
+        "PAGE-0429",
+        "PAGE-0431"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/ComplianceCalendarController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-CUSTOM-FIELD": {
+      "source_family_ids": [
+        "HR-CUSTOM-FIELD"
+      ],
+      "route_ids": [
+        "ROUTE-1741",
+        "ROUTE-1742",
+        "ROUTE-1743",
+        "ROUTE-1744"
+      ],
+      "page_ids": [
+        "PAGE-0512"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/CustomFieldController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-DEPARTMENT": {
+      "source_family_ids": [
+        "HR-DEPARTMENT"
+      ],
+      "route_ids": [
+        "ROUTE-1387",
+        "ROUTE-1388",
+        "ROUTE-1389",
+        "ROUTE-1390",
+        "ROUTE-1391"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/DepartmentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-DEVELOPMENT-GOAL": {
+      "source_family_ids": [
+        "HR-DEVELOPMENT-GOAL"
+      ],
+      "route_ids": [
+        "ROUTE-1472",
+        "ROUTE-1473",
+        "ROUTE-1474",
+        "ROUTE-1475"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/DevelopmentGoalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-DISCIPLINARY": {
+      "source_family_ids": [
+        "HR-DISCIPLINARY"
+      ],
+      "route_ids": [
+        "ROUTE-1310",
+        "ROUTE-1311",
+        "ROUTE-1315",
+        "ROUTE-1316",
+        "ROUTE-1317"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/DisciplinaryController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-HEADCOUNT": {
+      "source_family_ids": [
+        "HR-HEADCOUNT"
+      ],
+      "route_ids": [
+        "ROUTE-1479"
+      ],
+      "page_ids": [
+        "PAGE-0460"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/HeadcountController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-INTERVIEW-KIT": {
+      "source_family_ids": [
+        "HR-INTERVIEW-KIT",
+        "HR-ROUTE-HR-KITS-INDEX"
+      ],
+      "route_ids": [
+        "ROUTE-1703",
+        "ROUTE-1704",
+        "ROUTE-1705"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/InterviewKitController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-ORG-CHART": {
+      "source_family_ids": [
+        "HR-ORG-CHART"
+      ],
+      "route_ids": [
+        "ROUTE-1583",
+        "ROUTE-1584"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/OrgChartController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-POSITION": {
+      "source_family_ids": [
+        "HR-POSITION"
+      ],
+      "route_ids": [
+        "ROUTE-1660",
+        "ROUTE-1661",
+        "ROUTE-1662",
+        "ROUTE-1663",
+        "ROUTE-1664",
+        "ROUTE-1665"
+      ],
+      "page_ids": [
+        "PAGE-0502",
+        "PAGE-0503",
+        "PAGE-0504"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PositionController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-PUBLIC-HOLIDAY": {
+      "source_family_ids": [
+        "HR-PUBLIC-HOLIDAY"
+      ],
+      "route_ids": [
+        "ROUTE-1502",
+        "ROUTE-1503",
+        "ROUTE-1504",
+        "ROUTE-1505"
+      ],
+      "page_ids": [
+        "PAGE-0463"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/PublicHolidayController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-RECRUITMENT": {
+      "source_family_ids": [
+        "HR-RECRUITMENT",
+        "HR-ROUTE-HR-JOB-POSTINGS-INDEX",
+        "HR-ROUTE-HR-JOBS-INDEX",
+        "HR-ROUTE-HR-RECRUITMENT-ANALYTICS",
+        "HR-ROUTE-HR-RECRUITMENT-KANBAN"
+      ],
+      "route_ids": [
+        "ROUTE-1666",
+        "ROUTE-1674"
+      ],
+      "page_ids": [
+        "PAGE-0505"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Hr/RecruitmentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-STAFF-ASSIGNMENT": {
+      "source_family_ids": [
+        "HR-STAFF-ASSIGNMENT"
+      ],
+      "route_ids": [
+        "ROUTE-2919",
+        "ROUTE-2920"
+      ],
+      "page_ids": [
+        "PAGE-0943"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/StaffAssignmentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "HR-STAFF-CREDENTIAL": {
+      "source_family_ids": [
+        "HR-STAFF-CREDENTIAL"
+      ],
+      "route_ids": [
+        "ROUTE-2927",
+        "ROUTE-2928",
+        "ROUTE-2929",
+        "ROUTE-2930"
+      ],
+      "page_ids": [
+        "PAGE-0945"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/StaffCredentialController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-ACTIVITY-FEED": {
+      "source_family_ids": [
+        "OPS-ACTIVITY-FEED"
+      ],
+      "route_ids": [
+        "ROUTE-1898"
+      ],
+      "page_ids": [
+        "PAGE-0564"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ActivityFeedController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CALENDAR-SYNC": {
+      "source_family_ids": [
+        "OPS-CALENDAR",
+        "OPS-CALENDAR-SYNC"
+      ],
+      "route_ids": [
+        "ROUTE-1900",
+        "ROUTE-1901",
+        "ROUTE-1902",
+        "ROUTE-1903",
+        "ROUTE-1904"
+      ],
+      "page_ids": [
+        "PAGE-0565",
+        "PAGE-0566"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CalendarSyncController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CARE-NOTE-TEMPLATE": {
+      "source_family_ids": [
+        "OPS-CARE-NOTE-TEMPLATE"
+      ],
+      "route_ids": [
+        "ROUTE-2111",
+        "ROUTE-2112",
+        "ROUTE-2113",
+        "ROUTE-2114",
+        "ROUTE-2115",
+        "ROUTE-2116"
+      ],
+      "page_ids": [
+        "PAGE-0656",
+        "PAGE-0657",
+        "PAGE-0658"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/CareNoteTemplateController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-ACTIONS": {
+      "source_family_ids": [
+        "OPS-CLIENT-ACTIONS"
+      ],
+      "route_ids": [
+        "ROUTE-1938"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientActionsController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-CONSENT": {
+      "source_family_ids": [
+        "OPS-CLIENT-CONSENT"
+      ],
+      "route_ids": [
+        "ROUTE-1953",
+        "ROUTE-1954",
+        "ROUTE-1955"
+      ],
+      "page_ids": [
+        "PAGE-0581"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientConsentController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-MEAL-LOG": {
+      "source_family_ids": [
+        "OPS-CLIENT-MEAL-LOG"
+      ],
+      "route_ids": [
+        "ROUTE-2008",
+        "ROUTE-2009",
+        "ROUTE-2010"
+      ],
+      "page_ids": [
+        "PAGE-0541",
+        "PAGE-0555",
+        "PAGE-0606"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientMealLogController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-PATH-PLAN": {
+      "source_family_ids": [
+        "OPS-CLIENT-PATH-PLAN"
+      ],
+      "route_ids": [
+        "ROUTE-2028",
+        "ROUTE-2029"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientPathPlanController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-PERSONAL-ASSET": {
+      "source_family_ids": [
+        "OPS-CLIENT-PERSONAL-ASSET"
+      ],
+      "route_ids": [
+        "ROUTE-2030",
+        "ROUTE-2031",
+        "ROUTE-2032",
+        "ROUTE-2033"
+      ],
+      "page_ids": [
+        "PAGE-0611"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientPersonalAssetController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-PHOTO-MEDIA": {
+      "source_family_ids": [
+        "OPS-CLIENT-PHOTO-MEDIA"
+      ],
+      "route_ids": [
+        "ROUTE-1977",
+        "ROUTE-1978",
+        "ROUTE-2273",
+        "ROUTE-2274"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/ClientPhotoMediaController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-ROUTINE": {
+      "source_family_ids": [
+        "OPS-CLIENT-ROUTINE"
+      ],
+      "route_ids": [
+        "ROUTE-2046",
+        "ROUTE-2047",
+        "ROUTE-2048"
+      ],
+      "page_ids": [
+        "PAGE-0615"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientRoutineController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-CLIENT-TRANSPORT-BOOKING": {
+      "source_family_ids": [
+        "OPS-CLIENT-TRANSPORT-BOOKING"
+      ],
+      "route_ids": [
+        "ROUTE-2050",
+        "ROUTE-2051",
+        "ROUTE-2052"
+      ],
+      "page_ids": [],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ClientTransportBookingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-DASHBOARD": {
+      "source_family_ids": [
+        "OPS-DASHBOARD"
+      ],
+      "route_ids": [
+        "ROUTE-1897"
+      ],
+      "page_ids": [
+        "PAGE-0651"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/DashboardController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-FAMILY-PORTAL": {
+      "source_family_ids": [
+        "OPS-FAMILY-PORTAL"
+      ],
+      "route_ids": [
+        "ROUTE-2063",
+        "ROUTE-2064",
+        "ROUTE-2065",
+        "ROUTE-2066"
+      ],
+      "page_ids": [
+        "PAGE-0622",
+        "PAGE-0623",
+        "PAGE-0624"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/FamilyPortalController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-FUNDING": {
+      "source_family_ids": [
+        "OPS-FUNDING"
+      ],
+      "route_ids": [
+        "ROUTE-2075"
+      ],
+      "page_ids": [
+        "PAGE-0633"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/FundingController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-GEOFENCE": {
+      "source_family_ids": [
+        "OPS-GEOFENCE"
+      ],
+      "route_ids": [
+        "ROUTE-2082",
+        "ROUTE-2083",
+        "ROUTE-2084",
+        "ROUTE-2085",
+        "ROUTE-2086"
+      ],
+      "page_ids": [
+        "PAGE-0634",
+        "PAGE-0635"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/GeofenceController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-OPS-NOTIFICATION": {
+      "source_family_ids": [
+        "OPS-OPS-NOTIFICATION"
+      ],
+      "route_ids": [
+        "ROUTE-2117",
+        "ROUTE-2118",
+        "ROUTE-2119"
+      ],
+      "page_ids": [
+        "PAGE-0659"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/OpsNotificationController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-REPORT": {
+      "source_family_ids": [
+        "OPS-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2136",
+        "ROUTE-2137"
+      ],
+      "page_ids": [
+        "PAGE-0665",
+        "PAGE-0667"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-ROSTER": {
+      "source_family_ids": [
+        "OPS-ROSTER"
+      ],
+      "route_ids": [
+        "ROUTE-1890",
+        "ROUTE-1891"
+      ],
+      "page_ids": [
+        "PAGE-0552",
+        "PAGE-0553",
+        "PAGE-0555",
+        "PAGE-0562"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/RosterController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    },
+    "OPS-SHIFT-REPORT": {
+      "source_family_ids": [
+        "OPS-SHIFT-REPORT"
+      ],
+      "route_ids": [
+        "ROUTE-2138",
+        "ROUTE-2139"
+      ],
+      "page_ids": [
+        "PAGE-0666"
+      ],
+      "backend_anchors": [
+        "app/Http/Controllers/Operations/ShiftReportController.php"
+      ],
+      "origin_files": [
+        "manifest-hr-operations-final.json"
+      ]
+    }
+  },
+  "unresolved_targets": [],
+  "checksums": {
+    "working_manifest_sha256": "0bcef71148e275df3e066a20146ba8389f81bb0121ec5b7708d50921d1aa3b16",
+    "inventory_sha256": "e4ec65d0ee7e1745bb513da220f4efc0d480cbc76e846a7b7b6117a79eed4570",
+    "adjudication_sha256": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715",
+    "targets_canonical_sha256": "91a29938c53ba30482161aa929d654f1f70537abd0ecafe2d0624912b14b479e",
+    "validation_errors": []
+  }
+}

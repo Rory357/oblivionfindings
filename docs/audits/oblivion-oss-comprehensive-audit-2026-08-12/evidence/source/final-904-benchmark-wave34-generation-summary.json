@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "final-904-benchmark-wave34-generation-summary",
+  "generated_at": "2026-08-21T20:00:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "inputs": {
+    "wave34": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-904-wave34.json",
+      "sha256": "c050378f4897dd9ed7a6d19b3d9338b2d20aae20adba12d8b85518c5714e4f08",
+      "bytes": 15025
+    }
+  },
+  "outputs": {
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "84f73bd34c2ff0e59551196a8a1886b4790de6eebc8f2be34b6e5978ea008491",
+      "bytes": 658762
+    },
+    "inventory": {
+      "path": "inventory-904.json",
+      "sha256": "579d2bde9e5f0d28ff1e912da354ec0244f6abe9eebaaf2eabf3c7ad3af2144e",
+      "bytes": 11772132
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger-904.csv",
+      "sha256": "c2cec6779d1ac4e8521a995a66a5a826e19a914e598f0bc309eb8d358386c0ae",
+      "bytes": 1960533
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix-904.csv",
+      "sha256": "e6ac00c8703ca7037f4f49f2a4973b5b036cf77fb7586ba7677dcb73ac5f6112",
+      "bytes": 3293911
+    }
+  },
+  "counts": {
+    "denominator": 904,
+    "direct": 353,
+    "rename": 22,
+    "verified": 375,
+    "ncm": 89,
+    "eligible": 464,
+    "completion_unproved": 440
+  },
+  "validation": {
+    "selected": 8,
+    "direct": 8,
+    "retained": 0,
+    "runtime_credit_delta": 0,
+    "completion_status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE"
+  }
+}

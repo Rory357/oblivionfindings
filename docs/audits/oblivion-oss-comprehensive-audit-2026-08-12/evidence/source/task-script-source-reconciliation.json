@@ -1,0 +1,19 @@
+{
+  "schema_version": "2.0",
+  "generated_at": "2026-08-12T04:34:52.893Z",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "provisional_static_generation_independent_review_blocked",
+  "projection_human_scripts": 677,
+  "read_only_scripts": 159,
+  "controller_method_anchors": 2809,
+  "form_request_references": 119,
+  "runtime_executed": 0,
+  "independently_semantically_validated": 0,
+  "method": "Exact controller method blocks, FormRequest rules, route middleware, response/persistence/error/event lines and render/action page relationships. State categories use anchored controller action tokens only.",
+  "limits": [
+    "Accepted distinct-capability denominator is null",
+    "No runtime task execution",
+    "No generic persisted outcome or next-owner handoff",
+    "No page-presence loading/empty/error claims"
+  ]
+}

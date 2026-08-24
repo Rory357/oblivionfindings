@@ -1,0 +1,352 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-24T14:39:31+12:00",
+  "scope": "Audit artifacts only; no application source or audit-credit mutation.",
+  "machine_path_replacements": 178,
+  "machine_path_files": [
+    "audit-dashboard.html",
+    "evidence/browser/current-main-control-room-handover-viewport-evidence.json",
+    "evidence/browser/current-main-visual-family-resample-2026-08-14.json",
+    "evidence/browser/frozen-baseline-control-room-handover-preflight-2026-08-21.json",
+    "evidence/source/benchmark-target-specific-adjudication-901-wave2.json",
+    "evidence/source/benchmark-target-specific-adjudication-901-wave3.json",
+    "evidence/source/benchmark-target-specific-adjudication-901.json",
+    "evidence/source/benchmark-target-specific-adjudication-902-wave4.json",
+    "evidence/source/benchmark-target-specific-adjudication-902-wave5.json",
+    "evidence/source/benchmark-target-specific-adjudication-902-wave6.json",
+    "evidence/source/benchmark-target-specific-adjudication-902-wave7.json",
+    "evidence/source/benchmark-target-specific-adjudication-902-wave8.json",
+    "evidence/source/browser-clinical-lead-current-main-pass-902.json",
+    "evidence/source/coordinator-live-checkpoint-2026-08-21.json",
+    "evidence/source/coordinator-live-checkpoint-2026-08-21.md",
+    "evidence/source/coordinator-recovery-handoff-2026-08-20.md",
+    "evidence/source/no-credible-match-adjudication.json",
+    "evidence/source/orchestration-status-2026-08-14.json",
+    "evidence/source/remediation-delivery-snapshot-2026-08-23.json",
+    "evidence/source/remediation-workspace-census-2026-08-23.json",
+    "generators/apply-project-triage-complete-2026-08-14.py",
+    "generators/rebuild-benchmark-target-specific-wave2.py",
+    "generators/rebuild-benchmark-target-specific-wave3.py",
+    "generators/rebuild-benchmark-target-specific-wave4.py",
+    "generators/reconcile-remediation-wave-2026-08-22.py"
+  ],
+  "remaining_machine_local_paths": 0,
+  "normalized_jpeg_named_png_count": 52,
+  "normalized_images": [
+    {
+      "path": "evidence/browser/BVIS-0001-dashboard-1600x1000-observed-cropped.png",
+      "width": 1311,
+      "height": 556,
+      "pixel_sha256": "20ce72408954476e89f2f56ecc82edddc195697b676c5b68d547b498e3a2ae04"
+    },
+    {
+      "path": "evidence/browser/BVIS-0002-dashboard-1440x900-observed-cropped.png",
+      "width": 1289,
+      "height": 556,
+      "pixel_sha256": "04c756c85f594f268713d1d9f9f4957e740430a36add644f47e44c9018f7658d"
+    },
+    {
+      "path": "evidence/browser/BVIS-0003-dashboard-390x844-observed-cropped.png",
+      "width": 433,
+      "height": 578,
+      "pixel_sha256": "ff630ded618f4e34e5f5b417c1df0e13bc34ee1f50c8e018794e52226441b6c1"
+    },
+    {
+      "path": "evidence/browser/BVIS-0004-health-safety-corrective-actions-390x844-overflow-cropped.png",
+      "width": 433,
+      "height": 689,
+      "pixel_sha256": "8c6eb90150656348f872eba34ef92531f28418ce4f7d84ac77490c942bcededd"
+    },
+    {
+      "path": "evidence/browser/BVIS-0005-dashboard-1280x800-observed-cropped.png",
+      "width": 889,
+      "height": 500,
+      "pixel_sha256": "daa1f2d52443fde0a551a20dc73f3bc67941acb8423f6fd09a60c6d83ea02f01"
+    },
+    {
+      "path": "evidence/browser/BVIS-0006-dashboard-1024x768-observed-cropped.png",
+      "width": 849,
+      "height": 500,
+      "pixel_sha256": "1cc8d02ce1ac7ca713a54f15148708068b7d901cc0545ae95aa07f87913272cc"
+    },
+    {
+      "path": "evidence/browser/BVIS-0008-dashboard-mobile-navigation-overlay-390x844-observed-cropped.png",
+      "width": 433,
+      "height": 689,
+      "pixel_sha256": "32a8aa9beca6ea169a3f27b964bf2cac3b9708c63857a6bd8211973f3d6bded5"
+    },
+    {
+      "path": "evidence/browser/BVIS-0009-all-tasks-1600x1000-observed-cropped.png",
+      "width": 1600,
+      "height": 689,
+      "pixel_sha256": "afc306d4a3d1a4aecd6fb6e2aaf3fb260cc660d98873aa84cc1ce3452534bb90"
+    },
+    {
+      "path": "evidence/browser/BVIS-0010-my-day-390x844-header-overflow-cropped.png",
+      "width": 433,
+      "height": 722,
+      "pixel_sha256": "5131a3633490b4b0097986240ba53ceee44ce59db557446f9277a564d239661f"
+    },
+    {
+      "path": "evidence/browser/BVIS-0011-system-users-staff-path-blocked.png",
+      "width": 1265,
+      "height": 712,
+      "pixel_sha256": "2d9c94e582bb6f559fe1cc2a3fc7e6464f75a3d50bfd7b99318ff8a317dc09a0"
+    },
+    {
+      "path": "evidence/browser/BVIS-0012-health-safety-hero-density-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "ab63badd436ca0b7f5a584b2f0caf3d8fb6bf13ca041b9af7f123d64b75fc597"
+    },
+    {
+      "path": "evidence/browser/BVIS-0013-finance-hero-density-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "ea42e15924875800b64c1ce08b808760124b7010c68372165d1ae76f39714ab3"
+    },
+    {
+      "path": "evidence/browser/BVIS-0014-clinical-hero-density-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "62eb358d21549f0a06e6daf36878e484507aa5b7cc857247dfec9fdfa2a96ba0"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-clinical-hero-density-1024x768.png",
+      "width": 1009,
+      "height": 757,
+      "pixel_sha256": "a74493918909c031b59d9e5619a79f202c8fd3ebf58e00cb696c1a3a37aedb4d"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-clinical-hero-density-1280x800.png",
+      "width": 1265,
+      "height": 791,
+      "pixel_sha256": "d494ad37750fa62bae7d50ecd18d054fcbada5cf2868f44dafb94b30e0cbabf7"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-clinical-hero-density-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "60ee45928adae6164e6a24a3923edcd406dc70e32fe23aaabc36a164c4614836"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-finance-hero-density-1024x768.png",
+      "width": 1009,
+      "height": 757,
+      "pixel_sha256": "7dbf788c5192ccfabbda4066055fdc11a06b080bd40b36e6c636b488aa95ef93"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-finance-hero-density-1280x800.png",
+      "width": 1265,
+      "height": 791,
+      "pixel_sha256": "115b86871a3f956e4d1bda5c2798c90353768ed8b773751152311553c47d2ad3"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-finance-hero-density-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "1187cf1abc1d1cdc53e692425131799dc938198735e540c780a3978df1da4c44"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-health-safety-hero-density-1024x768.png",
+      "width": 1009,
+      "height": 757,
+      "pixel_sha256": "6fb467f81dc211f4d89adeea5a758961f410744590075263032bc705da92bb0f"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-health-safety-hero-density-1280x800.png",
+      "width": 1265,
+      "height": 791,
+      "pixel_sha256": "27d9089d532e6e0ee0dfaef9072433da4e5191a0b5236848832af94f4d8f00b7"
+    },
+    {
+      "path": "evidence/browser/BVIS-0015-health-safety-hero-density-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "83aafbe11fdce61a83505c2f83fdb615a4366b1d6a939ec161dfa1ec3dd0fab5"
+    },
+    {
+      "path": "evidence/browser/BVIS-901-admin-dashboard-390x844-overflow-2026-08-13.png",
+      "width": 462,
+      "height": 1041,
+      "pixel_sha256": "eca52dc0d79d7d49fd5380fcad3000caf6cc1606e23961c5e7a2097e19619d9c"
+    },
+    {
+      "path": "evidence/browser/BVIS-901-support-worker-my-day-390x844-overflow-2026-08-13.png",
+      "width": 462,
+      "height": 1023,
+      "pixel_sha256": "d77fb7a8d58bf7b6659179552b3662e2b1bf84955f5a5448ec906c16598f26d9"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-464of904-2026-08-21-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "20ccbcc30b435e9b7da96a9dcc12d83d3d2f2ce71f57206de1721bbc74e3ce13"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-464of904-2026-08-21-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "084b6b0c7760a2c2fbfff3ddbd4bb9c4d7a3433fbde1088e3570a2ed4de77e35"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-main-fa5602-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "7bde0340ca778ddbc4aaa3eaafa192dbf74e2717dd6b94db1ebdc450afbfcc2e"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-main-fa5602-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "c44fcd3244f7e8508e0ca4a95d9ed8e623b53ba963fc5e8a421159ab1ec0ce62"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-main-fa5602-header-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "1018b5878cfc0c9857ee25a9522c94aaba7852b59f268f3cbe5cacf849a9d201"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-current-main-fa5602-header-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "fc854f1214eb14c62da38c431df45578457d578cb59fe27eaac6a6606634d306"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-local-main-2026-08-24-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "a324fe5ea21afac0f096c690a9cc20f4b5abb2b3fee3f0542c80be5ec5870425"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-local-main-2026-08-24-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "e4149d513bafde881265c0b563e44b7177614554ad7abdbfab7e37609f7009a7"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-local-main-2026-08-24-progress-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "91bca7709d3d4c25fdb5bf409567cd4686a00ada3d9274356e779fd30961b4ac"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-local-main-2026-08-24-progress-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "9516df00e71018bed2423102c0cbe632f614950973da9aa08c5cf9352a0ebdfa"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-progress-2026-08-21-25tasks.png",
+      "width": 1905,
+      "height": 938,
+      "pixel_sha256": "73004d7edaef548d02d4334518f10fa395457046cc905b2ada7170e09f759be3"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-release-main-2026-08-21.png",
+      "width": 1905,
+      "height": 10993,
+      "pixel_sha256": "6ad8f453b07eda2d5a4e3b5f7b2e94ac856c7672911f8b0b5c2ff696970ac659"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave28-post-regeneration-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "7bde0340ca778ddbc4aaa3eaafa192dbf74e2717dd6b94db1ebdc450afbfcc2e"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave28-post-regeneration-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "c44fcd3244f7e8508e0ca4a95d9ed8e623b53ba963fc5e8a421159ab1ec0ce62"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave30-main20ad-header-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "22711bf0ba2a0234b0921a03dbb42b3d04092870fc9da28112273bacbf15d539"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave30-main20ad-header-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "fc854f1214eb14c62da38c431df45578457d578cb59fe27eaac6a6606634d306"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave30-main20ad-progress-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "4c66490419ba7fb3cd6005fb96d58eacce06d4aad3fc3c28a562c5cf14f80d4c"
+    },
+    {
+      "path": "evidence/browser/audit-dashboard-wave30-main20ad-progress-390x844.png",
+      "width": 375,
+      "height": 812,
+      "pixel_sha256": "4772147e4456bcb59e64c62e53ebdd5c553254aa704b2c03fe704007b953b5f2"
+    },
+    {
+      "path": "evidence/browser/dashboard-consent-slot-progress-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "b95aaf9fa33f6dec8f71c0cc67e04d4bbf85b3e6745402634a6f961716fb9af9"
+    },
+    {
+      "path": "evidence/browser/dashboard-main-109750de-banner-1440x900.png",
+      "width": 1425,
+      "height": 891,
+      "pixel_sha256": "80dec7e4fceebe47684d01d9c89d5eb11af535c7b11ec3e6bb172f7d03fc56a4"
+    },
+    {
+      "path": "evidence/browser/dashboard-main-109750de-progress-1440x900.png",
+      "width": 1425,
+      "height": 541,
+      "pixel_sha256": "d67b9386f23a3c9731fd106597e1db87a95358a349686e0e8d56cee1aa74e1ea"
+    },
+    {
+      "path": "evidence/browser/dashboard-orchestration-current-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "9cda4e210908b654c4299f56defda9e1a8c3af7a1d14c79cc56c38e7efd4fd02"
+    },
+    {
+      "path": "evidence/browser/dashboard-post-hs-orchestration-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "9e2d0d5071c805f6f7cdfae58bfc993cbe4c8e4a98489cd81cddd7c426839a6f"
+    },
+    {
+      "path": "evidence/browser/dashboard-progress-current-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "b898b32fb6af0a71b30771afca6e4559c793777fdef78fe3ec5c566eeda4943c"
+    },
+    {
+      "path": "evidence/browser/dashboard-progress-current-live-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "64f4b851d5d3dd21b9c565691885d0dae6cab55f6d96ce3df64431f1cdd1c14b"
+    },
+    {
+      "path": "evidence/browser/dashboard-regenerated-fleet-slot-progress-2026-08-21.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "764a17af067505afc2b9f8563534e30a84e6aaca373601dcc3eacc683fbf4b41"
+    },
+    {
+      "path": "evidence/browser/dashboard-wave24-main-a8bd-2026-08-21.png",
+      "width": 3425,
+      "height": 11023,
+      "pixel_sha256": "927213647cb4bc31e2b74467344765a9171147ba5f17e6aa6126f46b316ee1a9"
+    },
+    {
+      "path": "evidence/browser/dashboard-wave24-static-20260821-rendered.png",
+      "width": 3425,
+      "height": 1299,
+      "pixel_sha256": "0461ed3f06aa28c8ab5a47d33e55f91d21b8a3119e857ba6257532e088b507ac"
+    }
+  ],
+  "remaining_jpeg_named_png": [],
+  "remaining_pyc_files": [],
+  "status": "PASS"
+}

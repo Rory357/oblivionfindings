@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "artifact": "benchmark-final-894-lineage-reconciliation",
+  "generated_at": "2026-08-13T06:20:44.914+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_lineage_refresh",
+  "audit_boundary": "Audit-artifact-only static reconciliation. Only benchmark-final-894-mapping.json and this audit-local summary were written; no application code, configuration, routes, tests, data, Git state, browser state or runtime state was changed.",
+  "inputs": {
+    "working_manifest": {
+      "path": "evidence/source/working-capability-manifest-894.json",
+      "file_sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+      "working_targets_sha256": "4175a22e5b4713b7fdd171b9a12fc15758ca5c5966e7d0e579e52fadbc7bbff9",
+      "canonical_stable_target_ids_sha256": "3eb30b2c1098654e080e1b7087ac5670da8a6d54585482810a651572afd102be"
+    },
+    "selected_benchmark_adjudication": {
+      "path": "evidence/source/selected-benchmark-adjudication.json",
+      "file_sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3"
+    },
+    "no_credible_match_adjudication": {
+      "path": "evidence/source/no-credible-match-adjudication.json",
+      "file_sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71"
+    },
+    "prior_mapping": {
+      "path": "evidence/source/benchmark-final-894-mapping.json",
+      "file_sha256": "705b7e5b0e1eedda80d150374bad7f446cc50b08162960064fe7526d839a450d",
+      "full_mapping_sha256": "ad910b9a6b6076fbf49c5d9a744a2b324453f3305e2587637539c6da0de915dd",
+      "eligible_subset_sha256": "693d2054198e5f8a57a6d3f29361894b3421f109b1329a5f1f26ed74532ac93e"
+    }
+  },
+  "method": {
+    "source_family_snapshot": "Replace every mapping target source_family_ids snapshot with the array persisted for the identical working_key in the enriched 894-row working manifest.",
+    "completion_gate": "Grant completion only for an exact target-specific completed adjudication unit whose persisted source family includes that unit's originating source family, or for an unchanged target already admitted by the reviewed strict one-to-one rename allowlist.",
+    "non_inheritance": "Persisted lineage alone does not transfer a broad selected or no-match family outcome into a split, regrouped or merged target. Pending and reject remain unproved.",
+    "evidence_preservation": "Candidate-found units retain the pinned repository SHA, path and line locus. Documented-no-credible-match units retain every target-specific rejected repository and pinned SHA."
+  },
+  "reconciliation": {
+    "denominator": {
+      "total": 894,
+      "H": 784,
+      "D": 108,
+      "M": 2
+    },
+    "exact_key_set_equal": true,
+    "source_family_snapshots_equal": true,
+    "source_family_snapshots_refreshed": 125,
+    "status_changes": 5,
+    "lineage_only_changes_remaining_unproved": 120,
+    "reason_only_five_statuses_changed": "The five Control Room settings targets are the only refreshed-lineage rows that also have exact target-specific completed adjudication units. The other 120 rows have lineage context but no exact completed unit eligible under the strict rules."
+  },
+  "status_changes": [
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS",
+      "from": "unproved",
+      "to": "documented_ncm_direct",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "source_unit": "ncm:CAP-CR-CONTROL-ROOM-SETTINGS-CONFIGURATION-OPTIONS",
+      "evidence": "Seven target-specific rejected official-repository snapshots are retained from no-credible-match-adjudication.json."
+    },
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS",
+      "from": "unproved",
+      "to": "verified_benchmark_direct",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "source_unit": "ncm:CAP-CR-CONTROL-ROOM-SETTINGS-MAINTENANCE-WINDOWS",
+      "evidence": "repo:thingsboard-thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038::application/src/main/java/org/thingsboard/server/controller/AlarmController.java::L127-L227"
+    },
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY",
+      "from": "unproved",
+      "to": "verified_benchmark_direct",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "source_unit": "ncm:CAP-CR-CONTROL-ROOM-SETTINGS-OUTBOX-RECOVERY",
+      "evidence": "repo:thingsboard-thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038::application/src/main/java/org/thingsboard/server/controller/AlarmController.java::L127-L227"
+    },
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES",
+      "from": "unproved",
+      "to": "documented_ncm_direct",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "source_unit": "ncm:CAP-CR-CONTROL-ROOM-SETTINGS-RESPONSE-QUEUES",
+      "evidence": "Seven target-specific rejected official-repository snapshots are retained from no-credible-match-adjudication.json."
+    },
+    {
+      "working_key": "CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES",
+      "from": "unproved",
+      "to": "verified_benchmark_direct",
+      "source_family_ids": [
+        "CR-CONTROL-ROOM-SETTINGS"
+      ],
+      "source_unit": "ncm:CAP-CR-CONTROL-ROOM-SETTINGS-SIGNAL-RULES",
+      "evidence": "repo:thingsboard-thingsboard@684f92bbfd0cf48015b6e42f5592bc0c2fc18038::application/src/main/java/org/thingsboard/server/controller/AlarmController.java::L127-L227"
+    }
+  ],
+  "final_counts": {
+    "verified_benchmark": {
+      "direct": 168,
+      "strict_one_to_one_rename": 23,
+      "total": 191
+    },
+    "documented_no_credible_match": {
+      "direct": 68,
+      "strict_one_to_one_rename": 7,
+      "total": 75
+    },
+    "eligible_total": 266,
+    "completion_unproved": {
+      "ordinary": 579,
+      "audit_assigned_stable_name": 11,
+      "prior_pending": 34,
+      "prior_reject": 3,
+      "source_stable_semantic_merge": 1,
+      "total": 628
+    }
+  },
+  "final_mapping": {
+    "path": "evidence/source/benchmark-final-894-mapping.json",
+    "file_sha256": "b411dc410273fb7a18623af45b2be6f691a716accea1161d4d0e3238cd8e9131",
+    "full_mapping_sha256": "f292e642ad189958a8da021786f0f7d6c3a3bd242e531b4006515ed411d759a5",
+    "eligible_subset_sha256": "0c0aa63e254b777cf735bb95703f866dbbe8c80071a58011d4682f75428754b6"
+  }
+}

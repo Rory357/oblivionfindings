@@ -1,0 +1,379 @@
+{
+  "schema_version": "1.0",
+  "artifact": "final-894-ledger-generation-summary",
+  "generator": "evidence/source/rebuild-final-894-ledgers.py",
+  "generator_run_at": "2026-08-12T18:50:10.496526+00:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "generated_894_rows_validation_passed_audit_completion_not_claimed",
+  "audit_boundary": "Audit-artifact-only deterministic CSV generation. No application source, routes, configuration, tests, data, deployment, Git history, or external system was changed.",
+  "denominator": {
+    "total": 894,
+    "class_counts": {
+      "H": 784,
+      "D": 108,
+      "M": 2
+    },
+    "module_counts": {
+      "ASSETS": {
+        "total": 8,
+        "H": 8,
+        "D": 0,
+        "M": 0
+      },
+      "AUTH": {
+        "total": 6,
+        "H": 6,
+        "D": 0,
+        "M": 0
+      },
+      "CLIENTS": {
+        "total": 27,
+        "H": 23,
+        "D": 4,
+        "M": 0
+      },
+      "CLINICAL": {
+        "total": 20,
+        "H": 19,
+        "D": 1,
+        "M": 0
+      },
+      "CONTROL_ROOM": {
+        "total": 37,
+        "H": 34,
+        "D": 3,
+        "M": 0
+      },
+      "EMAR": {
+        "total": 72,
+        "H": 48,
+        "D": 24,
+        "M": 0
+      },
+      "FINANCE": {
+        "total": 71,
+        "H": 64,
+        "D": 7,
+        "M": 0
+      },
+      "FLEET": {
+        "total": 48,
+        "H": 48,
+        "D": 0,
+        "M": 0
+      },
+      "FRONTLINE": {
+        "total": 7,
+        "H": 7,
+        "D": 0,
+        "M": 0
+      },
+      "GOVERNANCE": {
+        "total": 62,
+        "H": 50,
+        "D": 12,
+        "M": 0
+      },
+      "HEALTH_SAFETY": {
+        "total": 68,
+        "H": 41,
+        "D": 27,
+        "M": 0
+      },
+      "HR": {
+        "total": 151,
+        "H": 135,
+        "D": 16,
+        "M": 0
+      },
+      "INCIDENTS": {
+        "total": 19,
+        "H": 14,
+        "D": 5,
+        "M": 0
+      },
+      "IT": {
+        "total": 2,
+        "H": 2,
+        "D": 0,
+        "M": 0
+      },
+      "OPERATIONS": {
+        "total": 74,
+        "H": 72,
+        "D": 2,
+        "M": 0
+      },
+      "PLATFORM": {
+        "total": 2,
+        "H": 1,
+        "D": 0,
+        "M": 1
+      },
+      "PORTAL": {
+        "total": 4,
+        "H": 4,
+        "D": 0,
+        "M": 0
+      },
+      "PRIVACY": {
+        "total": 20,
+        "H": 17,
+        "D": 3,
+        "M": 0
+      },
+      "PUBLIC": {
+        "total": 4,
+        "H": 4,
+        "D": 0,
+        "M": 0
+      },
+      "REPORTING": {
+        "total": 21,
+        "H": 21,
+        "D": 0,
+        "M": 0
+      },
+      "RESPITE": {
+        "total": 22,
+        "H": 21,
+        "D": 1,
+        "M": 0
+      },
+      "ROADMAP": {
+        "total": 8,
+        "H": 7,
+        "D": 1,
+        "M": 0
+      },
+      "SECURITY_DEVICES": {
+        "total": 37,
+        "H": 36,
+        "D": 0,
+        "M": 1
+      },
+      "SETTINGS": {
+        "total": 34,
+        "H": 34,
+        "D": 0,
+        "M": 0
+      },
+      "SITES": {
+        "total": 70,
+        "H": 68,
+        "D": 2,
+        "M": 0
+      }
+    },
+    "working_key_equals_feature_id": true
+  },
+  "inputs": [
+    {
+      "path": "evidence/source/rebuild-final-894-ledgers.py",
+      "sha256": "05a36cb7b096ba94ed66c7eb97781941fdb43667647fecdd779f2f3ee62d92d7",
+      "bytes": 49617
+    },
+    {
+      "path": "evidence/source/working-capability-manifest-894.json",
+      "sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+      "bytes": 677638
+    },
+    {
+      "path": "inventory.json",
+      "sha256": "47bd9e8374cc588d325c1883e3e27e539ccaaf38f46b687080655a0a89625e38",
+      "bytes": 10641575
+    },
+    {
+      "path": "findings.json",
+      "sha256": "a30a2253a2deceb8483337e9fb82b0db303332dbb143e6d5b9905ff85c780ec0",
+      "bytes": 945259
+    },
+    {
+      "path": "evidence/source/benchmark-final-894-mapping.json",
+      "sha256": "b411dc410273fb7a18623af45b2be6f691a716accea1161d4d0e3238cd8e9131",
+      "bytes": 547551
+    },
+    {
+      "path": "evidence/source/selected-benchmark-adjudication.json",
+      "sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3",
+      "bytes": 888935
+    },
+    {
+      "path": "evidence/source/no-credible-match-adjudication.json",
+      "sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71",
+      "bytes": 3137820
+    }
+  ],
+  "outputs": {
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "875d7c243c11b8374e87108bc989485b5dc4ed9f01fcf63d58802536fc3d4d52",
+      "bytes": 1750281,
+      "data_rows": 894,
+      "headers": [
+        "feature_id",
+        "working_key",
+        "class",
+        "module",
+        "submodule",
+        "source_family_inventory_envelope",
+        "P1_status",
+        "P2_status",
+        "P3_status",
+        "P4_status",
+        "P5_status",
+        "P6_status",
+        "P7_status",
+        "P8_status",
+        "agent_assignments",
+        "evidence_count",
+        "gaps",
+        "reconciliation_status"
+      ],
+      "canonical_row_sha256": "61b36131950eef3680efd3c09ffcdb57d08fe8855be4b067b72389382f61bfca"
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "55ae6f425f62edcf44a2a8fd9f3312ad9c4f4eb1c617e8a7d240c064d057eae2",
+      "bytes": 3056086,
+      "data_rows": 894,
+      "headers": [
+        "feature_id",
+        "module",
+        "submodule",
+        "owning_actor",
+        "secondary_actors",
+        "user_job",
+        "criticality",
+        "navigation_entry",
+        "route_names",
+        "route_paths",
+        "page_files",
+        "backend_anchors",
+        "current_states",
+        "current_workflow_summary",
+        "benchmark_candidates",
+        "selected_open_source_benchmark",
+        "benchmark_url_and_sha",
+        "verified_behaviour",
+        "neutral_requirements_extracted",
+        "no_match_evidence",
+        "current_ease_score",
+        "target_ease_score",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "P8",
+        "finding_ids",
+        "confidence"
+      ],
+      "canonical_row_sha256": "f8e38b2238477ca4a2da633cbb064a47d7b12c4b17c15ad19cad62f469cb3647"
+    }
+  },
+  "deterministic_key_checksums": {
+    "ordering": "ascending ordinal working_key; working_key == feature_id",
+    "working_key_lf_sha256": "c48dd574e50937a23a7988afba5e3108ced61070f0300b96fee475a1c1c73bc9",
+    "feature_id_lf_sha256": "c48dd574e50937a23a7988afba5e3108ced61070f0300b96fee475a1c1c73bc9",
+    "working_key_unique_count": 894,
+    "feature_id_unique_count": 894
+  },
+  "exact_target_enrichment": {
+    "targets_with_route_ids": 889,
+    "unique_route_ids": 2827,
+    "targets_with_page_ids": 734,
+    "unique_page_ids": 899,
+    "targets_with_manifest_backend_anchors": 716,
+    "missing_route_inventory_lookups": [],
+    "missing_page_inventory_lookups": [],
+    "source_family_envelope_route_or_page_ids_used_as_exact": 0
+  },
+  "source_family_inventory_envelope": {
+    "purpose": "Discovery context only; never exclusive target route/page/backend ownership.",
+    "inventory_feature_source": "superseded_feature_projection.features",
+    "inventory_feature_rows": 740,
+    "targets_with_at_least_one_matching_legacy_inventory_row": 894,
+    "targets_without_matching_legacy_inventory_row": 0
+  },
+  "benchmark_integration": {
+    "artifact_present": true,
+    "mapped_completion_credit": 266,
+    "completion_unproved": 628,
+    "status_counts": {
+      "documented_ncm_direct": 68,
+      "documented_ncm_rename": 7,
+      "unproved": 579,
+      "unproved_audit_assigned_id": 11,
+      "unproved_pending": 34,
+      "unproved_reject": 3,
+      "unproved_source_stable": 1,
+      "verified_benchmark_direct": 168,
+      "verified_benchmark_rename": 23
+    },
+    "resolution_counts": {
+      "documented_ncm": 75,
+      "ncm_candidate_found": 132,
+      "selected_direct": 39,
+      "selected_projected_supported": 20,
+      "unproved": 628
+    },
+    "field_validation": {
+      "verified_rows": 191,
+      "verified_rows_with_complete_required_fields": 191,
+      "documented_ncm_rows": 75,
+      "documented_ncm_rows_with_target_explicit_evidence": 75,
+      "completion_unproved_rows_with_no_accidental_completion_fields": 628
+    },
+    "proof_rule": "Only completion_credit=true final-target rows are marked P3 Mapped; prior family, pending, reject, split, regroup, and merge evidence grants no mechanical credit."
+  },
+  "exact_finding_integration": {
+    "targets_with_exact_feature_id_links": 40,
+    "exact_finding_links": 48,
+    "official_source_finding_targets": 29,
+    "inheritance_rule": "Only finding.feature_ids exact equality with final feature_id; no family inheritance."
+  },
+  "pass_status_summary": {
+    "P1_static_identity_envelope_reviewed": 894,
+    "P2_runtime_task_blocked": 894,
+    "P3_mapped": 266,
+    "P3_blocked": 628,
+    "P4_runtime_visual_task_blocked": 894,
+    "P5_static_target_anchors_reviewed": 889,
+    "P5_target_trace_blocked": 5,
+    "P6_official_source_link_reviewed_runtime_blocked": 29,
+    "P6_target_specific_source_and_runtime_blocked": 865,
+    "P7_exact_finding_source_reviewed_tests_not_run": 40,
+    "P7_target_specific_test_failure_trace_blocked": 854,
+    "P8_corrected_static_identity_challenge_reviewed": 894
+  },
+  "validation": {
+    "status": "passed",
+    "assertions": [
+      "Corrected manifest contains exactly 894 unique working keys and feature IDs.",
+      "working_key equals feature_id for all generated rows.",
+      "Manifest class totals are 784 H, 108 D, and 2 M.",
+      "Both CSVs re-parse with exactly 894 data rows and declared headers.",
+      "Both CSVs have 894 unique feature IDs in deterministic key order.",
+      "Every manifest route/page ID used in exact fields resolves in inventory.json.",
+      "No source-family inventory-envelope route/page ID is promoted into an exact target field.",
+      "Source-family discovery envelopes use superseded_feature_projection.features when present; otherwise they fall back to inventory.features.",
+      "Only exact final feature-ID finding links are included.",
+      "All 191 verified-benchmark rows resolve through 39 selected direct, 20 selected projected-supported and 132 NCM candidate-found records, with nonblank benchmark, URL/SHA, behaviour and neutral-requirement fields.",
+      "All 75 documented-NCM rows identify both the final target and source adjudication unit and retain nonblank candidate, URL/SHA, neutral-requirement and no-match evidence.",
+      "All 628 completion-unproved rows remain P3 Blocked and receive no selected benchmark, verified behaviour, neutral requirement or no-match completion field.",
+      "Final benchmark mapping target set exactly equals the 894-target manifest and exactly 266 rows receive P3 completion credit."
+    ]
+  },
+  "limitations": [
+    "This generation does not establish 894 representative user jobs, actors, navigation entries, workflow states, or ease scores.",
+    "Empty exact route/page/backend cells mean target enrichment is unavailable; they never prove absence.",
+    "Source-family inventory envelopes are discovery context only and do not prove exclusive ownership.",
+    "Only 266 final targets have P3 completion credit (191 verified benchmark, 75 bounded documented no-match); 628 remain unproved.",
+    "P2/P4 runtime task and visual proof remain blocked; P6 role/site/direct-object runtime remains blocked.",
+    "Tests were not executed because an isolated safe test database was not proven.",
+    "No audit-wide completion claim follows from row generation or structural validation."
+  ]
+}

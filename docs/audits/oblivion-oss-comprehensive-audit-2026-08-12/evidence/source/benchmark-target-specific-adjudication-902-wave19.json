@@ -1,0 +1,153 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave19",
+  "generated_at": "2026-08-21T15:25:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Nineteenth bounded target-specific wave: eight current completion-unproved eMAR targets; two direct medication benchmark recommendations and six conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "884b429ad41c36807fd53462f4bd5f1be6d38f1898e0271f44bcb5b7faa80c89",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci; generic fields or adjacent medication primitives remain unproved.",
+    "reuse_rule": "Shared repositories and previously cited medication-administration source do not grant family credit. Each accepted target is bounded to its own administration-record or prescription-lifecycle job."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "6565e56fa55437dc7b2e19f8a8a63c310b169dcc81eb967b732f1ea614de7160"
+    }
+  },
+  "repository_snapshots": {
+    "BAHMNI_MEDICATION_ADMINISTRATION": {
+      "repo": "Bahmni/openmrs-module-medicationadministration",
+      "official_repository_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+      "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE:L1-L25",
+      "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java",
+          "lines": "L18-L59",
+          "sha256": "4719cfe49350b095b4d3dfe52f4be4fe989121b0d98a486cb9a0cad1048c2d33"
+        },
+        {
+          "path": "api/src/main/java/org/openmrs/module/fhir2/apiext/dao/impl/FhirMedicationAdministrationDaoImpl.java",
+          "lines": "L43-L60",
+          "sha256": "9dd7a6e5c533d6a85b47d3ac7f7c44b5b3b1fb19870d535fa6d01cc7ac4571f6"
+        }
+      ]
+    },
+    "OPENEMR": {
+      "repo": "openemr/openemr",
+      "official_repository_url": "https://github.com/openemr/openemr",
+      "commit_sha": "312b5d042f7fa49cc78ebed041155fba339a991c",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "controllers/C_Prescription.class.php",
+          "lines": "L307-L328",
+          "sha256": "90d305ab0cacac2b7400e7f0dfb27219d4b50f1a11ff2bc621639b9b5684285f"
+        },
+        {
+          "path": "library/classes/Prescription.class.php",
+          "lines": "L258-L295,L314-L386",
+          "sha256": "eca25e5b745918b01603860f21aae1aee851912be236483b0b3ad3344d18717e"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "verified_benchmark_direct_recommended": 2,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 6,
+    "completion_credit_recommended": 2
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-MED-CLIENT-DOSE-ADMINISTRATION",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Write an authorized patient/order-bound dose administration with performer, status, time, dose, route, site and notes.",
+      "research_candidate": "Bahmni/openmrs-module-medicationadministration administration model and DAO at pinned loci",
+      "evidence_loci": "Bahmni/openmrs-module-medicationadministration@acb65f75d3515b4f2b36083345bfbafc2ee146b0 :: MedicationAdministration.java :: L18-L59; FhirMedicationAdministrationDaoImpl.java :: L43-L60",
+      "reason": "The authorized administration-record write is directly scoped to patient, drug order, performer, status/reason, time, dose, route, site and notes. The claim is limited to the neutral dose-administration job."
+    },
+    {
+      "working_key": "CAP-MED-MEDICATION-ORDER-LIFECYCLE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist medication-order creation and update state while carrying its linked medication-list active/inactive lifecycle.",
+      "research_candidate": "openemr/openemr prescription persistence at pinned loci",
+      "evidence_loci": "openemr/openemr@312b5d042f7fa49cc78ebed041155fba339a991c :: controllers/C_Prescription.class.php :: L307-L328; library/classes/Prescription.class.php :: L258-L295,L314-L386",
+      "reason": "OpenEMR persists prescription create/update timing and updates the linked medication-list active/inactive state. This directly benchmarks the bounded medication-order lifecycle job."
+    },
+    {
+      "working_key": "CAP-MED-ADMINISTRATION-CORRECTION-REQUEST",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Create an immutable, attributable medication-administration correction request linked to the original record and reason.",
+      "research_candidate": "Bahmni administration create/update source at pinned loci",
+      "reason": "Generic create/update does not establish correction-request provenance, original-record linkage, rationale, dedicated state or governed handoff."
+    },
+    {
+      "working_key": "CAP-MED-ADMINISTRATION-CORRECTION-DECISION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Approve or reject a correction through an independent decision with rationale and terminal provenance.",
+      "research_candidate": "Bahmni administration create/update source at pinned loci",
+      "reason": "The candidate does not establish a distinct approve/reject decision, independent reviewer or decision provenance."
+    },
+    {
+      "working_key": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Verify or reject a medication order through an independently accountable clinical decision lifecycle.",
+      "research_candidate": "openemr/openemr prescription persistence at pinned loci",
+      "reason": "Prescription persistence and active-list transition do not prove a verify/reject lifecycle with reviewer identity and decision provenance."
+    },
+    {
+      "working_key": "CAP-MED-PRN-EFFECTIVENESS-REVIEW",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Link a PRN dose to a subsequent effectiveness observation and accountable review.",
+      "research_candidate": "Bahmni administration model at pinned loci",
+      "reason": "Administration status, reason and notes are not a PRN dose-to-effectiveness observation and review workflow."
+    },
+    {
+      "working_key": "CAP-MED-ROUND-OPERATIONS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Generate, assign, start and complete a governed medication round with locked items and round-level provenance.",
+      "research_candidate": "Bahmni administration model and DAO at pinned loci",
+      "reason": "No inspected candidate provides round generation, assignment, lifecycle, locked items or round-level operational provenance."
+    },
+    {
+      "working_key": "CAP-MED-ROUND-TEMPLATE-CONFIGURATION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Govern versioned medication-round template creation, update and retirement.",
+      "research_candidate": "Bahmni administration model and DAO at pinned loci",
+      "reason": "No candidate provides a round-template aggregate or governed versioned configuration lifecycle."
+    }
+  ],
+  "count_delta": {
+    "verified_benchmark_direct": 2,
+    "documented_ncm_direct": 0,
+    "eligible_total": 2,
+    "completion_unproved": -2
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 344,
+    "documented_ncm": 89,
+    "eligible": 433,
+    "completion_unproved": 469
+  }
+}

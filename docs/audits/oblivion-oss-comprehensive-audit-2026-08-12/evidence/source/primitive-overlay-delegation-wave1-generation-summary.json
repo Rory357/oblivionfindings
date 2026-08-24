@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "primitive-overlay-delegation-wave1-generation-summary",
+  "generated_at": "2026-08-21T23:50:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "outputs": {
+    "adjudication": {
+      "path": "evidence/source/primitive-overlay-delegation-adjudication-904-wave1.json",
+      "sha256": "55e7bec8d214dd909983d8f199edf87c762c1ea03dc9e59b5c99bded0b019c35",
+      "bytes": 27423
+    },
+    "overlay_classifier": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "563fc8ba4177f427c46dc085c8395878a20b43363cfa390cb2036382bdd87c13",
+      "bytes": 1143200
+    }
+  },
+  "counts": {
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 242,
+    "primitive_unresolved": 235,
+    "custom_denominator": 659,
+    "custom_exact_trigger_resolved": 223,
+    "custom_unresolved_or_blocked": 270
+  },
+  "credit_boundary": {
+    "static_classifier_delta": 34,
+    "runtime_credit_delta": 0,
+    "browser_credit_delta": 0,
+    "completion_credit_delta": 0
+  }
+}

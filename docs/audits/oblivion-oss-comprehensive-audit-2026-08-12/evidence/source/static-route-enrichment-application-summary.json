@@ -1,0 +1,277 @@
+{
+  "schema_version": "1.0",
+  "artifact": "static-route-enrichment-application-summary",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "historical_894_enrichment_stage_superseded_by_902_static_disposition_register",
+  "audit_boundary": "Audit artifacts only; no application code, configuration, data, tests, browser state, deployment or Git history changed.",
+  "inputs": {
+    "manifest_input_sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+    "inventory_sha256": "e4ec65d0ee7e1745bb513da220f4efc0d480cbc76e846a7b7b6117a79eed4570",
+    "source_adjudication_sha256": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715",
+    "enrichment_artifacts": [
+      {
+        "file": "hr-operations-static-route-enrichment.json",
+        "sha256": "7423b3bacec8c70b227681d8c6b56f8b21fc9617a3c7c7bb93bbb8dd83b9c71d",
+        "target_patches": 225,
+        "status": "validated_static_source_lineage_runtime_unverified"
+      },
+      {
+        "file": "finance-sites-static-route-enrichment.json",
+        "sha256": "9a7af9222a05626f8c203e4d4113d0930860e12f9488d467f87f25bb986fd5a0",
+        "target_patches": 255,
+        "status": "static_target_lineage_enriched_with_explicit_unresolved_targets_runtime_unverified"
+      },
+      {
+        "file": "full-static-route-enrichment.json",
+        "sha256": "9a87f07dad56bd1e61aa1897a62f4d477496558c531b6e2b01eeb738016b5175",
+        "target_patches": 107,
+        "status": "complete_static_enrichment_runtime_unverified"
+      }
+    ]
+  },
+  "application": {
+    "patched_targets": 587,
+    "patches_by_artifact": {
+      "hr-operations-static-route-enrichment.json": 225,
+      "finance-sites-static-route-enrichment.json": 255,
+      "full-static-route-enrichment.json": 107
+    },
+    "before": {
+      "targets_with_routes": 326,
+      "route_relations": 874,
+      "unique_routes": 874,
+      "targets_with_pages": 285,
+      "page_relations": 516,
+      "unique_pages": 278,
+      "targets_with_backend_anchors": 137
+    },
+    "after": {
+      "targets_with_routes": 889,
+      "route_relations": 2869,
+      "unique_routes": 2827,
+      "targets_with_pages": 734,
+      "page_relations": 1446,
+      "unique_pages": 899,
+      "targets_with_backend_anchors": 716
+    },
+    "unresolved_targets": [
+      {
+        "working_key": "CAP-FLEET-CHECKLIST-RUN-EXECUTION",
+        "reason": "FLEET-CHECKLIST has a retained four-route envelope, but no independently retained exact target split allocates execution routes/pages without re-adjudicating the sibling template-definition target.",
+        "status": "target_exclusive_route_page_allocation_unproved",
+        "artifact": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "working_key": "CAP-FLEET-CHECKLIST-TEMPLATE-DEFINITION",
+        "reason": "FLEET-CHECKLIST has a retained four-route envelope, but no independently retained exact target split allocates template-definition routes/pages without re-adjudicating the sibling run-execution target.",
+        "status": "target_exclusive_route_page_allocation_unproved",
+        "artifact": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "working_key": "CAP-FLEET-DEVICE-REGISTRY-PAIRING",
+        "reason": "FLEET-DEVICE has a retained seven-route envelope, but no independently retained exact target split allocates registry/pairing routes/pages without re-adjudicating the sibling consent target.",
+        "status": "target_exclusive_route_page_allocation_unproved",
+        "artifact": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "working_key": "CAP-FLEET-DEVICE-TRACKING-CONSENT",
+        "reason": "FLEET-DEVICE has a retained seven-route envelope, but no independently retained exact target split allocates consent routes/pages without re-adjudicating the sibling registry/pairing target.",
+        "status": "target_exclusive_route_page_allocation_unproved",
+        "artifact": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "working_key": "CAP-SITE-MEAL-SERVICE-COMPLETION",
+        "reason": "The accepted target retains SITE-DASHBOARD source lineage, but the semantic serve/unserve routes ROUTE-2836 and ROUTE-2837 belong to SITE-SITE-MEAL-PLAN. Assigning them here would cross the accepted source-family boundary, so target-exclusive route/page/backend evidence remains empty.",
+        "status": "source_lineage_conflict_target_exclusive_mapping_unproved",
+        "artifact": "finance-sites-static-route-enrichment.json"
+      }
+    ],
+    "declared_shared_routes": [
+      {
+        "route_id": "ROUTE-0082",
+        "working_keys": [
+          "CAP-SITE-SITE-CALENDAR-EVENT-PLANNING",
+          "CAP-SITE-SITE-CALENDAR-FEEDS",
+          "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW"
+        ],
+        "reason": "The global calendar host, exception action and global-events data route support overlapping planning/feed/overview propositions. The relation is deliberately non-exclusive and runtime-unverified.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-0083",
+        "working_keys": [
+          "CAP-SITE-SITE-CALENDAR-EVENT-PLANNING",
+          "CAP-SITE-SITE-CALENDAR-FEEDS",
+          "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW"
+        ],
+        "reason": "The global calendar host, exception action and global-events data route support overlapping planning/feed/overview propositions. The relation is deliberately non-exclusive and runtime-unverified.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-0086",
+        "working_keys": [
+          "CAP-SITE-SITE-CALENDAR-EVENT-PLANNING",
+          "CAP-SITE-SITE-CALENDAR-FEEDS",
+          "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW"
+        ],
+        "reason": "The global calendar host, exception action and global-events data route support overlapping planning/feed/overview propositions. The relation is deliberately non-exclusive and runtime-unverified.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2348",
+        "working_keys": [
+          "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+          "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+          "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+        ],
+        "reason": "The exact {report} parameter dispatches three accepted report propositions through the same show/export controller routes and render root; this is shared static transport evidence, not duplicate exclusive ownership.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2349",
+        "working_keys": [
+          "CAP-REP-COMBINED-REPORT-CARE-QUALITY",
+          "CAP-REP-COMBINED-REPORT-COMPLIANCE-RISK",
+          "CAP-REP-COMBINED-REPORT-WORKFORCE-OPERATIONS"
+        ],
+        "reason": "The exact {report} parameter dispatches three accepted report propositions through the same show/export controller routes and render root; this is shared static transport evidence, not duplicate exclusive ownership.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2355",
+        "working_keys": [
+          "CAP-REP-MODULE-REPORT-ASSETS",
+          "CAP-REP-MODULE-REPORT-AUDIT-LOGS",
+          "CAP-REP-MODULE-REPORT-CLIENTS",
+          "CAP-REP-MODULE-REPORT-CONTROLLED-DRUG-DISCREPANCIES",
+          "CAP-REP-MODULE-REPORT-FLEET-TRIPS",
+          "CAP-REP-MODULE-REPORT-INCIDENTS",
+          "CAP-REP-MODULE-REPORT-MEDICATION-ADMINISTRATIONS",
+          "CAP-REP-MODULE-REPORT-RESPITE-BOOKINGS",
+          "CAP-REP-MODULE-REPORT-RESPITE-REQUESTS",
+          "CAP-REP-MODULE-REPORT-SAFEGUARDING",
+          "CAP-REP-MODULE-REPORT-SHIFTS",
+          "CAP-REP-MODULE-REPORT-SITES",
+          "CAP-REP-MODULE-REPORT-STAFF",
+          "CAP-REP-MODULE-REPORT-TIMESHEETS"
+        ],
+        "reason": "The exact {module} parameter dispatches fourteen accepted module-report propositions through the same show/export routes and render root; ReportCatalog supplies the proposition key.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2356",
+        "working_keys": [
+          "CAP-REP-MODULE-REPORT-ASSETS",
+          "CAP-REP-MODULE-REPORT-AUDIT-LOGS",
+          "CAP-REP-MODULE-REPORT-CLIENTS",
+          "CAP-REP-MODULE-REPORT-CONTROLLED-DRUG-DISCREPANCIES",
+          "CAP-REP-MODULE-REPORT-FLEET-TRIPS",
+          "CAP-REP-MODULE-REPORT-INCIDENTS",
+          "CAP-REP-MODULE-REPORT-MEDICATION-ADMINISTRATIONS",
+          "CAP-REP-MODULE-REPORT-RESPITE-BOOKINGS",
+          "CAP-REP-MODULE-REPORT-RESPITE-REQUESTS",
+          "CAP-REP-MODULE-REPORT-SAFEGUARDING",
+          "CAP-REP-MODULE-REPORT-SHIFTS",
+          "CAP-REP-MODULE-REPORT-SITES",
+          "CAP-REP-MODULE-REPORT-STAFF",
+          "CAP-REP-MODULE-REPORT-TIMESHEETS"
+        ],
+        "reason": "The exact {module} parameter dispatches fourteen accepted module-report propositions through the same show/export routes and render root; ReportCatalog supplies the proposition key.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2568",
+        "working_keys": [
+          "CAP-SEC-QUECLINK-HUB-DEVICE-CUSTODY",
+          "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE"
+        ],
+        "reason": "The hub index plus claim/reject actions are the shared static boundary between pending intake and device custody. Their reuse does not prove either workflow at runtime.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2572",
+        "working_keys": [
+          "CAP-SEC-QUECLINK-HUB-DEVICE-CUSTODY",
+          "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE"
+        ],
+        "reason": "The hub index plus claim/reject actions are the shared static boundary between pending intake and device custody. Their reuse does not prove either workflow at runtime.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2581",
+        "working_keys": [
+          "CAP-SEC-QUECLINK-HUB-DEVICE-CUSTODY",
+          "CAP-SEC-QUECLINK-HUB-PENDING-INTAKE"
+        ],
+        "reason": "The hub index plus claim/reject actions are the shared static boundary between pending intake and device custody. Their reuse does not prove either workflow at runtime.",
+        "source": "finance-sites-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2615",
+        "working_keys": [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        "reason": "One update request atomically carries role assignments and per-user permission overrides.",
+        "source": "full-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2616",
+        "working_keys": [
+          "CAP-SET-PERMISSION-OVERRIDES",
+          "CAP-SET-ROLE-ASSIGNMENTS",
+          "CAP-SET-USER-ACCOUNT-LIFECYCLE"
+        ],
+        "reason": "User approval atomically establishes account state, role assignments and optional permission overrides.",
+        "source": "full-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2617",
+        "working_keys": [
+          "CAP-SET-API-CREDENTIAL-LIFECYCLE",
+          "CAP-SET-OUTBOUND-WEBHOOK-CONFIG"
+        ],
+        "reason": "One combined API-settings GET render owns both API-key and outbound-webhook configuration.",
+        "source": "full-static-route-enrichment.json"
+      },
+      {
+        "route_id": "ROUTE-2628",
+        "working_keys": [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        "reason": "The Settings AccessController board-member actions establish/remove the board appointment and its access-role assignment atomically; this is shared static evidence, not exclusive route ownership.",
+        "source": "apply-static-route-enrichments.py"
+      },
+      {
+        "route_id": "ROUTE-2629",
+        "working_keys": [
+          "CAP-GOV-BOARD-MEMBER-APPOINTMENT",
+          "CAP-SET-ROLE-ASSIGNMENTS"
+        ],
+        "reason": "The Settings AccessController board-member actions establish/remove the board appointment and its access-role assignment atomically; this is shared static evidence, not exclusive route ownership.",
+        "source": "apply-static-route-enrichments.py"
+      }
+    ]
+  },
+  "output": {
+    "manifest": "working-capability-manifest-894.json",
+    "manifest_sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51"
+  },
+  "validation": {
+    "canonical_target_count_preserved": true,
+    "canonical_working_key_set_preserved": true,
+    "all_route_ids_exist_in_inventory": true,
+    "all_page_ids_exist_in_inventory": true,
+    "existing_allocations_only_retained_or_expanded": true,
+    "all_shared_route_relations_explicitly_declared": true,
+    "source_family_lineage_only_retained_or_expanded_from_known_inventory_families": true,
+    "runtime_or_completion_claimed": false
+  },
+  "superseded_by": [
+    "working-capability-manifest-902.json",
+    "route-page-gap-reconciliation-902.json",
+    "canonical-inventory-register-generation-summary.json"
+  ],
+  "derivation_stage_boundary": "Frozen 894-stage enrichment evidence; do not read its after-counts as current authority."
+}

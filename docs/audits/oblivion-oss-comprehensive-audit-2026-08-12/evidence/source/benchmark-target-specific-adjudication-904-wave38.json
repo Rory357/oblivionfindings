@@ -1,0 +1,271 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-904-wave38",
+  "generated_at": "2026-08-21T23:55:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Eight current Governance/Compliance completion-unproved targets independently reviewed; six bounded direct decisions and two retained-unproved decisions.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "Comparator evidence changes benchmark P3 mapping completion_credit only; Oblivion product, runtime, browser, representative-task, release and overall-audit completion deltas remain zero.",
+    "no_copy_rule": "Behavioural evidence only; no source, schema, UI or wording is copied.",
+    "selection_preimage_rule": "Packet-order IDs joined by LF with no terminal LF, UTF-8 without BOM.",
+    "selection_sha256": "e0426d3d835de5cbf9076f641136e94eaf30ea13bf9b5ad1ed50585934a00b48",
+    "independent_review_verdict": "GO_6_direct_2_retained_after_scope_and_collision_corrections"
+  },
+  "selected_target_ids": [
+    "CAP-COMP-OBLIGATION-EVIDENCE",
+    "CAP-COMP-OBLIGATION-LIFECYCLE",
+    "CAP-GOV-RISK-ACCEPTANCE-CLOSURE",
+    "CAP-GOV-RISK-COMMITTEE-OVERSIGHT",
+    "CAP-GOV-RISK-HEATMAP",
+    "CAP-GOV-RISK-TREATMENT-DOWNLOAD",
+    "CAP-GOV-RISK-TREATMENTS-EVIDENCE",
+    "CAP-GOV-RISK-TRENDS"
+  ],
+  "input_pins": {
+    "benchmark_final_904_before_wave": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "4696a2521654be97a9d0d8528b4bb35080a68376ec096819e43c6008ea51ddbc",
+      "bytes": 664990
+    },
+    "canonical_pointer_before_wave": {
+      "path": "evidence/source/canonical-audit-inputs.json",
+      "sha256": "f588e4bfc0537b192a2043a58c913f35b1bf4b7e3f423b5febab5dbf70cbf69f",
+      "bytes": 15189
+    }
+  },
+  "repository_snapshots": {
+    "CISO_ASSISTANT": {
+      "repo": "intuitem/ciso-assistant-community",
+      "url": "https://github.com/intuitem/ciso-assistant-community",
+      "commit": "82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c",
+      "tree": "b7afb2c9bfb2014a1e2b191aa7092ad4ee2f78af",
+      "parent": "c99132248ae24e77209b0054c455ad0126bcf02a",
+      "commit_date": "2026-08-21T09:26:19Z",
+      "default_branch": "main",
+      "repository_root_licence": "GNU AGPL v3",
+      "edition_boundary": "Official self-hosted community code outside enterprise/** only; enterprise/PRO, hosted services and out-of-tree behavior excluded."
+    }
+  },
+  "verified_files": [
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "LICENSE.md",
+      "blob": "c12c788b3b96e8e97004cda9a130d5c70114336c",
+      "bytes": 817,
+      "sha256": "5d880897167f748de8e9750feebd8331c04b06daba8f829ace3cbfc13866d13a",
+      "loci": "L1-L9"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "LICENSE-AGPL.txt",
+      "blob": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+      "bytes": 34523,
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "loci": "L1-L12"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "enterprise/LICENSE.md",
+      "blob": "a536385426bcf5126a73e7db9c643ea992e36203",
+      "bytes": 2141,
+      "sha256": "4344d7762701977262a0be691551c216c39deab97f04d1d2e6204d5391814e58",
+      "loci": "L1-L16; excluded enterprise boundary"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "backend/core/base_models.py",
+      "blob": "8daec5203ca2d3f457bed2dc62bdab6d940f99e6",
+      "bytes": 9389,
+      "sha256": "5641035b8e7edfdedd39bcec4c5c7e46b3409625e3e31c81162fce3aea2aeaa3",
+      "loci": "L181-L190"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "backend/core/models.py",
+      "blob": "ac813cacd4ccc9d41f369b09df2fb8bd017792ae",
+      "bytes": 412264,
+      "sha256": "3aaa52bef1882e17d5cef904a8630dfbe66565b99740feea325744bdaea4d36d",
+      "loci": "L5067-L5205,L5589-L5715,L6292-L6316,L6322-L6372,L6385-L6446,L6852-L7032,L7322-L7400,L7540-L7581,L8778-L8882,L9911-L10016,L10324-L10420"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "backend/core/serializers.py",
+      "blob": "a0070142e83291d488b1242dede6605072e002e2",
+      "bytes": 221147,
+      "sha256": "812068d623e17eb47cae1a25415b3ee9ffa2c6e45b1870f45f381949d68d135d",
+      "loci": "L130-L275,L467-L505,L1459-L1624,L2568-L2728,L3313-L3485"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "backend/core/views.py",
+      "blob": "168b6b0caa4748950a8d73d5d5f55aab726d7150",
+      "bytes": 713378,
+      "sha256": "4ec77ab6af39ebfa03b958d0f7f90b4001559dae5e5c401923a45d0a2cf78f7f",
+      "loci": "L953-L1009,L4818-L4868,L7122-L7275,L9631-L9712,L10043-L10115,L10682-L10724,L14261-L14326"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "backend/metrology/models.py",
+      "blob": "e433e171bb2b0f3d2d894dbc7bf84b492e86c9eb",
+      "bytes": 44031,
+      "sha256": "35669d51d5229723abffb4a550920bdcd59f415829821da886b6b0771fe07121",
+      "loci": "L493-L546"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "frontend/src/routes/(app)/(internal)/risk-assessments/[id=uuid]/+page.svelte",
+      "blob": "804e3bc3cdb927bc0a1849ae22a1e54999cf348b",
+      "bytes": 17276,
+      "sha256": "a57085c56bb44e6725700647aced6b59167cde1a3db61b3c7efb5664f7d44276",
+      "loci": "L185-L213,L487-L527"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "frontend/src/routes/(app)/(internal)/risk-assessments/[id=uuid]/analytics/+page.server.ts",
+      "blob": "698f2fd4065218dabb96a5fa7ed14477bd436841",
+      "bytes": 1031,
+      "sha256": "8b70bfdb324105202a51d7980e8e4f2213c7aecb0c84c3f2de774bf202cecada",
+      "loci": "L4-L34"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "frontend/src/routes/(app)/(internal)/risk-assessments/[id=uuid]/analytics/+page.svelte",
+      "blob": "0ffb1277200dbdb3a546e5c9c7b2f85344114ca2",
+      "bytes": 8657,
+      "sha256": "851f15cae100f360f5a9d61e3d5bde989137fc3313197813ee95895b4e03baba",
+      "loci": "L27-L101,L122-L156"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "frontend/src/lib/components/RiskMatrix/RiskMatrix.svelte",
+      "blob": "bf65d8cec6e4dbd4c30fd897098e4cce6b3331ac",
+      "bytes": 7334,
+      "sha256": "8c88e5df0b24b15b2296c53468cd308fd50918c891b492497ebbacdd9668a559",
+      "loci": "L41-L85,L133-L232"
+    },
+    {
+      "repo": "intuitem/ciso-assistant-community",
+      "path": "product-docs/introduction/vocabulary.md",
+      "blob": "f512f0bd245e9d666e3ff794a6e3f3142f97b437",
+      "bytes": 18912,
+      "sha256": "a8be8cb662e58617818bded10d35941a289bdd797dc2911b8870ca0c814efb76",
+      "loci": "L169"
+    }
+  ],
+  "counts": {
+    "evaluated": 8,
+    "direct": 6,
+    "retained_unproved": 2,
+    "documented_ncm": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-COMP-OBLIGATION-EVIDENCE",
+      "status": "direct",
+      "candidate": "CISO Assistant versioned evidence",
+      "requirement": "Manage authorised, requirement-linked obligation evidence with versioned file/link material, integrity metadata and guarded retrieval.",
+      "behavior": "Evidence and EvidenceRevision preserve status, expiry, attachment hashes and versions, link to RequirementAssessment, and expose scoped revision/download APIs.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/models.py L5067-L5205,L8778-L8878; serializers.py L2568-L2728; views.py L9631-L9712,L10043-L10115,L14261-L14323",
+      "reason": "Analogous requirement-linked evidence lifecycle only; no exact Oblivion obligation upload, Site, direct-object, UI or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-COMP-OBLIGATION-LIFECYCLE",
+      "status": "direct",
+      "candidate": "CISO Assistant compliance assessment lifecycle",
+      "requirement": "Operate an authorised compliance-requirement assessment lifecycle with state, result, observations, reviewer, dates and guarded writes.",
+      "behavior": "ComplianceAssessment and RequirementAssessment implement planned/todo/in-progress/in-review/done state, due date, version and reviewer fields under writable serializer/view boundaries.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/base_models.py L181-L190; models.py L6322-L6372,L7322-L7400,L7540-L7581,L8778-L8882; serializers.py L130-L275,L3313-L3485; views.py L10682-L10724,L14261-L14326",
+      "reason": "Framework-requirement assessment analogue, not a one-to-one free-form Oblivion regulatory-obligation model or runtime claim.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-RISK-ACCEPTANCE-CLOSURE",
+      "status": "retain",
+      "candidate": "CISO Assistant risk acceptance",
+      "reason": "Approver-only accept/reject/revoke with justification, timestamps and expiry does not prove the indivisible target's distinct terminal risk-close state and closure rationale.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-GOV-RISK-COMMITTEE-OVERSIGHT",
+      "status": "retain",
+      "candidate": "CISO Assistant validation flow",
+      "reason": "Generic assessment/evidence approval and vocabulary analogy do not provide committee identity, membership/quorum, committee-scoped portfolio, decisions, actions or review evidence.",
+      "candidate_status": "retain_unproved",
+      "completion_credit_recommended": false
+    },
+    {
+      "working_key": "CAP-GOV-RISK-HEATMAP",
+      "status": "direct",
+      "candidate": "CISO Assistant risk matrix",
+      "requirement": "Render an authorised inherent/current/residual probability-impact matrix with configured levels and per-cell scenario aggregation.",
+      "behavior": "RiskScenario levels and the risk-assessment page construct inherent/current/residual clusters rendered by a configured RiskMatrix with count bubbles.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/models.py L6852-L7032; risk-assessments/[id=uuid]/+page.svelte L185-L213,L487-L527; RiskMatrix.svelte L41-L85,L133-L232",
+      "reason": "No Oblivion Site, committee, exact scale, accessibility, browser or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-RISK-TREATMENT-DOWNLOAD",
+      "status": "direct",
+      "candidate": "CISO Assistant treatment-control evidence download",
+      "requirement": "Download authorised evidence linked through a risk treatment/control with visibility guard and stable version response.",
+      "behavior": "RiskScenario links AppliedControl, AppliedControl links Evidence, the action-plan serializer exposes evidence, and an authorised endpoint downloads its latest EvidenceRevision.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/models.py L5138-L5168,L5589-L5715,L6928-L6933; serializers.py L1598-L1624,L2568-L2682; views.py L9631-L9712,L10043-L10075",
+      "reason": "Analogous control-evidence chain, not a native TreatmentAttachment entity or Oblivion Site/runtime contract.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-RISK-TREATMENTS-EVIDENCE",
+      "status": "direct",
+      "candidate": "CISO Assistant risk action-plan evidence",
+      "requirement": "Manage authorised risk-treatment/control state, owner and dates with linked versioned evidence.",
+      "behavior": "Scenario treatment state, linked AppliedControls, versioned Evidences and action-plan/RBAC list paths establish bounded treatment-control evidence handling.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/models.py L5067-L5205,L5589-L5715,L6852-L7032; serializers.py L1459-L1624,L2568-L2728; views.py L9631-L9712,L10043-L10115",
+      "reason": "No Oblivion treatment schema, exact routes, Site/direct-object, replay, UI or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    },
+    {
+      "working_key": "CAP-GOV-RISK-TRENDS",
+      "status": "direct",
+      "candidate": "CISO Assistant risk analytics timeline",
+      "requirement": "Review authorised dated risk snapshots and treatment distributions as an over-time risk trend.",
+      "behavior": "RiskAssessment snapshots per-treatment counts and historical metrics; scoped views and analytics pages expose distributions and timelines.",
+      "loci": "intuitem/ciso-assistant-community@82e8a7ed66fbfbd2d8ddc93e9fcfac702a1f8a8c :: backend/core/models.py L6292-L6316,L6385-L6446; backend/metrology/models.py L493-L546; views.py L4818-L4868; analytics/+page.server.ts L4-L34; analytics/+page.svelte L27-L101,L122-L156",
+      "reason": "No Oblivion period, Site, committee, exact chart, browser or runtime parity.",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true
+    }
+  ],
+  "collision_disclosure": {
+    "prior_materialized_packets": 33,
+    "prior_evaluation_occurrences": 346,
+    "prior_unique_evaluated_ids": 340,
+    "prior_unique_id_set_sha256": "7800b8bed0ad3e126485bc223ba5fc67c50ac800b28bc9710331758ddf239eec",
+    "selected_target_intersection": 0,
+    "raw_path_collision": "backend/core/views.py previously appeared at CISO commit 1ba187... lines 500-625 for a privacy compliance-report export target; Wave38 uses commit 82e8... and disjoint target-specific loci beginning at line 953.",
+    "exact_repo_commit_path_locus_collision": 0,
+    "source_reuse": "Repository and one raw path are disclosed; no family, repository, path or adjacent-locus credit is inherited."
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 6,
+    "eligible_total": 6,
+    "completion_unproved": -6,
+    "documented_ncm": 0,
+    "product_runtime_representative_task_overall_completion": 0
+  },
+  "post_wave_totals": {
+    "verified_benchmark_direct": 373,
+    "verified_benchmark_total": 395,
+    "documented_ncm": 89,
+    "eligible_total": 484,
+    "completion_unproved": 420
+  }
+}

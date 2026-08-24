@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "observed_at": "2026-08-12T16:35:25.4463776+12:00",
+  "target": "https://oblivionfindings.com/",
+  "request_scope": "Unauthenticated, read-only GET of the public HTML shell; no credentials or application mutation.",
+  "http_status": 200,
+  "server_header": "nginx/1.28.3 (Ubuntu)",
+  "deployed_asset_references": {
+    "inertia_asset_version": "84e8ccc59d2676356b165b4327abb9bc",
+    "application_javascript": {
+      "url": "https://oblivionfindings.com/build/assets/app-DpCHbvaC.js",
+      "content_length": 122885,
+      "sha256": "c604cdefe2c222b5b175c1d2108a4dc325d7a5f8de1aefcd8cb563b268e2264a",
+      "last_modified": "Tue, 11 Aug 2026 21:49:51 GMT",
+      "etag": "6a7b98ff-1e005"
+    },
+    "application_css": {
+      "url": "https://oblivionfindings.com/build/assets/app-B1fPkNR-.css",
+      "content_length": 413188,
+      "sha256": "303dc70901eb0e14b6eee7671111547a04a1c247db739fdda2d70a1a6743c36b",
+      "last_modified": "Tue, 11 Aug 2026 21:49:51 GMT",
+      "etag": "6a7b98ff-64e04"
+    },
+    "vendor_react": "https://oblivionfindings.com/build/assets/vendor-react-O83cS0sC.js",
+    "vendor_inertia": "https://oblivionfindings.com/build/assets/vendor-inertia-xLKS3E79.js",
+    "vendor_ui": "https://oblivionfindings.com/build/assets/vendor-ui-DA_PTN4E.js",
+    "vendor_calendar": "https://oblivionfindings.com/build/assets/vendor-calendar-DoMeiBRp.js"
+  },
+  "audited_checkout": {
+    "commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "cached_manifest_path": "public/build/manifest.json",
+    "cached_manifest_last_write_local": "2026-07-11T21:47:28+12:00",
+    "cached_manifest_sha256": "3341666d30499a8d4449382641c27a96d36046d1901b709901bed2a2393ef1e2",
+    "cached_manifest_md5": "863a5626bc872afbd29455d3f98b1b29",
+    "cached_application_javascript": "assets/app-Dkf5auCE.js",
+    "cached_application_css": "assets/app-Bi8NMgrD.css"
+  },
+  "comparison": "The deployed application and CSS fingerprints differ from the checkout's cached manifest fingerprints.",
+  "conclusion": "Deployed-build provenance remains blocked. The differing fingerprints prove only that the public target is not serving the checkout's retained cached bundle; they do not identify a deployed Git commit or prove drift from a fresh build of the audited source.",
+  "minimum_input": "Expose a non-sensitive build/release identifier in the test environment or provide the deployed Git SHA through an owner-controlled channel."
+}

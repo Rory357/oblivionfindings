@@ -1,0 +1,371 @@
+{
+  "schema_version": "1.0",
+  "artifact": "final-capability-denominator-reconciliation",
+  "audited_repository": "https://github.com/Rory357/oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Static, read-only repository adjudication. No runtime capability completion is claimed.",
+  "status": "historical_superseded_894_denominator_derivation_evidence_only",
+  "correction": {
+    "earlier_894_claim": {
+      "total": 894,
+      "H": 784,
+      "D": 108,
+      "M": 2,
+      "status": "superseded_and_derivation_disproved"
+    },
+    "intermediate_working_denominator": {
+      "total": 895,
+      "H": 785,
+      "D": 108,
+      "M": 2,
+      "status": "superseded_after_rag_identity_reconciliation"
+    },
+    "current_working_denominator": {
+      "total": 894,
+      "H": 784,
+      "D": 108,
+      "M": 2
+    },
+    "reason": "The earlier 894 derivation incorrectly collapsed RespiteReferral into the distinct RespiteBookingRequest lifecycle. Corrected independent reconciliation retains both and re-establishes 894 by merging the Client and Platform RAG implementation families as one Client aggregate capability.",
+    "proof_artifacts": [
+      "manifest-denominator-contradiction.json",
+      "rag-capability-identity-adjudication.json"
+    ],
+    "canonical_id_boundary": "All 894 stable IDs are materialized in the working manifest and canonical inventory/02/03 ledgers; all 784 human IDs have structural scorecard/task-script rows. Route/page enrichment, benchmark coverage, visual links and finding links remain partial, and runtime completion is unexecuted."
+  },
+  "working_manifest": {
+    "path": "working-capability-manifest-894.json",
+    "sha256": "ad62d982e8e2fa2917ecf0f5106559403a28f8acb9946f6e906c2b280c679c51",
+    "rows": 894,
+    "unique_stable_ids": 894,
+    "stable_id_provenance": {
+      "exact_current": 881,
+      "source_stable": 2,
+      "audit_assigned": 11
+    },
+    "route_enrichment": {
+      "targets": 889,
+      "relations": 2869,
+      "unique_routes": 2827,
+      "inventory_routes": 3024,
+      "percent": 93.49,
+      "explicit_unresolved_targets": 5
+    },
+    "page_enrichment": {
+      "targets": 734,
+      "relations": 1446,
+      "unique_pages": 899,
+      "inventory_pages": 962,
+      "percent": 93.45
+    },
+    "backend_enrichment": {
+      "targets": 716
+    },
+    "status": "working_static_manifest_semantically_reconciled_not_completion_claim"
+  },
+  "benchmark_mapping": {
+    "eligible": 266,
+    "verified_benchmark": 191,
+    "verified_direct": 168,
+    "verified_rename": 23,
+    "documented_no_credible_match": 75,
+    "documented_ncm_direct": 68,
+    "documented_ncm_rename": 7,
+    "completion_unproved": 628
+  },
+  "class_definitions": {
+    "H": "human_ui",
+    "D": "download_or_api",
+    "M": "machine_ingress",
+    "excluded": [
+      "legacy_unreachable",
+      "redirect_only",
+      "dead_or_alias",
+      "generated_or_test_only",
+      "orphan_duplicate"
+    ]
+  },
+  "raw_partition_sums": {
+    "finance_assets_fleet_reporting_security_sites": {
+      "total": 244,
+      "H": 241,
+      "D": 2,
+      "M": 1
+    },
+    "full_auth_control_frontline_incidents_it_platform_portal_public_respite_roadmap_settings_plus_catering": {
+      "total": 152,
+      "H": 143,
+      "D": 8,
+      "M": 1
+    },
+    "clients_clinical_emar_source_unique": {
+      "total": 144,
+      "H": 104,
+      "D": 40,
+      "M": 0
+    },
+    "governance_health_safety_privacy_source": {
+      "total": 149,
+      "H": 109,
+      "D": 40,
+      "M": 0
+    },
+    "hr_operations_owned": {
+      "total": 225,
+      "H": 207,
+      "D": 18,
+      "M": 0
+    },
+    "all_raw": {
+      "total": 914,
+      "H": 804,
+      "D": 108,
+      "M": 2
+    }
+  },
+  "duplicate_subtractions": {
+    "total": 20,
+    "H": 20,
+    "D": 0,
+    "M": 0,
+    "groups": [
+      {
+        "kind": "catering_partition_overlap",
+        "count": 12,
+        "class": "H",
+        "ids": [
+          "CAP-SITE-MEAL-PLANNING",
+          "CAP-SITE-MEAL-SERVICE-COMPLETION",
+          "CAP-SITE-MEAL-BUDGET-CONFIG",
+          "CAP-SITE-MEAL-INVENTORY-ITEM-REGISTER",
+          "CAP-SITE-MEAL-STOCK-CONTROL",
+          "CAP-SITE-SHOPPING-LIST-GENERATE",
+          "CAP-SITE-SHOPPING-PROCUREMENT",
+          "CAP-SITE-MEAL-WEEK-TEMPLATE-DEFINITION",
+          "CAP-SITE-MEAL-WEEK-TEMPLATE-APPLY",
+          "CAP-SITE-PRODUCT-LIFECYCLE",
+          "CAP-SITE-RECIPE-LIFECYCLE",
+          "CAP-SITE-DIETARY-TAG-LIFECYCLE"
+        ]
+      },
+      {
+        "kind": "clients_full_alias",
+        "count": 1,
+        "class": "H",
+        "ids": [
+          "CAP-INC-INCIDENT-REPORT-EVIDENCE"
+        ]
+      },
+      {
+        "kind": "clients_hr_operations_alias",
+        "count": 6,
+        "class": "H",
+        "ids": [
+          "CAP-HR-STAFF-TIMELINE-VIEW",
+          "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+          "CAP-OPS-FAMILY-NOTE-SHIFT-HANDOFF",
+          "CAP-OPS-CLIENT-NOTE",
+          "CAP-OPS-CONVERSATIONS",
+          "CAP-OPS-CONSENT-REQUEST"
+        ]
+      },
+      {
+        "kind": "client_platform_rag_identity_merge",
+        "count": 1,
+        "class": "H",
+        "accepted_id": "CLI-CLIENT-RAG",
+        "source_family_ids": [
+          "CLI-CLIENT-RAG",
+          "PLAT-RAG"
+        ],
+        "reason": "Both implementation families resolve the same Client aggregate through ClientRagIndexer, OpenAiVectorStoreClient, per-client vector store/snapshot state and the same answer/source contract; only actor, entry point and transport vary."
+      }
+    ]
+  },
+  "accepted": {
+    "total": 894,
+    "H": 784,
+    "D": 108,
+    "M": 2
+  },
+  "canonical_module_counts": {
+    "ASSETS": {
+      "H": 8,
+      "D": 0,
+      "M": 0
+    },
+    "FINANCE": {
+      "H": 64,
+      "D": 7,
+      "M": 0
+    },
+    "FLEET": {
+      "H": 48,
+      "D": 0,
+      "M": 0
+    },
+    "REPORTING": {
+      "H": 21,
+      "D": 0,
+      "M": 0
+    },
+    "SECURITY_DEVICES": {
+      "H": 36,
+      "D": 0,
+      "M": 1
+    },
+    "SITES": {
+      "H": 68,
+      "D": 2,
+      "M": 0
+    },
+    "AUTH": {
+      "H": 6,
+      "D": 0,
+      "M": 0
+    },
+    "CONTROL_ROOM": {
+      "H": 34,
+      "D": 3,
+      "M": 0
+    },
+    "FRONTLINE": {
+      "H": 7,
+      "D": 0,
+      "M": 0
+    },
+    "INCIDENTS": {
+      "H": 14,
+      "D": 5,
+      "M": 0
+    },
+    "IT": {
+      "H": 2,
+      "D": 0,
+      "M": 0
+    },
+    "PLATFORM": {
+      "H": 1,
+      "D": 0,
+      "M": 1
+    },
+    "PORTAL": {
+      "H": 4,
+      "D": 0,
+      "M": 0
+    },
+    "PUBLIC": {
+      "H": 4,
+      "D": 0,
+      "M": 0
+    },
+    "RESPITE": {
+      "H": 21,
+      "D": 1,
+      "M": 0
+    },
+    "ROADMAP": {
+      "H": 7,
+      "D": 1,
+      "M": 0
+    },
+    "SETTINGS": {
+      "H": 34,
+      "D": 0,
+      "M": 0
+    },
+    "CLIENTS": {
+      "H": 23,
+      "D": 4,
+      "M": 0
+    },
+    "CLINICAL": {
+      "H": 19,
+      "D": 1,
+      "M": 0
+    },
+    "EMAR": {
+      "H": 48,
+      "D": 24,
+      "M": 0
+    },
+    "GOVERNANCE": {
+      "H": 50,
+      "D": 12,
+      "M": 0
+    },
+    "HEALTH_SAFETY": {
+      "H": 41,
+      "D": 27,
+      "M": 0
+    },
+    "PRIVACY": {
+      "H": 17,
+      "D": 3,
+      "M": 0
+    },
+    "HR": {
+      "H": 135,
+      "D": 16,
+      "M": 0
+    },
+    "OPERATIONS": {
+      "H": 72,
+      "D": 2,
+      "M": 0
+    }
+  },
+  "source_coverage": {
+    "gross": {
+      "families": 607,
+      "routes": 3074,
+      "page_references": 1287
+    },
+    "source_overlap": {
+      "families": 12,
+      "routes": 50,
+      "page_references": 35,
+      "reason": "Catering appears in two source partitions."
+    },
+    "exact_union": {
+      "families": 595,
+      "routes": 3024,
+      "page_references": 1252,
+      "unique_pages": 962,
+      "shared_page_reference_multiplicity": 290
+    },
+    "residual": {
+      "families": 0,
+      "routes": 0,
+      "pages": 0
+    }
+  },
+  "proof_boundary": {
+    "denominator_arithmetic": "complete",
+    "source_family_route_page_union": "complete",
+    "durable_accepted_target_id_manifest": "working_static_manifest_materialized_894_unique_ids",
+    "route_page_assignment_to_final_ids": "partial_889_targets_2869_route_relations_2827_unique_routes_of_3024_734_targets_1446_page_relations_899_unique_pages_of_962_5_explicit_unresolved_route_targets",
+    "benchmark_mapping_to_final_ids": "266_eligible_191_verified_benchmark_75_documented_no_credible_match_628_completion_unproved",
+    "canonical_inventory_02_03_ledgers": "integrated_894_unique_ids",
+    "task_scripts_and_scorecard_for_final_human_ids": "structurally_integrated_784_rows_zero_measured_or_independently_validated_scores",
+    "visual_links_to_final_ids": "partial_6877_of_8753_rows_1876_unresolved_616_ids_assigned_741_ids_with_any_lineage",
+    "material_state_links_to_final_ids": "partial_3276_of_4312_rows_1036_unresolved_547_ids_assigned",
+    "finding_links_to_final_ids": "partial_48_literal_links_to_40_targets_across_35_findings_31_of_63_p0_p1_not_equivalent_to_full_re_adjudication",
+    "runtime_outcomes": "not_executed"
+  },
+  "allocation_correction": "The initial global module allocation inherited the superseded 7H Assets / 67H base Sites split. Fresh Finance/Sites reconstruction proves 8H Assets / 66H base Sites; after inbound cross-partition targets the global split is 8H Assets / 68H Sites. Global accepted totals are unchanged.",
+  "superseded_by": [
+    "capability-denominator-902-adjudication.json",
+    "working-capability-manifest-902.json"
+  ],
+  "current_authority": {
+    "manifest": "working-capability-manifest-902.json",
+    "sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "counts": {
+      "total": 902,
+      "H": 788,
+      "D": 111,
+      "M": 3
+    }
+  }
+}

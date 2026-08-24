@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave22",
+  "generated_at": "2026-08-21T14:15:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-second bounded target-specific wave: eight current completion-unproved Finance and eMAR targets; four direct CiviCRM recommendations and four conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "Ordinal-sorted eight target IDs joined by LF with one terminal LF.",
+    "selection_sha256": "d718f3e323ea599c714b7022b15665fa5f719dda9fcd77d48dc4b94a335c8173",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Generic report, company hierarchy or dispense primitives do not inherit audit-package, Site-API or eMAR-workspace credit.",
+    "reuse_rule": "Every direct source locus is target-specific and collision-free. Reuse within retained rows is explanatory only and no repository- or family-level inference is allowed."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "25625c6b5524bdaed1b4660bc7f5ff991a997e47978037af5d1c449c9ae4afaa"
+    }
+  },
+  "repository_snapshots": {
+    "CIVICRM": {
+      "repo": "civicrm/civicrm-core",
+      "official_repository_url": "https://github.com/civicrm/civicrm-core",
+      "commit_sha": "fb6cb94dc833292afaa74df3156998acca8903bc",
+      "spdx": "AGPL-3.0-only",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "f581f4525818588b8cced39a5028d311d5403fc9bdaf50f5dbd681eca45ecd84",
+      "edition_boundary": "Pinned official community source only; hosted extensions, payment processors, private deployments and unpinned behavior are excluded.",
+      "files": [
+        {"path": "ext/civi_contribute/Civi/Api4/Contribution.php", "lines": "L21-L47", "sha256": "ce728ecc7b052ba69648882dd091b3d79eb71435b03712936ae83cb5b199c99c"},
+        {"path": "api/v3/Contribution.php", "lines": "L21-L105", "sha256": "792b8201fdc3306334d8c94e3d0befb6961c5549fa83585da4bef532499fa0cc"},
+        {"path": "CRM/Contribute/BAO/Contribution.php", "lines": "L97-L283", "sha256": "b1ef7d77c26e581f8b223530947933cc030d42ac9e4316f943dcb9511d502075"},
+        {"path": "CRM/Financial/BAO/FinancialTrxn.php", "lines": "L17-L43", "sha256": "5ea74dccc345e85dc62353797911f018b640a6b8fae7980be4dec5e658afd170"},
+        {"path": "CRM/Report/Form/Contribute/Summary.php", "lines": "L60-L210,L502-L552,L614-L759", "sha256": "3e38625c96afce229810bf1a67b8a98fddb37107c8709db6d06e7c8f813c4877"},
+        {"path": "CRM/Report/Form/Contribute/Detail.php", "lines": "L78-L241,L400-L451,L519-L619,L862-L949", "sha256": "a227f6b47c1a4970b90ed1da1356991810fe23ebc8caf5ee3c3502da8b27c8a5"}
+      ]
+    },
+    "ERPNEXT": {
+      "repo": "frappe/erpnext",
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "275844d49654688b2323bd6b5273f13546a154a6",
+      "spdx": "GPL-3.0-only",
+      "license_locus": "license.txt:L1-L18",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {"path": "erpnext/accounts/report/consolidated_financial_statement/consolidated_financial_statement.py", "lines": "L44-L61,L294-L314,L506-L529,L605-L665", "sha256": "a945cde7b71eb3cd23d23d29291189df3c9ff24e79fb91d93e096ba0dddc1749"}
+      ]
+    },
+    "OPENEMR": {
+      "repo": "openemr/openemr",
+      "official_repository_url": "https://github.com/openemr/openemr",
+      "commit_sha": "312b5d042f7fa49cc78ebed041155fba339a991c",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {"path": "src/Services/FHIR/FhirMedicationDispenseService.php", "lines": "L84-L125,L156-L184", "sha256": "a1d0b0e7186ed89d20701a4ed8ce73c7b0e199edaa8e1552558a894ecc7f2b7c"},
+        {"path": "src/Services/FHIR/MedicationDispense/FhirMedicationDispenseLocalDispensaryService.php", "lines": "L133-L202,L234-L344", "sha256": "15df88dfc103bc9ad217a2c9582468e792719fbc408f1e023a4cd5021aaba920"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 4, "documented_ncm_direct_recommended": 0, "retained_unproved": 4, "completion_credit_recommended": 4},
+  "evaluations": [
+    {
+      "working_key": "CAP-FIN-DONOR-FUND-LIFECYCLE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Create and update an access-controlled donor contribution with fund classification, lifecycle state and linked financial effects.",
+      "research_candidate": "civicrm/civicrm-core contribution API and canonical contribution processing at pinned loci",
+      "evidence_loci": "civicrm/civicrm-core@fb6cb94dc833292afaa74df3156998acca8903bc :: ext/civi_contribute/Civi/Api4/Contribution.php :: L21-L47; api/v3/Contribution.php :: L21-L105; CRM/Contribute/BAO/Contribution.php :: L97-L283",
+      "reason": "Access-controlled contribution create/update requires contact, amount, date and financial type, prevents duplicates, maintains status and receipt/recurrence fields, persists the record and invokes linked financial-entity processing. This is a bounded donor contribution/fund-classification analogue, not a grant-budget, Site-scope, reconciliation, audit-chain or runtime claim."
+    },
+    {
+      "working_key": "CAP-FIN-DONOR-FUND-TRANSACTIONS",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Persist donor-fund financial transactions and link them canonically to the originating contribution or supplied entity.",
+      "research_candidate": "civicrm/civicrm-core financial transaction BAO at pinned locus",
+      "evidence_loci": "civicrm/civicrm-core@fb6cb94dc833292afaa74df3156998acca8903bc :: CRM/Financial/BAO/FinancialTrxn.php :: L17-L43",
+      "reason": "The canonical command creates a financial transaction, preserves its total amount and creates the entity-financial-transaction linkage to the contribution or supplied entity. This does not infer Oblivion allocation, ledger, Site, bank, audit or replay policy."
+    },
+    {
+      "working_key": "CAP-FIN-DONOR-FUND-REPORTS",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Report donor contributions by fund classification, status, date and currency with aggregate counts and amounts.",
+      "research_candidate": "civicrm/civicrm-core contribution summary report at pinned loci",
+      "evidence_loci": "civicrm/civicrm-core@fb6cb94dc833292afaa74df3156998acca8903bc :: CRM/Report/Form/Contribute/Summary.php :: L60-L210,L502-L552,L614-L759",
+      "reason": "The contribution report exposes financial-type, status, date and currency filters, joins contacts, contributions and financial types, and calculates contribution count, sum and average by currency. This is a bounded report slice, not fund acquittal, Site policy, audit package or runtime proof."
+    },
+    {
+      "working_key": "CAP-FIN-FINANCIAL-REPORT-FUNDING-STREAM-SUMMARY",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Summarise financial activity by funding-stream classification with status/date filters, transaction context, totals and drill-down.",
+      "research_candidate": "civicrm/civicrm-core contribution detail report at pinned loci",
+      "evidence_loci": "civicrm/civicrm-core@fb6cb94dc833292afaa74df3156998acca8903bc :: CRM/Report/Form/Contribute/Detail.php :: L78-L241,L400-L451,L519-L619,L862-L949",
+      "reason": "Financial-type, status and date filters, financial-transaction and batch joins, currency totals and contribution detail provide a bounded funding-stream summary and drill-down analogue. It does not prove Oblivion funding agreements, allocation controls, Site privacy or runtime."
+    },
+    {
+      "working_key": "CAP-FIN-AUDIT-EXPORT-PACKAGE",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Generate a governed immutable Finance audit-export package with manifest, hashes, approval/redaction and auditable generation/retry provenance.",
+      "research_candidate": "civicrm/civicrm-core contribution summary report at pinned locus",
+      "reason": "An aggregate contribution report does not provide an immutable audit package, package manifest, snapshot hashes, approval/redaction, auditable generation/retry or bundle-download provenance."
+    },
+    {
+      "working_key": "CAP-FIN-API-SITE-FINANCIAL-SUMMARY",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Expose an authorised Site-scoped financial summary API with canonical current-caller and direct-object concealment.",
+      "research_candidate": "frappe/erpnext consolidated financial statement at pinned locus",
+      "reason": "A report calculated across a Company hierarchy is not a Site-scoped API summary with current caller authority and direct-object concealment."
+    },
+    {
+      "working_key": "CAP-FIN-API-SITES-FINANCIAL-OVERVIEW",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Expose an authorised all-Sites financial overview API with bounded cross-Site policy and current data provenance.",
+      "research_candidate": "frappe/erpnext consolidated financial statement at pinned locus",
+      "reason": "A Company-hierarchy report is not an all-Sites financial overview endpoint with Oblivion Site authority, direct-object concealment or current-caller provenance."
+    },
+    {
+      "working_key": "CAP-MED-EMAR-WORKSPACE",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Provide a role- and Site-scoped eMAR worker workspace with due/scheduled medication work, safety actions and interaction state.",
+      "research_candidate": "openemr/openemr medication-dispense FHIR services at pinned loci",
+      "reason": "Historical dispense query/mapping and an encounter summary do not provide a medication-worker workspace, due/scheduled worklist, safety action surface, role/Site direct-object workflow or interaction proof."
+    }
+  ],
+  "count_delta": {"verified_benchmark_direct": 4, "documented_ncm_direct": 0, "eligible_total": 4, "completion_unproved": -4},
+  "post_wave_totals": {"verified_benchmark": 352, "documented_ncm": 89, "eligible": 441, "completion_unproved": 461}
+}

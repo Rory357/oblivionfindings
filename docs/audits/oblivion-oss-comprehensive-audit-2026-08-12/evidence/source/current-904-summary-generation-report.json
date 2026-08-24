@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "current-904-summary-generation-report",
+  "generated_at": "2026-08-23T15:44:58+12:00",
+  "status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "runtime_credit_delta": 0,
+  "inputs": {
+    "manifest": {
+      "path": "evidence/source/working-capability-manifest-904.json",
+      "sha256": "b9c1cf28e53e26df91fe772d91924beb56f56c1b9f3c68ddb320134bf148aa10",
+      "bytes": 683490
+    },
+    "benchmark": {
+      "path": "evidence/source/benchmark-final-904-mapping.json",
+      "sha256": "659dc53cd3f8438c0c699b17d7579c449f741081f963956b2c941183905717b7",
+      "bytes": 674511
+    },
+    "gap": {
+      "path": "evidence/source/route-page-gap-reconciliation-904.json",
+      "sha256": "cd5c01133d6a0bc4ca9154bfbf3eb54457cb0d382dd97e9b15ebb7bf25f2c18c",
+      "bytes": 36016
+    },
+    "surface_reconciliation": {
+      "path": "evidence/source/route-page-source-provenance-reconciliation-2026-08-23.json",
+      "sha256": "a670f10adf4d1a4d2c84f360fa3fdd566fa85e4a04877058312a96a7a0f08563",
+      "bytes": 7134
+    },
+    "inventory": {
+      "path": "inventory.json",
+      "sha256": "8fd94c22aea29c6d82253e0dd15603dbd6d39fbe68328b20ca025662e48f63b8",
+      "bytes": 11885342
+    },
+    "ledger": {
+      "path": "02-eight-pass-coverage-ledger.csv",
+      "sha256": "bf740b72726fede6ce1c06e91b4c5f7bb47db800bba1d4f3bbbf8ca3c1580770",
+      "bytes": 1959490
+    },
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "sha256": "5b3f3e84a0cfe4137036d2062b449b0cf096ed4a4ecf034848e6eedc072984b6",
+      "bytes": 3312496
+    },
+    "scorecard": {
+      "path": "04-workflow-usability-scorecard.csv",
+      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "bytes": 1082667
+    },
+    "visual": {
+      "path": "05-browser-visual-coverage-matrix.csv",
+      "sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+      "bytes": 8489292
+    },
+    "visual_summary": {
+      "path": "evidence/source/final-904-visual-link-generation-summary.json",
+      "sha256": "a54111b954bde8db34b9499a60fe535bfe3981b61c69752bb2a0e85838d8d382",
+      "bytes": 4979
+    },
+    "overlay": {
+      "path": "evidence/source/overlay-trigger-classification.json",
+      "sha256": "60b02298132846b6d27db9fc08d981f925fbe4d72890553551b4d915a033fa9b",
+      "bytes": 1156860
+    },
+    "findings": {
+      "path": "findings.json",
+      "sha256": "9aed3e7149b49004011b43a13fc2e6f5498b07fa198adcd2bd3434f02ae644a8",
+      "bytes": 1392668
+    },
+    "official_map": {
+      "path": "evidence/source/official-nz-finding-proposition-map.json",
+      "sha256": "ce9970b5adb892a2fae8161a7317b9fa6b09b797234b189ac51af0686db149c8",
+      "bytes": 12979
+    }
+  },
+  "outputs": {
+    "completion_report": {
+      "path": "evidence/source/completion-gate-report.json",
+      "sha256": "f70c776416391263fcba7899d46b0edf1e4051bf4b666dde82111a3d8959c30e",
+      "bytes": 16368
+    },
+    "executive_summary": {
+      "path": "00-executive-summary.md",
+      "sha256": "98b234098b024b4a343678bbf78f54ef2414d92e5e44eb3cd42a01dce030184a",
+      "bytes": 13820
+    },
+    "module_map": {
+      "path": "01-repository-module-map.md",
+      "sha256": "e7222431022d9bfb6d139688466355e5e85eb5d244fa10ee0c30bf4c8f3ea76e",
+      "bytes": 7819
+    },
+    "module_findings": {
+      "path": "07-module-findings.md",
+      "sha256": "0341846091bf9214c167b794775e7d0c2c19fb3f98a92990fd26181ad13a3acf",
+      "bytes": 297816
+    },
+    "visual_narrative": {
+      "path": "09-ui-ux-accessibility-visual-consistency.md",
+      "sha256": "3907608297a9a0ab071e44fa3de94d2f0c050df7e0f04cd691edac382687c3ca",
+      "bytes": 11177
+    },
+    "architecture_narrative": {
+      "path": "10-architecture-data-integration-security.md",
+      "sha256": "ee5953c49c065d2ae1809e0e62c4f4a085476ed31040663d536574307bef2f00",
+      "bytes": 14428
+    },
+    "unresolved_questions": {
+      "path": "13-unresolved-questions-and-evidence-gaps.md",
+      "sha256": "a8037f064314c4ab1d54418b91d1d112f0832c4695c04a0688bfd1909165e46d",
+      "bytes": 12896
+    },
+    "dashboard": {
+      "path": "audit-dashboard.html",
+      "sha256": "4053bbf7edf4c5b06a219328059cdd88589ad059683093d91d3f7c00a5d82868",
+      "bytes": 234294
+    },
+    "dashboard_reconciliation": {
+      "path": "evidence/source/dashboard-reconciliation-2026-08-23.json",
+      "sha256": "5411f1defedd75833ba730148e7804aa1476a93af9f04452ad4c13eeec5b35a1",
+      "bytes": 3925
+    },
+    "deployed_public_login_resample": {
+      "path": "evidence/browser/deployed-public-login-resample-2026-08-23.json",
+      "sha256": "d828ca481d6dfc2b8871a8431a0391afc13bc02d9ccec631377eb60964f7495e",
+      "bytes": 1489
+    }
+  },
+  "counts": {
+    "capabilities": 904,
+    "human_tasks": 790,
+    "benchmark_decided": 500,
+    "benchmark_unproved": 404,
+    "visual_assigned": 8168,
+    "visual_unresolved": 585,
+    "material_assigned": 3948,
+    "material_unresolved": 364,
+    "custom_overlay_exact": 253,
+    "custom_overlay_unresolved_or_blocked": 262,
+    "primitive_overlay_exact": 242,
+    "primitive_overlay_unresolved": 235,
+    "completion_blockers": 19,
+    "custom_overlay_inferred": 144
+  },
+  "claim_limit": "Artifact consistency and dashboard refresh only; no runtime, browser-task, remediation, release or all-pass completion credit."
+}

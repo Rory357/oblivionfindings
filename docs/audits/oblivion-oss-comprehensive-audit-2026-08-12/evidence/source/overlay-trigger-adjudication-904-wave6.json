@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave6",
+  "generated_at": "2026-08-21T23:10:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Audited-baseline static source trigger pairing only. Current-main, runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "method": {
+    "selection_sha256": "d92fff5af8a8fb2fe9af6286c5f4438fa04c4087594c22a348f9751a534adb07",
+    "exclusion_count": 50,
+    "exclusion_sha256": "bad1e132b3ce3605fb67a7095c69c66b75ab6f63146d924544436cb18a823f7e",
+    "upstream_declared_proof_tuple_sha256": "9284200d9bf48e6f8f34c5be02c63c617daf1f576346d464d6c7213b01992f1c",
+    "upstream_declared_source_map_sha256": "3da9d2fd9b0c3b73f1673ad53d48230713ef7d1a9fcc7b754481f734d8ee902b",
+    "verdict": "GO_10_exact_static_trigger_pairings"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/components/rostering/availability-pane.tsx",
+      "line": 222,
+      "symbol": "EditAvailabilityDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/rostering/availability-pane.tsx",
+        "source_sha256": "7fb2a3e840d1080304646c02beeaeeb3c23fc066aac689bd836805014d8bbdf6",
+        "state_identifier": "editing",
+        "setter": "setEditing",
+        "static_chain": "state 87; callback/setter 216; Button trigger 441; open 223",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/components/rostering/calendar-pane.tsx",
+      "line": 1656,
+      "symbol": "DayDetailDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/rostering/calendar-pane.tsx",
+        "source_sha256": "db91992debab73eeb37e6e2d59eda7f0fd61bcff11a487ca1ea77e5585e17dcf",
+        "state_identifier": "openDayKey",
+        "setter": "setOpenDayKey",
+        "static_chain": "state 974; setter 1314-1318; day-cell triggers 415/487; callback binding 1620; open 1657",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/components/timesheets/view-timesheet-dialog.tsx",
+      "line": 543,
+      "symbol": "ReasonDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/components/timesheets/view-timesheet-dialog.tsx",
+        "source_sha256": "c4080c145fe094f71d9c220831d67af22e6c87a3533fda1d8b9d23cf1986cd20",
+        "state_identifier": "reasonAction",
+        "setter": "setReasonAction",
+        "static_chain": "state 162; intrinsic trigger/setters 501/510; open 544",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/attendance/index.tsx",
+      "line": 1467,
+      "symbol": "FixClockOutWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/attendance/index.tsx",
+        "source_sha256": "a571a5439fc53e021a67f94e72a4d844cb551fb828138496051c6855d244bd60",
+        "state_identifier": "fixSessions",
+        "setter": "setFixSessions",
+        "static_chain": "state 717; hero trigger/setter 1325-1327; open 1468",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/attendance/index.tsx",
+      "line": 1474,
+      "symbol": "HandoverDetailDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/attendance/index.tsx",
+        "source_sha256": "a571a5439fc53e021a67f94e72a4d844cb551fb828138496051c6855d244bd60",
+        "state_identifier": "detailId",
+        "setter": "setDetailId",
+        "static_chain": "state 722; intrinsic row trigger 578; callback/setter 1448; open 1476",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/attendance/index.tsx",
+      "line": 1544,
+      "symbol": "ReasonDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/attendance/index.tsx",
+        "source_sha256": "a571a5439fc53e021a67f94e72a4d844cb551fb828138496051c6855d244bd60",
+        "state_identifier": "endTarget",
+        "setter": "setEndTarget",
+        "static_chain": "state 725; context action/setter 1018; open 1545",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/compliance/index.tsx",
+      "line": 816,
+      "symbol": "LogObligationDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/compliance/index.tsx",
+        "source_sha256": "1fd05a173190bcb239c2a5efcbbff5b331b2c1505d8aa9c73bdab68872eae5ed",
+        "state_identifier": "wizard",
+        "setter": "setWizard",
+        "static_chain": "state 348; setter 352-354; hero trigger 484; open 817",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/compliance/index.tsx",
+      "line": 822,
+      "symbol": "RecordEvidenceDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/compliance/index.tsx",
+        "source_sha256": "1fd05a173190bcb239c2a5efcbbff5b331b2c1505d8aa9c73bdab68872eae5ed",
+        "state_identifier": "wizard",
+        "setter": "setWizard",
+        "static_chain": "state 348; setter 352-354; hero/context trigger 485/438; open 823",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/compliance/index.tsx",
+      "line": 828,
+      "symbol": "CompleteObligationDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/compliance/index.tsx",
+        "source_sha256": "1fd05a173190bcb239c2a5efcbbff5b331b2c1505d8aa9c73bdab68872eae5ed",
+        "state_identifier": "wizard",
+        "setter": "setWizard",
+        "static_chain": "state 348; setter 352-354; context trigger 437; open 829",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    },
+    {
+      "file": "resources/js/pages/compliance/index.tsx",
+      "line": 835,
+      "symbol": "LogNotifiableDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/compliance/index.tsx",
+        "source_sha256": "1fd05a173190bcb239c2a5efcbbff5b331b2c1505d8aa9c73bdab68872eae5ed",
+        "state_identifier": "wizard",
+        "setter": "setWizard",
+        "static_chain": "state 348; setter 352-354; hero trigger 486; open 836",
+        "credit_boundary": "audited-baseline static pairing only"
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -10,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -10,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 213,
+    "source_inferred_not_exactly_paired": 173,
+    "unresolved_or_blocked": 273,
+    "same_scope_state_handler": 194,
+    "internal_state_trigger_candidate": 173,
+    "controlled_without_resolved_activator": 256,
+    "generic_unresolved": 271,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208,
+    "primitive_unresolved": 269
+  }
+}

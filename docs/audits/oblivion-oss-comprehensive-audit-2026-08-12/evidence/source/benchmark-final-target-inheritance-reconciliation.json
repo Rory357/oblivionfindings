@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0",
+  "artifact": "benchmark-final-target-inheritance-reconciliation",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "eligibility_reconciled_formal_final_target_mapping_not_integrated",
+  "audit_boundary": "Read-only static reconciliation. Eligibility is not completion credit and does not assert a benchmark/no-match outcome for any unreviewed split, regrouped or candidate target.",
+  "working_denominator": {
+    "total": 895,
+    "H": 785,
+    "D": 108,
+    "M": 2,
+    "proof": "manifest-denominator-contradiction.json"
+  },
+  "source_evidence_pool": {
+    "source_families": {
+      "selected_benchmark": 229,
+      "previously_no_selected": 366,
+      "total": 595,
+      "sorted_id_sha256": "57a683ac6fec67d4a801b1dc4e6512950cb45465be71981e017fe3afbbb27eaa"
+    },
+    "old_adjudication_units": {
+      "verified_benchmark": 407,
+      "documented_no_credible_match": 188,
+      "pending_or_overextended": 131,
+      "reject": 14,
+      "total": 740,
+      "sorted_id_sha256": "016bcb52a0742d57eae432646642aeb1ae14c2193126bc73a07014d2d75fec12"
+    }
+  },
+  "working_target_inheritance_eligibility": {
+    "direct_retained": {
+      "verified_benchmark": 164,
+      "documented_no_credible_match": 66,
+      "total": 230
+    },
+    "strict_one_to_one_semantic_rename": {
+      "verified_benchmark": 23,
+      "documented_no_credible_match": 7,
+      "total": 30
+    },
+    "eligible_total": {
+      "verified_benchmark": 187,
+      "documented_no_credible_match": 73,
+      "total": 260,
+      "percent_of_working_denominator": 29.05
+    },
+    "target_specific_unproved": {
+      "total": 635,
+      "percent_of_working_denominator": 70.95
+    }
+  },
+  "formal_completion_credit": {
+    "mapped_final_target_rows": 0,
+    "denominator": 895,
+    "reason": "A consistent durable 895-row stable-ID manifest and target-by-target evidence mapping have not been integrated. The 260 figure is inheritance eligibility only."
+  },
+  "inheritance_rules": {
+    "DIRECT_RETAINED_UNIT": "Require exact final target ID equality with the old adjudication unit, retained source-family lineage, unchanged semantic scope and complete carried evidence. Only verified-benchmark or documented-no-credible-match outcomes may inherit.",
+    "EXACT_ENVELOPE_RENAME": "Require exactly one source family, one old unit and one final target with the same user job and envelope; preserve the old evidence plus explicit one-to-one rename provenance.",
+    "SPLIT_REGROUP_MERGE_OR_CANDIDATE": "Do not inherit mechanically. Perform target-specific candidate research. A broader ancestor is context only and cannot enter the numerator.",
+    "PENDING_OR_REJECT": "Never count as benchmark or documented no-credible-match completion.",
+    "BENCHMARK_EVIDENCE": "Require an official repository, pinned commit SHA and exact source locus.",
+    "NO_CREDIBLE_MATCH_EVIDENCE": "Require target-specific searches, rejected-candidate evaluations and no selected matching repository."
+  },
+  "strict_rename_ids": {
+    "verified_benchmark": [
+      "CAP-CLIN-CLIENT-ABC-BEHAVIOUR-RECORD",
+      "CAP-CLIN-CLIENT-BOWEL-CHART",
+      "CAP-CLIN-CLIENT-FLUID-CHART",
+      "CAP-CLIN-CLIENT-SEIZURE-CHART",
+      "CAP-CLIN-CLIENT-SLEEP-CHART",
+      "CAP-CLIN-CLIENT-SUMMARY",
+      "CAP-COMP-COMPLIANCE-DASHBOARD",
+      "CAP-PRIV-DASHBOARD",
+      "CAP-PRIV-SHARED-ATTACHMENT-SERVICE",
+      "CAP-FIN-ROADMAP-BUDGET-API",
+      "CAP-SITE-MEAL-SERVICE-COMPLETION",
+      "CAP-SITE-PRODUCT-LIFECYCLE",
+      "CAP-SITE-RECIPE-LIFECYCLE",
+      "CAP-MED-GUIDED-ROUND-EXECUTION",
+      "CAP-MED-SETTINGS-RULES",
+      "CAP-MED-MY-DAY-DOSE-QUICK-ACTIONS",
+      "CAP-OPS-AUTOSCHEDULE-SUGGESTIONS",
+      "CAP-OPS-STAFF-TIME-OFF",
+      "CAP-OPS-CLIENT-ONBOARDING-WORKFLOW",
+      "CAP-OPS-FUNDING-CLAIM-LIFECYCLE",
+      "CAP-OPS-MILEAGE-CLAIM-LIFECYCLE",
+      "CAP-FIN-CLIENT-FINANCIAL-OVERVIEW",
+      "CAP-RESP-REFERRAL-INTAKE"
+    ],
+    "documented_no_credible_match": [
+      "CAP-GOV-GOVERNANCE-SETTINGS",
+      "CAP-GOV-TE-TIRITI-OBLIGATIONS",
+      "CAP-SITE-DIETARY-TAG-LIFECYCLE",
+      "CAP-HR-AUTOMATION-RULES",
+      "CAP-HR-SUPERVISION-NOTE-ACKNOWLEDGEMENT",
+      "CAP-OPS-FAMILY-VISIT-REQUEST",
+      "CAP-SITE-CLIENT-ALLOCATION"
+    ]
+  },
+  "input_sha256": {
+    "selected-benchmark-adjudication.json": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3",
+    "no-credible-match-adjudication.json": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71",
+    "full-distinct-capability-adjudication.json": "edab091ca88a0338b6ea17787df339867399e82314794035dccc5049beeb3715"
+  },
+  "unavailable_checksum": "No final target/status/source-unit/evidence-locus checksum is issued because the durable final mapping does not yet exist."
+}

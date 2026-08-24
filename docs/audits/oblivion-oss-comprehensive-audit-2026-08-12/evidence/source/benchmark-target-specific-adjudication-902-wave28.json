@@ -1,0 +1,184 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave28",
+  "generated_at": "2026-08-21T15:05:44+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twenty-eighth bounded target-specific wave: eight current completion-unproved Sites meal-operations targets; three independently supported direct recommendations and five conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed or credited.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "The eight target IDs in packet order joined by LF with no terminal LF and encoded as UTF-8 without BOM.",
+    "selection_sha256": "b2eb9d13831052470efe6c951b08d59fc8ff7e57ef9470bee8e8afe68cb84de3",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Repository, family and adjacent-record behavior do not inherit credit.",
+    "reuse_rule": "Exact target-key and cited-source-path collisions were replayed against every materialized Wave 4 through Wave 27 artifact. Repository reuse alone is disclosed and is not evidence."
+  },
+  "selected_target_ids": [
+    "CAP-SITE-MEAL-PLANNING",
+    "CAP-SITE-MEAL-STOCK-CONTROL",
+    "CAP-SITE-SHOPPING-LIST-GENERATE",
+    "CAP-SITE-SHOPPING-PROCUREMENT",
+    "CAP-SITE-MEAL-WEEK-TEMPLATE-APPLY",
+    "CAP-SITE-MEAL-WEEK-TEMPLATE-DEFINITION",
+    "CAP-SITE-MEAL-BUDGET-CONFIG",
+    "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW"
+  ],
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "698548b476cec3bd0f1d6651f4918ddc3243f3aca4c00142f290d6d6efe58916",
+      "verified_benchmark_direct": 336,
+      "verified_benchmark_rename": 22,
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "eligible_total": 447,
+      "completion_unproved": 455
+    }
+  },
+  "repository_snapshots": {
+    "GROCY": {
+      "repo": "grocy/grocy",
+      "official_repository_url": "https://github.com/grocy/grocy",
+      "commit_sha": "acd061e2cde09fc5bc4e34673021039b25ab7067",
+      "tree_sha": "7b4b45cbf56e2654a8c819b3dce13d28443883e4",
+      "spdx": "MIT",
+      "license_locus": "LICENSE.md",
+      "license_sha256": "8ed5277fef47c50c718ec0816cbe79fc4ec0a751b9983745069a272060c63177",
+      "edition_boundary": "Pinned official community source only; hosted services, private extensions and unpinned behavior are excluded.",
+      "files": [
+        {
+          "path": "public/viewjs/mealplan.js",
+          "lines": "L5-L55,L81-L109,L492-L546,L642-L680,L743-L797,L821-L845,L875-L895",
+          "sha256": "d96e8ffaaa504b938b28c57ef9a804ccba96768801ab70e2df26f7bbc2502b53"
+        },
+        {
+          "path": "public/viewjs/shoppinglist.js",
+          "lines": "L146-L168,L240-L312,L321-L365",
+          "sha256": "a52f9c803b44518373f29121ed35536f13e66d004fd3ebcd0b03f627c712b449"
+        },
+        {
+          "path": "services/RecipesService.php",
+          "lines": "L9-L12,L14-L74,L80-L112",
+          "sha256": "b48525a3b9cb7c7421135e4e82fc433b13e3e07205af44ef2cccf3febe107ec7"
+        },
+        {
+          "path": "services/StockService.php",
+          "lines": "L112-L250,L365-L525",
+          "sha256": "b8f6e249cb877059fc465347b6b88f0fa09a02fe457c89d70bd6f0ef0503572e"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "verified_benchmark_direct_recommended": 3,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 5,
+    "completion_credit_recommended": 3
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-SITE-MEAL-PLANNING",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Create, amend, remove, copy and mark meal-plan entries complete.",
+      "research_candidate": "grocy/grocy meal-plan entry workflow at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: public/viewjs/mealplan.js :: L492-L546,L642-L680,L821-L845,L875-L895",
+      "reason": "The pinned UI performs meal-plan entry delete, create and edit requests, copies entries from one day to another, and marks entries complete after single-product or recipe consumption succeeds. The bounded claim excludes Site policy, audit, concurrent coordination, atomic consume-and-complete behavior and Oblivion runtime."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-STOCK-CONTROL",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Apply recipe-driven food-stock consumption with validation, stock-entry updates and transaction history.",
+      "research_candidate": "grocy/grocy recipe consumption and stock transaction service at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: services/RecipesService.php :: L80-L112; services/StockService.php :: L365-L525",
+      "reason": "Recipe consumption begins a database transaction, calls stock consumption for resolved recipe positions, rolls back on exception and commits on success. Stock consumption validates existence, amount and available stock, writes negative stock-log rows and deletes or updates stock entries. The claim excludes Site isolation, multi-actor authority, Oblivion ledger semantics and runtime."
+    },
+    {
+      "working_key": "CAP-SITE-SHOPPING-LIST-GENERATE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Calculate meal-recipe shortages and persist required shopping-list rows.",
+      "research_candidate": "grocy/grocy recipe shortage and shopping-list generation at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: services/RecipesService.php :: L14-L74; public/viewjs/shoppinglist.js :: L146-L168; public/viewjs/mealplan.js :: L743-L797",
+      "reason": "The service resolves recipe positions, calculates missing quantities, then creates or increases persisted shopping-list rows. Pinned UI loci trigger missing-product generation. The claim excludes Site authorization, direct-object concealment, idempotent retry and Oblivion runtime."
+    },
+    {
+      "working_key": "CAP-SITE-SHOPPING-PROCUREMENT",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Procure shopping-list items into controlled stock through a persisted purchase or receipt transition with provenance.",
+      "research_candidate": "grocy/grocy shopping-list stock-add UI and generic stock purchase service at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: public/viewjs/shoppinglist.js :: L240-L312,L321-L365; services/StockService.php :: L112-L250",
+      "reason": "The UI opens a purchase iframe and reacts to an AfterItemAdded browser message; separately, the stock service supports generic purchase-type additions. The pinned loci do not provide an end-to-end server-side/controller/form bridge proving that the shopping-list workflow reaches that purchase command, so procurement receives no direct credit."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-WEEK-TEMPLATE-APPLY",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Apply a reusable Site meal-week template through a durable lifecycle.",
+      "research_candidate": "grocy/grocy meal-plan week type and date-copy behavior at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: services/RecipesService.php :: L9-L12; public/viewjs/mealplan.js :: L642-L680",
+      "reason": "Week-type constants and date-to-date copying do not establish a reusable named Site week-template apply lifecycle."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-WEEK-TEMPLATE-DEFINITION",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Define and maintain durable named Site meal-week templates.",
+      "research_candidate": "grocy/grocy meal-plan week type records at pinned loci",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: services/RecipesService.php :: L9-L12; public/viewjs/mealplan.js :: L642-L680",
+      "reason": "The cited recipe types and single-date copy flow do not establish named template definition, management or durability."
+    },
+    {
+      "working_key": "CAP-SITE-MEAL-BUDGET-CONFIG",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Configure meal-budget limits, thresholds and approval controls.",
+      "research_candidate": "grocy/grocy meal-plan weekly-cost display at pinned locus",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: public/viewjs/mealplan.js :: L81-L109",
+      "reason": "Weekly-cost calculation and display do not establish budget configuration, threshold enforcement or approval."
+    },
+    {
+      "working_key": "CAP-SITE-SITE-CALENDAR-GLOBAL-OVERVIEW",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Provide a permission-filtered multi-Site calendar overview.",
+      "research_candidate": "grocy/grocy meal-plan day/week calendar rendering at pinned locus",
+      "evidence_loci": "grocy/grocy@acd061e2cde09fc5bc4e34673021039b25ab7067 :: public/viewjs/mealplan.js :: L5-L55",
+      "reason": "The cited calendar renders local day/week meal-plan views and does not establish permission-filtered multi-Site or global overview behavior."
+    }
+  ],
+  "collision_disclosure": {
+    "precondition": "All eight selected keys are current-map unproved with completion_credit=false.",
+    "target_key_procedure": "Exact quoted working-key search across benchmark-target-specific-adjudication-902-wave4.json through benchmark-target-specific-adjudication-902-wave27.json.",
+    "target_key_hits": 0,
+    "cited_path_procedure": "Exact path search across the same materialized Wave 4 through Wave 27 artifact set.",
+    "cited_path_hits": {
+      "public/viewjs/mealplan.js": 0,
+      "public/viewjs/shoppinglist.js": 0,
+      "services/RecipesService.php": 0,
+      "services/StockService.php": 0
+    },
+    "repository_reuse": "Grocy was used in Wave 4, but only for routes.php and controllers/StockController.php. This packet cites no prior Wave 4 through Wave 27 source path. No family or repository inheritance is claimed.",
+    "no_inheritance": true
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 3,
+    "documented_ncm_direct": 0,
+    "eligible_total": 3,
+    "completion_unproved": -3
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 361,
+    "documented_ncm": 89,
+    "eligible": 450,
+    "completion_unproved": 452,
+    "verified_benchmark_direct": 339,
+    "verified_benchmark_rename": 22,
+    "documented_ncm_direct": 82,
+    "documented_ncm_rename": 7
+  }
+}

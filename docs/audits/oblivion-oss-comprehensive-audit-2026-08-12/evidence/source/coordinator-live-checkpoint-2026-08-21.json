@@ -1,0 +1,215 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-08-21T17:02:32+12:00",
+  "status": "BLOCKED_NOT_COMPREHENSIVE_OR_COMPLETE",
+  "purpose": "Durable audit-only coordinator handoff. It records live orchestration and protected worktree context; it grants no runtime authority and creates no completion credit.",
+  "inputs": {
+    "orchestration_status": {
+      "path": "evidence/source/orchestration-status-2026-08-14.json",
+      "sha256": "6b88c6a217222fbbaef2128ed34adbb8d1f28504c8cc322288af135647e41abe"
+    },
+    "completion_gate_report": {
+      "path": "evidence/source/completion-gate-report.json",
+      "sha256": "91ebec96235eadceb85d6e61b4a24e5bc27c826c4d6cc08f63c92e161d087740",
+      "blockers": 19
+    },
+    "cached_origin_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "worktree_observation": "git worktree list --porcelain and scoped git status/merge-base reads only"
+  },
+  "canonical_current_counts": {
+    "findings": 92,
+    "p0_p1": 80,
+    "literal_exact_current_id_links": 159,
+    "benchmark_decided": 451,
+    "benchmark_unproved": 451,
+    "visual_assigned": 8153,
+    "visual_unresolved": 600
+  },
+  "sole_lane": {
+    "holder": null,
+    "kind": "released; no active heavy process",
+    "dependency": "fresh task-specific grant only after bounded migration correction review",
+    "queued_after_holder": [
+      "FIN-PAYMENT-MATCH-01",
+      "FLEET-MED-WITNESS-01"
+    ],
+    "boundary": "No task infers a runtime, browser, PHP, Composer, database or publication grant from this checkpoint."
+  },
+  "active_lane_balance": {
+    "total_background_tasks_active": 27,
+    "remediation_tasks_active": 20,
+    "total_pinned_tasks": 20,
+    "read_only_audit_research_lanes": [
+      {
+        "ref": "pinned-module-audit:operations",
+        "title": "Operations read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:security-devices",
+        "title": "Security and Devices read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:fleet",
+        "title": "Fleet read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:finance",
+        "title": "Finance read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:settings",
+        "title": "Settings read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:incidents",
+        "title": "Incidents read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      },
+      {
+        "ref": "pinned-module-audit:public",
+        "title": "Public read-only module audit",
+        "status": "active_pinned_read_only_module_audit"
+      }
+    ],
+    "queued_source_remediation_pivots": [
+      {
+        "ref": "pinned-module-audit:emar",
+        "title": "eMAR medication-error lifecycle queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:health-safety",
+        "title": "Health and Safety queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:hr",
+        "title": "HR queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:governance",
+        "title": "Governance queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:sites",
+        "title": "Sites queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:control-room",
+        "title": "Control Room queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:reporting",
+        "title": "Reporting queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:respite",
+        "title": "Respite queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:privacy",
+        "title": "Privacy-DPIA queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:roadmap",
+        "title": "Roadmap queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:clinical",
+        "title": "Clinical queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:clients",
+        "title": "Clients queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      },
+      {
+        "ref": "pinned-module-audit:frontline",
+        "title": "Frontline queued source-remediation pivot",
+        "status": "queued_pinned_source_remediation_pivot",
+        "next_action": "await protected worktree allocation or explicit task-specific remediation dispatch"
+      }
+    ]
+  },
+  "protected_worktrees": [
+    {
+      "finding_id": "FLEET-MED-WITNESS-01",
+      "source_state": "reviewed 15-path source is merged on current main at 109750de7d03eb9dc258640b991a3b9d84f6c535",
+      "runtime_state": "automated gates and bounded browser workflow are green; baseline-wide visual/product completion remains unproved",
+      "publication_state": "merged and pushed to main at 109750de7; no immutable baseline completion credit",
+      "next_action": "retain fixed-pending-verification until the required release/baseline evidence is accepted",
+      "worktree": "<local-user>/.codex/worktrees/797b/oblivionfindings",
+      "branch": "codex/fleet-med-witness-01",
+      "head": "109750de7d03eb9dc258640b991a3b9d84f6c535",
+      "merge_base_with_cached_origin_main": "109750de7d03eb9dc258640b991a3b9d84f6c535",
+      "git_status_entries": 0,
+      "retention": "protected/reserved in coordination; do not prune, reclaim or reuse without explicit release"
+    },
+    {
+      "finding_id": "FIN-PAYMENT-MATCH-01",
+      "source_state": "bounded source-only formatting correction state retained",
+      "runtime_state": "released at the first behavior gate on MySQL 1215; bounded migration review active",
+      "publication_state": "not published from this checkpoint",
+      "next_action": "take the next appropriate serialized finance verification grant after lane release",
+      "worktree": "<local-user>/.codex/worktrees/7365/oblivionfindings",
+      "branch": "codex/fin-payment-match-candidate-20260821",
+      "head": "258ff44da7295df928caabaccc3d604fc98a5b11",
+      "merge_base_with_cached_origin_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+      "git_status_entries": 2,
+      "retention": "protected/reserved in coordination; do not prune, reclaim or reuse without explicit release"
+    },
+    {
+      "finding_id": "GOV-RESOLUTION-QUORUM-01",
+      "source_state": "protected queued source state",
+      "runtime_state": "reserved; no runtime grant active",
+      "publication_state": "not published from this checkpoint",
+      "next_action": "preserve worktree until explicit task-specific source/remediation dispatch",
+      "worktree": "<local-user>/.codex/worktrees/f310/oblivionfindings",
+      "branch": "codex/gov-resolution-quorum-01",
+      "head": "a4bb8dc84d5600a3e4d7d62142038fddaf005867",
+      "merge_base_with_cached_origin_main": "a4bb8dc84d5600a3e4d7d62142038fddaf005867",
+      "git_status_entries": 26,
+      "retention": "protected/reserved in coordination; do not prune, reclaim or reuse without explicit release"
+    },
+    {
+      "finding_id": "MED-ORDER-ERASURE-01",
+      "source_state": "protected queued source state",
+      "runtime_state": "reserved pending dependency order; no runtime grant active",
+      "publication_state": "not published from this checkpoint",
+      "next_action": "preserve worktree until dependency acceptance and an explicit proportional continuation grant",
+      "worktree": "<local-user>/.codex/worktrees/7e90/oblivionfindings",
+      "branch": "codex/med-order-erasure-01",
+      "head": "4d10641c3676d5e055d9293df488e6360a684aac",
+      "merge_base_with_cached_origin_main": "9b420035007a86dcb2f45805f959817c3448884f",
+      "git_status_entries": 0,
+      "retention": "protected/reserved in coordination; do not prune, reclaim or reuse without explicit release"
+    }
+  ],
+  "constraint": "This checkpoint is coordination metadata only. It does not alter findings, benchmark credit, visual ownership, runtime evidence, historical evidence bytes or the blocked audit status."
+}

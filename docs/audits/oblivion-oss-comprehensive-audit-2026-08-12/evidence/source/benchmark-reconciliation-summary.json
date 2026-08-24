@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.1",
+  "generated_at": "2026-08-21T00:00:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "prompt_listed_projects": 97,
+  "supplemental_projects": 1,
+  "physical_rows": 98,
+  "native_benchmark_prompt_listed": 72,
+  "native_benchmark_supplemental": 1,
+  "native_benchmark_total": 73,
+  "reject": 15,
+  "separate_future": 10,
+  "pending": 0,
+  "register_sha256": "95fbfdf22b0acb6204a334677422ce5c0145621e268b8e112ee0249413169ffe",
+  "benchmark_mapping_sha256": "6594c1f6ea03959faa6e07d54ce7fe292452a57c2e114e3465b40e8d5deb3e34",
+  "boundary": "Project catalogue triage is complete, but related-feature metadata does not grant target-specific benchmark, runtime, usability, or overall audit completion credit."
+}

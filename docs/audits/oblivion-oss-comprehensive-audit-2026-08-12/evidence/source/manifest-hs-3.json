@@ -1,0 +1,31 @@
+{
+  "partition":"GOV_HS_PRIV_SOURCE_UNION",
+  "chunk":"HS_3_of_3",
+  "targets":[
+    {"id":"CAP-HS-REPORT-RISK-ASSESSMENT-REGISTER-API","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-GOVERNANCE-REPORT"],"route_ids":["ROUTE-1197"],"page_ids":["PAGE-0364","PAGE-0365"]},
+    {"id":"CAP-HS-REPORT-WORKSAFE-REGISTER-API","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-GOVERNANCE-REPORT"],"route_ids":["ROUTE-1198"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0375"]},
+    {"id":"CAP-HS-RESTRAINT-EVENTS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RESTRAINT"],"route_ids":["ROUTE-1199","ROUTE-1200","ROUTE-1201","ROUTE-1202","ROUTE-1203","ROUTE-1204","ROUTE-1206"],"page_ids":["PAGE-0373","PAGE-0394","PAGE-0395"]},
+    {"id":"CAP-HS-BEHAVIOUR-SUPPORT-PLANS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RESTRAINT"],"route_ids":["ROUTE-1208","ROUTE-1209","ROUTE-1210","ROUTE-1211","ROUTE-1212","ROUTE-1213"],"page_ids":["PAGE-0394","PAGE-0395"]},
+    {"id":"CAP-HS-RESTRAINT-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RESTRAINT"],"route_ids":["ROUTE-1205"],"page_ids":["PAGE-0394"]},
+    {"id":"CAP-HS-RESTRAINT-REGISTER-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-RESTRAINT"],"route_ids":["ROUTE-1207"],"page_ids":["PAGE-0394"]},
+    {"id":"CAP-HS-RISK-ASSESSMENT-AUTHORING-EVIDENCE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-RISK-ASSESSMENT"],"route_ids":["ROUTE-1214","ROUTE-1215","ROUTE-1216","ROUTE-1217","ROUTE-1220","ROUTE-1221","ROUTE-1223"],"page_ids":["PAGE-0396"]},
+    {"id":"CAP-HS-RISK-ASSESSMENT-REVIEW-LIFECYCLE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-RISK-ASSESSMENT"],"route_ids":["ROUTE-1218","ROUTE-1219","ROUTE-1224","ROUTE-1225"],"page_ids":["PAGE-0396"]},
+    {"id":"CAP-HS-RISK-ASSESSMENT-ATTACHMENT-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HS-RISK-ASSESSMENT"],"route_ids":["ROUTE-1222"],"page_ids":["PAGE-0396"]},
+    {"id":"CAP-HS-HAZARDOUS-SUBSTANCE-REGISTER","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HAZARDOUS-SUBSTANCE"],"route_ids":["ROUTE-1226","ROUTE-1227","ROUTE-1228","ROUTE-1229","ROUTE-1234","ROUTE-1236"],"page_ids":["PAGE-0373","PAGE-0397","PAGE-0398"]},
+    {"id":"CAP-HS-HAZARDOUS-SUBSTANCE-EXPOSURES","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HAZARDOUS-SUBSTANCE"],"route_ids":["ROUTE-1230","ROUTE-1231"],"page_ids":["PAGE-0398"]},
+    {"id":"CAP-HS-HAZARDOUS-SUBSTANCE-SDS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HAZARDOUS-SUBSTANCE"],"route_ids":["ROUTE-1232"],"page_ids":["PAGE-0398"]},
+    {"id":"CAP-HS-HAZARDOUS-SUBSTANCE-STORAGE","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HAZARDOUS-SUBSTANCE"],"route_ids":["ROUTE-1235"],"page_ids":["PAGE-0398"]},
+    {"id":"CAP-HS-HAZARDOUS-SUBSTANCE-SDS-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-HAZARDOUS-SUBSTANCE"],"route_ids":["ROUTE-1233"],"page_ids":["PAGE-0398"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-WORKBENCH","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1237"],"page_ids":["PAGE-0364","PAGE-0365","PAGE-0373","PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-COMMITTEES","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1238"],"page_ids":["PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-MEETINGS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1239","ROUTE-1246","ROUTE-1247","ROUTE-1248","ROUTE-1249","ROUTE-1250"],"page_ids":["PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-CONSULTATIONS","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1240","ROUTE-1241","ROUTE-1242","ROUTE-1244"],"page_ids":["PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-REPRESENTATIVES","class":"H","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1252","ROUTE-1253"],"page_ids":["PAGE-0373","PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-MINUTES-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1251"],"page_ids":["PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-CONSULTATION-DOWNLOAD","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1243"],"page_ids":["PAGE-0399"]},
+    {"id":"CAP-HS-WORKER-PARTICIPATION-EXPORT","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["HS-WORKER-PARTICIPATION"],"route_ids":["ROUTE-1245"],"page_ids":["PAGE-0399"]}
+  ],
+  "counts":{"targets":22,"H":13,"D":9},
+  "inbound_global_target":{"id":"CAP-HS-LONE-WORKER-GEOCODE","id_status":"unproved_exact_spelling","class":"D","canonical_module":"HEALTH_SAFETY","source_family_ids":["CLI-SITE-GEOCODING"],"route_ids":["ROUTE-1144"],"page_ids":[]},
+  "proof_boundary":"Exact static source-union IDs/classes/routes/pages. The inbound geocode target's semantic identity, class, source and route are proved; its final ID spelling is not."
+}

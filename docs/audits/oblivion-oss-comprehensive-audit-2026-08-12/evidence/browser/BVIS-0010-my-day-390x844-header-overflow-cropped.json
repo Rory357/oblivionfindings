@@ -1,0 +1,35 @@
+{
+  "schema_version": "browser-visual-evidence.v1",
+  "visual_id": "BVIS-0010",
+  "generated_at": "2026-08-13T15:23:33+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "url": "/my-day",
+  "route_id": "ROUTE-1884",
+  "feature_id": "CAP-DAY-MY-DAY-WORKSPACE",
+  "role": "Demo Administrator",
+  "site_scope": "No explicit site selector was visible in the captured state",
+  "viewport": {
+    "outer_width": 390,
+    "outer_height": 844,
+    "document_client_width": 373,
+    "document_scroll_width": 457,
+    "horizontal_overflow_px": 84
+  },
+  "classification": "Observed",
+  "state": "Initial My Day view before any domain action",
+  "observation": "The shared StaffHeader action cluster extends beyond the document client width. The notification bell is partly off-screen and the page exposes horizontal scrolling.",
+  "dominant_element": {
+    "source": "resources/js/components/staff-header.tsx:168-172",
+    "implementation": "ml-auto flex shrink-0 items-center gap-2",
+    "content": ["Report incident", "Live status", "Notifications"]
+  },
+  "supporting_source": [
+    "resources/js/components/staff-header.tsx:154-172",
+    "resources/js/pages/my-day/index.tsx:730-785",
+    "resources/js/pages/my-day/index.tsx:788-795"
+  ],
+  "screenshot": "evidence/browser/BVIS-0010-my-day-390x844-header-overflow-cropped.png",
+  "redaction": "The crop contains synthetic/demo dashboard content only. No credentials, cookies, tokens or storage were inspected or retained.",
+  "mutation_boundary": "Read-only browser observation. One non-mutating popover was opened and closed; no form was submitted and no domain record, download or external message was created.",
+  "claim_limit": "This proves the exact My Day state at 390x844 for Demo Administrator. It does not prove every role, route or shared StaffHeader use is affected."
+}

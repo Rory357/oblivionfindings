@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0",
+  "artifact": "frozen-baseline-control-room-handover-browser-preflight",
+  "observed_at": "2026-08-21T07:30:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "branch": "codex/backup-local-plans-2026-08-10",
+  "status": "blocked_authentication_no_existing_session_no_visual_credit",
+  "audit_boundary": "Read-only local preview and GET navigation only. No credential entry, session manufacture, Site change, seed, database/schema command, domain form submission, shift mutation, handover action, or application-source edit was performed.",
+  "target": {
+    "route_id": "ROUTE-0306",
+    "method": "GET",
+    "path_template": "/control-room/shifts/{shift}/handover",
+    "capability_id": "CAP-CR-SHIFT-HANDOVER",
+    "visual_ids": [
+      "VIS-000101",
+      "VIS-000102",
+      "VIS-000103",
+      "VIS-000104"
+    ],
+    "required_viewports": [
+      "1024x768",
+      "1280x800",
+      "1440x900",
+      "390x844"
+    ]
+  },
+  "source_identity": {
+    "routes/control-room.php": {
+      "git_blob_sha1": "51af3b705c46eb0fce81181590e9362d942666bd",
+      "sha256": "d64b8309def0763558bb4121a3a454183aa75de1b978db1d5e05d9e9c3c9a78f"
+    },
+    "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php": {
+      "git_blob_sha1": "0301b90e0e74731f72844c9418e38b8266e0f77e",
+      "sha256": "d77d9e0b236c32907802d5fb0a41091f457a6b85cadd429334ba2f83dc57594e"
+    },
+    "resources/js/pages/control-room/shifts/handover.tsx": {
+      "git_blob_sha1": "2e91bd45724f35d018107ace4b9fe7a2994b394b",
+      "sha256": "0f78801472b94e5e8482a0e2973702489400706b4b11cdef6dd48dd0945bcc59"
+    },
+    "resources/js/components/app-sidebar.tsx": {
+      "git_blob_sha1": "a94c12e86959bd2f7a79468512970f552a6292c4",
+      "sha256": "1cadfa92ebd77801f6b55c145d0c6f7b14c0027bf7c937d7d5591aad3a38093b"
+    },
+    "resources/css/app.css": {
+      "git_blob_sha1": "76ce1ecca5f89ba7236a39fc1129e77fa58eb352",
+      "sha256": "0d718973b17bb1da767b74731db3a8f026f497426ad0c97bbf248a115e96ff5b"
+    }
+  },
+  "dependency_identity": {
+    "composer_lock_sha256": "9347755dd062f866daa8b4f98f16cb2e84636fab3bf36765f649cd94d539c94c",
+    "package_lock_sha256": "38df4486f945df519512000c3b928ab204316ed8f2a5842aaf058d428eb10a6f",
+    "composer_install": "one direct PHP 8.4 composer.lock install, no scripts, exited 0",
+    "npm_install": "one npm ci from package-lock.json, ignore scripts, exited 0; the pre-existing partial node_modules directory was preserved separately for exact restoration"
+  },
+  "fresh_build_identity": {
+    "command": "node_modules/.bin/vite.cmd build --outDir <temporary-audit-build> --emptyOutDir",
+    "modules_transformed": 4930,
+    "duration": "3m12s",
+    "manifest_sha256": "1b0882f368eceaf2f43f807a717f6654eb6bf87a9b229868004b6fddf054893c",
+    "manifest_entries": {
+      "resources/js/app.tsx": {
+        "file": "assets/app-DjTh_BTc.js",
+        "sha256": "8bbe8198df1f655adb1d05d434b68b7ff5d4e968e3afe6cf528806ff1c16fd1f"
+      },
+      "resources/css/app.css": {
+        "file": "assets/app-Cofd7tLi.css",
+        "sha256": "4c039ff58bfe792a55ccc0a7e236d4061a90c52808256e1f8c2aa1cb09811c17"
+      },
+      "resources/js/pages/control-room/shifts/handover.tsx": {
+        "file": "assets/handover-C9VoEy4V.js",
+        "sha256": "d3fbaca5f3d23cae54c04efb6f9dc753471193c6dddad4bda3349e5e90afa8f5"
+      }
+    }
+  },
+  "preview": {
+    "repo_root": "<local-user>/Herd/oblivionfindings",
+    "command": "<local-user>/.config/herd/bin/php84/php.exe -S 127.0.0.1:8149 server.php",
+    "pid": 67072,
+    "port": 8149,
+    "login_status": 200,
+    "login_served_app_asset": "/build/assets/app-DjTh_BTc.js",
+    "login_served_css_asset": "/build/assets/app-Cofd7tLi.css"
+  },
+  "browser_observation": {
+    "initial_url": "http://127.0.0.1:8149/control-room/shifts",
+    "http_status": 302,
+    "location": "http://127.0.0.1:8149/login",
+    "final_url": "http://127.0.0.1:8149/login",
+    "console_warnings_or_errors": [],
+    "existing_authenticated_session": false,
+    "active_shift_link_discovery": "not reached",
+    "handover_page_rendered": false,
+    "screenshots": [],
+    "viewport_records": []
+  },
+  "completion_credit": {
+    "browser_rows_completed": 0,
+    "visual_ids_updated": [],
+    "reason": "The safe packet required discovery of an existing Active shift through an already-authenticated shifts list. Authentication was unavailable, so no shift ID was guessed and no session or fixture was manufactured. VIS-000101 through VIS-000104 remain incomplete."
+  },
+  "preflight_process_snapshots": [
+    {
+      "at": "2026-08-21T07:19:06.4738164+12:00",
+      "blocked_processes": 0,
+      "php_cgi": 5,
+      "php": 0,
+      "node": 2,
+      "composer": 0
+    },
+    {
+      "at": "2026-08-21T07:19:10.5819117+12:00",
+      "blocked_processes": 0,
+      "php_cgi": 5,
+      "php": 0,
+      "node": 2,
+      "composer": 0
+    }
+  ],
+  "cleanup": {
+    "status": "complete",
+    "preview_pid_absent": true,
+    "port_8149_listeners": 0,
+    "vendor_restored_to_initial_absent_state": true,
+    "preexisting_node_modules_restored": true,
+    "preexisting_node_modules_vite_present": false,
+    "public_build_restored": true,
+    "restored_public_manifest_sha256": "3341666d30499a8d4449382641c27a96d36046d1901b709901bed2a2393ef1e2",
+    "temporary_build_and_logs_absent": true,
+    "temporary_backup_paths_absent": true,
+    "tracked_worktree_changes": 0,
+    "head_after_cleanup": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "post_process_snapshots": [
+      {
+        "at": "2026-08-21T07:33:12.4025361+12:00",
+        "blocked_processes": 0,
+        "php_cgi": 5,
+        "php": 0,
+        "node": 2,
+        "composer": 0
+      },
+      {
+        "at": "2026-08-21T07:33:16.5112859+12:00",
+        "blocked_processes": 0,
+        "php_cgi": 5,
+        "php": 0,
+        "node": 2,
+        "composer": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "artifact": "final-901-visual-link-generation-summary",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "partial_final_id_linkage_observations_preserved_runtime_coverage_unchanged",
+  "audit_boundary": "Audit artifacts only; no application code, configuration, data, tests, browser state, deployment or Git history changed.",
+  "inputs": {
+    "visual_matrix_input_sha256": "66f4e8e4258e22f839575b086808b439db0ce526feefebae29444edb884eb2a2",
+    "visual_matrix_original_sha256": "92d12eedaa2e7593cc1ad0bc829f22d57aed36ded55ccfca8d919865f407e1a6",
+    "manifest_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900",
+    "inventory_sha256": "17a48ffe2f8d487d9100c88f5882d4b4f35fa30c90ff5b5b995fbeed7193b4c5"
+  },
+  "counts": {
+    "rows": 8753,
+    "unique_visual_ids": 8753,
+    "assigned_final_feature_id": 7785,
+    "unresolved_final_feature_id": 968,
+    "unique_assigned_final_feature_ids": 742,
+    "manifest_ids_with_any_visual_lineage": 821,
+    "manifest_ids_without_visual_lineage": 80,
+    "unresolved_with_manifest_candidates": 455,
+    "unresolved_without_manifest_candidates": 513,
+    "status_counts": {
+      "exact_working_key": 3497,
+      "global_exact_page": 224,
+      "global_exact_route": 109,
+      "global_exact_route_page": 353,
+      "material_state_exact_route_action": 125,
+      "source_family_one_to_one": 1565,
+      "split_family_exact_page": 758,
+      "split_family_exact_route": 61,
+      "split_family_exact_route_page": 1081,
+      "split_family_global_exact_page": 5,
+      "split_family_global_exact_route": 1,
+      "split_family_global_exact_route_page": 6,
+      "unresolved_no_manifest_lineage": 513,
+      "unresolved_split_family_page_ambiguous": 342,
+      "unresolved_split_source_family": 113
+    },
+    "classification_counts": {
+      "Blocked": 547,
+      "Not safely reproducible": 4312,
+      "Observed": 2503,
+      "Source-inferred": 1391
+    },
+    "pattern_type_counts": {
+      "hero/custom-usage": 85,
+      "hero/pagehero-call-site": 521,
+      "hero/wrapper-reference": 50,
+      "material-state-applicability": 4312,
+      "navigation-overlay": 1,
+      "overlay/custom-usage": 659,
+      "overlay/primitive-root": 477,
+      "overlay/primitive-trigger": 146,
+      "page/component": 1880,
+      "safe-route-template": 622
+    }
+  },
+  "outputs": {
+    "matrix": "../../05-browser-visual-coverage-matrix.csv",
+    "matrix_sha256": "66f4e8e4258e22f839575b086808b439db0ce526feefebae29444edb884eb2a2",
+    "semantic_tuple_sha256": "1d2286e748de22f9a4eefd636b70eaafa8c10ea5016b7e7153886fdc70fb6de4",
+    "semantic_tuple_algorithm": "Current row order; UTF-8; LF/no trailing LF; visual_id US legacy_feature_id US feature_id US working_feature_ids US feature_link_status US feature_link_evidence"
+  },
+  "proof_boundary": "Every original observation is preserved. Four browser-measured Observed-light labels are normalized to Observed; five static Dead/unreachable source conclusions are normalized to Source-inferred; their evidence notes remain unchanged. Blank final feature IDs are explicit unresolved links. Source-family envelopes are never promoted to split-target proof; a missing or stale family label may be bypassed only when the row's exact inventory route/page relation identifies one unique current target. Browser/runtime coverage is unchanged.",
+  "material_state_exact_route_action_wave": {
+    "count": 125,
+    "classification": "Not safely reproducible",
+    "selection_rule": "Material-state applicability + exact source-applicability map + exact current route name/path + one inventory target equal to one manifest route target + existing frontend source + existing backend controller method.",
+    "patch_map_sha256": "baae6c620b6cf33cd70a69047ca1a3c912d86bc694966094d1c13147d36321ae",
+    "patch_map_algorithm": "Lexicographic line sort; UTF-8; LF/no trailing LF; visual_id US target US route_id US route_name US route_path US action US component_anchor US state",
+    "unresolved_remainder_sha256": "d7b67c2751774a20a7a8e5fed5c5f6f8b829d5a779161c780e08a19304bccf9c",
+    "unresolved_remainder_algorithm": "Lexicographic line sort; UTF-8; LF/no trailing LF; visual_id US current_status US legacy_feature_id US working_feature_ids US route_name US route_path US component_anchor US pattern_type",
+    "claim_limit": "This proves exact target lineage for route-specific material-state rows; it does not convert any row into runtime/browser completion."
+  },
+  "validation": {
+    "row_count_preserved": true,
+    "visual_id_order_preserved": true,
+    "legacy_feature_id_preserved": true,
+    "original_observation_fields_preserved_except_permitted_classification_normalization": true,
+    "browser_claim_classification_vocabulary_conforming": true,
+    "assigned_ids_exist_in_manifest": true,
+    "unresolved_rows_have_blank_final_id": true
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "968 rows remain without a uniquely proved final working ID"
+  }
+}

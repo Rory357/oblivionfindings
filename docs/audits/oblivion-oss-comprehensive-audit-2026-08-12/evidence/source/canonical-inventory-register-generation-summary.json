@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "artifact": "canonical-inventory-register-generation-summary",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "complete_static_identity_register_runtime_unverified",
+  "audit_boundary": "Audit artifacts only; no application code, configuration, routes, data, tests, browser state, deployment or Git history changed.",
+  "inputs": {
+    "manifest_sha256": "ded38bc3672bf51cb48a02a576cc36ca83d01af6a982dbd19c118ff50edf59b9",
+    "benchmark_mapping_sha256": "c2cb6ea0f584b8eef7c6e74cf6aca3cf580139fabdb66198ace43e02fddabe3c",
+    "route_page_gap_reconciliation_sha256": "cefc4af1571d50ad17c155c083635d2bacf79828a78d1d68ffc2ee86242c49eb",
+    "superseded_projection_semantic_sha256": "6f4be98348c78391acfbda866dd6217f5aa7e67958cb3076049c1c5318f79b1a",
+    "superseded_projection_id_sha256": "016bcb52a0742d57eae432646642aeb1ae14c2193126bc73a07014d2d75fec12"
+  },
+  "counts": {
+    "canonical_features": 902,
+    "H": 788,
+    "D": 111,
+    "M": 3,
+    "id_provenance": {
+      "exact_current": 881,
+      "source_stable": 5,
+      "audit_assigned_stable_name": 16
+    },
+    "benchmark_completion_credit": 451,
+    "benchmark_completion_unproved": 451,
+    "verified_benchmark": 362,
+    "documented_no_credible_match": 89,
+    "route_enriched_targets": 901,
+    "route_relations": 3065,
+    "unique_enriched_routes": 2985,
+    "shared_route_ids": 30,
+    "excluded_route_surface_relations": 39,
+    "route_inventory_ids_with_static_disposition": 3024,
+    "page_enriched_targets": 756,
+    "page_relations": 1526,
+    "unique_enriched_pages": 945,
+    "shared_page_ids": 228,
+    "excluded_page_surface_relations": 17,
+    "page_inventory_ids_with_static_disposition": 962,
+    "backend_enriched_targets": 729,
+    "backend_relations": 828,
+    "unique_backend_anchors": 469,
+    "source_family_relations": 993,
+    "representative_role_tasks_executed": 0
+  },
+  "outputs": {
+    "inventory": "../../inventory.json",
+    "inventory_sha256": "076015a57c9368cdc737d0e8139589ba5708d0fa6bcee1d6654c2e72b4b9889a",
+    "canonical_tuple_sha256": "a9460b4306f3f2eb0f710c221a94ffcb304f9ecffea6d8671c3478659cfdb113"
+  },
+  "completion_gate": {
+    "status": "blocked",
+    "accepted_feature_ids_registered": 902,
+    "reason": "Static accepted FEATURE-ID registration and route/page disposition do not prove representative-role runtime completion, persisted outcomes, recovery, handoff, viewport behavior, or permission enforcement."
+  },
+  "proof_boundary": "Empty target route/page arrays mean not enriched. Benchmark completion credit is only the benchmark/NCM gate. Runtime, usability, error, recovery, handoff and viewport completion remain unproved."
+}

@@ -1,0 +1,759 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave9",
+  "generated_at": "2026-08-14T10:51:49+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Ninth bounded target-specific wave: 12 current unique completion-unproved targets, with no prior-wave reuse or inherited family credit.",
+  "methodology": {
+    "credit_rule": "Only target-specific official repository-native source pinned to an immutable commit, with exact file hashes and loci proving a material same-target slice, receives credit.",
+    "licence_rule": "Only cited community source is credited; hosted, paid, enterprise, private and unpinned behavior is excluded.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or Git state was changed."
+  },
+  "input_pins": {
+    "working_capability_manifest_902": {
+      "path": "evidence/source/working-capability-manifest-902.json",
+      "file_sha256": "4a90a19d20ffe332840d46dfe3e427d224d0f53db2a4b8515a7b5c64d2f59fb8"
+    },
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "347e8cbf78249db0d0f6ee648c992b6a639e2bbe15547e218436219852de9171"
+    }
+  },
+  "repository_snapshots": {
+    "ERPNext": {
+      "official_repository_url": "https://github.com/frappe/erpnext",
+      "commit_sha": "081d269f6d7796adcc297d75ed4b0190c236b106",
+      "spdx": "GPL-3.0",
+      "license_locus": "license.txt",
+      "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "edition_boundary": "Pinned GPL-3.0 ERPNext repository-native community source only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded."
+    },
+    "Frappe_HRMS": {
+      "official_repository_url": "https://github.com/frappe/hrms",
+      "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+      "spdx": "GPL-3.0",
+      "license_locus": "license.txt",
+      "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+      "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded."
+    },
+    "Odoo_Community": {
+      "official_repository_url": "https://github.com/odoo/odoo",
+      "commit_sha": "62e1c17ceb711a566e42d7f7be2d249d4278dc4c",
+      "spdx": "LGPL-3.0",
+      "license_locus": "LICENSE",
+      "license_sha256": "abc09dad5f84a76e1b0279237053cae16c03228ab27d8d467677054c2bd17eeb",
+      "edition_boundary": "Pinned LGPL-3.0 Odoo Community repository source only; Enterprise, hosted Odoo Online behavior, proprietary modules and unpinned branches are excluded."
+    },
+    "Traccar": {
+      "official_repository_url": "https://github.com/traccar/traccar",
+      "commit_sha": "17e7a330e8a07896f000898b37dc770f2df3c142",
+      "spdx": "Apache-2.0",
+      "license_locus": "LICENSE.txt",
+      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "edition_boundary": "Pinned Apache-2.0 Traccar server repository source only; hosted tracking service, commercial support, separately distributed clients and unpinned branches are excluded."
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_direct_recommended": 12,
+    "documented_ncm_direct_recommended": 0,
+    "completion_credit_recommended": 12
+  },
+  "selected_keys_sha256": "f269ad458ac5434605621dbe5b3ebb5c0801ad09375446319df1c809ee1ab367",
+  "selected_lineage_tuple_sha256": "1c9d96cd458673c6a56e16b8db0fee9b648029543d95de5ba196dcec81b59a99",
+  "evaluations": [
+    {
+      "working_key": "CAP-FLEET-VEHICLE-REGISTER",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Maintain an authorised vehicle register with a stable vehicle identity, registration, make/model, odometer, location, assignment and change history.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FLEET-VEHICLE"
+        ],
+        "route_ids": [
+          "ROUTE-0835",
+          "ROUTE-0836",
+          "ROUTE-0837",
+          "ROUTE-0840",
+          "ROUTE-0851"
+        ],
+        "page_ids": [
+          "PAGE-0261",
+          "PAGE-0262"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FLEET"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "081d269f6d7796adcc297d75ed4b0190c236b106",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned GPL-3.0 ERPNext repository-native community source only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "ERPNext",
+        "exact_loci": [
+          {
+            "path": "erpnext/setup/doctype/vehicle/vehicle.json",
+            "lines": "L1-L29,L40-L112,L243-L248",
+            "sha256": "c8739148e00245726b166ee2beca98816862c97311b2f2cdefa0254386434fd2",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/vehicle/vehicle.json"
+          }
+        ],
+        "proven_slice": "Vehicle uses licence plate as its stable name and materially records make, model, last odometer, location, chassis, assigned employee and insurance fields with tracked changes.",
+        "parity_limits": "Does not prove Oblivion bulk actions, Site-scoped visibility, wheelchair/medical equipment fields, live tracker state, NZ WOF/COF rules or direct-object authorization.",
+        "p6_caveats": "Benchmark-only behavior; do not copy schema, labels or layout. Validate NZ fleet compliance and disability-support context independently."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/vehicle/vehicle.json :: L1-L29,L40-L112,L243-L248 :: sha256=c8739148e00245726b166ee2beca98816862c97311b2f2cdefa0254386434fd2"
+      ]
+    },
+    {
+      "working_key": "CAP-FLEET-VEHICLE-FUEL",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record and retrieve vehicle-linked refuelling entries with date, odometer, quantity, price, supplier/invoice context and attributable driver or employee.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FLEET-VEHICLE"
+        ],
+        "route_ids": [
+          "ROUTE-0734",
+          "ROUTE-0735",
+          "ROUTE-0844"
+        ],
+        "page_ids": [
+          "PAGE-0220"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FLEET"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "Frappe_HRMS",
+        "exact_loci": [
+          {
+            "path": "hrms/hr/doctype/vehicle_log/vehicle_log.json",
+            "lines": "L49-L65,L85-L131,L155-L161",
+            "sha256": "a3c095cfd19b2b9bedf4d3761e6eddef5c3ecf8ce19b56ca103cd37846bf0703",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/vehicle_log/vehicle_log.json"
+          },
+          {
+            "path": "hrms/hr/doctype/vehicle_log/vehicle_log.py",
+            "lines": "L38-L47,L73-L95",
+            "sha256": "7c0e5edebc5f38c08e33ec5edfcc411adcc8dc591973c4c3017e8d6f4629960f",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/vehicle_log/vehicle_log.py"
+          },
+          {
+            "path": "hrms/hr/report/vehicle_expenses/vehicle_expenses.py",
+            "lines": "L23-L60,L63-L100",
+            "sha256": "722f50347caa7ff7a7901593cd9a4a505002f6503b0470cc7456c38f1dc9703e",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/report/vehicle_expenses/vehicle_expenses.py"
+          }
+        ],
+        "proven_slice": "Vehicle Log binds vehicle, employee, date and monotonic odometer to fuel quantity and price; submit updates vehicle odometer, and the report derives fuel expense with employee, vehicle and date filters.",
+        "parity_limits": "Does not prove fuel-card integration, receipt immutability, duplicate detection, Site scope, approval, emissions reporting or Oblivion's exact fuel-entry route behavior.",
+        "p6_caveats": "Accounting-oriented fleet evidence is not proof of NZ tax treatment, accessibility, privacy or safe direct-object handling."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/vehicle_log/vehicle_log.json :: L49-L65,L85-L131,L155-L161 :: sha256=a3c095cfd19b2b9bedf4d3761e6eddef5c3ecf8ce19b56ca103cd37846bf0703",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/vehicle_log/vehicle_log.py :: L38-L47,L73-L95 :: sha256=7c0e5edebc5f38c08e33ec5edfcc411adcc8dc591973c4c3017e8d6f4629960f",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/report/vehicle_expenses/vehicle_expenses.py :: L23-L60,L63-L100 :: sha256=722f50347caa7ff7a7901593cd9a4a505002f6503b0470cc7456c38f1dc9703e"
+      ]
+    },
+    {
+      "working_key": "CAP-FLEET-VEHICLE-TRIPS",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Retrieve authorised vehicle trips with device/vehicle identity, start/end times, start/end positions or addresses, duration, distance, speed and driver context.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FLEET-VEHICLE"
+        ],
+        "route_ids": [
+          "ROUTE-0831",
+          "ROUTE-0834"
+        ],
+        "page_ids": [
+          "PAGE-0258"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FLEET"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/traccar/traccar",
+        "commit_sha": "17e7a330e8a07896f000898b37dc770f2df3c142",
+        "spdx": "Apache-2.0",
+        "license_locus": "LICENSE.txt",
+        "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "edition_boundary": "Pinned Apache-2.0 Traccar server repository source only; hosted tracking service, commercial support, separately distributed clients and unpinned branches are excluded.",
+        "repo": "Traccar",
+        "exact_loci": [
+          {
+            "path": "src/main/java/org/traccar/reports/TripsReportProvider.java",
+            "lines": "L58-L79",
+            "sha256": "207259d9afd3fb08f9845c9fa07776820091ddd470a183670d6da13964b122ef",
+            "primary_source_url": "https://github.com/traccar/traccar/blob/17e7a330e8a07896f000898b37dc770f2df3c142/src/main/java/org/traccar/reports/TripsReportProvider.java"
+          },
+          {
+            "path": "src/main/java/org/traccar/reports/model/BaseReportItem.java",
+            "lines": "L21-L125",
+            "sha256": "4952dfa0efc283c2ac02191867f01abb76c0235846be372a6abbf5a5306046da",
+            "primary_source_url": "https://github.com/traccar/traccar/blob/17e7a330e8a07896f000898b37dc770f2df3c142/src/main/java/org/traccar/reports/model/BaseReportItem.java"
+          },
+          {
+            "path": "src/main/java/org/traccar/reports/model/TripReportItem.java",
+            "lines": "L19-L117",
+            "sha256": "4317a3356fd439fe9a4e2876fdc9759fe28183f003d9855bd337432fcd426637",
+            "primary_source_url": "https://github.com/traccar/traccar/blob/17e7a330e8a07896f000898b37dc770f2df3c142/src/main/java/org/traccar/reports/model/TripReportItem.java"
+          }
+        ],
+        "proven_slice": "The provider enforces accessible-device selection and period limits before detecting trips; report models carry device, distance, speed, odometer, times, endpoints, addresses, duration and driver identity.",
+        "parity_limits": "Does not prove Oblivion's personal/business toggle, consent boundary, Site custody, correction provenance, tracker ingestion reliability or healthcare transport context.",
+        "p6_caveats": "Location and driver evidence is privacy-sensitive; a tracking benchmark cannot establish lawful care-sector tracking or NZ privacy compliance."
+      },
+      "evidence_loci": [
+        "https://github.com/traccar/traccar@17e7a330e8a07896f000898b37dc770f2df3c142 :: src/main/java/org/traccar/reports/TripsReportProvider.java :: L58-L79 :: sha256=207259d9afd3fb08f9845c9fa07776820091ddd470a183670d6da13964b122ef",
+        "https://github.com/traccar/traccar@17e7a330e8a07896f000898b37dc770f2df3c142 :: src/main/java/org/traccar/reports/model/BaseReportItem.java :: L21-L125 :: sha256=4952dfa0efc283c2ac02191867f01abb76c0235846be372a6abbf5a5306046da",
+        "https://github.com/traccar/traccar@17e7a330e8a07896f000898b37dc770f2df3c142 :: src/main/java/org/traccar/reports/model/TripReportItem.java :: L19-L117 :: sha256=4317a3356fd439fe9a4e2876fdc9759fe28183f003d9855bd337432fcd426637"
+      ]
+    },
+    {
+      "working_key": "CAP-FLEET-DRIVER-DIRECTORY",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Maintain an authorised searchable driver directory with person linkage, active status, contact, licence identifier, issue/expiry dates and permitted licence categories.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FLEET-DRIVER"
+        ],
+        "route_ids": [
+          "ROUTE-0731",
+          "ROUTE-0732"
+        ],
+        "page_ids": [
+          "PAGE-0214",
+          "PAGE-0218",
+          "PAGE-0219"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/FleetAssets/DriverController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FLEET"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "081d269f6d7796adcc297d75ed4b0190c236b106",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned GPL-3.0 ERPNext repository-native community source only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "ERPNext",
+        "exact_loci": [
+          {
+            "path": "erpnext/setup/doctype/driver/driver.json",
+            "lines": "L12-L30,L39-L51,L66-L103,L119-L128,L178-L186",
+            "sha256": "d19ce43793753f89aa7879b208803d36fca04e29f8adfcf4117ba3fe2262ea66",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/driver/driver.json"
+          }
+        ],
+        "proven_slice": "Driver records expose full name, active/suspended/left status, employee/user linkage, contact, licence number, issue/expiry dates and categories with list/search fields.",
+        "parity_limits": "Does not prove NZ licence checks, medical/competency eligibility, Site-specific directory visibility, expiry escalation, driving scorecard or direct-object denial.",
+        "p6_caveats": "Licence and contact data are sensitive HR records; benchmark presence is not authorization, retention or accessibility proof."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/driver/driver.json :: L12-L30,L39-L51,L66-L103,L119-L128,L178-L186 :: sha256=d19ce43793753f89aa7879b208803d36fca04e29f8adfcf4117ba3fe2262ea66"
+      ]
+    },
+    {
+      "working_key": "FLEET-MILEAGE",
+      "prior_status": "unproved_pending",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record employee vehicle mileage from monotonic odometer evidence, derive reimbursable vehicle expense, submit it into an approval/accounting lifecycle and preserve reversal behavior.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "FLEET-MILEAGE"
+        ],
+        "route_ids": [
+          "ROUTE-0790",
+          "ROUTE-0791",
+          "ROUTE-0792",
+          "ROUTE-0793",
+          "ROUTE-0794",
+          "ROUTE-0795",
+          "ROUTE-0796"
+        ],
+        "page_ids": [
+          "PAGE-0214",
+          "PAGE-0240"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/FleetAssets/MileageController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "FLEET"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "Frappe_HRMS",
+        "exact_loci": [
+          {
+            "path": "hrms/hr/doctype/vehicle_log/vehicle_log.py",
+            "lines": "L38-L69,L73-L95",
+            "sha256": "7c0e5edebc5f38c08e33ec5edfcc411adcc8dc591973c4c3017e8d6f4629960f",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/vehicle_log/vehicle_log.py"
+          },
+          {
+            "path": "hrms/hr/doctype/expense_claim/expense_claim.py",
+            "lines": "L55-L93,L122-L154,L196-L226,L264-L283",
+            "sha256": "10c34680b0a09321b311ca03c9a33e8461c30640611bb01fdf76e5167d0d78c0",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/expense_claim/expense_claim.py"
+          }
+        ],
+        "proven_slice": "Vehicle Log rejects odometer rollback, updates the vehicle on submit, reverses distance on cancel and constructs a linked Expense Claim; Expense Claim supplies approval/payment states and accounting entries.",
+        "parity_limits": "Does not prove Oblivion's exact approve/reject/mark-paid controls, NZ IRD mileage rates, Site ownership, duplicate journey checks, employee attestations or exported evidence format.",
+        "p6_caveats": "Tax and reimbursement rules are jurisdiction-specific; no rate, regulatory or payroll suitability is inferred."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/vehicle_log/vehicle_log.py :: L38-L69,L73-L95 :: sha256=7c0e5edebc5f38c08e33ec5edfcc411adcc8dc591973c4c3017e8d6f4629960f",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/expense_claim/expense_claim.py :: L55-L93,L122-L154,L196-L226,L264-L283 :: sha256=10c34680b0a09321b311ca03c9a33e8461c30640611bb01fdf76e5167d0d78c0"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-CALENDAR-EVENT-MANAGEMENT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Authorised users can create, update, retrieve and remove calendar events with subject, organiser, time, location, privacy, attendees and reminders.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-CALENDAR"
+        ],
+        "route_ids": [
+          "ROUTE-1296",
+          "ROUTE-1297",
+          "ROUTE-1298",
+          "ROUTE-1299",
+          "ROUTE-1300",
+          "ROUTE-1301",
+          "ROUTE-1302"
+        ],
+        "page_ids": [
+          "PAGE-0408"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/CalendarController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/odoo/odoo",
+        "commit_sha": "62e1c17ceb711a566e42d7f7be2d249d4278dc4c",
+        "spdx": "LGPL-3.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "abc09dad5f84a76e1b0279237053cae16c03228ab27d8d467677054c2bd17eeb",
+        "edition_boundary": "Pinned LGPL-3.0 Odoo Community repository source only; Enterprise, hosted Odoo Online behavior, proprietary modules and unpinned branches are excluded.",
+        "repo": "Odoo_Community",
+        "exact_loci": [
+          {
+            "path": "addons/calendar/models/calendar_event.py",
+            "lines": "L70-L81,L131-L215,L583-L606,L768-L805,L930-L952",
+            "sha256": "2eca7a2f229c74b2a836710f0ea00ba1eeb95d5ac86605987bed114964a7af59",
+            "primary_source_url": "https://github.com/odoo/odoo/blob/62e1c17ceb711a566e42d7f7be2d249d4278dc4c/addons/calendar/models/calendar_event.py"
+          }
+        ],
+        "proven_slice": "Calendar Event defines subject, description, organiser, location, privacy, availability, times, attendees and alarms, with repository-native create, update and delete behavior.",
+        "parity_limits": "Does not prove Oblivion attachment lifecycle, HR record binding, Site scope, event-type policy, download authorization, recurrence UX or audit evidence.",
+        "p6_caveats": "Generic community calendar behavior only; HR privacy, NZ employment obligations and accessibility require separate validation."
+      },
+      "evidence_loci": [
+        "https://github.com/odoo/odoo@62e1c17ceb711a566e42d7f7be2d249d4278dc4c :: addons/calendar/models/calendar_event.py :: L70-L81,L131-L215,L583-L606,L768-L805,L930-L952 :: sha256=2eca7a2f229c74b2a836710f0ea00ba1eeb95d5ac86605987bed114964a7af59"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-CALENDAR-PARTICIPATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An invited participant can respond to an authorised calendar event with accepted, declined or tentative state and retain attributable participation evidence.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-CALENDAR"
+        ],
+        "route_ids": [
+          "ROUTE-1296",
+          "ROUTE-1303"
+        ],
+        "page_ids": [
+          "PAGE-0408"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/CalendarController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/odoo/odoo",
+        "commit_sha": "62e1c17ceb711a566e42d7f7be2d249d4278dc4c",
+        "spdx": "LGPL-3.0",
+        "license_locus": "LICENSE",
+        "license_sha256": "abc09dad5f84a76e1b0279237053cae16c03228ab27d8d467677054c2bd17eeb",
+        "edition_boundary": "Pinned LGPL-3.0 Odoo Community repository source only; Enterprise, hosted Odoo Online behavior, proprietary modules and unpinned branches are excluded.",
+        "repo": "Odoo_Community",
+        "exact_loci": [
+          {
+            "path": "addons/calendar/models/calendar_attendee.py",
+            "lines": "L16-L46,L57-L80,L115-L124,L225-L247",
+            "sha256": "a9682e5485d0b304fd6ca512d15ed7b1d33057c07b03ffcaff06696eb1c5e52e",
+            "primary_source_url": "https://github.com/odoo/odoo/blob/62e1c17ceb711a566e42d7f7be2d249d4278dc4c/addons/calendar/models/calendar_attendee.py"
+          }
+        ],
+        "proven_slice": "Calendar Attendee links an identified partner to an event and persists needs-action, accepted, declined or tentative state; accept/decline actions post attributable messages and update state.",
+        "parity_limits": "Does not prove Oblivion RSVP authorization, Site boundaries, event visibility after revocation, attachment privacy, notification recovery or correction history.",
+        "p6_caveats": "Participation can disclose employment information; generic calendar behavior does not establish lawful HR disclosure or retention."
+      },
+      "evidence_loci": [
+        "https://github.com/odoo/odoo@62e1c17ceb711a566e42d7f7be2d249d4278dc4c :: addons/calendar/models/calendar_attendee.py :: L16-L46,L57-L80,L115-L124,L225-L247 :: sha256=a9682e5485d0b304fd6ca512d15ed7b1d33057c07b03ffcaff06696eb1c5e52e"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-EMPLOYEE-PROFILE-ACCOUNT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Govern the linkage between an employee profile and a login account, create the account from an authorised employee record and constrain the resulting employee access.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-EMPLOYEE-PROFILE",
+          "HR-STAFF"
+        ],
+        "route_ids": [
+          "ROUTE-1609"
+        ],
+        "page_ids": [],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/EmployeeProfileController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "081d269f6d7796adcc297d75ed4b0190c236b106",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned GPL-3.0 ERPNext repository-native community source only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "ERPNext",
+        "exact_loci": [
+          {
+            "path": "erpnext/setup/doctype/employee/employee.json",
+            "lines": "L27-L34,L175-L183,L208-L216,L283-L304,L364-L372",
+            "sha256": "238e600228dd3d0b842d2fd3915d64f0edea708fdc2cd9ee2edf8966fb2671c7",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/employee/employee.json"
+          },
+          {
+            "path": "erpnext/setup/doctype/employee/employee.py",
+            "lines": "L435-L482",
+            "sha256": "5e2823056a5df0b75123bdc00cfb5300028cf9767495f264338d957b72ff3d67",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/employee/employee.py"
+          }
+        ],
+        "proven_slice": "Employee stores a linked User ID and optional automatic creation; the POST-only create-user operation checks write permission, rejects duplicate linkage, validates email, creates User, assigns Employee role and can add employee/company permissions.",
+        "parity_limits": "Does not prove Oblivion invitation delivery, expiry, replay prevention, Site assignment, role composition or generic direct-object concealment.",
+        "p6_caveats": "Account creation is security-sensitive; benchmark evidence does not authorize reset links as invitations or establish Oblivion's access model."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/employee/employee.json :: L27-L34,L175-L183,L208-L216,L283-L304,L364-L372 :: sha256=238e600228dd3d0b842d2fd3915d64f0edea708fdc2cd9ee2edf8966fb2671c7",
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/employee/employee.py :: L435-L482 :: sha256=5e2823056a5df0b75123bdc00cfb5300028cf9767495f264338d957b72ff3d67"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-OFFBOARDING-TASK",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Instantiate employee offboarding activities as assigned tasks, track each task through completion and derive the parent offboarding status from task/project completion.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-OFFBOARDING"
+        ],
+        "route_ids": [
+          "ROUTE-1553"
+        ],
+        "page_ids": [],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/OffboardingController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "Frappe_HRMS",
+        "exact_loci": [
+          {
+            "path": "hrms/hr/doctype/employee_separation/employee_separation.json",
+            "lines": "L53-L59,L73-L91,L119-L152",
+            "sha256": "f2c609736864fdb75b4254c274ad1e6c1e9c986b98bceba269fd706cf1695db6",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/employee_separation/employee_separation.json"
+          },
+          {
+            "path": "hrms/controllers/employee_boarding_controller.py",
+            "lines": "L14-L18,L26-L100,L114-L141,L178-L199",
+            "sha256": "ec3f0ea0ffdfcdbbf3034dfd1d04748aa7fff28d499b7d4888817d0226a1fe79",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/controllers/employee_boarding_controller.py"
+          }
+        ],
+        "proven_slice": "Employee Separation stores pending/in-process/completed state and activities; submission creates a project and dated tasks, assigns configured users or roles, and task/project progress updates parent separation status.",
+        "parity_limits": "Does not prove Oblivion evidence upload, sign-off user, access revocation, Site scope, actor/time provenance, idempotent completion or credential/device recovery.",
+        "p6_caveats": "Offboarding can affect employment rights and system access; this workflow is not a legal or security termination policy."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/employee_separation/employee_separation.json :: L53-L59,L73-L91,L119-L152 :: sha256=f2c609736864fdb75b4254c274ad1e6c1e9c986b98bceba269fd706cf1695db6",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/controllers/employee_boarding_controller.py :: L14-L18,L26-L100,L114-L141,L178-L199 :: sha256=ec3f0ea0ffdfcdbbf3034dfd1d04748aa7fff28d499b7d4888817d0226a1fe79"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-CAREERS-PUBLIC-APPLICATION",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Publish open job information and allow an unauthenticated candidate to submit an application linked to the opening with identity, contact, cover letter and resume evidence.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-CAREERS-CAREER-PORTAL",
+          "HR-CONTROLLERS-CAREER-PORTAL",
+          "HR-ROUTE-CAREERS-SHOW"
+        ],
+        "route_ids": [
+          "ROUTE-0088",
+          "ROUTE-0089",
+          "ROUTE-0090",
+          "ROUTE-0091",
+          "ROUTE-0092"
+        ],
+        "page_ids": [
+          "PAGE-0016",
+          "PAGE-0017",
+          "PAGE-0018"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/CareerPortalController.php",
+          "app/Http/Controllers/Careers/CareerPortalController.php",
+          "routes/*.php closure"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "Frappe_HRMS",
+        "exact_loci": [
+          {
+            "path": "hrms/hr/doctype/job_opening/job_opening.py",
+            "lines": "L19-L58,L65-L70,L161-L174",
+            "sha256": "d460d7d11d99cc58721c4a947a3eecfc6f32d9c79ce39cedd6bde3449b627c59",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/job_opening/job_opening.py"
+          },
+          {
+            "path": "hrms/templates/generators/job_opening.html",
+            "lines": "L4-L40,L45-L199,L201-L220",
+            "sha256": "6ff7154cc8a80504355a131df0ff8c4e4078cf20cad8999c0f6e59ae7c5a30ed",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/templates/generators/job_opening.html"
+          },
+          {
+            "path": "hrms/hr/web_form/job_application/job_application.json",
+            "lines": "L1-L38,L38-L151",
+            "sha256": "8ff10fdd44e6b42a681a503508f89205a579a558ed70bf397c547cfd92eff963",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/web_form/job_application/job_application.json"
+          },
+          {
+            "path": "hrms/hr/doctype/job_applicant/job_applicant.json",
+            "lines": "L42-L108,L128-L136,L185-L191",
+            "sha256": "f252c8ed9a05dcd4b2d47774f7e636b461da302208fd9491231106cab8b64b63",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/job_applicant/job_applicant.json"
+          }
+        ],
+        "proven_slice": "Published Job Opening has a stable public route and closing state; its template displays the opening and Apply action; the public non-login form creates Job Applicant data with name, email, opening, cover letter and resume evidence.",
+        "parity_limits": "Does not prove Oblivion token secrecy, anti-abuse, malware scanning, privacy notice/consent, duplicate policy, accessibility or candidate communication lifecycle.",
+        "p6_caveats": "Candidate data is sensitive and employment decisions high-impact; public-form similarity does not prove privacy, fairness, security or NZ employment-law compliance."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/job_opening/job_opening.py :: L19-L58,L65-L70,L161-L174 :: sha256=d460d7d11d99cc58721c4a947a3eecfc6f32d9c79ce39cedd6bde3449b627c59",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/templates/generators/job_opening.html :: L4-L40,L45-L199,L201-L220 :: sha256=6ff7154cc8a80504355a131df0ff8c4e4078cf20cad8999c0f6e59ae7c5a30ed",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/web_form/job_application/job_application.json :: L1-L38,L38-L151 :: sha256=8ff10fdd44e6b42a681a503508f89205a579a558ed70bf397c547cfd92eff963",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/job_applicant/job_applicant.json :: L42-L108,L128-L136,L185-L191 :: sha256=f252c8ed9a05dcd4b2d47774f7e636b461da302208fd9491231106cab8b64b63"
+      ]
+    },
+    {
+      "working_key": "HR-POSITION",
+      "prior_status": "unproved_pending",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Maintain an authorised catalogue of uniquely named organisational positions with a human-readable description for assignment to employee records.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-POSITION"
+        ],
+        "route_ids": [
+          "ROUTE-1660",
+          "ROUTE-1661",
+          "ROUTE-1662",
+          "ROUTE-1663",
+          "ROUTE-1664",
+          "ROUTE-1665"
+        ],
+        "page_ids": [
+          "PAGE-0502",
+          "PAGE-0503",
+          "PAGE-0504"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/PositionController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/erpnext",
+        "commit_sha": "081d269f6d7796adcc297d75ed4b0190c236b106",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "edition_boundary": "Pinned GPL-3.0 ERPNext repository-native community source only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "ERPNext",
+        "exact_loci": [
+          {
+            "path": "erpnext/setup/doctype/designation/designation.json",
+            "lines": "L1-L29",
+            "sha256": "772d13319c3367c177f51394bae0132a23ba2216ce3a74144eaa51d68c52fa25",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/designation/designation.json"
+          },
+          {
+            "path": "erpnext/setup/doctype/employee/employee.json",
+            "lines": "L36-L42,L364-L372",
+            "sha256": "238e600228dd3d0b842d2fd3915d64f0edea708fdc2cd9ee2edf8966fb2671c7",
+            "primary_source_url": "https://github.com/frappe/erpnext/blob/081d269f6d7796adcc297d75ed4b0190c236b106/erpnext/setup/doctype/employee/employee.json"
+          }
+        ],
+        "proven_slice": "Designation is a setup record with required unique name and description, and Employee materially links to that designation.",
+        "parity_limits": "Does not prove Oblivion reporting lines, Site assignment, headcount/vacancy controls, effective dating, approvals, deletion rules or position history.",
+        "p6_caveats": "This is a narrow catalogue match; do not infer broader position-management parity or copy field/layout choices."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/designation/designation.json :: L1-L29 :: sha256=772d13319c3367c177f51394bae0132a23ba2216ce3a74144eaa51d68c52fa25",
+        "https://github.com/frappe/erpnext@081d269f6d7796adcc297d75ed4b0190c236b106 :: erpnext/setup/doctype/employee/employee.json :: L36-L42,L364-L372 :: sha256=238e600228dd3d0b842d2fd3915d64f0edea708fdc2cd9ee2edf8966fb2671c7"
+      ]
+    },
+    {
+      "working_key": "CAP-HR-EXPENSE-PAYMENT",
+      "prior_status": "unproved",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Disburse an approved employee expense against its payable/accounting record, update reimbursed and paid state and preserve reversal linkage.",
+      "current_source_lineage": {
+        "source_family_ids": [
+          "HR-EXPENSE"
+        ],
+        "route_ids": [
+          "ROUTE-1336"
+        ],
+        "page_ids": [],
+        "backend_anchors": [
+          "app/Http/Controllers/Hr/ExpenseController.php"
+        ],
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "HR"
+      },
+      "benchmark": {
+        "official_repository_url": "https://github.com/frappe/hrms",
+        "commit_sha": "fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0",
+        "spdx": "GPL-3.0",
+        "license_locus": "license.txt",
+        "license_sha256": "f333043685c88280b1a0a41b4f8e2eacb02079f0bfca4d467e52c8834c658cea",
+        "edition_boundary": "Pinned GPL-3.0 Frappe HRMS repository-native community source plus its declared ERPNext dependency only; Frappe Cloud hosting, paid support, private apps, proprietary extensions and unpinned branches are excluded.",
+        "repo": "Frappe_HRMS",
+        "exact_loci": [
+          {
+            "path": "hrms/hr/doctype/expense_claim/expense_claim.py",
+            "lines": "L55-L93,L122-L154,L196-L226,L264-L283,L333-L354",
+            "sha256": "10c34680b0a09321b311ca03c9a33e8461c30640611bb01fdf76e5167d0d78c0",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/hr/doctype/expense_claim/expense_claim.py"
+          },
+          {
+            "path": "hrms/public/js/erpnext/payment_entry.js",
+            "lines": "L4-L60,L64-L90",
+            "sha256": "cc262abeb709392aac356c649c5b224f645c00ce18707b70271e27dd908619f4",
+            "primary_source_url": "https://github.com/frappe/hrms/blob/fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0/hrms/public/js/erpnext/payment_entry.js"
+          }
+        ],
+        "proven_slice": "Expense Claim has approved/rejected and paid/unpaid states, tracks reimbursed totals, posts employee payable GL entries and payment-side accounting; Payment Entry restricts employee references to unpaid Expense Claims.",
+        "parity_limits": "Does not prove Oblivion's exact mark-paid precondition, maker/checker independence, bank execution, payment evidence, Site scope, concurrency/idempotency, notification or recovery behavior.",
+        "p6_caveats": "Accounting workflow evidence is not financial-control assurance; segregation, NZ accounting/tax rules and payment authorization need independent verification."
+      },
+      "evidence_loci": [
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/hr/doctype/expense_claim/expense_claim.py :: L55-L93,L122-L154,L196-L226,L264-L283,L333-L354 :: sha256=10c34680b0a09321b311ca03c9a33e8461c30640611bb01fdf76e5167d0d78c0",
+        "https://github.com/frappe/hrms@fe46f9ba16881f9bf49971f6fcdf6e04b0b7cfb0 :: hrms/public/js/erpnext/payment_entry.js :: L4-L60,L64-L90 :: sha256=cc262abeb709392aac356c649c5b224f645c00ce18707b70271e27dd908619f4"
+      ]
+    }
+  ],
+  "projected_delta": {
+    "verified_benchmark_direct": 12,
+    "eligible_total": 12,
+    "completion_unproved": -12
+  }
+}

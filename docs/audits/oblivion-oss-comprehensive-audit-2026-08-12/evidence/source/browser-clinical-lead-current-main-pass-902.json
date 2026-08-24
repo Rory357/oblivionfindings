@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "artifact": "browser-clinical-lead-current-main-pass-902",
+  "observed_at": "2026-08-14T09:57:11.2984269+12:00",
+  "audit_status": "bounded_current-main_browser_evidence_not_canonical_task_completion",
+  "audited_baseline_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "remediation_main_commit": "ad19f994a280835d039d1a31ebdcb05778733c5a",
+  "local_build_manifest_sha256": "d585d36fbc1527e803a5758ef770727509fa1df12ac6c61c58e18109d472e0e5",
+  "environment": {
+    "owner_classification": "test/development",
+    "served_checkout": "<local-user>/.config/superpowers/worktrees/oblivionfindings/codex-ticketing-main-integration",
+    "served_commit": "ad19f994a280835d039d1a31ebdcb05778733c5a",
+    "origin": "http://127.0.0.1:8147",
+    "browser_driver": "Playwright CLI with headed Chrome",
+    "server_boundary": "The canonical Herd checkout initially returned 500 because vendor/autoload.php was absent. A clean current-main integration worktree with existing dependencies was served using environment values inherited only by the child process; no .env, dependency, application-source or database file was copied or written.",
+    "credential_boundary": "A repository-native synthetic demo account was used. The credential was not written to the audit bundle."
+  },
+  "actor": {
+    "required_class": "Clinical/Medication Lead",
+    "user_name": "Demo Clinical Lead",
+    "user_email": "clinical.lead@demo.test",
+    "application_role": "clinical_lead",
+    "authentication": "direct synthetic-account login; no impersonation",
+    "landing_route": "/my-day",
+    "landing_status": 200
+  },
+  "required_viewports": [
+    "390x844",
+    "1024x768",
+    "1280x800",
+    "1440x900"
+  ],
+  "observations": [
+    {
+      "route": "/health-clinical",
+      "title": "Health & Clinical",
+      "status": 200,
+      "feature_ids": [
+        "CAP-CLIN-MODULE-DASHBOARD"
+      ],
+      "viewports_observed": 4,
+      "horizontal_overflow": {
+        "390x844": false,
+        "1024x768": false,
+        "1280x800": false,
+        "1440x900": false
+      },
+      "visible_role_actions": [
+        "Record observation",
+        "Log clinical event",
+        "Record ABC"
+      ],
+      "console_errors": 0,
+      "console_warnings": 0,
+      "claim_limit": "The role can authenticate and render the command centre and action affordances. No action was submitted, so observation/event/ABC completion, failure, recovery and persistence are not credited."
+    },
+    {
+      "route": "/emar",
+      "title": "eMAR",
+      "status": 200,
+      "feature_ids": [
+        "CAP-MED-EMAR-WORKSPACE"
+      ],
+      "viewports_observed": 4,
+      "horizontal_overflow": {
+        "390x844": {
+          "present": true,
+          "document_scroll_width": 601,
+          "document_client_width": 375,
+          "overflow_pixels": 226
+        },
+        "1024x768": false,
+        "1280x800": false,
+        "1440x900": false
+      },
+      "mobile_overflow_owner": {
+        "source": "resources/js/pages/emar/Index.tsx",
+        "lines": "948-1288",
+        "rendered_grid_class": "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]",
+        "rendered_card_width": 563,
+        "rendered_grid_client_width": 313,
+        "affected_regions": [
+          "Action centre",
+          "Administration compliance",
+          "Today's med-pass outcomes",
+          "Reason not given"
+        ]
+      },
+      "console_errors": 0,
+      "console_warnings": [
+        "Recharts reported width(-1) and height(-1) should be greater than 0."
+      ],
+      "claim_limit": "The role can render the eMAR oversight workspace and its visible action affordances. No medication, round, export, count, review or error action was submitted; no canonical task completion is credited."
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "evidence/browser/clinical-lead-health-clinical-390x844.png",
+      "bytes": 264559,
+      "sha256": "ad9b1f1b83e89ce628b84f3699a16bc4e7e32675ee8c08a196ccbf1e8d6d25a0"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-health-clinical-1024x768.png",
+      "bytes": 287103,
+      "sha256": "d569b6cefed22f740a73180e88bbb13ae3f31738deab5563586aa03c064a1512"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-health-clinical-1280x800.png",
+      "bytes": 320644,
+      "sha256": "0623abb9b97ac0918dbf66f80d745081c35bd8e6b8fbdf492358595ea4ab8fbd"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-health-clinical-1440x900.png",
+      "bytes": 320296,
+      "sha256": "98844816d4ca88969a1986fea0bac018530c15495a83fb185694a107568a7a0c"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-emar-390x844.png",
+      "bytes": 346739,
+      "sha256": "875e5c7da15c3268c369dd06a720e7f27480924b7d20fc97a444595a6ee8ddbd"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-emar-1024x768.png",
+      "bytes": 433306,
+      "sha256": "842d782de2ff0bb463707a05876b52247a473411eaadb911d866e3ada9c7b9bd"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-emar-1280x800.png",
+      "bytes": 383662,
+      "sha256": "79d8cbcacb1e94d6c20a062bc7abcb2bc3885cefe8c79ca7a1b6bf3d9f946134"
+    },
+    {
+      "path": "evidence/browser/clinical-lead-emar-1440x900.png",
+      "bytes": 396950,
+      "sha256": "1cd0a7693941faa18fb4a145731cbfbd16bcfb78e81327ef6219539c205cc6d7"
+    }
+  ],
+  "mutation_boundary": {
+    "domain_forms_submitted": 0,
+    "canonical_tasks_completed": 0,
+    "downloads_triggered": 0,
+    "application_source_changed": false,
+    "database_fixture_changes": false,
+    "browser_side_effects": "Normal direct-login session/authentication activity only."
+  },
+  "coverage_effect": {
+    "representative_actor_classes_before": 11,
+    "representative_actor_classes_after": 12,
+    "actor_class_denominator": 12,
+    "actor_entry_coverage_percent_after": 100.0,
+    "canonical_task_execution_after": 0,
+    "canonical_task_denominator": 788,
+    "completion_gate_satisfied": false
+  }
+}

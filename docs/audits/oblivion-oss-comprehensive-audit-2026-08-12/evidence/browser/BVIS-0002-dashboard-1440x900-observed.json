@@ -1,0 +1,27 @@
+{
+  "classification": "Observed",
+  "role": "Demo Administrator",
+  "siteScope": "not visibly selected",
+  "environmentEvidence": "owner-confirmed test/development; no visible UI marker",
+  "redaction": "Cropped to exclude account identity and person-linked task content",
+  "metrics": {
+    "banners": 0,
+    "clientWidth": 1423,
+    "devicePixelRatio": 0.8999999761581421,
+    "dialogs": 0,
+    "headings": [
+      "Overview",
+      "Human Resources",
+      "Analytics",
+      "Schedule & Tasks"
+    ],
+    "horizontalOverflow": false,
+    "scrollWidth": 1423,
+    "title": "Dashboard - Oblivion Findings",
+    "url": "https://oblivionfindings.com/dashboard",
+    "viewport": {
+      "height": 900,
+      "width": 1440
+    }
+  }
+}

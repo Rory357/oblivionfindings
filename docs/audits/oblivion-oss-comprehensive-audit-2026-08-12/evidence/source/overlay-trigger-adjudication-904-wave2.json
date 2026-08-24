@@ -1,0 +1,265 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "overlay-trigger-adjudication-904-wave2",
+  "generated_at": "2026-08-21T19:50:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "independently_reviewed_exact_static_pairings_runtime_unchanged",
+  "audit_boundary": "Static source trigger pairing only. Runtime, focus, keyboard, viewport, visibility, permission, usability and completion credit remain zero.",
+  "inputs": {
+    "classifier_before": {
+      "sha256": "5db2c2a5a98949f0aa186bbf31e11627d41de5802d3e3831eaf5fe3126fc47a1",
+      "rows": 659
+    }
+  },
+  "method": {
+    "selection_sha256": "7e75dd94685373201a02684adf8bb2f0774434f75000f61a746e8f74f843a105",
+    "independent_proof_tuple_sha256": "f9304db6c989498ecd3820e4b7b7494802c3805f27b9d04d3a4ece8a2404152e",
+    "independent_source_map_sha256": "9c7c85e2ae7cc7d984d764b5bcdf502d1c62b109978e000dfa453dc64ff8109a",
+    "verdict": "GO_10_exact_named_state_open_handler_chains"
+  },
+  "adjudications": [
+    {
+      "file": "resources/js/pages/attendance/index.tsx",
+      "line": 1496,
+      "symbol": "HandoverWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/attendance/index.tsx",
+        "source_sha256": "a571a5439fc53e021a67f94e72a4d844cb551fb828138496051c6855d244bd60",
+        "state_identifier": "handoverOpen",
+        "state_line": 718,
+        "setter": "setHandoverOpen",
+        "setter_line": 893,
+        "handler": "openHandoverWizard",
+        "handler_line": 888,
+        "trigger_line": 1294,
+        "open_line": 1497,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/control-room/sla/index.tsx",
+      "line": 1127,
+      "symbol": "SlaFormDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/control-room/sla/index.tsx",
+        "source_sha256": "b8e99ae7b411a893712c6d401724a7dbc7a7b0b6a76cb10ed2b7e956f54c4535",
+        "state_identifier": "dialogOpen",
+        "state_line": 895,
+        "setter": "setDialogOpen",
+        "setter_line": 905,
+        "handler": "handleCreate",
+        "handler_line": 902,
+        "trigger_line": 1032,
+        "open_line": 1128,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/AuditLog.tsx",
+      "line": 439,
+      "symbol": "MedicationEventDrawer",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/AuditLog.tsx",
+        "source_sha256": "f67990e546c7dd35e19e035a3ebeac8e8f0bd3665761fa1f05f62955c288ec52",
+        "state_identifier": "selected",
+        "state_line": 124,
+        "setter": "setSelected",
+        "setter_line": 129,
+        "handler": "openEvent",
+        "handler_line": 129,
+        "trigger_line": 429,
+        "open_line": 438,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/MarCharts.tsx",
+      "line": 446,
+      "symbol": "RecordDoseWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/MarCharts.tsx",
+        "source_sha256": "257261fb6b00cf753afbcd22f092200e37b6fa232d6df09962596b7d06c846f3",
+        "state_identifier": "recordTarget",
+        "state_line": 123,
+        "setter": "setRecordTarget",
+        "setter_line": 219,
+        "handler": "onRecord",
+        "handler_line": 219,
+        "trigger_line": 405,
+        "open_line": 445,
+        "child_trigger": {
+          "file": "resources/js/components/emar/mar/mar-grid.tsx",
+          "line": 158,
+          "token": "onRecord",
+          "sha256": "a8913ac0e94df1de3a82197871e1f3bbf5acf7ef6a9794e91c53755fd08192d2"
+        }
+      }
+    },
+    {
+      "file": "resources/js/pages/emar/MarCharts.tsx",
+      "line": 479,
+      "symbol": "PrnWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/emar/MarCharts.tsx",
+        "source_sha256": "257261fb6b00cf753afbcd22f092200e37b6fa232d6df09962596b7d06c846f3",
+        "state_identifier": "prnMedId",
+        "state_line": 125,
+        "setter": "setPrnMedId",
+        "setter_line": 220,
+        "handler": "onGivePrn",
+        "handler_line": 220,
+        "trigger_line": 399,
+        "open_line": 478,
+        "child_trigger": {
+          "file": "resources/js/components/emar/mar/prn-card.tsx",
+          "line": 71,
+          "token": "onGive",
+          "sha256": "66e31724729c22417416b49053ba0b8442b1f368a0e73602043be9b0d7ef7606"
+        }
+      }
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "line": 315,
+      "symbol": "ConfirmDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+        "source_sha256": "15ffabd73537736da9273649135f095d0edf0f10a4ff6b16b28c0d525d37e8c9",
+        "state_identifier": "showCancelConfirm",
+        "state_line": 85,
+        "setter": "setShowCancelConfirm",
+        "setter_line": 90,
+        "handler": "handleUpdate",
+        "handler_line": 87,
+        "trigger_line": 270,
+        "open_line": 316,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/health-safety/drills/show.tsx",
+      "line": 31,
+      "symbol": "DrillCompleteDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/health-safety/drills/show.tsx",
+        "source_sha256": "5a4fe1d4385ac0d3f4b33dd6c5abff806e4f7ca864fb7bcb35fe99b8ef994198",
+        "state_identifier": "completeOpen",
+        "state_line": 11,
+        "setter": "setCompleteOpen",
+        "setter_line": 27,
+        "handler": "onLaunchComplete",
+        "handler_line": 27,
+        "trigger_line": 27,
+        "open_line": 30,
+        "child_trigger": {
+          "file": "resources/js/components/health-safety/drill-detail-dialog.tsx",
+          "line": 188,
+          "token": "onLaunchComplete",
+          "sha256": "5329735124d25192928402f22ce027d4836afdb71ad2e6c91445e7ee6157860a"
+        }
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/feed/index.tsx",
+      "line": 346,
+      "symbol": "RecognitionWizard",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/feed/index.tsx",
+        "source_sha256": "1e894f612da854bee3ad4ccf24cd7fc093265b282e6362191575563207c297ad",
+        "state_identifier": "recogOpen",
+        "state_line": 93,
+        "setter": "setRecogOpen",
+        "setter_line": 190,
+        "handler": "openRecognition",
+        "handler_line": 188,
+        "trigger_line": 241,
+        "open_line": 347,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/leave/balances.tsx",
+      "line": 383,
+      "symbol": "LeaveAdjustDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/leave/balances.tsx",
+        "source_sha256": "e8558cb2fe7f29f6c27d5004ae64ae6ddd1bf15be993f7f3d54e47a270db53d5",
+        "state_identifier": "adjustOpen",
+        "state_line": 139,
+        "setter": "setAdjustOpen",
+        "setter_line": 146,
+        "handler": "openAdjust",
+        "handler_line": 144,
+        "trigger_line": 279,
+        "open_line": 384,
+        "child_trigger": null
+      }
+    },
+    {
+      "file": "resources/js/pages/hr/onboarding/index.tsx",
+      "line": 357,
+      "symbol": "OnboardingWizardDialog",
+      "verdict": "GO_exact_static_trigger_pairing",
+      "evidence": {
+        "kind": "named_state_open_handler",
+        "file": "resources/js/pages/hr/onboarding/index.tsx",
+        "source_sha256": "f4254d1d7bb446d83fb7de2b71220b726ccc9a7d97006cad18c631102f97c2e1",
+        "state_identifier": "wizardOpen",
+        "state_line": 140,
+        "setter": "setWizardOpen",
+        "setter_line": 262,
+        "handler": "openWizard",
+        "handler_line": 260,
+        "trigger_line": 275,
+        "open_line": 358,
+        "child_trigger": {
+          "file": "resources/js/components/hr/onboarding/onboarding-hero.tsx",
+          "line": 210,
+          "token": "onStart",
+          "sha256": "d71213020411ddd50800cc4834c6c09da3e269d920074070550de5f76b6e95ce"
+        }
+      }
+    }
+  ],
+  "count_delta": {
+    "exact_trigger_resolved": 10,
+    "source_inferred_not_exactly_paired": -5,
+    "same_scope_state_handler": 10,
+    "internal_state_trigger_candidate": -5,
+    "controlled_without_resolved_activator": -5,
+    "generic_unresolved": -5,
+    "unresolved_or_blocked": -5,
+    "runtime_credit": 0
+  },
+  "post_counts": {
+    "custom_denominator": 659,
+    "exact_trigger_resolved": 173,
+    "source_inferred_not_exactly_paired": 213,
+    "unresolved_or_blocked": 273,
+    "same_scope_state_handler": 154,
+    "internal_state_trigger_candidate": 213,
+    "controlled_without_resolved_activator": 256,
+    "generic_unresolved": 271,
+    "primitive_denominator": 477,
+    "primitive_exact_trigger_resolved": 208,
+    "primitive_unresolved": 269
+  }
+}

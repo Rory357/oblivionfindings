@@ -1,0 +1,233 @@
+{
+  "schema_version": "1.0",
+  "artifact": "working-895-manifest-integration-recipe",
+  "status": "superseded_by_working-894-manifest-integration-recipe.json",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "audit_boundary": "Read-only static integration recipe. Thirteen candidate target spellings, incomplete target-level route/page enrichment and unresolved Client-Incident H allocation prohibit a canonical-final claim.",
+  "physical_inputs": {
+    "rows": 916,
+    "H": 805,
+    "D": 109,
+    "M": 2,
+    "files": [
+      {"file":"manifest-clients-source-final.json","rows":51,"H":37,"D":14,"M":0,"sha256":"cc5a6f307d798f460458f147c25cb31ca4541ea6ae3417c3c50e9fd8d9f14ccd"},
+      {"file":"manifest-clinical.json","rows":23,"H":20,"D":3,"M":0,"sha256":"504f376d93131af854ce5ec0ab6e6015b2d6ebbec0efb426d3d8b0425806cb0d"},
+      {"file":"manifest-emar-final.json","rows":72,"H":48,"D":24,"M":0,"sha256":"3470ab1574ab5687eb3c802b873b843c810515b57e9c40c0b7443ca56caed420"},
+      {"file":"manifest-finance-sites-tuples-1.json","rows":119,"H":118,"D":1,"M":0,"sha256":"e3fc7ffba341bf4197095314e8d38e8a50604989111eb26bfd773f04450a5470"},
+      {"file":"manifest-finance-sites-tuples-2.json","rows":125,"H":123,"D":1,"M":1,"sha256":"b270f1e7630c32bd1658868da459a2e16317b1f08356c69210861406a7b9f5fe"},
+      {"file":"manifest-full-global-exact-ids.json","rows":152,"H":143,"D":8,"M":1,"sha256":"ae9703d322228a67494960724f4428391fcfe5387f03702bfd834b79c53c0bfe"},
+      {"file":"manifest-gov-1.json","rows":26,"H":22,"D":4,"M":0,"sha256":"3a99b4360f266f78afe09df64110b69e33265e9d4489f47ce3cf6ac624fa258c"},
+      {"file":"manifest-gov-2.json","rows":33,"H":27,"D":6,"M":0,"sha256":"3b4efb1ecea17c9a4f09c0ae392ada36b4c49fcc99af3a0a75bba4dcb234cfd9"},
+      {"file":"manifest-hr-operations-final.json","rows":225,"H":207,"D":18,"M":0,"sha256":"b54b50579c85156651a63112f80526efe64907e4400f9427d2b764e73cb3d36a"},
+      {"file":"manifest-hs-1.json","rows":21,"H":15,"D":6,"M":0,"sha256":"43234a8712a30b80e8f026b02224b3505a46f195e705bbadb20feac73a41e4d7"},
+      {"file":"manifest-hs-2.json","rows":24,"H":13,"D":11,"M":0,"sha256":"b670dfd657d6bf3d93ceeb67468adca7e2decc0cf7d86ae665c369065dc5ee6b"},
+      {"file":"manifest-hs-3.json","rows":22,"H":13,"D":9,"M":0,"sha256":"d562d2764e6d68f5b34650b28304154cfa703373803940563717c50e7534bbcb"},
+      {"file":"manifest-privacy-transfers.json","rows":23,"H":19,"D":4,"M":0,"sha256":"74d71a927edc45bc865267f0d58c7a79758df68fc0370b92984a1a89c178b690"}
+    ]
+  },
+  "non_cardinality_enrichment_inputs": [
+    {
+      "file": "manifest-full-core-chunks.json",
+      "rows": 14,
+      "sha256": "3a33080b55965b3d81dd2201acf2042e3c06ae1eb05f8c84544aad33939be5ac",
+      "boundary": "Older source-family route/page envelopes whose IDs differ from normalized Full IDs. Explicit semantic mapping is required; never add rows mechanically."
+    },
+    {
+      "file": "manifest-full-platform-portal.json",
+      "rows": 6,
+      "sha256": "fceb9b514696cf1f794e0f2e4e2be7eee3e068b828579d9866ea49a3beaa9808",
+      "boundary": "Older PLATFORM/PORTAL envelopes whose IDs differ from normalized Full IDs. Explicit semantic mapping is required; never add rows mechanically."
+    }
+  ],
+  "stages": [
+    {
+      "name": "internal_clinical_coalesce",
+      "operations": [
+        {
+          "id": "CAP-MED-MAR-CHART-REVIEW",
+          "class": "H",
+          "survivor": "manifest-emar-final.json",
+          "remove_occurrence_from": "manifest-clients-source-final.json",
+          "reason": "The EMAR row already unions Client and EMAR sources, routes and pages."
+        },
+        {
+          "id": "CAP-MED-MAR-CSV-EXPORT",
+          "class": "D",
+          "survivor": "manifest-clients-source-final.json",
+          "remove_occurrence_from": "manifest-emar-final.json",
+          "reason": "The EMAR occurrence is explicitly the inbound Client transfer and repeats the Client envelope."
+        }
+      ],
+      "result": {"total":914,"H":804,"D":108,"M":2}
+    },
+    {
+      "name": "exact_cross_partition_h_coalesce",
+      "catering": {
+        "count": 12,
+        "survivor": "manifest-finance-sites-tuples-2.json",
+        "remove_occurrences_from": "manifest-full-global-exact-ids.json:SITES_CATERING_OVERLAP",
+        "ids": [
+          "CAP-SITE-DIETARY-TAG-LIFECYCLE",
+          "CAP-SITE-MEAL-BUDGET-CONFIG",
+          "CAP-SITE-MEAL-INVENTORY-ITEM-REGISTER",
+          "CAP-SITE-MEAL-PLANNING",
+          "CAP-SITE-MEAL-SERVICE-COMPLETION",
+          "CAP-SITE-MEAL-STOCK-CONTROL",
+          "CAP-SITE-MEAL-WEEK-TEMPLATE-APPLY",
+          "CAP-SITE-MEAL-WEEK-TEMPLATE-DEFINITION",
+          "CAP-SITE-PRODUCT-LIFECYCLE",
+          "CAP-SITE-RECIPE-LIFECYCLE",
+          "CAP-SITE-SHOPPING-LIST-GENERATE",
+          "CAP-SITE-SHOPPING-PROCUREMENT"
+        ]
+      },
+      "clients_hr_operations": {
+        "count": 6,
+        "survivor": "manifest-hr-operations-final.json",
+        "merge_rule": "Union Client source families, routes and pages into the surviving exact target; remove only the duplicate cardinality occurrence.",
+        "ids": [
+          "CAP-HR-STAFF-TIMELINE-VIEW",
+          "CAP-OPS-CLIENT-NOTE",
+          "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+          "CAP-OPS-CONSENT-REQUEST",
+          "CAP-OPS-CONVERSATIONS",
+          "CAP-OPS-FAMILY-NOTE-SHIFT-HANDOFF"
+        ]
+      },
+      "result": {"total":896,"H":786,"D":108,"M":2}
+    },
+    {
+      "name": "incident_h_semantic_absorption",
+      "source_id": "CAP-INC-INCIDENT-REPORT-EVIDENCE",
+      "source": "manifest-clients-source-final.json",
+      "class": "H",
+      "route_ids": ["ROUTE-0156","ROUTE-0157","ROUTE-0158","ROUTE-1995","ROUTE-1996","ROUTE-1997"],
+      "effect": "Remove one H cardinality occurrence as alternate-entry coverage of the Full Incident reporting/evidence human outcome.",
+      "candidate_enrichment_targets_only": ["CAP-INC-INCIDENT-AUTHOR","CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT","CAP-INC-INCIDENT-REPORT"],
+      "exact_target_allocation": "unproved",
+      "result": {"total":895,"H":785,"D":108,"M":2}
+    },
+    {
+      "name": "incident_d_actor_envelope_reconciliation",
+      "staff_download_target": {
+        "id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+        "id_status": "exact_current_fragment",
+        "sources": ["manifest-full-global-exact-ids.json","manifest-clients-source-final.json"],
+        "route_ids": ["ROUTE-1845","ROUTE-0159","ROUTE-1998"],
+        "identity": "Staff-facing downloads of the same ClientIncidentAttachment aggregate. The nested routes add client-parent binding but use the same incident-view authority and private streaming outcome."
+      },
+      "portal_consumption_target": {
+        "working_key": "CLI-PORTAL-INCIDENT-ATTACHMENT",
+        "id": "CLI-PORTAL-INCIDENT-ATTACHMENT",
+        "id_status": "source_stable_id_reclassified_D",
+        "source": "manifest-clients-source-final.json",
+        "route_ids": ["ROUTE-2260"],
+        "identity": "Authorised-delegate portal consumption requires portal permissions, section access, reviewed and portal-visible incident state, and portal-visible attachment state."
+      },
+      "transformation": "Split the combined Client fragment row before dedupe: merge ROUTE-0159/1998 into the staff target and retain ROUTE-2260 as the source-stable portal target. This adds and removes one D occurrence with zero net cardinality effect.",
+      "rule": "Retain two actor/outcome envelopes. Do not group portal consumption with staff download and do not invent a new CAP spelling."
+    },
+    {
+      "name": "module_corrections",
+      "operations": [
+        {
+          "candidate_id": "CAP-OPS-PORTAL-VISIT-REQUEST",
+          "working_module": "CLIENTS",
+          "id_status": "candidate_unproved",
+          "route_ids": ["ROUTE-2282","ROUTE-2283"],
+          "effect_on_total": 0
+        }
+      ],
+      "must_remain_distinct": [
+        {
+          "working_key": "clients.portal_visit_request_submission_cancellation",
+          "from": "CAP-OPS-FAMILY-VISIT-REQUEST"
+        },
+        {
+          "id": "CAP-RESP-REFERRAL-INTAKE",
+          "from": ["CAP-RESP-BOOKING-REQUEST-INTAKE","CAP-RESP-BOOKING-REQUEST-APPROVAL"]
+        }
+      ]
+    }
+  ],
+  "working_counts": {
+    "total": 895,
+    "H": 785,
+    "D": 108,
+    "M": 2,
+    "stable_source_or_current_target_ids": 882,
+    "existing_candidate_unproved_ids": 13,
+    "semantic_targets_without_stable_id": 0,
+    "unresolved_incident_h_enrichment_allocations": 1
+  },
+  "expected_module_counts": {
+    "ASSETS":{"H":8,"D":0,"M":0},
+    "AUTH":{"H":6,"D":0,"M":0},
+    "CLIENTS":{"H":24,"D":4,"M":0},
+    "CLINICAL":{"H":19,"D":1,"M":0},
+    "CONTROL_ROOM":{"H":34,"D":3,"M":0},
+    "EMAR":{"H":48,"D":24,"M":0},
+    "FINANCE":{"H":64,"D":7,"M":0},
+    "FLEET":{"H":48,"D":0,"M":0},
+    "FRONTLINE":{"H":7,"D":0,"M":0},
+    "GOVERNANCE":{"H":50,"D":12,"M":0},
+    "HEALTH_SAFETY":{"H":41,"D":27,"M":0},
+    "HR":{"H":135,"D":16,"M":0},
+    "INCIDENTS":{"H":14,"D":5,"M":0},
+    "IT":{"H":2,"D":0,"M":0},
+    "OPERATIONS":{"H":72,"D":2,"M":0},
+    "PLATFORM":{"H":1,"D":0,"M":1},
+    "PORTAL":{"H":4,"D":0,"M":0},
+    "PRIVACY":{"H":17,"D":3,"M":0},
+    "PUBLIC":{"H":4,"D":0,"M":0},
+    "REPORTING":{"H":21,"D":0,"M":0},
+    "RESPITE":{"H":21,"D":1,"M":0},
+    "ROADMAP":{"H":7,"D":1,"M":0},
+    "SECURITY_DEVICES":{"H":36,"D":0,"M":1},
+    "SETTINGS":{"H":34,"D":0,"M":0},
+    "SITES":{"H":68,"D":2,"M":0}
+  },
+  "checksums": {
+    "physical_rows": {
+      "count": 916,
+      "sha256": "01428c73ea8d01e045ec70247fed6a42794d81b8e173b48fb65b489162d3f185",
+      "canonical_line": "file|id|class|module|id_status"
+    },
+    "working_targets": {
+      "count": 895,
+      "sha256": "8e8618cfb2dcf216e8d9a1a11a4182ebfa6ab40ca1d60fc3a8c788314661a451",
+      "canonical_line": "working_key|class|canonical_module|id_status"
+    },
+    "exact_current_target_ids": {
+      "count": 881,
+      "sha256": "597060f27c58d9038e36617cd70d056d4c8c37aa20f4ede73af22cee6a9588a2"
+    },
+    "stable_or_exact_target_ids": {
+      "count": 882,
+      "sha256": "6686091d50c31c54dd4f1e809c430793307c92b17ad62c4d38be878d6635e092"
+    },
+    "candidate_working_keys": {
+      "count": 13,
+      "sha256": "8315fbc1ac1ba22bd6c2ed3673d8319dc637e69d9621c2f5a5f611856eb7072a"
+    },
+    "digest_method": "PowerShell 7 Sort-Object; LF join without terminal newline; UTF-8 SHA-256",
+    "status": "Recomputed after the evidence-backed staff-versus-portal Incident download regroup. Exact-current IDs and the one source-stable reclassified ID are reported separately; candidate spellings are not presented as source-proved names."
+  },
+  "materialized_working_manifest": {
+    "file": "working-capability-manifest-895.json",
+    "sha256": "573377b08be1837f5fa11e52de34010446edb5cce6d2fa875cec649ffcf2c219",
+    "bytes": 485777,
+    "rows": 895,
+    "duplicate_working_keys": 0,
+    "targets_with_route_ids": 293,
+    "unique_route_ids_currently_enriched": 771,
+    "targets_with_page_ids": 255,
+    "unique_page_ids_currently_enriched": 250,
+    "boundary": "This is the deterministic materialization of the working recipe, not the canonical completion register. Empty route/page arrays mean enrichment is unavailable, not that the capability has no route or page."
+  },
+  "completion_credit": {
+    "canonical_stable_id_manifest_rows": 0,
+    "denominator": 895,
+    "reason": "A working semantic-key recipe is not the required stable FEATURE-ID register."
+  }
+}

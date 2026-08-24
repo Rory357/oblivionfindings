@@ -1,0 +1,728 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-901-wave3",
+  "generated_at": "2026-08-13T11:35:00+12:00",
+  "audited_repository": "<local-user>/Herd\\oblivionfindings",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Third bounded target-specific wave: 12 current unproved targets selected for high-value identity, incident, safeguarding, control-room and privacy boundaries.",
+  "methodology": {
+    "credit_rule": "Only target-specific official repositories pinned to immutable commits and exact source loci proving a material same-target slice receive verified credit.",
+    "ncm_rule": "A completed NCM must retain target-specific searches, exact inspected evidence and explicit rejected-repository reasons; paid-plan behavior cannot receive open-source benchmark credit.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layout.",
+    "runtime_boundary": "No application tests, browser journeys, databases, queues, jobs, commits, pushes, deployments or product mutations were executed for this research wave."
+  },
+  "input_pins": {
+    "working_capability_manifest_901": {
+      "path": "evidence/source/working-capability-manifest-901.json",
+      "file_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900"
+    },
+    "benchmark_final_901_before_wave": {
+      "path": "evidence/source/benchmark-final-901-mapping.json",
+      "file_sha256": "4ea03909bf9b9b3f6dabffba249aa169788042be9060ba50cd37c483fbbaccf2"
+    }
+  },
+  "repository_snapshots": {
+    "https://github.com/OneUptime/oneuptime": {
+      "url": "https://github.com/OneUptime/oneuptime",
+      "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee"
+    },
+    "https://github.com/intuitem/ciso-assistant-community": {
+      "url": "https://github.com/intuitem/ciso-assistant-community",
+      "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3"
+    },
+    "https://github.com/keycloak/keycloak": {
+      "url": "https://github.com/keycloak/keycloak",
+      "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d"
+    },
+    "https://github.com/primeroIMS/primero": {
+      "url": "https://github.com/primeroIMS/primero",
+      "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a"
+    }
+  },
+  "counts": {
+    "evaluated": 12,
+    "verified_benchmark_recommended": 12,
+    "documented_ncm_recommended": 0,
+    "completion_credit_recommended": 12,
+    "remains_unproved": 0
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-SET-USER-ACCOUNT-LIFECYCLE",
+      "adjudication_id": "fresh-901-wave3:CAP-SET-USER-ACCOUNT-LIFECYCLE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised identity administrator can create, validate, update, enable or disable, session-revoke, and retire a unique user account with credential and administrative-event evidence.",
+      "search_terms": [
+        "open source identity account create update enable disable revoke sessions delete admin events",
+        "Keycloak UsersResource UserResource account lifecycle"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS",
+        "source_family_ids": [
+          "SET-ACCESS",
+          "SET-USER-MANAGEMENT-REDIRECT",
+          "SET-USERS"
+        ],
+        "route_ids": [
+          "ROUTE-2616",
+          "ROUTE-2701",
+          "ROUTE-2702",
+          "ROUTE-2703",
+          "ROUTE-2704",
+          "ROUTE-2707",
+          "ROUTE-2959",
+          "ROUTE-2960",
+          "ROUTE-2961",
+          "ROUTE-2962",
+          "ROUTE-2963",
+          "ROUTE-2964",
+          "ROUTE-2968",
+          "ROUTE-2969"
+        ],
+        "page_ids": [
+          "PAGE-0862",
+          "PAGE-0863",
+          "PAGE-0954"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Settings/AccessController.php",
+          "app/Http/Controllers/Settings/UserManagementRedirectController.php",
+          "app/Http/Controllers/System/UsersController.php"
+        ]
+      },
+      "evidence_loci": [
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/UsersResource.java :: L120-L190",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/UserResource.java :: L175-L270",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/UserResource.java :: L680-L727"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/keycloak/keycloak",
+        "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d",
+        "source_loci": [
+          "services/src/main/java/org/keycloak/services/resources/admin/UsersResource.java:L120-L190",
+          "services/src/main/java/org/keycloak/services/resources/admin/UserResource.java:L175-L270",
+          "services/src/main/java/org/keycloak/services/resources/admin/UserResource.java:L680-L727"
+        ],
+        "proven_slice": "Permission-gated unique account creation with validation, credentials, groups and a successful admin event; permission-gated profile/enabled-state update with rollback/error paths and successful admin event; session logout and account deletion with successful admin events.",
+        "parity_limits": "Identity-system account lifecycle only; does not prove Oblivion staff/client profile coupling, site assignments, approvals, soft-delete semantics, role vocabulary, privacy or runtime acceptance."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-SET-TWO-FACTOR-MANAGEMENT",
+      "adjudication_id": "fresh-901-wave3:CAP-SET-TWO-FACTOR-MANAGEMENT",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authenticated user can configure a labelled OTP credential, reject missing or invalid codes, optionally revoke other sessions, view non-secret credential metadata, and remove the credential with event evidence.",
+      "search_terms": [
+        "open source TOTP configure validate labelled credential remove session revoke event",
+        "Keycloak UpdateTotp AccountCredentialResource"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS",
+        "source_family_ids": [
+          "SET-CONFIRMED-TWO-FACTOR-AUTHENTICATION",
+          "SET-CONTROLLERS-TWO-FACTOR-AUTHENTICATION",
+          "SET-RECOVERY-CODE",
+          "SET-SETTINGS-TWO-FACTOR-AUTHENTICATION",
+          "SET-TWO-FACTOR-QR-CODE",
+          "SET-TWO-FACTOR-SECRET-KEY"
+        ],
+        "route_ids": [
+          "ROUTE-2700",
+          "ROUTE-3014",
+          "ROUTE-3015",
+          "ROUTE-3016",
+          "ROUTE-3017",
+          "ROUTE-3018",
+          "ROUTE-3019",
+          "ROUTE-3020"
+        ],
+        "page_ids": [
+          "PAGE-0861"
+        ],
+        "backend_anchors": [
+          "Laravel/Fortify/Http/Controllers/ConfirmedTwoFactorAuthenticationController",
+          "Laravel/Fortify/Http/Controllers/RecoveryCodeController",
+          "Laravel/Fortify/Http/Controllers/TwoFactorAuthenticationController",
+          "Laravel/Fortify/Http/Controllers/TwoFactorQrCodeController",
+          "Laravel/Fortify/Http/Controllers/TwoFactorSecretKeyController",
+          "app/Http/Controllers/Settings/TwoFactorAuthenticationController.php"
+        ]
+      },
+      "evidence_loci": [
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/authentication/requiredactions/UpdateTotp.java :: L95-L200",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/account/AccountCredentialResource.java :: L166-L240",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/account/AccountCredentialResource.java :: L297-L350",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/authentication/requiredactions/RecoveryAuthnCodesAction.java :: L103-L140"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/keycloak/keycloak",
+        "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d",
+        "source_loci": [
+          "services/src/main/java/org/keycloak/authentication/requiredactions/UpdateTotp.java:L95-L200",
+          "services/src/main/java/org/keycloak/services/resources/account/AccountCredentialResource.java:L166-L240",
+          "services/src/main/java/org/keycloak/services/resources/account/AccountCredentialResource.java:L297-L350",
+          "services/src/main/java/org/keycloak/authentication/requiredactions/RecoveryAuthnCodesAction.java:L103-L140"
+        ],
+        "proven_slice": "OTP challenge and validation, persisted labelled credential setup, optional logout of other sessions, generation and storage of recovery authentication codes, safe metadata listing with secret stripping, and authorised removal with credential/TOTP success events.",
+        "parity_limits": "TOTP credential slice only; no Oblivion Fortify confirmation UX, QR/secret presentation, recovery-code regeneration, password-confirm boundary, accessibility, rate limits or runtime parity."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-SET-ROLE-DEFINITIONS",
+      "adjudication_id": "fresh-901-wave3:CAP-SET-ROLE-DEFINITIONS",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised identity administrator can list, create, view, update, compose and delete stable role definitions while enforcing management permissions and recording administrative events.",
+      "search_terms": [
+        "open source RBAC role create update delete composite permission admin event",
+        "Keycloak RoleContainerResource RoleByIdResource RoleResource"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "SETTINGS",
+        "source_family_ids": [
+          "SET-ACCESS-CONTROL",
+          "SET-ROLES"
+        ],
+        "route_ids": [
+          "ROUTE-2676",
+          "ROUTE-2677",
+          "ROUTE-2678",
+          "ROUTE-2679",
+          "ROUTE-2680",
+          "ROUTE-2954",
+          "ROUTE-2955",
+          "ROUTE-2956",
+          "ROUTE-2957",
+          "ROUTE-2958"
+        ],
+        "page_ids": [
+          "PAGE-0852",
+          "PAGE-0853",
+          "PAGE-0953"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/Settings/RolesController.php",
+          "app/Http/Controllers/System/AccessControlController.php"
+        ]
+      },
+      "evidence_loci": [
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/RoleContainerResource.java :: L116-L242",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/RoleByIdResource.java :: L88-L204",
+        "keycloak/keycloak@7c34342861092b8b8ce8b48dbc0f99ca3c3e541d :: services/src/main/java/org/keycloak/services/resources/admin/RoleResource.java :: L55-L171"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/keycloak/keycloak",
+        "commit_sha": "7c34342861092b8b8ce8b48dbc0f99ca3c3e541d",
+        "source_loci": [
+          "services/src/main/java/org/keycloak/services/resources/admin/RoleContainerResource.java:L116-L242",
+          "services/src/main/java/org/keycloak/services/resources/admin/RoleByIdResource.java:L88-L204",
+          "services/src/main/java/org/keycloak/services/resources/admin/RoleResource.java:L55-L171"
+        ],
+        "proven_slice": "Permission-gated role list/create/view/update/delete plus composite-role add/remove, validation, default-role deletion guard, and successful create/update/delete admin events.",
+        "parity_limits": "Generic realm/client RBAC only; does not prove Oblivion permission keys, landing routes, site scope, hierarchy/level semantics, user-count guardrails, direct-object denial or runtime parity."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-INC-INCIDENT-AUTHOR",
+      "adjudication_id": "fresh-901-wave3:CAP-INC-INCIDENT-AUTHOR",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised incident worker can create and update a persisted incident linked to a person/case, preserve stable identity, ownership, status, event details and actor/time history, and enforce record permissions.",
+      "search_terms": [
+        "open source incident case create update ownership status history attachments permission",
+        "Primero incident model incidents controller"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS",
+        "source_family_ids": [
+          "CLI-CLIENT-INCIDENT",
+          "INC-INCIDENT"
+        ],
+        "route_ids": [
+          "ROUTE-0156",
+          "ROUTE-0157",
+          "ROUTE-1838",
+          "ROUTE-1839",
+          "ROUTE-1840",
+          "ROUTE-1841",
+          "ROUTE-1854",
+          "ROUTE-1995",
+          "ROUTE-1996"
+        ],
+        "page_ids": [
+          "PAGE-0371",
+          "PAGE-0377",
+          "PAGE-0526",
+          "PAGE-0527",
+          "PAGE-0546",
+          "PAGE-0556",
+          "PAGE-0588",
+          "PAGE-0609"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ClientIncidentController.php@index|store",
+          "app/Http/Controllers/IncidentController.php@index|create|store|show|update",
+          "app/Models/ClientIncident.php",
+          "app/Policies/ClientIncidentPolicy.php"
+        ]
+      },
+      "evidence_loci": [
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/incident.rb :: L3-L87",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/incident.rb :: L93-L178",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/controllers/api/v2/incidents_controller.rb :: L3-L31",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/controllers/api/v2/concerns/record.rb :: L34-L52,L202-L217"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/primeroIMS/primero",
+        "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
+        "source_loci": [
+          "app/models/incident.rb:L3-L87",
+          "app/models/incident.rb:L93-L178",
+          "app/controllers/api/v2/incidents_controller.rb:L3-L31",
+          "app/controllers/api/v2/concerns/record.rb:L34-L52,L202-L217"
+        ],
+        "proven_slice": "A persisted, historical, ownable, attachable and access-loggable incident model linked to a case, with incident identifiers/details/status/owner, defaults, derived dates, case history, update behavior and permission-gated creation.",
+        "parity_limits": "Child-protection incident model, not Oblivion NZ supported-living classification, severity, notifications, site/assignment privacy, close/reopen rules, UI or runtime acceptance."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+      "adjudication_id": "fresh-901-wave3:CAP-INC-INCIDENT-EVIDENCE-MANAGEMENT",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised incident worker can attach, view, update and detach evidence bound to an owning incident/case record with record-level and attachment-level authorization and file metadata.",
+      "search_terms": [
+        "open source incident attachment create update delete download record permission",
+        "Primero incident attachments controller"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS",
+        "source_family_ids": [
+          "CLI-CLIENT-INCIDENT",
+          "INC-INCIDENT"
+        ],
+        "route_ids": [
+          "ROUTE-0158",
+          "ROUTE-1838",
+          "ROUTE-1840",
+          "ROUTE-1842",
+          "ROUTE-1843",
+          "ROUTE-1844",
+          "ROUTE-1997"
+        ],
+        "page_ids": [
+          "PAGE-0526",
+          "PAGE-0527"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ClientIncidentController.php@uploadAttachment",
+          "app/Http/Controllers/IncidentController.php@uploadAttachment|removeAttachment|updateAttachment",
+          "app/Models/ClientIncidentAttachment.php",
+          "resources/js/components/incidents/incident-detail-dialog.tsx"
+        ]
+      },
+      "evidence_loci": [
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/incident.rb :: L3-L23",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/controllers/api/v2/attachments_controller.rb :: L3-L112"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/primeroIMS/primero",
+        "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
+        "source_loci": [
+          "app/models/incident.rb:L3-L23",
+          "app/controllers/api/v2/attachments_controller.rb:L3-L112"
+        ],
+        "proven_slice": "Incident records are attachable; attachment endpoints separately authorize owning-record read/write and attachment read/create/write/destroy, persist metadata changes, bind attachment to the record, safely stream content, and reject immutable-field updates.",
+        "parity_limits": "Generic case attachment evidence only; does not prove Oblivion file limits, malware scanning, evidence sensitivity, audit-retention, download headers, deletion recovery, site privacy or runtime parity."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+      "adjudication_id": "fresh-901-wave3:CAP-INC-SAFEGUARDING-STATUS-CLOSURE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised safeguarding case worker can move a protected case through explicit workflow states, close it with closure date, and reopen it while preserving actor/time reopen history.",
+      "search_terms": [
+        "open source safeguarding case workflow close reopen actor timestamp",
+        "Primero reopenable case workflow closure date"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS",
+        "source_family_ids": [
+          "INC-SAFEGUARDING-CONCERN"
+        ],
+        "route_ids": [
+          "ROUTE-2502",
+          "ROUTE-2504",
+          "ROUTE-2513",
+          "ROUTE-2521"
+        ],
+        "page_ids": [
+          "PAGE-0812",
+          "PAGE-0813"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/SafeguardingConcernController.php@close|updateStatus",
+          "app/Services/Safeguarding/SafeguardingLifecycle.php",
+          "resources/js/components/safeguarding/concern-dialog.tsx"
+        ]
+      },
+      "evidence_loci": [
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/child.rb :: L20-L50",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/child.rb :: L53-L75",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/concerns/reopenable.rb :: L3-L60",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/concerns/workflow.rb :: L3-L59"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/primeroIMS/primero",
+        "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
+        "source_loci": [
+          "app/models/child.rb:L20-L50",
+          "app/models/child.rb:L53-L75",
+          "app/models/concerns/reopenable.rb:L3-L60",
+          "app/models/concerns/workflow.rb:L3-L59"
+        ],
+        "proven_slice": "Historical, ownable, access-loggable protected case with closure date; explicit new/assessment/case-plan/services/closed/reopened workflow; close stamps date; reopen changes status and records reopening actor/time.",
+        "parity_limits": "Primero case closure, not Oblivion concern closure prerequisites, triage substantiation, open-action/referral override, subject-informed warning, sensitivity/site permissions, notifications or runtime parity."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-INC-SAFEGUARDING-ACTION-PLAN",
+      "adjudication_id": "fresh-901-wave3:CAP-INC-SAFEGUARDING-ACTION-PLAN",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised safeguarding worker can record an intervention/action plan with responsible provider/contact, goal, due timeframe, completion state, approval status and persisted case linkage.",
+      "search_terms": [
+        "open source safeguarding case action plan owner goal due completion approval",
+        "Primero case plan interventions approval task completion"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "INCIDENTS",
+        "source_family_ids": [
+          "INC-SAFEGUARDING-ACTION-PLAN"
+        ],
+        "route_ids": [
+          "ROUTE-2502",
+          "ROUTE-2504",
+          "ROUTE-2506",
+          "ROUTE-2507",
+          "ROUTE-2508"
+        ],
+        "page_ids": [
+          "PAGE-0812",
+          "PAGE-0813"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/SafeguardingActionPlanController.php",
+          "resources/js/components/safeguarding/concern-dialog.tsx"
+        ]
+      },
+      "evidence_loci": [
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: db/configuration/forms/case/cp_case_plan.rb :: L3-L35",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: db/configuration/forms/case/cp_case_plan.rb :: L38-L100",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/tasks/case_plan_task.rb :: L5-L27",
+        "primeroIMS/primero@9cea249d502269c258028844884d51e9a89bd00a :: app/models/child.rb :: L53-L75"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/primeroIMS/primero",
+        "commit_sha": "9cea249d502269c258028844884d51e9a89bd00a",
+        "source_loci": [
+          "db/configuration/forms/case/cp_case_plan.rb:L3-L35",
+          "db/configuration/forms/case/cp_case_plan.rb:L38-L100",
+          "app/models/tasks/case_plan_task.rb:L5-L27",
+          "app/models/child.rb:L53-L75"
+        ],
+        "proven_slice": "Case-plan interventions persist service/intervention, responsible provider/contact, goal, expected end date and successful-implementation state; case plan includes manager approval/date/comments/status, initiation date, a due task and completion field, bound to the case.",
+        "parity_limits": "Configurable child-protection case plan, not Oblivion discrete safeguarding action records, assignee identities, priorities, cancellation, completion actor/notes, concern closure gates, site privacy or runtime parity."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-CR-ALERT-TRIAGE",
+      "adjudication_id": "fresh-901-wave3:CAP-CR-ALERT-TRIAGE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised control-room operator can take ownership of an operational alert, maintain priority and state, reject invalid or duplicate transitions, and preserve actor/cause/time evidence for triage handoff.",
+      "search_terms": [
+        "open source alert state timeline acknowledge assign severity transition audit",
+        "OneUptime Alert AlertStateTimeline AlertStateTimelineService"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-ALERT"
+        ],
+        "route_ids": [
+          "ROUTE-0214",
+          "ROUTE-0216",
+          "ROUTE-0221",
+          "ROUTE-0228",
+          "ROUTE-0229",
+          "ROUTE-0240"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+        ]
+      },
+      "evidence_loci": [
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/Alert.ts :: L58-L123,L1320-L1505,L1630-L1697,L2180-L2281",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/AlertStateTimeline.ts :: L26-L86,L300-L638",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Server/Services/AlertStateTimelineService.ts :: L62-L215,L217-L280,L305-L461",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: App/FeatureSet/Workers/Jobs/AlertOwners/SendStateChangeNotification.ts :: L33-L63,L185-L200,L208-L317"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/OneUptime/oneuptime",
+        "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee",
+        "source_loci": [
+          "Common/Models/DatabaseModels/Alert.ts:L58-L123,L1320-L1505,L1630-L1697,L2180-L2281",
+          "Common/Models/DatabaseModels/AlertStateTimeline.ts:L26-L86,L300-L638",
+          "Common/Server/Services/AlertStateTimelineService.ts:L62-L215,L217-L280,L305-L461",
+          "App/FeatureSet/Workers/Jobs/AlertOwners/SendStateChangeNotification.ts:L33-L63,L185-L200,L208-L317"
+        ],
+        "proven_slice": "Permission-gated and audited alert records retain current severity/state; timeline records actor, state, cause and time; service validates references, rejects repeats/backward transitions, updates current state, writes the feed, and notifies alert owners with project-owner fallback.",
+        "parity_limits": "Configurable SRE alert states are not Oblivion's exact triage/assign/SLA graph and do not prove local site/role/ownership/privacy boundaries, resident context, UI or runtime acceptance."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-CR-ALERT-RESPONSE-CLOSURE",
+      "adjudication_id": "fresh-901-wave3:CAP-CR-ALERT-RESPONSE-CLOSURE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised control-room operator can progress an alert-like operational record through explicit states to a resolved terminal state while retaining actor/cause/time evidence and a controlled history.",
+      "search_terms": [
+        "open source alert resolved final state timeline transition history archive",
+        "OneUptime alert resolution state timeline service"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-ALERT"
+        ],
+        "route_ids": [
+          "ROUTE-0217",
+          "ROUTE-0220",
+          "ROUTE-0224",
+          "ROUTE-0225",
+          "ROUTE-0233",
+          "ROUTE-0246"
+        ],
+        "page_ids": [
+          "PAGE-0048",
+          "PAGE-0065"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php"
+        ]
+      },
+      "evidence_loci": [
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/Alert.ts :: L1320-L1505",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/AlertStateTimeline.ts :: L300-L638",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Server/Services/AlertStateTimelineService.ts :: L30-L60,L62-L215,L305-L461,L494-L524"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/OneUptime/oneuptime",
+        "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee",
+        "source_loci": [
+          "Common/Models/DatabaseModels/Alert.ts:L1320-L1505",
+          "Common/Models/DatabaseModels/AlertStateTimeline.ts:L300-L638",
+          "Common/Server/Services/AlertStateTimelineService.ts:L30-L60,L62-L215,L305-L461,L494-L524"
+        ],
+        "proven_slice": "Alert state history retains actor/cause/time; service validates and applies transitions, recognizes the resolved final state, writes operational feed/notification effects and archives the alert channel.",
+        "parity_limits": "OneUptime's configurable SRE resolved state is not proof of Oblivion's two-step resolve-to-close semantics, required notes, linked incidents, site scope, notifications, UI or runtime acceptance."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-PRIV-BREACH-RECORD-ASSESS",
+      "adjudication_id": "fresh-901-wave3:CAP-PRIV-BREACH-RECORD-ASSESS",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised privacy lead can record, assign, assess and progress a data breach with type, risk, affected subjects/data, notification state, remediation/evidence, investigation linkage and terminal closure.",
+      "search_terms": [
+        "open source privacy data breach record risk affected subjects notification remediation evidence",
+        "CISO Assistant privacy breach model"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "PRIVACY",
+        "source_family_ids": [
+          "PRIV-DATA-BREACH"
+        ],
+        "route_ids": [
+          "ROUTE-2297",
+          "ROUTE-2298",
+          "ROUTE-2299",
+          "ROUTE-2300",
+          "ROUTE-2303",
+          "ROUTE-2304"
+        ],
+        "page_ids": [
+          "PAGE-0730",
+          "PAGE-0731"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/DataBreachController.php"
+        ]
+      },
+      "evidence_loci": [
+        "intuitem/ciso-assistant-community@1ba187b0117f4dba9e00605bd7d5319ded61cee3 :: backend/privacy/models.py :: L475-L565"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/intuitem/ciso-assistant-community",
+        "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+        "source_loci": [
+          "backend/privacy/models.py:L475-L565"
+        ],
+        "proven_slice": "Persisted breach model includes breach type, risk level, discovered/investigating/authority-notified/subjects-notified/closed states, assignees, discovery time, affected subject/data counts and links, authority/subject notification timestamps/reference, consequences, remediation controls, evidence and linked investigation.",
+        "parity_limits": "AGPL-3.0 community privacy data model only; enterprise-labelled files are excluded. No controller authorization, NZ Privacy Act/OPC deadline semantics, Oblivion permissions/site scope, notification delivery, validation, correction/reopen or runtime acceptance; benchmark behavior only, no reuse conclusion."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT",
+      "adjudication_id": "fresh-901-wave3:CAP-PRIV-DSR-INTAKE-CASE-MANAGEMENT",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised privacy lead can register and own a data-rights request, classify its right, track request and due dates, move it through active/on-hold/done states, retain observations, and link affected processing records.",
+      "search_terms": [
+        "open source data subject rights request case owner due date status processing records",
+        "CISO Assistant privacy rights request model"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "PRIVACY",
+        "source_family_ids": [
+          "PRIV-DATA-SUBJECT-REQUEST"
+        ],
+        "route_ids": [
+          "ROUTE-2325",
+          "ROUTE-2326",
+          "ROUTE-2327",
+          "ROUTE-2328",
+          "ROUTE-2334"
+        ],
+        "page_ids": [
+          "PAGE-0741",
+          "PAGE-0742"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/DataSubjectRequestController.php"
+        ]
+      },
+      "evidence_loci": [
+        "intuitem/ciso-assistant-community@1ba187b0117f4dba9e00605bd7d5319ded61cee3 :: backend/privacy/models.py :: L432-L472"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/intuitem/ciso-assistant-community",
+        "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+        "source_loci": [
+          "backend/privacy/models.py:L432-L472"
+        ],
+        "proven_slice": "Persisted rights-request case supports deletion, rectification, access, portability, restriction, objection and other types; new/in-progress/on-hold/done states; owner, requested and due dates, observation and linked processing records.",
+        "parity_limits": "AGPL-3.0 community data model only; enterprise-labelled files are excluded. No requester identity verification, deadline extension/refusal rules, client export/fulfilment, NZ statutory semantics, Oblivion direct-object/site privacy, controller permissions, UI or runtime acceptance; benchmark behavior only."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    },
+    {
+      "working_key": "CAP-CR-ESCALATION-LIFECYCLE",
+      "adjudication_id": "fresh-901-wave3:CAP-CR-ESCALATION-LIFECYCLE",
+      "candidate_status": "candidate_found_direct",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "An authorised operational-response actor can configure ordered escalation rules, wait to the next step, and inspect an alert/incident-linked execution timeline retaining recipient, state, acknowledgement and actor/time evidence.",
+      "search_terms": [
+        "open source on call escalation ordered rules wait recipient acknowledgement timeline",
+        "OneUptime escalation rule execution log timeline self hosted"
+      ],
+      "current_source_lineage": {
+        "id_status": "exact",
+        "class": "H",
+        "canonical_module": "CONTROL_ROOM",
+        "source_family_ids": [
+          "CR-CONTROL-ROOM-ESCALATION"
+        ],
+        "route_ids": [
+          "ROUTE-0255",
+          "ROUTE-0256",
+          "ROUTE-0257",
+          "ROUTE-0258",
+          "ROUTE-0259"
+        ],
+        "page_ids": [
+          "PAGE-0053"
+        ],
+        "backend_anchors": [
+          "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php"
+        ]
+      },
+      "evidence_loci": [
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/OnCallDutyPolicyEscalationRule.ts :: L23-L75,L158-L236,L245-L323,L459-L534",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Models/DatabaseModels/OnCallDutyPolicyExecutionLogTimeline.ts :: L35-L74,L480-L597,L614-L867,L884-L1010,L1045-L1080",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: App/FeatureSet/Dashboard/src/Components/OnCallPolicy/ExecutionLogs/ExecutionLogsTimelineTable.tsx :: L34-L55,L76-L116,L123-L264",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: Common/Server/Types/Database/Permissions/BillingPermission.ts :: L23-L98",
+        "OneUptime/oneuptime@ba44f303182bb8e896809c8491023c8d2210f4ee :: README.md :: L73"
+      ],
+      "benchmark": {
+        "official_repository_url": "https://github.com/OneUptime/oneuptime",
+        "commit_sha": "ba44f303182bb8e896809c8491023c8d2210f4ee",
+        "source_loci": [
+          "Common/Models/DatabaseModels/OnCallDutyPolicyEscalationRule.ts:L23-L75,L158-L236,L245-L323,L459-L534",
+          "Common/Models/DatabaseModels/OnCallDutyPolicyExecutionLogTimeline.ts:L35-L74,L480-L597,L614-L867,L884-L1010,L1045-L1080",
+          "App/FeatureSet/Dashboard/src/Components/OnCallPolicy/ExecutionLogs/ExecutionLogsTimelineTable.tsx:L34-L55,L76-L116,L123-L264",
+          "Common/Server/Types/Database/Permissions/BillingPermission.ts:L23-L98",
+          "README.md:L73"
+        ],
+        "proven_slice": "Permission-gated ordered escalation rules include wait-to-next-step behavior; execution records link alert/incident and rule, recipient user/team/schedule, status/message, acknowledgement/time, creator and override; the UI exposes the execution timeline and status.",
+        "parity_limits": "Apache-2.0 and free to self-host; the model carries a hosted Growth-plan decorator, but billing enforcement runs only when billing is enabled and a current plan exists. This does not prove Oblivion queue-to-queue entry/exit, escalation level/reason, claim/bulk actions, site/privacy semantics or runtime acceptance."
+      },
+      "inheritance_boundary": "Fresh target-specific material slice; no source-family, split, merge or prior outcome is inherited."
+    }
+  ],
+  "integrity": {
+    "evaluated_keys_unique": true,
+    "evaluated_key_sha256": "dcff44f68063383716a17b9e4349f3160ad9250a23f7be7cfbd0bef58cf8fcb1",
+    "verified_key_sha256": "dcff44f68063383716a17b9e4349f3160ad9250a23f7be7cfbd0bef58cf8fcb1",
+    "ncm_key_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate_rows_have_repo_sha_and_loci": true,
+    "ncm_rows_have_searches_rejections_and_evidence": true,
+    "manifest_lineage_snapshots_exact": true,
+    "runtime_or_product_mutations": 0
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "Twelve rows are recommended for target-specific credit; 599/901 targets will remain completion-unproved after integration."
+  }
+}

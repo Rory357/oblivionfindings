@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0",
+  "artifact": "benchmark-final-901-generation-summary",
+  "generated_at": "2026-08-13T11:35:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "inputs": {
+    "working_manifest": {
+      "path": "evidence/source/working-capability-manifest-901.json",
+      "file_sha256": "5b477cc3fa5e5343b223b7ba559919f708f945426f193dbb0510245771148900",
+      "canonical_stable_target_ids_sha256": "170c06d9d7a3cc57d9046d37b56c37d9a35fab834112095bc7826102b09f4985"
+    },
+    "base_894_mapping": {
+      "path": "evidence/source/benchmark-final-894-mapping.json",
+      "file_sha256": "b411dc410273fb7a18623af45b2be6f691a716accea1161d4d0e3238cd8e9131"
+    },
+    "fresh_target_specific_adjudication": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901.json",
+      "file_sha256": "dd09aec14bb1cfd7016fbfea6150c97a969cc470d6ba2ca73b229a3601cf6054"
+    },
+    "fresh_target_specific_adjudication_wave2": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901-wave2.json",
+      "file_sha256": "0df1ca60ec838542a1d323a079b98a2b39ec0e3797a3ae174613483cfe98d7bc"
+    },
+    "fresh_target_specific_adjudication_wave3": {
+      "path": "evidence/source/benchmark-target-specific-adjudication-901-wave3.json",
+      "file_sha256": "6934bf243f9db549f9be8230b1f9133a333634ab5b21dc5fc6de0e8f7d5c009c"
+    },
+    "selected_benchmark_adjudication": {
+      "path": "evidence/source/selected-benchmark-adjudication.json",
+      "file_sha256": "cd8eaa5222a79efd0532af51db1c7f2b1e4f537ccf6d85ac6ab00402afe7d3a3"
+    },
+    "no_credible_match_adjudication": {
+      "path": "evidence/source/no-credible-match-adjudication.json",
+      "file_sha256": "8916e99738e3eefe94cf6e616ec5c16ec9fcdddb627f51b910408e13bc481b71"
+    }
+  },
+  "output": {
+    "file": "benchmark-final-901-mapping.json",
+    "sha256": "e3b650ab6303424e925acdcf6a4c9d0077de9d472bd71d8cb362290aa9294cc5"
+  },
+  "counts": {
+    "verified_benchmark": {
+      "direct": 196,
+      "strict_one_to_one_rename": 22,
+      "total": 218
+    },
+    "documented_no_credible_match": {
+      "direct": 77,
+      "strict_one_to_one_rename": 7,
+      "total": 84
+    },
+    "eligible_total": 302,
+    "completion_unproved": {
+      "ordinary": 555,
+      "audit_assigned_stable_name": 10,
+      "prior_pending": 30,
+      "prior_reject": 3,
+      "source_stable_semantic_merge": 1,
+      "total": 599
+    },
+    "status_counts": {
+      "documented_ncm_direct": 77,
+      "documented_ncm_rename": 7,
+      "unproved": 555,
+      "unproved_audit_assigned_id": 10,
+      "unproved_pending": 30,
+      "unproved_reject": 3,
+      "unproved_source_stable": 1,
+      "verified_benchmark_direct": 196,
+      "verified_benchmark_rename": 22
+    }
+  },
+  "checksums": {
+    "tuple_schema": "working_key|status|source_units|evidence_loci",
+    "array_encoding": "Ordinal-sort and deduplicate source_units and evidence_loci independently; join each array with semicolon.",
+    "record_encoding": "Ordinal-sort complete tuple lines; join with LF and no terminal LF; UTF-8 without BOM; SHA-256 lowercase hexadecimal.",
+    "eligible_subset": "Rows where completion_credit is true.",
+    "full_mapping_sha256": "1aedd86bab9e4bbca1d172690cdf7ecae7a35753b9b22186e0f74bee9f698e09",
+    "eligible_subset_sha256": "9c034eff0ae7cb7e5f1794e7f434695a370f7ddfee4a76d58c32f1ac7181964b"
+  },
+  "validation": {
+    "exact_manifest_key_set": true,
+    "unique_target_keys": true,
+    "fresh_target_count": true,
+    "wave2_evaluated_target_count": true,
+    "wave2_selected_target_count": true,
+    "wave3_evaluated_target_count": true,
+    "wave3_verified_target_count": true,
+    "wave3_documented_ncm_target_count": true,
+    "combined_fresh_selected_target_count": true,
+    "eligible_rows_have_one_source_unit": true,
+    "eligible_rows_have_evidence_loci": true,
+    "lineage_snapshots_match_manifest": true
+  },
+  "completion_gate": {
+    "complete": false,
+    "reason": "599/901 targets still require completed target-specific benchmark or bounded No Credible Match adjudication."
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "artifact": "finance-insights-direct-object-review",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "status": "static_authorization_gap_runtime_and_role_intent_unverified",
+  "audit_boundary": "Read-only static audit. No application code, configuration, routes, data, tests, builds, browser state, deployments, commits or pushes were changed or executed.",
+  "security_model": "Single tenant with multiple sites. The relevant boundaries are explicit global-role intent, site assignment, record ownership, direct-object denial and minimum-necessary disclosure; this is not a tenant-isolation finding.",
+  "finding_candidate": {
+    "id": "FIN-INSIGHTS-DIRECT-OBJECT-01",
+    "priority": "P1",
+    "confidence": "High for the missing guard and test; runtime exploitability and intended global finance scope remain unverified",
+    "affected_capability_ids": [
+      "CAP-FIN-API-CLIENT-FINANCIAL-SUMMARY-LEDGER",
+      "CAP-FIN-API-SITE-FINANCIAL-SUMMARY"
+    ],
+    "related_capability_ids": [
+      "CAP-FIN-API-FINANCIAL-INSIGHTS",
+      "CAP-FIN-API-FINANCIAL-KPIS",
+      "CAP-FIN-API-SITES-FINANCIAL-OVERVIEW"
+    ],
+    "affected_route_ids": [
+      "ROUTE-0456",
+      "ROUTE-0457",
+      "ROUTE-0464"
+    ],
+    "reviewed_family_route_ids": [
+      "ROUTE-0456",
+      "ROUTE-0457",
+      "ROUTE-0459",
+      "ROUTE-0460",
+      "ROUTE-0461",
+      "ROUTE-0462",
+      "ROUTE-0464",
+      "ROUTE-0468"
+    ]
+  },
+  "source_observations": [
+    {
+      "observation": "All eight Financial Insights API routes are protected only by permission:finance.dashboard at the route layer.",
+      "locus": "routes/finance.php:720-742"
+    },
+    {
+      "observation": "The single-site and two client endpoints accept raw integer identifiers and call services without authorize(), a policy, UserSiteAccessService or an equivalent caller/object scope check.",
+      "locus": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:35-47,68-95"
+    },
+    {
+      "observation": "Client financial summary resolves Client::withTrashed()->findOrFail($clientId), then composes ledger, cost and funding data for that supplied identifier.",
+      "locus": "app/Domain/Finance/Services/ClientFinancialSummaryService.php:25-35"
+    },
+    {
+      "observation": "ClientLedgerService filters ledger and allocation records by the supplied client ID but does not establish the requesting user's access to that client.",
+      "locus": "app/Domain/Finance/Services/ClientLedgerService.php:35-97"
+    },
+    {
+      "observation": "Single-site detail resolves Site::findOrFail($siteId) and computes the site dataset without a caller/site-scope check. The separate multi-site overview applies an organization filter.",
+      "locus": "app/Domain/Finance/Services/SiteFinancialDashboardService.php:25-83,88-99"
+    },
+    {
+      "observation": "No target-specific wrong-client, wrong-site or deleted-client denial test for these eight endpoints was found in the static test inventory.",
+      "locus": "tests/Feature/Finance (static search at audited commit)"
+    }
+  ],
+  "risk_inference": "If finance.dashboard is granted to a site-limited role, or if global finance access was not an explicit product decision, changing the client or site path identifier could disclose another site's client name, ledger, personal transactions, cost, funding, staffing and occupancy data. Client::withTrashed() also makes deleted-client summaries reachable by identifier unless another boundary intervenes.",
+  "proof_boundary": {
+    "proved": [
+      "The inspected route/controller/service path contains no target-level caller-to-client or caller-to-site authorization guard.",
+      "The broad permission alone does not encode object scope.",
+      "Target-specific denial coverage was not found in the inspected tests."
+    ],
+    "not_proved": [
+      "That every deployed finance.dashboard role is intended to be site-limited.",
+      "That an unauthorized deployed actor can currently exploit the path.",
+      "That organization scoping is absent from every downstream query used by KPI and insight aggregate endpoints.",
+      "That deleted-client visibility is never a legitimate explicitly authorized finance requirement."
+    ]
+  },
+  "interim_safeguard": "Until product/security ownership and runtime denial are established, grant finance.dashboard only to explicitly approved global finance roles and avoid distributing direct Financial Insights API URLs to site-limited roles.",
+  "acceptance_criteria": [
+    "Document whether each Financial Insights endpoint is global-finance-only, organization-scoped, site-scoped or client-relationship-scoped.",
+    "Enforce the documented boundary before any object is loaded or any name, count, amount, existence or deleted status is disclosed.",
+    "If a global exception is intended, represent it explicitly and test it separately from site-limited access.",
+    "Decide and enforce deleted-client visibility as an explicit finance/privacy rule rather than inheriting withTrashed behavior.",
+    "Add feature tests for allowed client/site access, wrong-site and wrong-client denial, nonexistent IDs, deleted clients and an explicit global-role exception.",
+    "Return 403 or 404 consistently without cross-site/client payload fragments or existence leakage."
+  ],
+  "runtime_validation": {
+    "executed": false,
+    "blocked_by": [
+      "No representative site-limited finance account",
+      "No approved wrong-site/wrong-client fixture",
+      "No isolated test database"
+    ]
+  }
+}

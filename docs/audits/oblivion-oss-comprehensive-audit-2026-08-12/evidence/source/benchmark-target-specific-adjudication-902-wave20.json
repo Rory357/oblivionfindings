@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave20",
+  "generated_at": "2026-08-21T15:40:00+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Twentieth bounded target-specific wave: eight current completion-unproved eMAR targets; one direct OpenEMR allergy-API recommendation and seven conservative retained-unproved outcomes.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_sha256": "3e47fd9d476465ba464e62242af92e51a187774dc22b767e565d47a6174b43a5",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Generic related-person, administration, audit or break-glass primitives remain unproved.",
+    "reuse_rule": "OpenEMR paths have no current 902 mapping hits. The reused Bahmni administration DAO receives no new credit, and no repository- or family-level inference is allowed."
+  },
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "0061f40580cc763297768ae53dcdf3ffb9d76d38bff2172015c4b9fe5d6fbd98"
+    }
+  },
+  "repository_snapshots": {
+    "OPENEMR": {
+      "repo": "openemr/openemr",
+      "official_repository_url": "https://github.com/openemr/openemr",
+      "commit_sha": "312b5d042f7fa49cc78ebed041155fba339a991c",
+      "spdx": "GPL-3.0-or-later",
+      "license_locus": "LICENSE:L1-L18",
+      "license_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {"path": "src/RestControllers/FHIR/FhirAllergyIntoleranceRestController.php", "lines": "L35-L136,L143-L226", "sha256": "ca48b2f8cc8ea82c4f00aa31a719c2ed371bc417775a02084a28839ba1232573"},
+        {"path": "src/Services/FHIR/FhirAllergyIntoleranceService.php", "lines": "L56-L63,L101-L163,L247-L264", "sha256": "db7998ed8095c39820d3656b18dd0419fa41b785f81afe36db2b74d0b433bb75"},
+        {"path": "src/Services/AllergyIntoleranceService.php", "lines": "L141-L244,L248-L361", "sha256": "f488e5a617d47224de41fcefe4957f98ad5d3b5880a30b0d8db3da74d7fc5301"},
+        {"path": "src/RestControllers/FHIR/FhirRelatedPersonRestController.php", "lines": "L158-L259", "sha256": "26bf9adaafd1036e6f16af48a889775d10b9a36732d3b9f8dc359230472bd0d9"},
+        {"path": "src/Services/FHIR/FhirRelatedPersonService.php", "lines": "L34-L168", "sha256": "e626fdf3d831ac3482ebda666a5b4208738e1e1fc7bc525515614af9f8fb674a"},
+        {"path": "src/Services/DemographicsRelatedPersonsService.php", "lines": "L30-L41,L130-L185", "sha256": "6365762fd2004d2c9f36e1b976389a434135812d2b522e55d67319648a70682f"},
+        {"path": "src/RestControllers/FHIR/FhirMedicationRequestRestController.php", "lines": "L115-L219", "sha256": "69c70e83bd3bb5f27de482872efdea6c199364c0b06e2960348210ce8d098c57"},
+        {"path": "src/Services/FHIR/FhirMedicationRequestService.php", "lines": "L109-L122,L205-L245,L527-L539", "sha256": "730a86b53929cf43c91a117049122f2356cec4e7d63676cee07593cd96b17449"},
+        {"path": "library/clinical_rules/RuleCriteriaAllergy.php", "lines": "L15-L34", "sha256": "46d31b5ba63c2d55b6a386b80e325c615514c5fbff21e552af4bcb5358e06f69"},
+        {"path": "library/classes/EventAuditLogger.php", "lines": "L105-L118,L299-L304,L449-L553,L688-L719", "sha256": "9380dbe660b147cc7a52461f3fdd9674123f31cba31819ddb07f8518d1507f22"},
+        {"path": "src/Common/Auth/BreakglassChecker.php", "lines": "L34-L63", "sha256": "f38e5b4595f48519dd2d413589ab774a564105a1ed32a416dae708d7c56a0d2a"}
+      ]
+    },
+    "BAHMNI_MEDICATION_ADMINISTRATION": {
+      "repo": "Bahmni/openmrs-module-medicationadministration",
+      "official_repository_url": "https://github.com/Bahmni/openmrs-module-medicationadministration",
+      "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+      "spdx": "MPL-2.0",
+      "license_locus": "LICENSE:L1-L25",
+      "license_sha256": "7b284ff454b433a2343d6832749da4e8c6b26ee502cc6f4c4ffe50eb6f1a5e92",
+      "edition_boundary": "Pinned official community source only; hosted services, private configuration and unpinned behavior are excluded.",
+      "files": [
+        {"path": "api/src/main/java/org/openmrs/module/fhir2/apiext/dao/impl/FhirMedicationAdministrationDaoImpl.java", "lines": "L43-L85", "sha256": "9dd7a6e5c533d6a85b47d3ac7f7c44b5b3b1fb19870d535fa6d01cc7ac4571f6"},
+        {"path": "api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java", "lines": "L18-L59", "sha256": "4719cfe49350b095b4d3dfe52f4be4fe989121b0d98a486cb9a0cad1048c2d33"}
+      ]
+    }
+  },
+  "counts": {"evaluated": 8, "verified_benchmark_direct_recommended": 1, "documented_ncm_direct_recommended": 0, "retained_unproved": 7, "completion_credit_recommended": 1},
+  "evaluations": [
+    {
+      "working_key": "CAP-MED-API-ALLERGIES",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Expose patient-scoped allergy read/search and validated record create, update and delete with patient-to-allergy identity binding.",
+      "research_candidate": "openemr/openemr FHIR allergy controller and services at pinned loci",
+      "evidence_loci": "openemr/openemr@312b5d042f7fa49cc78ebed041155fba339a991c :: FhirAllergyIntoleranceRestController.php :: L35-L136,L143-L226; FhirAllergyIntoleranceService.php :: L56-L63,L101-L163,L247-L264; AllergyIntoleranceService.php :: L141-L244,L248-L361",
+      "reason": "The source directly proves patient-scoped allergy read/search mapping and validated record insert/update/delete with patient and allergy ID pairing. No Site, audit, concurrency or runtime claim is inferred."
+    },
+    {
+      "working_key": "CAP-MED-CLIENT-EMERGENCY-CONTACTS",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Govern a distinct emergency-contact lifecycle with classification, CRUD, delete and provenance.",
+      "research_candidate": "openemr/openemr related-person sources at pinned loci",
+      "reason": "Patient related-person serialization and relationship upsert do not prove emergency-contact classification, delete or target lifecycle provenance."
+    },
+    {
+      "working_key": "CAP-MED-API-ORDER-VERSIONS",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Retrieve immutable medication-order version history with diffs and bounded version semantics.",
+      "research_candidate": "openemr/openemr medication-request sources at pinned loci",
+      "reason": "Current patient/status/intent query with meta version fixed to one does not establish order-version history, diff, revert or immutable version retrieval."
+    },
+    {
+      "working_key": "CAP-MED-API-MAR-PRN-READ",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Read MAR and PRN eligibility/effectiveness through a bounded patient and schedule API.",
+      "research_candidate": "Bahmni medication-administration DAO and model at pinned loci",
+      "reason": "Generic administration read/search lacks PRN eligibility/effectiveness and MAR schedule/cell semantics."
+    },
+    {
+      "working_key": "CAP-MED-API-DRUG-INTERACTIONS",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Calculate multi-drug interactions with severity, evidence and governed override response semantics.",
+      "research_candidate": "openemr/openemr allergy rule criterion at pinned locus",
+      "reason": "An allergy criterion and database view are not a multi-drug interaction calculation or response API."
+    },
+    {
+      "working_key": "CAP-MED-AUDIT-EVENT-INTEGRITY-API",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Expose a medication-event integrity API with scoped semantics, verification and replay-safe provenance.",
+      "research_candidate": "openemr/openemr generic audit logger at pinned loci",
+      "reason": "Generic audit, encryption, checksum and SQL-event primitives do not establish a medication-event integrity API."
+    },
+    {
+      "working_key": "CAP-MED-BREAK-GLASS-REQUEST-GRANTS",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Request and grant client-specific emergency access with reason, expiry, revocation and idempotent provenance.",
+      "research_candidate": "openemr/openemr break-glass checker and audit logger at pinned loci",
+      "reason": "Global group membership and forced audit override do not prove client-specific request/grant lifecycle, expiry, revoke or rationale."
+    },
+    {
+      "working_key": "CAP-MED-BREAK-GLASS-OVERSIGHT",
+      "candidate_status": "retained_unproved", "completion_credit_recommended": false,
+      "neutral_requirement": "Review emergency-access use through an accountable oversight queue with findings and lifecycle actions.",
+      "research_candidate": "openemr/openemr break-glass checker and audit logger at pinned loci",
+      "reason": "The source does not implement reviewer queues, scoped review/dismiss actions, findings or oversight lifecycle state."
+    }
+  ],
+  "count_delta": {"verified_benchmark_direct": 1, "documented_ncm_direct": 0, "eligible_total": 1, "completion_unproved": -1},
+  "post_wave_totals": {"verified_benchmark": 345, "documented_ncm": 89, "eligible": 434, "completion_unproved": 468}
+}

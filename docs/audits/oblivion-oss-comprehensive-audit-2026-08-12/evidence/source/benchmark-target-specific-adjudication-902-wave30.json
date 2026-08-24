@@ -1,0 +1,212 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "benchmark-target-specific-adjudication-902-wave30",
+  "generated_at": "2026-08-21T15:29:41+12:00",
+  "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+  "read_only": true,
+  "scope": "Thirtieth bounded target-specific wave: eight current completion-unproved Health and Safety targets. One narrowly evidenced comparator recommendation is retained; seven targets remain unproved.",
+  "methodology": {
+    "family_credit_inherited": false,
+    "runtime_boundary": "No application, browser, database, deployment or product Git state was changed or credited. This packet is comparator research only, not Oblivion runtime, release or product-completion evidence.",
+    "no_copy_rule": "Evidence is behavioural only; do not copy source, schema, UI, wording or distinctive layouts.",
+    "selection_preimage_rule": "The eight target IDs in packet order joined by LF with no terminal LF and encoded as UTF-8 without BOM.",
+    "selection_sha256": "ff8f2cf36a60b9086045173bca9524399fc9287b7ba24528d901e9450a46e343",
+    "direct_rule": "A recommendation requires target-specific neutral job alignment at pinned official community-source loci. Repository, family and adjacent-record behaviour do not inherit credit.",
+    "reuse_rule": "Exact target-key and cited-source-path collisions were replayed against every materialized Wave 4 through Wave 28 artifact. Repository reuse alone is disclosed and is not evidence."
+  },
+  "selected_target_ids": [
+    "CAP-HS-RISK-ASSESSMENT-AUTHORING-EVIDENCE",
+    "CAP-HS-RISK-ASSESSMENT-REVIEW-LIFECYCLE",
+    "CAP-HS-RISK-ASSESSMENT-ATTACHMENT-DOWNLOAD",
+    "CAP-HS-REPORT-RISK-ASSESSMENT-REGISTER-API",
+    "CAP-HS-CORRECTIVE-ACTION-VERIFICATION-REWORK",
+    "CAP-HS-ANALYTICS",
+    "CAP-HS-ANALYTICS-EXPORT",
+    "CAP-HS-SITE-HAZARD-LIFECYCLE"
+  ],
+  "input_pins": {
+    "benchmark_final_902_before_wave": {
+      "path": "evidence/source/benchmark-final-902-mapping.json",
+      "file_sha256": "0ec2c6c24659a9f2ce60268c0b916bf916c475d8731bb4e61e5325c927a354fa",
+      "verified_benchmark_direct": 339,
+      "verified_benchmark_rename": 22,
+      "documented_ncm_direct": 82,
+      "documented_ncm_rename": 7,
+      "eligible_total": 450,
+      "completion_unproved": 452
+    }
+  },
+  "repository_snapshots": {
+    "EUPHORIE": {
+      "repo": "euphorie/Euphorie",
+      "official_repository_url": "https://github.com/euphorie/Euphorie",
+      "commit_sha": "cd5d8f975741db20b42a648d6fc49806f8614152",
+      "tree_sha": "3108e7cdfa575bbebc433550bdaaf96bc4fe339a",
+      "source_subtree": "src/euphorie",
+      "source_subtree_tree_sha": "9fe30905470da0bd7852e82c824680fc14f297c6",
+      "spdx": "GPL-2.0-only",
+      "license_locus": "LICENSE.txt:L1-L22",
+      "license_git_blob_sha": "d511905c1647a1e311e8b20d5930a37a9c2531cd",
+      "license_sha256": "ab15fd526bd8dd18a9e77ebc139656bf4d33e97fc7238cd11bf60e2b9b8666c6",
+      "edition_boundary": "Pinned official public community repository only; hosted, customised, private and unpinned behaviour is excluded.",
+      "project_scope": {
+        "path": "README.rst",
+        "lines": "L7-L24",
+        "git_blob_sha": "b559448b1bd3433141b7d1f09b4034f3f8e46805",
+        "sha256": "43314d5768a6bd5e421c1d1e274fdce6f9782f2a41809b46d9906e2095dfc276",
+        "claim": "Risk-assessment tool commissioned for the European Agency for Safety and Health at Work; scope is contextual only."
+      },
+      "files": [
+        {
+          "path": "setup.py",
+          "lines": "L17,L29",
+          "sha256": "a36872d0f1c16015f28134b9157933739635df7bb672e126f99aa882baadf22a"
+        },
+        {
+          "path": "src/euphorie/client/browser/risk.py",
+          "git_blob_sha": "ac24dd772bab8f49c4a05cdb3428581cdbfa08c3",
+          "lines": "L214-L353,L534-L595,L658-L700,L784-L886,L897-L910,L1377-L1394",
+          "sha256": "dd3d27cabd6b4cc558e6f3c0d3e36198129c42ef9c587005b54b01a8cac58c9a"
+        },
+        {
+          "path": "src/euphorie/client/browser/webhelpers.py",
+          "git_blob_sha": "29013f4f0958fd6d1072947a8093ec341a47b633",
+          "lines": "L1058-L1093",
+          "sha256": "f486372c1cd0a2859e8e5e502d083dc65ab92307dc137056879870fa6e00aee6"
+        },
+        {
+          "path": "src/euphorie/client/browser/locking.py",
+          "git_blob_sha": "3b518669b4ecdfa89dd1e3371f6eb1a9ab397c86",
+          "lines": "L38-L79",
+          "sha256": "53fd4c2ed467aa3c17bca3ab126df11256b9f4b85a4549df8b246a0006edbbff"
+        },
+        {
+          "path": "src/euphorie/client/browser/report.py",
+          "git_blob_sha": "088b7783016ed17eda8aa9dfed8f34e4da25aee6",
+          "lines": "L29-L57,L60-L105,L231-L255",
+          "sha256": "bc6fa37a219214065e8c4612c8e3cd93cfd4c900295435d33dac3f8597744447"
+        },
+        {
+          "path": "src/euphorie/client/model.py",
+          "git_blob_sha": "3dbc2c4ea62a61ac541fb76ed2ab1728c5cf3e99",
+          "lines": "L720-L776,L881-L883,L1324-L1352,L1491-L1538",
+          "sha256": "c97f30ea452523244a56e32a9d4abc6d27d027bfc65015da8d9d924d0e6889a4"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "evaluated": 8,
+    "verified_benchmark_direct_recommended": 1,
+    "documented_ncm_direct_recommended": 0,
+    "retained_unproved": 7,
+    "completion_credit_recommended": 1
+  },
+  "evaluations": [
+    {
+      "working_key": "CAP-HS-RISK-ASSESSMENT-AUTHORING-EVIDENCE",
+      "candidate_status": "verified_benchmark_direct_recommended",
+      "completion_credit_recommended": true,
+      "neutral_requirement": "Record bounded risk-assessment authoring evidence for an authenticated editable session.",
+      "research_candidate": "euphorie/Euphorie editable risk-assessment session at pinned loci",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/webhelpers.py :: L1058-L1093; src/euphorie/client/browser/risk.py :: L534-L595,L658-L700,L1377-L1394; src/euphorie/client/model.py :: L1491-L1538",
+      "reason": "The pinned code first resolves a current account and editable, non-archived, non-locked session, then persists risk identification, comment and priority fields and replaces linked structured action-plan rows. The direct recommendation is strictly limited to authenticated editable-session identification, comment, priority and structured action-plan evidence. It explicitly excludes image/file evidence, attachment download and attachment governance, write audit/provenance evidence, Site policy, independent review, concurrent coordination and all Oblivion runtime or release claims."
+    },
+    {
+      "working_key": "CAP-HS-RISK-ASSESSMENT-REVIEW-LIFECYCLE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Run a distinct risk-assessment review lifecycle with its target-specific transitions and authority.",
+      "research_candidate": "euphorie/Euphorie permissioned session lock and validation views at pinned loci",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/locking.py :: L38-L79; src/euphorie/client/model.py :: L1324-L1352",
+      "reason": "Permissioned lock/unlock events and validation state do not prove the target's distinct activate, archive, mark-review and supersede lifecycle; no adjacent-record or family credit is inferred."
+    },
+    {
+      "working_key": "CAP-HS-RISK-ASSESSMENT-ATTACHMENT-DOWNLOAD",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Authorize and audit download of an assessment attachment.",
+      "research_candidate": "euphorie/Euphorie risk resource-presence handling at pinned locus",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/risk.py :: L897-L910",
+      "reason": "The cited code only exposes pre-authored resource presence. It does not establish assessment-attachment download authorization, attachment governance or read-audit evidence."
+    },
+    {
+      "working_key": "CAP-HS-REPORT-RISK-ASSESSMENT-REGISTER-API",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Provide an authorized risk-assessment register API.",
+      "research_candidate": "euphorie/Euphorie session action-plan timeline report at pinned loci",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/report.py :: L29-L57,L60-L105,L231-L255",
+      "reason": "The source offers an authorized session/action-plan workbook flow, not a target-specific risk-register API with the required shape and authority semantics."
+    },
+    {
+      "working_key": "CAP-HS-CORRECTIVE-ACTION-VERIFICATION-REWORK",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Verify corrective actions independently and return them for rework with durable provenance.",
+      "research_candidate": "euphorie/Euphorie action-plan create/update handling at pinned loci",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/risk.py :: L214-L353,L784-L886",
+      "reason": "Action-plan creation and update do not establish independently authorized verification, rework terminal state or its provenance chain."
+    },
+    {
+      "working_key": "CAP-HS-ANALYTICS",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Provide Health and Safety analytics aggregation with target-specific authority and operational ownership.",
+      "research_candidate": "euphorie/Euphorie session action-plan reporting at pinned locus",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/report.py :: L29-L105",
+      "reason": "Session/action-plan reporting is not Health and Safety analytics aggregation and does not prove the target's authority or operational ownership."
+    },
+    {
+      "working_key": "CAP-HS-ANALYTICS-EXPORT",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Export target-specific Health and Safety analytics.",
+      "research_candidate": "euphorie/Euphorie action-plan timeline workbook generation at pinned locus",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/browser/report.py :: L231-L255",
+      "reason": "Workbook generation is limited to an action-plan timeline; it is not target-specific analytics export."
+    },
+    {
+      "working_key": "CAP-HS-SITE-HAZARD-LIFECYCLE",
+      "candidate_status": "retained_unproved",
+      "completion_credit_recommended": false,
+      "neutral_requirement": "Manage a Site-scoped hazard through assignment, review and closure lifecycle transitions.",
+      "research_candidate": "euphorie/Euphorie survey and risk-session model at pinned loci",
+      "evidence_loci": "euphorie/Euphorie@cd5d8f975741db20b42a648d6fc49806f8614152 :: src/euphorie/client/model.py :: L720-L776,L1324-L1352; src/euphorie/client/browser/risk.py :: L534-L595",
+      "reason": "Survey and risk sessions do not establish a Site-scoped hazard entity with assign, review, status and close lifecycle controls."
+    }
+  ],
+  "collision_disclosure": {
+    "precondition": "All eight selected keys are current-map unproved with completion_credit=false.",
+    "target_key_procedure": "Exact quoted working-key search across every materialized Wave 4 through Wave 28 artifact.",
+    "target_key_hits": 0,
+    "cited_path_procedure": "Exact cited source-path search across the same materialized Wave 4 through Wave 28 artifact set; generic license filenames are excluded from path comparison because they are not evidence loci.",
+    "cited_path_hits": {
+      "src/euphorie/client/browser/risk.py": 0,
+      "src/euphorie/client/browser/webhelpers.py": 0,
+      "src/euphorie/client/browser/locking.py": 0,
+      "src/euphorie/client/browser/report.py": 0,
+      "src/euphorie/client/model.py": 0,
+      "README.rst": 0,
+      "setup.py": 0
+    },
+    "repository_reuse": "No materialized Wave 4 through Wave 28 artifact cites euphorie/Euphorie. Even if a repository were reused, repository reuse would not transfer target or family credit.",
+    "no_inheritance": true
+  },
+  "count_delta": {
+    "verified_benchmark_direct": 1,
+    "documented_ncm_direct": 0,
+    "eligible_total": 1,
+    "completion_unproved": -1
+  },
+  "post_wave_totals": {
+    "verified_benchmark": 362,
+    "documented_ncm": 89,
+    "eligible": 451,
+    "completion_unproved": 451,
+    "verified_benchmark_direct": 340,
+    "verified_benchmark_rename": 22,
+    "documented_ncm_direct": 82,
+    "documented_ncm_rename": 7
+  }
+}

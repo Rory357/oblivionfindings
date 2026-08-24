@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0.0",
+  "observed_at": "2026-08-21T19:11:56.7737168+12:00",
+  "target": "https://oblivionfindings.com/login",
+  "request_scope": "Unauthenticated, read-only browser and same-origin asset GETs. No credentials, cookies, form values or application mutations were used or recorded.",
+  "source_boundary": {
+    "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "current_origin_main": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "deployed_git_or_release_identifier_exposed": false,
+    "inertia_asset_version": "84e8ccc59d2676356b165b4327abb9bc",
+    "inertia_version_is_not_treated_as_a_git_commit": true,
+    "comparison": "The public deployment still serves the exact app and CSS fingerprints recorded on 2026-08-12. This proves fingerprint stability only; it does not identify the deployed source commit or tie the rendering to the audited baseline or current origin/main."
+  },
+  "browser": {
+    "engine": "Codex in-app browser",
+    "page_title": "Log in - Oblivion Findings",
+    "inertia_component": "auth/login",
+    "desktop_1440x900": {
+      "document_client_width": 1440,
+      "document_scroll_width": 1440,
+      "body_client_width": 1440,
+      "body_scroll_width": 1440,
+      "document_scroll_height": 900,
+      "horizontal_document_overflow": false,
+      "named_controls_visible": [
+        "Email address",
+        "Password",
+        "Forgot password?",
+        "Remember me",
+        "Log in",
+        "Continue with Microsoft (Organization)",
+        "Continue with Google",
+        "Sign up"
+      ]
+    },
+    "mobile_390x844": {
+      "document_client_width": 390,
+      "document_scroll_width": 390,
+      "body_client_width": 390,
+      "body_scroll_width": 390,
+      "document_scroll_height": 844,
+      "horizontal_document_overflow": false,
+      "named_controls_in_viewport": true,
+      "email_rect": {"x": 49, "right": 341, "y": 289.5, "bottom": 325.5},
+      "password_rect": {"x": 49, "right": 341, "y": 377.5, "bottom": 413.5},
+      "login_rect": {"x": 49, "right": 341, "y": 493.5, "bottom": 529.5},
+      "microsoft_rect": {"x": 49, "right": 341, "y": 553.5, "bottom": 589.5},
+      "google_rect": {"x": 49, "right": 341, "y": 601.5, "bottom": 637.5},
+      "signup_rect": {"x": 246.609375, "right": 294.921875, "y": 675.5, "bottom": 693.5}
+    },
+    "console_warning_or_error_count": 0,
+    "credentials_entered": false,
+    "authenticated_task_executed": false
+  },
+  "same_origin_assets": [
+    {
+      "url": "https://oblivionfindings.com/build/assets/app-DpCHbvaC.js",
+      "status": 200,
+      "content_type": "application/javascript; charset=utf-8",
+      "bytes": 122885,
+      "sha256": "c604cdefe2c222b5b175c1d2108a4dc325d7a5f8de1aefcd8cb563b268e2264a",
+      "last_modified": "Tue, 11 Aug 2026 21:49:51 GMT",
+      "etag": "6a7b98ff-1e005"
+    },
+    {
+      "url": "https://oblivionfindings.com/build/assets/app-B1fPkNR-.css",
+      "status": 200,
+      "content_type": "text/css",
+      "bytes": 413188,
+      "sha256": "303dc70901eb0e14b6eee7671111547a04a1c247db739fdda2d70a1a6743c36b",
+      "last_modified": "Tue, 11 Aug 2026 21:49:51 GMT",
+      "etag": "6a7b98ff-64e04"
+    },
+    {
+      "url": "https://oblivionfindings.com/build/assets/vendor-react-O83cS0sC.js",
+      "status": 200,
+      "content_type": "application/javascript; charset=utf-8",
+      "bytes": 257579,
+      "sha256": "e58c83ec1c39bc4a466edc5146b7a5e604346a062e9655ee15c0662974ee8bef"
+    },
+    {
+      "url": "https://oblivionfindings.com/build/assets/vendor-calendar-DoMeiBRp.js",
+      "status": 200,
+      "content_type": "application/javascript; charset=utf-8",
+      "bytes": 266147,
+      "sha256": "448b461e131514b03a29b84bf379acbc921de104ef3abacaba9089e0933a628d"
+    },
+    {
+      "url": "https://oblivionfindings.com/build/assets/vendor-inertia-xLKS3E79.js",
+      "status": 200,
+      "content_type": "application/javascript; charset=utf-8",
+      "bytes": 195031,
+      "sha256": "7dcc16795c190b2eff12d269383c2570325ee42170f14aecee732663e2e91b5f"
+    },
+    {
+      "url": "https://oblivionfindings.com/build/assets/vendor-ui-DA_PTN4E.js",
+      "status": 200,
+      "content_type": "application/javascript; charset=utf-8",
+      "bytes": 215207,
+      "sha256": "cc1bf6e15137c160f6777f00043fe884d544ee3aee02229c94e12c39b0d5326e"
+    }
+  ],
+  "comparison_to_prior_fingerprint": {
+    "prior_artifact": "evidence/browser/deployed-asset-fingerprint-2026-08-12.json",
+    "inertia_version_equal": true,
+    "application_javascript_url_and_hash_equal": true,
+    "application_css_url_and_hash_equal": true
+  },
+  "credit_boundary": {
+    "public_shell_rendering_evidence": true,
+    "audited_baseline_browser_credit_delta": 0,
+    "current_main_browser_credit_delta": 0,
+    "representative_task_execution_delta": 0,
+    "completion_credit_delta": 0,
+    "status": "BLOCKED_DEPLOYED_BUILD_PROVENANCE_AND_AUTHENTICATED_TASK_FIXTURES"
+  },
+  "minimum_input": "Expose a non-sensitive deployed Git/release identifier and provide approved resettable authenticated role/Site fixtures before any product-task or current-source browser credit can be awarded."
+}
