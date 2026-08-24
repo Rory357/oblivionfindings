@@ -1,0 +1,537 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-023",
+  "status": "COMPLETE_READ_ONLY_CROSS_SCOPE_ARBITRATION_NOT_FINAL_DENOMINATOR",
+  "generated_at": "2026-08-24T19:22:57+12:00",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "observed_repository_head": "012d374fd7ef8a6d2766483f622ffb6851fd5da1",
+    "non_audit_product_diff_count": 0
+  },
+  "inputs": [
+    {
+      "path": "evidence/source/raw-run-017-canonical-identity-frontline.json",
+      "sha256": "f503ce331a80457e04caf5859c69feecc8ccb9ac3f345ff81bf5b3d2fc3d5e4e"
+    },
+    {
+      "path": "evidence/source/raw-run-018-canonical-identity-platform.json",
+      "sha256": "74c793051fd186c3f077c01d9f4de76b95b58039aa3f30c99c794f478574e629"
+    },
+    {
+      "path": "evidence/source/raw-run-019-canonical-identity-adversary.json",
+      "sha256": "5590cebe920fc8779cd7bb771e6cce2e4115e6aa6a3f103c6e4d15ee4964ea64"
+    },
+    {
+      "path": "evidence/source/raw-run-020-canonical-identity-frontline-reconciliation.json",
+      "sha256": "5720eee0e0677585bb960f8d7209e469d13a6d3d1087f2475659c7c514c2ee70"
+    },
+    {
+      "path": "evidence/source/raw-run-021-canonical-identity-platform-reconciliation.json",
+      "sha256": "356c64cf2cae6c9eb1270c6b4f58596a4e5be1761c8b6b3be9a61d100e72bc20"
+    },
+    {
+      "path": "evidence/source/raw-run-022-canonical-identity-blocked-owner-verification.json",
+      "sha256": "05553c6e66bfae73a540302a38b121e61cd7573f628a5e89e3643b0fda0e261f"
+    }
+  ],
+  "arbitration_rule": "A final identity follows the independently nameable user job and concrete operation surface. A human route/page/read lens may be H without owning a persisted mutation lifecycle, while configuration, mutation, derived output, external execution, and terminal actions must not be collapsed across canonical record or authority boundaries.",
+  "architecture_boundary": "Single application for one operating organisation across multiple Sites. Roles, action permissions, approved-Site access, canonical record ownership, direct-object concealment, and privacy rules are the authorization boundaries; no tenant boundary is inferred.",
+  "mechanical_graph": {
+    "run_017": {
+      "edges": 150,
+      "unique_targets": 143,
+      "self_edges": 62,
+      "edge_sha256": "0f37709e8bab54b00db27656c7047b3db9e18a9b05658a8777a4f349f349fd2b",
+      "target_sha256": "223367f1e9fa572fe1e1455b438b924c93e684c057f0d15658768748277e84f9"
+    },
+    "run_018": {
+      "edges": 164,
+      "unique_targets": 160,
+      "self_edges": 50,
+      "edge_sha256": "e032eca6f51be3117273c917acfbf3d31c757bc2b0e1ab4a262a3e3daeef2dd0",
+      "target_sha256": "2f70528264fde83bc0c201a4cb1a9f77e0bfd128ec80636d49428dc0effa4f9f"
+    },
+    "combined_primary": {
+      "edges": 314,
+      "unique_targets": 303,
+      "target_sha256": "e17ec1dd80177fd2452eeaaee151bec68da3bf02bec298b4bb0e4440b331ed7a",
+      "exact_cross_primary_target_ids": 0,
+      "duplicate_target_groups": 10,
+      "cross_module_duplicate_target_groups": 5,
+      "duplicate_group_sha256": "8125973cd7bd51d6ae200aa5eaf24d41980d4d935593549fbb455ab52e172245"
+    },
+    "run_019": {
+      "edges": 350,
+      "unique_targets": 290,
+      "self_edges": 107,
+      "edge_sha256": "5da7bde37a357af1d6f9ad8cbce961d87a221b60fb5484402ccc3dd730a29763",
+      "target_sha256": "018e9e13a392d3e82bfbded4f9e51170d806e0950aa9a59bf73dcb894cfe148e"
+    },
+    "run_022": {
+      "edges": 4,
+      "unique_targets": 4,
+      "self_edges": 2,
+      "edge_sha256": "1126cdc391b7150e34959be0ff0f4317c842af38a708175cab20676162aaa3d0",
+      "target_sha256": "a479cc1691b68e9a4543d9025d0e60dbad0a33bfd9314d89bdae854a1eb12696"
+    },
+    "union": {
+      "edges": 668,
+      "unique_source_target_edges": 508,
+      "self_edges": 221,
+      "cycles_excluding_identity_self_edges": 0,
+      "edge_sha256": "7b473d8d3ce85e2c5d9190aded9d340bdb15aca3be22a0ab169d0d44ba35567d"
+    },
+    "comparison": {
+      "primary_adversary_target_intersection": 152,
+      "primary_only_target_names": 151,
+      "adversary_only_untyped_target_names": 138,
+      "adversary_targets_bridging_both_primary_scopes": 14,
+      "cross_scope_bridge_sha256": "86beb6afefb25b820c3602797bfb4cdf3563e6cc68b936fa8d70e68a5e175ca7"
+    }
+  },
+  "cross_scope_bridge_targets": [
+    "CAP-COMPLAINT-HR-CASEWORK",
+    "CAP-CR-EVIDENCE-PACK",
+    "CAP-CR-SLA-REPORT",
+    "CAP-FLEET-ACCESS-REPORT",
+    "CAP-FLEET-COST-REPORT",
+    "CAP-FLEET-MAINTENANCE-REPORT",
+    "CAP-FLEET-TRIP-REPORT",
+    "CAP-HS-BOARD-REPORT",
+    "CAP-HS-CORRECTIVE-ACTION-REPORT",
+    "CAP-HS-INVESTIGATION-REPORT",
+    "CAP-HS-RISK-REPORT",
+    "CAP-HS-WORKSAFE-EXPORT",
+    "CAP-OPS-REPORTING-EXPORT",
+    "CAP-RESP-EVIDENCE-PACK-EXPORT"
+  ],
+  "collision_groups": [
+    {
+      "group_id": "XCG-CARE-PLAN-LENS-OWNER",
+      "members": [
+        "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+        "CAP-OPS-CARE-PLAN-LIFECYCLE",
+        "CAP-OPS-CARE-PLAN-REVIEW-SIGNOFF"
+      ],
+      "conflicts": [
+        "duplicate_target",
+        "module_ownership",
+        "read_lens_collapsed_into_mutation_owner"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+          "feature_class": "H",
+          "module": "Operations",
+          "anchors": [
+            "routes/operations.php:638-686",
+            "app/Services/Operations/CarePlanService.php:9",
+            "app/Services/Operations/CarePlanAttestationService.php:19-392"
+          ]
+        },
+        {
+          "feature_id": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+          "feature_class": "H",
+          "module": "Care & Clinical",
+          "anchors": [
+            "routes/health-clinical.php:54-56",
+            "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:221-241",
+            "resources/js/pages/health-clinical/CarePlans.tsx"
+          ]
+        }
+      ],
+      "disposition": "Merge review/sign-off into the Operations lifecycle, but preserve the explicit clinical read-only review lens as a separate H operation surface."
+    },
+    {
+      "group_id": "XCG-HR-COMPLAINT-CASEWORK",
+      "members": [
+        "CAP-COMPLAINT-HR-CASEWORK",
+        "CAP-HR-PERFORMANCE-PEOPLE-CASEWORK",
+        "CAP-HR-PEOPLE-CASEWORK"
+      ],
+      "conflicts": [
+        "semantic_synonym",
+        "module_ownership",
+        "narrow_name_for_broad_record"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-HR-CASEWORK-LIFECYCLE",
+          "feature_class": "H",
+          "module": "HR",
+          "anchors": [
+            "routes/hr.php:539-567",
+            "app/Http/Controllers/Hr/HrCaseController.php:25-584",
+            "resources/js/pages/hr/cases/index.tsx:106-579",
+            "tests/Feature/Hr/HrCasesPageContractTest.php:66-202"
+          ]
+        }
+      ],
+      "disposition": "One canonical HR case record handles grievance, disciplinary, investigation, welfare, complaint, and other types; complaint-only and people-casework labels are aliases."
+    },
+    {
+      "group_id": "XCG-HS-HANDOVER-VS-TASK-TRANSFER",
+      "members": [
+        "CAP-HS-EVENT-REGISTER-HANDOVER",
+        "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+        "CAP-CR-TASK-ESCALATION-MY-QUEUE",
+        "CAP-CR-HS-TRANSFER",
+        "CAP-HS-CORRECTIVE-ACTION-EVIDENCE"
+      ],
+      "conflicts": [
+        "semantic_collision",
+        "record_ownership",
+        "terminal_action_mismatch"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+          "feature_class": "H",
+          "module": "Health & Safety",
+          "anchors": [
+            "routes/health-safety.php:66",
+            "app/Http/Controllers/HealthSafety/HsEventController.php:408-443",
+            "app/Services/HealthSafety/HsEventService.php:269-322"
+          ]
+        },
+        {
+          "feature_id": "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER",
+          "feature_class": "H",
+          "module": "Control Room",
+          "anchors": [
+            "routes/control-room.php:155-157",
+            "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:261-285",
+            "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:936-1005"
+          ]
+        }
+      ],
+      "relation": "The transfer terminates the Control Room task and creates the canonical H&S corrective action; it does not become incident-handover acceptance and does not replace CAP-HS-CORRECTIVE-ACTION-EVIDENCE as the resulting record owner.",
+      "disposition": "Keep incident handover acceptance and task-to-corrective-action transfer separate because they mutate different records under different authority."
+    },
+    {
+      "group_id": "XCG-CROSS-MODULE-REPORTING",
+      "members": [
+        "CAP-REP-CROSS-MODULE-REPORT-HUB",
+        "CAP-OPS-REPORTING-EXPORT",
+        "CAP-HR-REPORTING-EXPORT",
+        "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+        "CAP-FLEET-REPORTING-EXPORT",
+        "CAP-RESP-EVIDENCE-PACK-EXPORT"
+      ],
+      "conflicts": [
+        "cross_module_ownership",
+        "H_D_surface_collapse",
+        "navigation_owner_merged_into_output_owners"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-REP-REPORT-CATALOG-HUB",
+          "feature_class": "H",
+          "module": "Reporting",
+          "anchors": [
+            "routes/reports.php:23-24",
+            "app/Http/Controllers/ReportsController.php:17-125",
+            "resources/js/pages/reports/index.tsx:88"
+          ]
+        },
+        {
+          "feature_id": "CAP-REP-COMBINED-REPORTS",
+          "feature_class": "D",
+          "module": "Reporting",
+          "anchors": [
+            "routes/reports.php:32-37",
+            "app/Http/Controllers/CombinedReportController.php:19-103",
+            "resources/js/pages/reports/combined.tsx:23"
+          ]
+        }
+      ],
+      "merge_rule": "Map each generic ModuleReportController instance to its exact module-owned reporting/export target; do not create a second cross-module record owner.",
+      "remaining_gap": "All 14 ReportCatalog module instances still require exact global-ledger deduplication before denominator freeze."
+    },
+    {
+      "group_id": "XCG-CALENDAR-INTEGRATION",
+      "members": [
+        "CAP-OPS-CALENDAR-SYNC",
+        "CAP-INT-ADMIN-CONNECTIONS",
+        "CAP-INT-CALENDAR-CONNECTION"
+      ],
+      "conflicts": [
+        "semantic_synonym",
+        "personal_vs_site_resource_scope",
+        "configuration_vs_external_execution"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+          "feature_class": "H",
+          "module": "Operations",
+          "anchors": [
+            "routes/operations.php:1318-1322",
+            "app/Http/Controllers/Operations/CalendarSyncController.php:9-91",
+            "resources/js/pages/operations/calendar-sync/Index.tsx:72-134"
+          ]
+        },
+        {
+          "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+          "feature_class": "H",
+          "module": "Integrations",
+          "anchors": [
+            "routes/settings.php:312-331",
+            "app/Http/Controllers/Settings/CalendarSyncSettingsController.php:22-260",
+            "app/Http/Controllers/Settings/CalendarSyncOAuthController.php:12-109"
+          ]
+        },
+        {
+          "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-SYNC",
+          "feature_class": "D",
+          "module": "Integrations",
+          "anchors": [
+            "routes/settings.php:320-322",
+            "app/Services/Sites/Calendar/CalendarSyncService.php:18-555"
+          ]
+        }
+      ],
+      "disposition": "The Operations surface stores user-owned connection metadata and only timestamps trigger attempts; organisation Site-resource configuration and actual external synchronisation are separate Integration surfaces."
+    },
+    {
+      "group_id": "XCG-ALL-TASKS-WORKBENCH",
+      "members": [
+        "CAP-DAY-ALL-TASKS-WORKBENCH",
+        "CAP-DAY-TASK-REPORT",
+        "CAP-GOV-ACTION-ITEM-WORKFLOW",
+        "CAP-COMPLAINT-HR-CASEWORK",
+        "CAP-CR-ALERT-TASK-QUEUE",
+        "CAP-RESP-TASK-LIFECYCLE"
+      ],
+      "conflicts": [
+        "projection_vs_record_owner",
+        "cross_module_mutation_orchestration",
+        "missing_D_export_identity"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+          "feature_class": "H",
+          "module": "Frontline Workspaces",
+          "anchors": [
+            "routes/tasks.php:6-30",
+            "app/Http/Controllers/AllTasksController.php:28-383",
+            "app/Services/Tasks/TaskAggregator.php:42-160",
+            "resources/js/pages/tasks/index.tsx:266-755"
+          ]
+        },
+        {
+          "feature_id": "CAP-DAY-TASK-REPORT",
+          "feature_class": "H",
+          "module": "Frontline Workspaces",
+          "anchors": [
+            "routes/tasks.php:14",
+            "app/Http/Controllers/AllTasksController.php:531-618",
+            "resources/js/pages/tasks/reports.tsx:218-240"
+          ]
+        },
+        {
+          "feature_id": "CAP-DAY-TASK-CSV-EXPORT",
+          "feature_class": "D",
+          "module": "Frontline Workspaces",
+          "anchors": [
+            "app/Http/Controllers/AllTasksController.php:99-100",
+            "app/Http/Controllers/AllTasksController.php:488-517",
+            "resources/js/pages/tasks/index.tsx:393-558"
+          ]
+        }
+      ],
+      "disposition": "Retain the concrete workbench and its report surfaces while TaskProvider implementations preserve each module's canonical record authority."
+    },
+    {
+      "group_id": "XCG-QUALITY-CLASS",
+      "members": [
+        "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST"
+      ],
+      "conflicts": [
+        "H_M_class_conflict",
+        "operation_surface_definition"
+      ],
+      "recommended_targets": [
+        {
+          "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+          "feature_class": "H",
+          "module": "Quality/Internal",
+          "anchors": [
+            "routes/web.php:126-130",
+            "app/Http/Controllers/QualityChecklistController.php:7-15",
+            "resources/js/pages/quality/checklist.tsx:6-153",
+            "tests/Browser/Misc/MiscPagesTest.php:76-83"
+          ]
+        }
+      ],
+      "disposition": "RUN-022 supersedes the RUN-018/RUN-021 exclusion for identity only. An authorised human route, page, controller, and stable read-only job establish H; missing navigation, dedicated permission, persistence, and executed tests remain evidence and product-quality gaps."
+    },
+    {
+      "group_id": "XCG-BLOCKED-OWNER-RECONCILIATION",
+      "members": [
+        "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+        "CAP-DAY-ALL-TASKS-WORKBENCH",
+        "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+        "CAP-INC-REPORT-AUDIT-EXPORTS",
+        "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST"
+      ],
+      "conflicts": [
+        "phantom_export",
+        "unsupported_component",
+        "missing_product_capability",
+        "blocked_owner_overreach"
+      ],
+      "recommended_resolutions": [
+        {
+          "source_id": "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+          "decision": "MERGE",
+          "target": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+          "feature_class": "H",
+          "anchors": [
+            "routes/clients.php:28-39",
+            "app/Http/Controllers/ClientDocumentController.php:23-278"
+          ]
+        },
+        {
+          "source_id": "CAP-INC-REPORT-AUDIT-EXPORTS",
+          "decision": "SPLIT_AND_EXCLUDE_UNSUPPORTED_COMPONENTS",
+          "target": "CAP-INC-INCIDENT-REPORT-CSV-EXPORT",
+          "feature_class": "D",
+          "anchors": [
+            "routes/incidents.php:133-139",
+            "app/Http/Controllers/IncidentReportController.php:12-101",
+            "resources/js/pages/reports/incidents.tsx:29-163"
+          ],
+          "excluded_components": [
+            "Safeguarding audit/report export",
+            "Generic audit-evidence export"
+          ]
+        },
+        {
+          "source_id": "CAP-WHISTLE-PROTECTED-DISCLOSURE",
+          "decision": "EXCLUDE_AS_NO_CURRENT_PRODUCT_CAPABILITY",
+          "target": null,
+          "anchors": [
+            "routes/hr.php:536-567",
+            "app/Http/Controllers/Hr/HrCaseController.php:34-68"
+          ]
+        }
+      ],
+      "disposition": "Adopt RUN-022 for all five blocked rows; task and quality outcomes are represented in their dedicated collision groups."
+    }
+  ],
+  "late_consistency_conflicts": [
+    {
+      "source": "RUN-020",
+      "feature_id": "CAP-CLIN-TRENDS-SUMMARY-CARE-LENS",
+      "scoped_reconciliation": "Merge the clinical care-plan read into CAP-OPS-CARE-PLAN-LIFECYCLE.",
+      "cross_scope_arbitration": "Retain CAP-CLIN-CARE-PLAN-REVIEW-LENS as H while preserving Operations as the mutation system of record.",
+      "basis": "The dedicated clinical route, page, clinical.dashboard permission, controller method, and read-only review job satisfy the operation-surface rule."
+    },
+    {
+      "source": "RUN-020",
+      "feature_id": "CAP-CR-HS-TRANSFER",
+      "scoped_reconciliation": "Merge transfer into CAP-HS-CORRECTIVE-ACTION-EVIDENCE.",
+      "cross_scope_arbitration": "Retain the independently nameable Control Room terminal transfer operation and relate its result to CAP-HS-CORRECTIVE-ACTION-EVIDENCE.",
+      "basis": "The transfer route terminates a Control Room task and creates an H&S corrective action; it is neither incident handover acceptance nor the later corrective-action evidence lifecycle."
+    },
+    {
+      "source": "RUN-021",
+      "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "scoped_reconciliation": "Exclude pending a persisted owner and dedicated permission.",
+      "cross_scope_arbitration": "Retain as H for the authorised human read-only route/page job.",
+      "basis": "Persistence is not a prerequisite for human feature identity; the remaining weaknesses are evidence and product-quality gaps."
+    },
+    {
+      "source": "RUN-021",
+      "feature_id": "CAP-REP-CROSS-MODULE-REPORT-HUB",
+      "scoped_reconciliation": "Split report catalog H from combined reports D and merge module instances into module owners.",
+      "cross_scope_arbitration": "AGREE",
+      "basis": "The reporting controllers and module record owners establish the same split and global deduplication requirement."
+    },
+    {
+      "source": "RUN-021",
+      "feature_id": "CAP-HR-PERFORMANCE-PEOPLE-CASEWORK",
+      "scoped_reconciliation": "Use CAP-HR-CASEWORK-LIFECYCLE.",
+      "cross_scope_arbitration": "AGREE",
+      "basis": "HrCaseController owns all supported HR case types, including but not limited to complaints."
+    },
+    {
+      "source": "RUN-020_AND_RUN-022",
+      "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "scoped_reconciliation": "Retain H while preserving provider-owned authority.",
+      "cross_scope_arbitration": "AGREE",
+      "basis": "The route, controller, aggregator, page, and provider contracts establish a concrete cross-module workbench."
+    }
+  ],
+  "class_conflicts": {
+    "exact_same_id_conflicts": 1,
+    "items": [
+      {
+        "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+        "run_018_class": "M",
+        "run_022_class": "H",
+        "resolution": "H"
+      }
+    ],
+    "additional_surface_splits": [
+      "Reporting catalog H versus combined reports D",
+      "Task workbench and report H versus CSV export D",
+      "Calendar configuration H versus external synchronisation D"
+    ]
+  },
+  "orphan_and_anchor_findings": {
+    "unresolved_graph_references": 0,
+    "cycles_excluding_identity_self_edges": 0,
+    "run_018_targets_explicitly_not_final_id_credit_supportable": 120,
+    "adversary_only_targets_without_typed_direct_target_definition": 138,
+    "resolved_phantom_or_unsupported_sources": [
+      "CAP-CLI-CLIENT-DOCUMENT-AUDIT-EXPORT",
+      "CAP-SAFE-REPORT-AUDIT-EXPORT",
+      "CAP-WHISTLE-PROTECTED-DISCLOSURE"
+    ]
+  },
+  "unresolved_items": [
+    {
+      "id": "GLOBAL-RUN018-ANCHOR-GAP",
+      "status": "BLOCKED",
+      "count": 120,
+      "detail": "RUN-018 explicitly denies final-ID credit to 120 unique proposed targets; this cross-scope pass resolves only its named collision rows."
+    },
+    {
+      "id": "GLOBAL-ADVERSARY-NAMING-GAP",
+      "status": "BLOCKED",
+      "count": 138,
+      "detail": "RUN-019-only target names lack typed direct target definitions and cannot enter the denominator solely from adversary edges."
+    },
+    {
+      "id": "GLOBAL-REPORT-CATALOG-DEDUPE",
+      "status": "BLOCKED",
+      "count": 14,
+      "detail": "Every generic module-report instance requires an exact module-owned D mapping."
+    },
+    {
+      "id": "GLOBAL-DENOMINATOR-FREEZE",
+      "status": "BLOCKED",
+      "detail": "Primary and adversary target sets still differ by 151 versus 138 names; these recommendations do not freeze a canonical denominator."
+    }
+  ],
+  "evidence_limit": "Static source and ledger arbitration only. No route execution, browser result, test execution, benchmark inspection, ease score, release proof, production-readiness conclusion, or final denominator is awarded.",
+  "credits": {
+    "execution": 0,
+    "browser": 0,
+    "test_execution": 0,
+    "benchmark": 0,
+    "ease": 0,
+    "completion": 0
+  },
+  "arbiter_scope_complete": true,
+  "audit_completion_test_met": false,
+  "adjudication_wrote_files": true,
+  "materialization_wrote_files": true,
+  "materialized_paths": [
+    "evidence/source/raw-run-023-canonical-identity-cross-scope-arbitration.json"
+  ]
+}
