@@ -61,6 +61,12 @@ The two discovery waves now contain 172 unique grouped rows: 145 H, 26 D, and on
 
 Nine additional P1 source claims were retained provisionally, bringing the current provisional register to 12. The new claims cover governance meeting/resolution visibility, board-pack distribution, quorum/decision snapshots, H&S register Site scope, privacy report permission separation, safeguarding intake provenance, safeguarding alert identity and projection durability, and outbound webhook destination safety. None is a final finding, verified exploit, remediated issue, or closed gate.
 
+## Current official New Zealand source baseline
+
+The six official-source families required by the governing prompt were refreshed from current official pages: the Health Information Privacy Code 2020 including its 1 May 2026 indirect-collection amendment, HISO 10029:2022, the NZ FHIR Base Implementation Guide, Ngā Paerewa NZS 8134:2021, the Code of Health and Disability Services Consumers' Rights, and WorkSafe's HSWA guidance. The structured evidence separates each official source fact from the audit inference and the qualified specialist decision still required.
+
+The official HISO PDF asset was identified, but direct retrieval returned 403, so no complete HISO control mapping is claimed. WorkSafe's page records passed amendments that take effect on 1 April 2027; they are tracked as future-effective and are not treated as current law at the 24 August 2026 audit date. No legal, clinical, certification, interoperability, security, or compliance credit is awarded from this source baseline alone.
+
 ## Evidence created in this batch
 
 - `inventory.json`: the full current committed-file census, including Git object IDs, byte sizes, and conservative path categories.
@@ -71,6 +77,7 @@ Nine additional P1 source claims were retained provisionally, bringing the curre
 - `evidence/source/formal-source-wave-01-agent-register.json`: normalized RUN-001 through RUN-003 returns, no-write attestations, and orchestrator reconciliation.
 - `evidence/source/current-feature-discovery-wave-02.json`: 110 additional grouped source-discovery candidates and nine provisional finding rows.
 - `evidence/source/formal-source-wave-02-agent-register.json`: normalized RUN-004 through RUN-006 returns and the cumulative 6/11 formal-assignment state.
+- `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
 - `audit-dashboard.html`: responsive progress dashboard generated only from current structured evidence.

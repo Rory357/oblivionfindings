@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "status": "CURRENT_OFFICIAL_SOURCE_BASELINE_PARTIAL_APPLICATION_MAPPING_PENDING",
+  "observed_at": "2026-08-24T16:31:00+12:00",
+  "scope": "Current official New Zealand sources required by the governing audit prompt. Source facts, audit inferences, and specialist decisions are deliberately separated.",
+  "sources": [
+    {
+      "source_id": "NZ-HIPC-2020-AMENDMENT-2",
+      "title": "Health Information Privacy Code 2020",
+      "authority": "Office of the Privacy Commissioner",
+      "url": "https://www.privacy.org.nz/privacy-principles/codes-of-practice/hipc2020/",
+      "retrieval_status": "LIVE_OFFICIAL_PAGE_VERIFIED",
+      "current_marker": "The official page identifies the consolidated code in force from 1 May 2026 and Amendment No 2 made in March 2026.",
+      "source_facts": [
+        "The Code covers identifiable health information collected, used, held, and disclosed by health agencies.",
+        "The official applicability examples include supported accommodation and disability services.",
+        "Amendment No 2 reflects IPP3A and is in force from 1 May 2026 for indirect collection obligations."
+      ],
+      "audit_inference": "Oblivion workflows that receive health information from providers, integrations, delegates, devices, or imported records need explicit provenance and a reviewable decision about any required indirect-collection notice. This source does not by itself specify the product implementation or prove compliance.",
+      "specialist_decision_required": "A New Zealand privacy officer or lawyer must confirm which Oblivion collection pathways trigger the amended Code, applicable exceptions, notice content, timing, and records of the decision.",
+      "application_credit": "NONE_STATIC_SOURCE_BASELINE_ONLY"
+    },
+    {
+      "source_id": "NZ-HISO-10029-2022",
+      "title": "HISO 10029:2022 Health Information Security Framework",
+      "authority": "Health Information Standards Organisation, Health New Zealand | Te Whatu Ora",
+      "url": "https://www.tewhatuora.govt.nz/assets/Publications/HISO-Standards/HISO-10029-2022-Health-Information-Security-Framework.pdf",
+      "retrieval_status": "OFFICIAL_ASSET_IDENTIFIED_DIRECT_FETCH_RETURNED_403",
+      "current_marker": "The official PDF title and asset were indexed on the current Health New Zealand domain; the audit fetch could not retrieve the full PDF and therefore does not claim a complete control mapping.",
+      "source_facts": [
+        "The current official asset is identified as HISO 10029:2022 Health Information Security Framework.",
+        "The indexed official excerpt describes Māori co-design and Te Tiriti-based stewardship goals.",
+        "The full framework content was not directly retrieved in this lane."
+      ],
+      "audit_inference": "Security, privacy, data stewardship, access control, incident, supplier, and resilience findings should eventually be mapped to the full framework, but the blocked fetch prevents Pass 6 completion credit.",
+      "specialist_decision_required": "A qualified health-information security owner must supply or review the authoritative framework and decide applicability, control ownership, evidence, and residual risk.",
+      "application_credit": "NONE_FETCH_GAP_OPEN"
+    },
+    {
+      "source_id": "NZ-FHIR-BASE-IG-3.1.0",
+      "title": "HL7 FHIR New Zealand Base Implementation Guide",
+      "authority": "HL7 New Zealand; reached from the Health New Zealand NZ FHIR Registry link",
+      "url": "https://fhir.org.nz/ig/base/index.html",
+      "retrieval_status": "LIVE_CURRENT_PUBLISHED_VERSION_VERIFIED",
+      "current_marker": "Version 3.1.0, release, active as of 24 July 2026, based on FHIR R4.",
+      "source_facts": [
+        "The guide provides reusable New Zealand extensions, identifiers, terminology, naming systems, and profiles.",
+        "It prefers reuse of suitable core, international, or recognised-registry definitions.",
+        "The guide explicitly does not define complete conformance requirements for a particular implementation or use case."
+      ],
+      "audit_inference": "Oblivion interfaces using FHIR should reuse current NZ identifiers and terminology where applicable, while each interface still needs a use-case-specific implementation guide or conformance contract.",
+      "specialist_decision_required": "An interoperability architect and clinical data owner must determine applicable profiles, interactions, terminology bindings, identifier rules, versioning, and validation evidence for each interface.",
+      "application_credit": "NONE_NO_INTERFACE_CONFORMANCE_TESTED"
+    },
+    {
+      "source_id": "NZS-8134-2021",
+      "title": "Ngā Paerewa Health and Disability Services Standard NZS 8134:2021",
+      "authority": "New Zealand Ministry of Health",
+      "url": "https://www.health.govt.nz/regulation-legislation/certification-of-health-care-services/services-standard",
+      "retrieval_status": "LIVE_OFFICIAL_PAGE_VERIFIED",
+      "current_marker": "The Ministry page says NZS 8134:2021 remains in effect and was under review; page last-updated marker 11 February 2026.",
+      "source_facts": [
+        "NZS 8134:2021 has been in effect since 28 February 2022.",
+        "The standard is applicable to disability services and suitable for home and community support services.",
+        "The official summary describes person- and whānau-centred outcomes, cultural safety, equity, responsiveness to Māori, and a modular certification framework."
+      ],
+      "audit_inference": "Oblivion evidence and workflows should support person and whānau agency, culturally safe communication, outcome evidence, and module-appropriate assurance; source inspection cannot establish certification.",
+      "specialist_decision_required": "A qualified service quality lead or designated auditing agency must determine the exact applicable criteria and assess operational evidence; the ongoing standards review should be monitored.",
+      "application_credit": "NONE_NO_CERTIFICATION_OR_CRITERION_MAPPING"
+    },
+    {
+      "source_id": "NZ-HDC-CODE",
+      "title": "Code of Health and Disability Services Consumers' Rights",
+      "authority": "Health and Disability Commissioner",
+      "url": "https://www.hdc.org.nz/your-rights/about-the-code/code-of-health-and-disability-services-consumers-rights/",
+      "retrieval_status": "LIVE_OFFICIAL_PAGE_VERIFIED",
+      "current_marker": "The official HDC page sets out the current Code and provider duties.",
+      "source_facts": [
+        "The Code includes privacy and culturally responsive treatment, dignity and independence, appropriate standards, harm minimisation, and continuity between providers.",
+        "It requires effective communication and information a reasonable consumer needs for informed choice and consent.",
+        "It preserves competence to the appropriate extent, the right to refuse or withdraw consent, support-person rights, and a fair, simple, speedy, and efficient complaints process."
+      ],
+      "audit_inference": "Client, consent, clinical, medication, complaints, portal, delegate, and communication workflows need observable support for understandable information, agency, refusal/withdrawal, privacy, continuity, and complaint progression. The Code does not dictate a particular UI.",
+      "specialist_decision_required": "A clinical governance and consumer-rights specialist must validate how each workflow evidences these rights, including exceptions and supported decision-making.",
+      "application_credit": "NONE_NO_WORKFLOW_EXECUTION_OR_LEGAL_ASSURANCE"
+    },
+    {
+      "source_id": "NZ-HSWA-2015",
+      "title": "Health and Safety at Work Act 2015 overview",
+      "authority": "WorkSafe New Zealand",
+      "url": "https://www.worksafe.govt.nz/laws-and-regulations/acts/hswa/",
+      "retrieval_status": "LIVE_OFFICIAL_PAGE_VERIFIED",
+      "current_marker": "WorkSafe's page was updated 13 July 2026 and records amendments passed but not coming into force until 1 April 2027.",
+      "source_facts": [
+        "HSWA is the current New Zealand workplace health and safety law as at the audit date.",
+        "The official overview emphasises participation, leadership, accountability, proactive risk management, primary business responsibility, officer due diligence, and worker duties.",
+        "The official page says passed amendments take effect on 1 April 2027, after this audit date."
+      ],
+      "audit_inference": "Oblivion H&S workflows should make hazards, risk ownership, worker participation, actions, evidence, escalation, and assurance reviewable; event logging alone is not sufficient. The audit must not prematurely apply the 2027 changes as current law.",
+      "specialist_decision_required": "A PCBU health-and-safety lead and New Zealand legal adviser must confirm the duties, record requirements, sector guidance, and readiness work for the 2027 amendments.",
+      "application_credit": "NONE_NO_OPERATIONAL_OR_LEGAL_COMPLIANCE_ASSURANCE"
+    }
+  ],
+  "cross_source_rules": [
+    "Do not convert an official source fact into a product compliance claim without application evidence and a qualified applicability decision.",
+    "Record future-effective changes separately from law and standards in force at the audit date.",
+    "Preserve the single-tenant, multi-Site architecture; privacy and safety scope is expressed through exact action authority, approved Site access, canonical ownership, direct-object concealment, and minimum-necessary disclosure.",
+    "No source in this register authorises remediation or proves clinical, legal, security, certification, interoperability, or release readiness."
+  ],
+  "completion_credit": false
+}
