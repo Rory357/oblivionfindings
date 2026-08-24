@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-058-BROWSER",
+  "status": "SIGNED_IN_DEPLOYED_SELECTED_FEATURES_OBSERVED_UNKNOWN_BUILD_NO_CURRENT_SOURCE_BROWSER_CREDIT",
+  "observed_at": "2026-08-25T05:10:00+12:00",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "environment_boundary": {
+    "designated_url": "https://oblivionfindings.com",
+    "existing_signed_in_demo_session_observed": true,
+    "demo_account_values_persisted": false,
+    "environment_nonproduction_proven": false,
+    "authoritative_deployed_commit_or_tree_found": false,
+    "javascript_asset": "https://oblivionfindings.com/build/assets/app-DpCHbvaC.js",
+    "stylesheet_asset": "https://oblivionfindings.com/build/assets/app-B1fPkNR-.css",
+    "build_or_release_meta_found": false,
+    "manifest_navigation": "BLOCKED_BY_BROWSER_CLIENT",
+    "identity_assessment": "The signed-in deployment remains an unknown-build evidence source. Its observed pages cannot be attributed to the pinned application commit, so they receive no current-source route, workflow, responsive, ease, release, or browser coverage credit.",
+    "interaction_boundary": "GET navigation, viewport changes, opening and closing pre-submit overlays, DOM/layout inspection, and console inspection only",
+    "meaningful_mutations": 0,
+    "forms_submitted": 0,
+    "records_changed": 0,
+    "screenshots_retained": 0,
+    "screenshot_boundary": "No application screenshot was retained because deployed source identity is not attributable and visible demo-record values were not needed for this bounded structural observation."
+  },
+  "selected_features": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "title": "People - Oblivion Findings",
+      "observed_structure": {
+        "heading": "People",
+        "actions": ["Add employee", "Import", "Export"],
+        "tables": 1,
+        "forms": 1,
+        "table_headers": ["Employee", "Emp #", "Position", "Department", "Type", "Site", "Start", "Status"],
+        "empty_state_observed": true
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "title": "Payment Matching - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Payment Matching",
+        "actions": ["Matching", "Match Rules"],
+        "tables": 0,
+        "forms": 0,
+        "empty_state_observed": true
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "title": "Controlled Drug Register - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Controlled drug register",
+        "actions": ["Record CD entry", "Balance check", "Review"],
+        "tables": 1,
+        "forms": 0,
+        "table_headers": ["Client", "Medication", "On hand", "Last checked"],
+        "empty_state_observed": false
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "title": "Health & Clinical - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Health & Clinical",
+        "actions": ["Record observation", "Record ABC", "Apply"],
+        "tables": 1,
+        "forms": 0,
+        "tablists": 2,
+        "table_headers": ["Client", "Type", "Summary", "Recorded", "By", "Site", "Shift", "Protocol"]
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "title": "Health & Clinical - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Health & Clinical",
+        "actions": ["Log clinical event", "Record observation", "Record ABC", "Apply", "View detail"],
+        "tables": 0,
+        "forms": 0,
+        "tablists": 2
+      }
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "detail_route_observed": "/incidents/252",
+      "title": "Incidents - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Incidents",
+        "actions": ["Resolve"],
+        "tables": 1,
+        "forms": 0,
+        "table_headers": ["When", "Incident", "Client", "Severity", "Status", "Source", "Flags"],
+        "detail_dialog_observed": true,
+        "closure_pre_submit_state_observed": true,
+        "closure_fields": ["Outcome", "Closing notes"],
+        "closure_submission_performed": false
+      }
+    }
+  ],
+  "viewport_coverage": {
+    "selected_routes": 6,
+    "required_viewports_checked": 4,
+    "route_viewport_cells_checked": 24,
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 900,
+        "routes_checked": 6,
+        "routes_with_document_horizontal_overflow": 0,
+        "intentional_inner_horizontal_scroll": ["/incidents"]
+      },
+      {
+        "width": 1280,
+        "height": 800,
+        "routes_checked": 6,
+        "routes_with_document_horizontal_overflow": 0,
+        "intentional_inner_horizontal_scroll": ["/incidents"]
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "routes_checked": 6,
+        "routes_with_document_horizontal_overflow": 0,
+        "intentional_inner_horizontal_scroll": ["/hr/people", "/emar/controlled", "/health-clinical/observations", "/incidents"]
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "routes_checked": 6,
+        "routes_with_document_horizontal_overflow": 0,
+        "intentional_inner_horizontal_scroll": ["/hr/people", "/emar/controlled", "/health-clinical/observations", "/incidents"]
+      }
+    ],
+    "boundary": "These are structural observations of an unknown deployed build. They do not satisfy current-source responsive or browser denominators."
+  },
+  "overlay_observations": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "trigger": "Add employee",
+      "desktop_dialog": {"width": 980, "height": 762, "viewport": "1440x900", "body_scroll_locked": true},
+      "mobile_dialog": {"width": 366.59375, "height": 744.71875, "viewport": "390x844", "document_horizontal_overflow": false},
+      "first_step_labels": ["Full name", "Preferred name", "Work email", "Work phone"],
+      "primary_action": "Continue",
+      "escape_closed_without_edits": false,
+      "close_button_closed": true,
+      "focus_restored_to_trigger_after_close": false,
+      "submission_performed": false
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "trigger": "Balance check",
+      "desktop_dialog": {"width": 1080, "height": 830, "viewport": "1440x900", "body_scroll_locked": true},
+      "mobile_dialog": {"width": 366.59375, "height": 778.46875, "viewport": "390x844", "document_horizontal_overflow": false},
+      "labels": ["Controlled drug", "Expected (register)", "Actual (physical count)", "Witnessed by"],
+      "primary_action": "Record check",
+      "escape_closed_without_edits": true,
+      "focus_restored_to_trigger_after_close": false,
+      "submission_performed": false
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "trigger": "Record observation",
+      "desktop_dialog": {"width": 980, "height": 762, "viewport": "1440x900", "body_scroll_locked": true},
+      "mobile_dialog": {"width": 366.59375, "height": 744.71875, "viewport": "390x844", "document_horizontal_overflow": false, "internal_vertical_scroll": true},
+      "first_step_labels": ["Client", "Observation type"],
+      "primary_action": "Continue",
+      "escape_closed_without_edits": true,
+      "focus_restored_to_trigger_after_close": false,
+      "submission_performed": false
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "trigger": "Log clinical event",
+      "desktop_dialog": {"width": 980, "height": 762, "viewport": "1440x900", "body_scroll_locked": true},
+      "mobile_dialog": {"width": 366.59375, "height": 744.71875, "viewport": "390x844", "document_horizontal_overflow": false, "internal_vertical_scroll": true},
+      "first_step_labels": ["Client", "Event type", "Severity"],
+      "primary_action": "Continue",
+      "escape_closed_without_edits": true,
+      "focus_restored_to_trigger_after_close": false,
+      "submission_performed": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "trigger": "Close",
+      "desktop_detail_dialog": {"width": 980, "height": 762, "viewport": "1440x900", "body_scroll_locked": true},
+      "mobile_detail_dialog": {"width": 366.59375, "height": 744.71875, "viewport": "390x844", "document_horizontal_overflow": false, "internal_vertical_scroll": true},
+      "closure_labels": ["Outcome", "Closing notes"],
+      "primary_action": "Close incident",
+      "cancel_returned_to_detail": true,
+      "submission_performed": false
+    }
+  ],
+  "observed_unknown_build_candidates": [
+    {
+      "candidate_id": "VIS-UNKNOWN-BUILD-FOCUS-RESTORE-01",
+      "observation": "After closing the employee, controlled-drug, observation, and clinical-event overlays, focus was observed on the document body rather than restored to the invoking control.",
+      "affected_selected_overlay_families": 4,
+      "classification": "Observed on deployed unknown build; current-source finding prohibited until build attribution and independent resampling."
+    },
+    {
+      "candidate_id": "VIS-UNKNOWN-BUILD-HR-ESCAPE-01",
+      "observation": "The Add employee wizard remained open after Escape before any field change, while the other three selected create/check overlays closed.",
+      "affected_selected_overlay_families": 1,
+      "classification": "Observed on deployed unknown build; deliberate unsaved-protection versus inconsistency not yet adjudicated."
+    }
+  ],
+  "console": {
+    "warnings_or_errors": 0
+  },
+  "coverage_delta": {
+    "unknown_build_routes_observed": 6,
+    "unknown_build_route_viewport_cells_observed": 24,
+    "unknown_build_overlay_families_observed": 5,
+    "current_source_routes_observed": 0,
+    "current_source_route_viewport_cells_observed": 0,
+    "current_source_overlay_families_observed": 0
+  },
+  "credit_boundary": {
+    "deployed_unknown_build_observation": true,
+    "current_build_application_browser_credit": false,
+    "current_source_route_credit": false,
+    "current_source_responsive_credit": false,
+    "current_source_visual_credit": false,
+    "workflow_completion_credit": false,
+    "ease_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  }
+}

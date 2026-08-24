@@ -1,0 +1,83 @@
+{
+  "schema_version": "RUN-060R-S-1",
+  "initial_review": {
+    "run_id": "RUN-060R",
+    "verdict": "CORRECT_LINEAGE_BINDING_ONLY_THEN_ACCEPT",
+    "reviewed_hashes": {
+      "sealed_observation": "b559b2662f6148f31871f57a0aa15e26ac05a7abb235b781f5ac2fd5e99ef290",
+      "independent_review": "b2eae3ba63ef9f8a39ab9a0a96fd7f6c265bde859a6c0ec4d162f7f9b752f1e0",
+      "generator_before_correction": "fd4d4aa9f8dd030fa630958cb43602ae74a324270bf8fba90d3c65593739d3e0",
+      "output_before_correction": "f23adcc7f19436459d42765d8591ab8cdb8f614be7a3910de1f7642c33a78f4e"
+    },
+    "accepted_checks": [
+      "sealed input and application audit pin",
+      "six unique feature IDs and routes",
+      "four exact prompt dimensions and complete 6x4 cross-product",
+      "five overlays and two provisional unknown-build candidates",
+      "zero mutations, submissions, changes, screenshots, and console warnings/errors",
+      "no sensitive demo or credential material",
+      "observation acceptance separated from all-zero downstream credit"
+    ],
+    "corrections": [
+      "Bind the independent-review path and SHA in the generator and output.",
+      "Bind the generator path and computed SHA in the output."
+    ]
+  },
+  "corrected_review": {
+    "run_id": "RUN-060S",
+    "verdict": "ACCEPT_CORRECTED",
+    "remaining_issues": [],
+    "generator": {
+      "path": "generators/integrate-deployed-selected-feature-observation-wave-03.py",
+      "sha256": "ca190ab113ab5a18e31fe0f533f2ae536410d0663932bd615be384b5ae0c87e3",
+      "lineage_binding_accepted": true
+    },
+    "output": {
+      "path": "evidence/browser/current-deployed-selected-feature-observation-wave-03.json",
+      "sha256": "e9c95d695212875a756e704ec0754b0d6998476f9e34d6dce166f8e520027fc3",
+      "review_binding_accepted": true,
+      "generator_binding_accepted": true,
+      "deterministic": true
+    }
+  },
+  "counts": {
+    "selected_feature_ids": 6,
+    "selected_routes": 6,
+    "prompt_dimensions_sampled_on_unknown_build": 4,
+    "unique_route_viewport_cells": 24,
+    "overlay_families": 5,
+    "provisional_candidates": 2,
+    "meaningful_mutations": 0,
+    "forms_submitted": 0,
+    "records_changed": 0,
+    "screenshots_retained": 0,
+    "current_source_routes": 0,
+    "current_source_route_viewport_cells": 0,
+    "current_source_overlay_families": 0
+  },
+  "credit_boundary": {
+    "unknown_build_observation_accepted": true,
+    "current_source_credit": false,
+    "browser_credit": false,
+    "responsive_credit": false,
+    "visual_credit": false,
+    "workflow_credit": false,
+    "journey_credit": false,
+    "accessibility_credit": false,
+    "finding_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "independent_read_only_review": true,
+    "writes": false,
+    "vcs_used": false,
+    "browser_or_network_used": false,
+    "application_source_inspected": false,
+    "tests_build_runtime_database_used": false,
+    "downstream_credit_awarded": false
+  }
+}

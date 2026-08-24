@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "run_id": "RUN-060-DASHBOARD-VERIFY",
+  "status": "PASS_AUDIT_DASHBOARD_ONLY_ZERO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-25T05:04:06+12:00",
+  "audit_application_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "dashboard": {
+    "url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-0102c5cc-browser-wave-03#progress",
+    "path": "audit-dashboard.html",
+    "sha256": "ccad2db9da5b9b6e5d1fe01119dae1de1b8a1b28e89bb14bf544bedef63fb561",
+    "title": "Oblivion Findings current-source audit",
+    "heading": "Fresh current-source audit"
+  },
+  "generator": {
+    "path": "generators/build-current-audit-dashboard.py",
+    "sha256": "27143d961158292a765d013539cef57b3bea7596febbc59acbb510cbe84792c8",
+    "double_run_hash_1": "ccad2db9da5b9b6e5d1fe01119dae1de1b8a1b28e89bb14bf544bedef63fb561",
+    "double_run_hash_2": "ccad2db9da5b9b6e5d1fe01119dae1de1b8a1b28e89bb14bf544bedef63fb561",
+    "deterministic": true
+  },
+  "normalized_unknown_build_observation": {
+    "path": "evidence/browser/current-deployed-selected-feature-observation-wave-03.json",
+    "sha256": "e9c95d695212875a756e704ec0754b0d6998476f9e34d6dce166f8e520027fc3",
+    "double_run_deterministic": true,
+    "selected_routes": 6,
+    "prompt_dimensions": 4,
+    "route_viewport_cells": 24,
+    "overlay_families": 5,
+    "provisional_unknown_build_candidates": 2,
+    "current_source_routes": 0
+  },
+  "browser_checks": [
+    {
+      "requested_viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document_client_width": 1425,
+      "document_scroll_width": 1425,
+      "page_horizontal_overflow": false,
+      "unknown_build_counts_visible": true,
+      "unknown_build_evidence_panel_visible": true,
+      "current_source_zero_boundary_visible": true,
+      "anchor_count": 79
+    },
+    {
+      "requested_viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document_client_width": 375,
+      "document_scroll_width": 375,
+      "page_horizontal_overflow": false,
+      "table_wrappers": 6,
+      "intentional_inner_table_scroll_wrappers": 6,
+      "unknown_build_evidence_panel_visible": true,
+      "notice_visible": true,
+      "anchor_count": 79
+    }
+  ],
+  "link_check": {
+    "anchor_count": 79,
+    "local_file_link_occurrences": 71,
+    "unique_local_file_links": 66,
+    "missing_local_files": 0
+  },
+  "console": {
+    "warnings_or_errors": 0
+  },
+  "screenshot": {
+    "retained": false,
+    "credit": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_browser_verification": true,
+    "current_build_application_browser_credit": false,
+    "current_source_route_credit": false,
+    "current_source_responsive_credit": false,
+    "current_source_visual_credit": false,
+    "current_source_workflow_credit": false,
+    "finding_credit": false,
+    "ease_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "audit_artifact_only": true,
+    "application_route_or_workflow_executed": false,
+    "application_source_modified": false,
+    "meaningful_external_mutation": false,
+    "viewport_override_reset": true,
+    "verified_tab_marked_deliverable": true
+  }
+}

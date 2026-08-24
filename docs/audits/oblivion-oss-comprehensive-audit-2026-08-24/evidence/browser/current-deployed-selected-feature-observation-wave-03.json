@@ -1,0 +1,589 @@
+{
+  "schema_version": "1.0",
+  "run_id": "RUN-060",
+  "status": "UNKNOWN_BUILD_SELECTED_FEATURE_OBSERVATION_NORMALIZED_ZERO_CURRENT_SOURCE_CREDIT",
+  "generated_at": "2026-08-25T05:10:00+12:00",
+  "input": {
+    "path": "evidence/browser/deployed-selected-feature-observation-wave-03.json",
+    "sha256": "b559b2662f6148f31871f57a0aa15e26ac05a7abb235b781f5ac2fd5e99ef290",
+    "run_id": "RUN-058-BROWSER"
+  },
+  "independent_review": {
+    "path": "evidence/browser/raw-run-059b-independent-unknown-build-browser-review-wave-03.json",
+    "sha256": "b2eae3ba63ef9f8a39ab9a0a96fd7f6c265bde859a6c0ec4d162f7f9b752f1e0",
+    "verdict": "ACCEPT_UNKNOWN_BUILD_OBSERVATION_ONLY_INTEGRATION_UPDATE_REQUIRED"
+  },
+  "generator": {
+    "path": "generators/integrate-deployed-selected-feature-observation-wave-03.py",
+    "sha256": "ca190ab113ab5a18e31fe0f533f2ae536410d0663932bd615be384b5ae0c87e3"
+  },
+  "audit_application_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "deployed_identity": {
+    "deployed_application_commit": null,
+    "deployed_application_tree": null,
+    "reproducible_build_marker": null,
+    "attribution_status": "UNPROVEN"
+  },
+  "actor_and_fixture_boundary": {
+    "actor_role": "UNKNOWN",
+    "approved_site_context": "UNKNOWN",
+    "fixture_safety_context": "UNKNOWN",
+    "environment_classification": "UNKNOWN",
+    "signed_in_session_observed": true
+  },
+  "counts": {
+    "selected_feature_ids": 6,
+    "selected_routes": 6,
+    "prompt_dimensions_sampled_on_unknown_build": 4,
+    "unknown_build_route_viewport_cells": 24,
+    "unknown_build_overlay_families": 5,
+    "unknown_build_provisional_candidates": 2,
+    "current_build_required_viewports_credited": 0,
+    "current_source_routes": 0,
+    "current_source_route_viewport_cells": 0,
+    "current_source_overlay_families": 0,
+    "meaningful_mutations": 0,
+    "forms_submitted": 0,
+    "records_changed": 0,
+    "screenshots_retained": 0,
+    "console_warnings_or_errors": 0
+  },
+  "selected_features": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "title": "People - Oblivion Findings",
+      "observed_structure": {
+        "heading": "People",
+        "actions": [
+          "Add employee",
+          "Import",
+          "Export"
+        ],
+        "tables": 1,
+        "forms": 1,
+        "table_headers": [
+          "Employee",
+          "Emp #",
+          "Position",
+          "Department",
+          "Type",
+          "Site",
+          "Start",
+          "Status"
+        ],
+        "empty_state_observed": true
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "title": "Payment Matching - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Payment Matching",
+        "actions": [
+          "Matching",
+          "Match Rules"
+        ],
+        "tables": 0,
+        "forms": 0,
+        "empty_state_observed": true
+      }
+    },
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "title": "Controlled Drug Register - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Controlled drug register",
+        "actions": [
+          "Record CD entry",
+          "Balance check",
+          "Review"
+        ],
+        "tables": 1,
+        "forms": 0,
+        "table_headers": [
+          "Client",
+          "Medication",
+          "On hand",
+          "Last checked"
+        ],
+        "empty_state_observed": false
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "title": "Health & Clinical - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Health & Clinical",
+        "actions": [
+          "Record observation",
+          "Record ABC",
+          "Apply"
+        ],
+        "tables": 1,
+        "forms": 0,
+        "tablists": 2,
+        "table_headers": [
+          "Client",
+          "Type",
+          "Summary",
+          "Recorded",
+          "By",
+          "Site",
+          "Shift",
+          "Protocol"
+        ]
+      }
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "title": "Health & Clinical - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Health & Clinical",
+        "actions": [
+          "Log clinical event",
+          "Record observation",
+          "Record ABC",
+          "Apply",
+          "View detail"
+        ],
+        "tables": 0,
+        "forms": 0,
+        "tablists": 2
+      }
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "detail_route_observed": "/incidents/252",
+      "title": "Incidents - Oblivion Findings",
+      "observed_structure": {
+        "heading": "Incidents",
+        "actions": [
+          "Resolve"
+        ],
+        "tables": 1,
+        "forms": 0,
+        "table_headers": [
+          "When",
+          "Incident",
+          "Client",
+          "Severity",
+          "Status",
+          "Source",
+          "Flags"
+        ],
+        "detail_dialog_observed": true,
+        "closure_pre_submit_state_observed": true,
+        "closure_fields": [
+          "Outcome",
+          "Closing notes"
+        ],
+        "closure_submission_performed": false
+      }
+    }
+  ],
+  "route_viewport_observations": [
+    {
+      "cell_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|/hr/people|1440|900",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY|/finance/payment-matching|1440|900",
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-MED-CD-REGISTER-BALANCE|/emar/controlled|1440|900",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD|/health-clinical/observations|1440|900",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-EVENT-REGISTER-RECORD|/health-clinical/events|1440|900",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE|/incidents|1440|900",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "width": 1440,
+      "height": 900,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|/hr/people|1280|800",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY|/finance/payment-matching|1280|800",
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-MED-CD-REGISTER-BALANCE|/emar/controlled|1280|800",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD|/health-clinical/observations|1280|800",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-EVENT-REGISTER-RECORD|/health-clinical/events|1280|800",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE|/incidents|1280|800",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "width": 1280,
+      "height": 800,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|/hr/people|1024|768",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY|/finance/payment-matching|1024|768",
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-MED-CD-REGISTER-BALANCE|/emar/controlled|1024|768",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD|/health-clinical/observations|1024|768",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-EVENT-REGISTER-RECORD|/health-clinical/events|1024|768",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE|/incidents|1024|768",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "width": 1024,
+      "height": 768,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE|/hr/people|390|844",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY|/finance/payment-matching|390|844",
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "route": "/finance/payment-matching",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-MED-CD-REGISTER-BALANCE|/emar/controlled|390|844",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD|/health-clinical/observations|390|844",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-CLIN-EVENT-REGISTER-RECORD|/health-clinical/events|390|844",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": false,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "cell_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE|/incidents|390|844",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "width": 390,
+      "height": 844,
+      "document_horizontal_overflow_observed": false,
+      "intentional_inner_horizontal_scroll_observed": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    }
+  ],
+  "overlay_observations": [
+    {
+      "overlay_id": "UNKNOWN-BUILD-OVERLAY-01",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "route": "/hr/people",
+      "trigger": "Add employee",
+      "primary_action": "Continue",
+      "close_mechanism_observed": "close_button",
+      "focus_before_close_role_or_locator": null,
+      "focus_after_close_role_or_locator": null,
+      "focus_restored_to_trigger_observed": false,
+      "submission_performed": false,
+      "screenshot_count": 0,
+      "screenshot_credit": false,
+      "resampling_required": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "overlay_id": "UNKNOWN-BUILD-OVERLAY-02",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "route": "/emar/controlled",
+      "trigger": "Balance check",
+      "primary_action": "Record check",
+      "close_mechanism_observed": "escape",
+      "focus_before_close_role_or_locator": null,
+      "focus_after_close_role_or_locator": null,
+      "focus_restored_to_trigger_observed": false,
+      "submission_performed": false,
+      "screenshot_count": 0,
+      "screenshot_credit": false,
+      "resampling_required": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "overlay_id": "UNKNOWN-BUILD-OVERLAY-03",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "route": "/health-clinical/observations",
+      "trigger": "Record observation",
+      "primary_action": "Continue",
+      "close_mechanism_observed": "escape",
+      "focus_before_close_role_or_locator": null,
+      "focus_after_close_role_or_locator": null,
+      "focus_restored_to_trigger_observed": false,
+      "submission_performed": false,
+      "screenshot_count": 0,
+      "screenshot_credit": false,
+      "resampling_required": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "overlay_id": "UNKNOWN-BUILD-OVERLAY-04",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "route": "/health-clinical/events",
+      "trigger": "Log clinical event",
+      "primary_action": "Continue",
+      "close_mechanism_observed": "escape",
+      "focus_before_close_role_or_locator": null,
+      "focus_after_close_role_or_locator": null,
+      "focus_restored_to_trigger_observed": false,
+      "submission_performed": false,
+      "screenshot_count": 0,
+      "screenshot_credit": false,
+      "resampling_required": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    },
+    {
+      "overlay_id": "UNKNOWN-BUILD-OVERLAY-05",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "route": "/incidents",
+      "trigger": "Close",
+      "primary_action": "Close incident",
+      "close_mechanism_observed": "cancel_to_detail",
+      "focus_before_close_role_or_locator": null,
+      "focus_after_close_role_or_locator": null,
+      "focus_restored_to_trigger_observed": null,
+      "submission_performed": false,
+      "screenshot_count": 0,
+      "screenshot_credit": false,
+      "resampling_required": true,
+      "attribution": "DEPLOYED_UNKNOWN_BUILD_ONLY",
+      "current_source_credit": false
+    }
+  ],
+  "provisional_unknown_build_candidates": [
+    {
+      "candidate_id": "VIS-UNKNOWN-BUILD-FOCUS-RESTORE-01",
+      "observation": "After closing the employee, controlled-drug, observation, and clinical-event overlays, focus was observed on the document body rather than restored to the invoking control.",
+      "affected_selected_overlay_families": 4,
+      "classification": "Observed on deployed unknown build; current-source finding prohibited until build attribution and independent resampling."
+    },
+    {
+      "candidate_id": "VIS-UNKNOWN-BUILD-HR-ESCAPE-01",
+      "observation": "The Add employee wizard remained open after Escape before any field change, while the other three selected create/check overlays closed.",
+      "affected_selected_overlay_families": 1,
+      "classification": "Observed on deployed unknown build; deliberate unsaved-protection versus inconsistency not yet adjudicated."
+    }
+  ],
+  "credit_boundary": {
+    "observation_record_accepted": true,
+    "current_build_application_browser_credit": false,
+    "current_source_route_credit": false,
+    "current_source_responsive_credit": false,
+    "current_source_visual_credit": false,
+    "current_source_overlay_credit": false,
+    "current_source_workflow_credit": false,
+    "current_source_journey_credit": false,
+    "screenshot_credit": false,
+    "accessibility_credit": false,
+    "finding_credit": false,
+    "ease_credit": false,
+    "runtime_credit": false,
+    "test_execution_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "normalization_only": true,
+    "sealed_input_mutated": false,
+    "meaningful_application_mutation": false,
+    "credential_or_demo_record_value_persisted": false,
+    "application_source_inspected_by_generator": false,
+    "runtime_build_test_or_database_used_by_generator": false,
+    "unknown_build_observation_kept_separate_from_current_source_credit": true
+  }
+}
