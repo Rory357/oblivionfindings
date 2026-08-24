@@ -27,7 +27,7 @@
     "04-workflow-usability-scorecard.csv": {
       "data_rows": 790,
       "columns": 32,
-      "sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
+      "sha256": "60360acbc22337e456ea74e231c2b650d248792f4cce1611046e674e63c28553",
       "required_rows": 790,
       "structural_rows_complete": true,
       "runtime_executed": 0,
@@ -38,7 +38,7 @@
     "05-browser-visual-coverage-matrix.csv": {
       "data_rows": 8753,
       "columns": 22,
-      "sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+      "sha256": "4082310f08608b7743316f4a79724c162edfa69881887989215f02876ee3c32e",
       "semantic_tuple_sha256": "5aba32b52bb309e5a3d9be34ca15e69b4dc85cd7327e61c5a8fbe533577b8097",
       "assigned_final_feature_id": 8168,
       "unresolved_final_feature_id": 585,

@@ -1,0 +1,319 @@
+{
+  "schema_version": "1.0",
+  "artifact": "deployed-current-read-only-visual-resample",
+  "generated_at": "2026-08-24T03:10:30Z",
+  "classification": "supplemental_authenticated_deployed_current_read_only_unknown_build_no_audited_baseline_credit",
+  "source_boundary": {
+    "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "published_origin_main_at_review": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "reviewed_local_application_main": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "deployed_build_identity": null,
+    "attribution": "No deployed commit or release marker was exposed. These observations are not attributed to the audited commit, published origin/main, or reviewed local main."
+  },
+  "environment": {
+    "origin": "https://oblivionfindings.com",
+    "actor": "Demo Admin",
+    "authentication": "Existing user-supplied authenticated session; no credential is retained.",
+    "site_scope": "not visibly selected; Demo Admin is a positive/global actor and supplies no restricted-role or wrong-Site credit",
+    "domain_mutations_submitted": false,
+    "interaction_boundary": "GET navigation, responsive viewport changes, DOM/accessibility/console reads, opening and closing local overlays, selecting Injury in unsubmitted component-local incident state, and applying a read-only System Users GET filter. No form, workflow, handover, clock, medication, alert, incident, user, corrective action, export, impersonation or other domain action was submitted."
+  },
+  "deployed_asset_fingerprint": {
+    "application_script": "/build/assets/app-DpCHbvaC.js",
+    "application_stylesheet": "/build/assets/app-B1fPkNR-.css",
+    "build_commit_release_or_version_meta": [],
+    "claim_limit": "Hashed asset names are a comparison fingerprint, not a verified source commit or release identity."
+  },
+  "required_viewports": [
+    "1440x900",
+    "1280x800",
+    "1024x768",
+    "390x844"
+  ],
+  "observations": {
+    "dashboard_mobile_navigation": {
+      "route": "/dashboard",
+      "viewport": "390x844",
+      "pre_open_document_overflow": false,
+      "open_state": {
+        "close_menu_button_visible": true,
+        "dialog_role_count": 0,
+        "main_inert": false,
+        "main_aria_hidden": null,
+        "body_overflow": "visible",
+        "focused_element": "Toggle Menu button"
+      },
+      "escape_state": {
+        "menu_closed": false,
+        "main_remained_interactive": true
+      },
+      "explicit_close_state": {
+        "menu_closed": true,
+        "focused_element_after_close": "body",
+        "focus_restored_to_toggle": false
+      },
+      "result": "reproduced_current_deployment",
+      "finding_id": "VIS-MOBILE-NAV-01"
+    },
+    "dashboard_module_search": {
+      "route": "/dashboard",
+      "viewports": {
+        "1440x900": {
+          "document_overflow": false,
+          "dialog_role_count": 1,
+          "dialog_aria_modal": null,
+          "main_inert": false,
+          "main_aria_hidden": null,
+          "body_overflow_open": "hidden",
+          "focus_entered_combobox": true,
+          "escape_closed_after_transition": true,
+          "focused_element_after_close": "body",
+          "focus_restored_to_trigger": false
+        },
+        "390x844": {
+          "document_overflow": false,
+          "dialog_role_count": 1,
+          "dialog_aria_modal": null,
+          "main_inert": false,
+          "main_aria_hidden": null,
+          "body_overflow_open": "hidden",
+          "focus_entered_combobox": true,
+          "escape_closed_after_transition": true,
+          "focused_element_after_close": "body",
+          "focus_restored_to_trigger": false
+        }
+      },
+      "console_warning": "Missing Description or aria-describedby for DialogContent was logged during the bounded dialog interactions.",
+      "result": "reproduced_current_deployment",
+      "finding_id": "VIS-OVERLAY-FOCUS-01"
+    },
+    "incident_register_and_unsubmitted_wizard": {
+      "route": "/incidents",
+      "shared_page_boundary": "The page is shared by several incident capabilities; no whole-page or canonical-task credit is assigned to one final ID.",
+      "viewport_records": [
+        {
+          "viewport": "1440x900",
+          "client_width": 1425,
+          "scroll_width": 1425,
+          "document_overflow": false,
+          "heading_top": 227,
+          "report_action_top": 196,
+          "first_register_row_top": 811,
+          "table_scroller_client_width": 1055,
+          "table_scroller_scroll_width": 1055
+        },
+        {
+          "viewport": "1280x800",
+          "client_width": 1265,
+          "scroll_width": 1265,
+          "document_overflow": false,
+          "heading_top": 253,
+          "report_action_top": 222,
+          "first_register_row_top": 867,
+          "table_scroller_client_width": 895,
+          "table_scroller_scroll_width": 971
+        },
+        {
+          "viewport": "1024x768",
+          "client_width": 1009,
+          "scroll_width": 1009,
+          "document_overflow": false,
+          "heading_top": 253,
+          "report_action_top": 352,
+          "first_register_row_top": 995,
+          "table_scroller_client_width": 639,
+          "table_scroller_scroll_width": 971
+        },
+        {
+          "viewport": "390x844",
+          "client_width": 375,
+          "scroll_width": 375,
+          "document_overflow": false,
+          "heading_top": 353,
+          "report_action_top": 487,
+          "first_register_row_top": 1798,
+          "table_scroller_client_width": 284,
+          "table_scroller_scroll_width": 971
+        }
+      ],
+      "unsubmitted_recovery_trace": {
+        "wizard_opened": true,
+        "incident_path_selected": true,
+        "injury_selected_before_close": true,
+        "wizard_closed_without_submit": true,
+        "wizard_reopened": true,
+        "injury_selected_after_reopen": false,
+        "form_submitted": false
+      },
+      "results": [
+        {
+          "finding_id": "VIS-HERO-DENSITY-01",
+          "result": "partially_reproduced_current_deployment",
+          "boundary": "The primary Report action remains available, but the first register row begins 954 CSS pixels below the 390x844 viewport and 1,445 pixels below the heading top. This is one worklist sample, not a universal PageHero finding rate."
+        },
+        {
+          "finding_id": "INCIDENT-RECOVERY-01",
+          "result": "reproduced_current_deployment",
+          "boundary": "Closing and reopening the unsubmitted wizard silently discarded the component-local Injury selection. Reload, offline, server retry and submitted-record recovery were not exercised."
+        }
+      ]
+    },
+    "my_day_header": {
+      "route": "/my-day",
+      "finding_id": "VIS-MY-DAY-HEADER-OVERFLOW-01",
+      "viewport_records": [
+        {
+          "viewport": "1440x900",
+          "client_width": 1425,
+          "scroll_width": 1425,
+          "document_overflow": false,
+          "report_incident_in_viewport": true,
+          "live_refresh_in_viewport": true,
+          "notifications_in_viewport": true
+        },
+        {
+          "viewport": "1280x800",
+          "client_width": 1265,
+          "scroll_width": 1265,
+          "document_overflow": false,
+          "report_incident_in_viewport": true,
+          "live_refresh_in_viewport": true,
+          "notifications_in_viewport": true
+        },
+        {
+          "viewport": "1024x768",
+          "client_width": 1009,
+          "scroll_width": 1112,
+          "document_overflow": true,
+          "report_incident_in_viewport": true,
+          "live_refresh_in_viewport": false,
+          "notifications_in_viewport": false
+        },
+        {
+          "viewport": "390x844",
+          "client_width": 375,
+          "scroll_width": 470,
+          "document_overflow": true,
+          "report_incident_in_viewport": true,
+          "live_refresh_in_viewport": false,
+          "notifications_in_viewport": false
+        }
+      ],
+      "result": "reproduced_current_deployment",
+      "boundary": "The sampled header causes 103 CSS pixels of document overflow at 1024x768 and 95 pixels at 390x844. The Report incident control remains in bounds; Live refresh and Notifications extend beyond the document client width."
+    },
+    "corrective_actions": {
+      "route": "/health-safety/corrective-actions",
+      "finding_id": "VIS-RESPONSIVE-OVERFLOW-01",
+      "viewport_records": [
+        {
+          "viewport": "1440x900",
+          "client_width": 1425,
+          "scroll_width": 1788,
+          "document_overflow": true
+        },
+        {
+          "viewport": "1280x800",
+          "client_width": 1265,
+          "scroll_width": 1788,
+          "document_overflow": true
+        },
+        {
+          "viewport": "1024x768",
+          "client_width": 1009,
+          "scroll_width": 1788,
+          "document_overflow": true
+        },
+        {
+          "viewport": "390x844",
+          "client_width": 375,
+          "scroll_width": 1526,
+          "document_overflow": true
+        }
+      ],
+      "result": "reproduced_current_deployment",
+      "boundary": "The authenticated page rendered the expected Corrective actions heading, but the document overflowed at every required viewport. No action was started, completed, verified or closed, and no escaping descendant/root cause is attributed without deployed source identity."
+    },
+    "system_users": {
+      "routes": [
+        "/system/users",
+        "/system/users/create"
+      ],
+      "zero_result_role_filter": {
+        "query": "role=67",
+        "rendered_table_rows": 0,
+        "post_navigation_samples": 8,
+        "negative_kpi_values_observed": false,
+        "stable_kpi_values": {
+          "total_users": 83,
+          "active": 78,
+          "pending_approval": 5,
+          "staff_members": 50
+        },
+        "finding_id": "VIS-SYSTEM-USERS-COUNT-01",
+        "result": "not_reproduced_in_bounded_current_deployment_sample",
+        "boundary": "The transient negative animation did not reproduce in eight post-navigation samples. The displayed KPI values remained organization-wide while the filtered table had zero rows; this pass neither closes the retained finding nor asserts a new filtered-summary contract."
+      },
+      "create_user_staff_path": {
+        "open_hr_people_link_visible": true,
+        "open_hr_people_href": "/hr/people",
+        "client_and_next_of_kin_account_options_visible": true,
+        "form_typed_or_submitted": false,
+        "finding_id": "HR-STAFF-CREATION-PATH-01",
+        "result": "deployed_entry_handoff_present",
+        "boundary": "The deployed Create User entry visibly hands staff creation to HR People. Atomic staff/user creation, Site selection, duplicate handling and verification were not executed."
+      }
+    },
+    "security_device_alerts_events": {
+      "route": "/security-devices/alerts-events",
+      "heading": "Alerts & Events",
+      "viewport_records": [
+        {
+          "viewport": "1440x900",
+          "client_width": 1425,
+          "scroll_width": 1425,
+          "document_overflow": false
+        },
+        {
+          "viewport": "1280x800",
+          "client_width": 1265,
+          "scroll_width": 1265,
+          "document_overflow": false
+        },
+        {
+          "viewport": "1024x768",
+          "client_width": 1009,
+          "scroll_width": 1009,
+          "document_overflow": false
+        },
+        {
+          "viewport": "390x844",
+          "client_width": 375,
+          "scroll_width": 375,
+          "document_overflow": false
+        }
+      ],
+      "result": "authenticated_read_only_entry_rendered",
+      "boundary": "This proves only the positive/global Demo Admin surface and responsive entry. Site custody, direct-object denial, alert acknowledgement, outbox atomicity and replay behavior were not exercised."
+    }
+  },
+  "resample_summary": {
+    "retained_visual_risk_families_sampled": 4,
+    "retained_visual_risk_family_denominator": 4,
+    "reproduced": 3,
+    "partially_reproduced": 1,
+    "not_reproduced": 0,
+    "audited_baseline_credit_delta": 0,
+    "canonical_task_credit_delta": 0,
+    "journey_credit_delta": 0,
+    "ease_score_delta": 0,
+    "audit_wide_test_credit_delta": 0,
+    "new_root_cause_findings_created": 0
+  },
+  "minimum_next_evidence": [
+    "Expose a non-secret deployed commit or release marker before source attribution.",
+    "Repeat the four retained visual-family interactions on the immutable audited build for baseline resample credit.",
+    "Use representative restricted roles and two-Site fixtures for authorization/privacy checks; Demo Admin supplies positive entry only.",
+    "Use a disposable resettable test/development environment and separate mutation authority before executing any canonical task or journey."
+  ]
+}

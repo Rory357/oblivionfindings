@@ -5,7 +5,7 @@
 - Owning module: Control Room
 - Legacy family: `CR-CONTROL-ROOM-HANDOVER`
 - Audited source: `081ef198f9f992f224e8c0c9fba33df33dde40be`
-- Validation: **Blocked—authenticated deployed-current GET attempted, but all four required viewports rendered `500 Server Error`; deployed build identity and independent semantic validation remain absent**
+- Validation: **Blocked—one authenticated deployed-current GET rendered a page labelled `500 Server Error`, captured at all four required viewports; deployed build identity, transport status and independent semantic validation remain absent**
 - Benchmark: Pass 3 pending separate capability-level adjudication
 
 ## Start condition and entry
@@ -25,7 +25,7 @@ Retrieve and understand the exact routed information/file without claiming a mut
 
 ## Ordered task and decisions
 
-1. Enter through `GET|HEAD control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`). An authenticated rendered link supplied shift ID 9; the GET was attempted at 1440×900, 1280×800, 1024×768 and 390×844 and rendered `500 Server Error` at each viewport.
+1. Enter through `GET|HEAD control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`). An authenticated rendered link supplied shift ID 9; one GET rendered a page labelled `500 Server Error`, which was captured at 1440×900, 1280×800, 1024×768 and 390×844. The HTTP transport status was not independently captured.
 
 ## Source-applicable states and transitions
 

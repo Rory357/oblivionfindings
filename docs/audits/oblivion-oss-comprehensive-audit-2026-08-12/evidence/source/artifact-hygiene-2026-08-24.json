@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-24T15:06:48+12:00",
+  "generated_at": "2026-08-24T15:23:25+12:00",
   "scope": "Audit artifacts only; no application source or audit-credit mutation.",
   "machine_path_replacements": 178,
   "machine_path_files": [

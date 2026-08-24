@@ -87,7 +87,7 @@
       "denominator": 1880,
       "percent": 99.79,
       "status": "blocked",
-      "detail": "Four immutable-baseline Control Room handover rows lack full geometry; 469/470 families are fully measured. A separate historical browser-evidence pass measured the materially changed handover component at all four viewports without horizontal overflow. On 24 Aug an authenticated unknown-build deployment instead rendered 500 Server Error at all four viewports. Neither supplemental result retroactively changes baseline credit."
+      "detail": "Four immutable-baseline Control Room handover rows lack full geometry; 469/470 families are fully measured. A separate historical browser-evidence pass measured the materially changed handover component at all four viewports without horizontal overflow. On 24 Aug one authenticated unknown-build GET instead rendered a page labelled 500 Server Error, captured at all four viewports; transport status was not independently retained. Neither supplemental result retroactively changes baseline credit."
     },
     "browser_claims_use_allowed_labels": {
       "completed": 8753,
@@ -295,7 +295,7 @@
       "denominator": 4,
       "percent": 0.0,
       "status": "blocked-no-independent-runtime-resample",
-      "detail": "Four retained material hero/overlay finding families are in scope: VIS-HERO-DENSITY-01, VIS-OVERLAY-FOCUS-01, VIS-MOBILE-NAV-01 and INCIDENT-RECOVERY-01. The frozen audited baseline still has 0/4 independent runtime resamples. A supplemental read-only current-main pass sampled all 4/4 and reproduced or partially reproduced every family, but source/build drift means it cannot be credited retroactively to the baseline denominator; see evidence/browser/current-main-visual-family-resample-2026-08-14.json."
+      "detail": "Four retained material hero/overlay finding families are in scope: VIS-HERO-DENSITY-01, VIS-OVERLAY-FOCUS-01, VIS-MOBILE-NAV-01 and INCIDENT-RECOVERY-01. The frozen audited baseline still has 0/4 independent runtime resamples. A supplemental read-only historical-pin pass and a separate 24 Aug authenticated unknown-build deployment each sampled all 4/4: mobile navigation, overlay focus and unsubmitted incident recovery reproduced, while hero/task-first distance partially reproduced. The unknown-build pass additionally reproduced My Day overflow at 1024x768 and 390x844 and H&S Corrective Actions overflow at all four required viewports; the System Users negative-count animation did not reproduce, Create User exposed only the Open HR People staff handoff, and Security Devices Alerts & Events rendered without document overflow at all four widths. No form, alert, task, journey or other domain workflow was submitted. Neither pass changes audited-baseline, source-attribution, canonical-task, journey, ease-score or audit-wide-test credit; see evidence/browser/current-main-visual-family-resample-2026-08-14.json and evidence/browser/deployed-current-read-only-visual-resample-2026-08-24.json."
     },
     "all_findings_with_literal_current_feature_id": {
       "completed": 100,

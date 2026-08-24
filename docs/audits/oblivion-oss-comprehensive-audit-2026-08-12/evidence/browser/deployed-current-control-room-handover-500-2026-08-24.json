@@ -17,6 +17,7 @@
     "actor": "Demo Admin",
     "authentication": "Existing user-supplied authenticated session; no credential is retained in this artifact.",
     "site_scope": "not visibly selected",
+    "domain_mutations_submitted": false,
     "interaction_boundary": "Read-only GET navigation, rendered-link discovery, DOM text/count reads, responsive viewport changes and screenshots only. No form, handover, acknowledgement, preparation, override, acceptance, alert, shift or other domain action was submitted."
   },
   "target": {
@@ -39,13 +40,16 @@
     "active_shift_label": "[INCIDENT-HANDOVER-E2E] Incoming closure desk",
     "lead_label": "Playwright Incoming Control Room Operator",
     "discovered_handover_path": "/control-room/shifts/9/handover",
-    "id_source": "Rendered link on the authenticated Active shifts list; the ID was not guessed or copied from historical evidence."
+    "id_source": "Rendered link on the authenticated Active shifts list; the ID was not guessed or copied from historical evidence.",
+    "retained_capture_boundary": "The discovery values are operator-observed DOM reads. No redacted list-page capture was retained, so this artifact independently pins only the generic rendered error surface and its four screenshots."
   },
   "browser_observation": {
     "final_url": "https://oblivionfindings.com/control-room/shifts/9/handover",
+    "navigation_request_count": 1,
     "rendered_title": "Server Error",
     "rendered_body_text": "500\nServer Error",
-    "rendered_status_code": 500,
+    "rendered_status_label": 500,
+    "transport_status_code": null,
     "transport_status_independently_captured": false,
     "handover_ui_rendered": false,
     "forms_present": 0,
@@ -95,6 +99,6 @@
     "Expose a non-secret deployed commit or release marker.",
     "Retain the corresponding non-sensitive server exception class and source locus for this exact request.",
     "Repair or identify the failed deployed build in an isolated, resettable test/development environment.",
-    "Repeat the safe GET at all four required viewports before any separately authorised mutation workflow."
+    "Repeat the safe GET and capture the rendered result at all four required viewports before any separately authorised mutation workflow."
   ]
 }

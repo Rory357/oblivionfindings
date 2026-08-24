@@ -13,23 +13,23 @@
     },
     "inventory": {
       "path": "inventory-904.json",
-      "sha256": "9b3efa1334e7a8db65c3380ccbb6c1206142196cbfd9e0bc69cecb7516e224f4",
-      "bytes": 11784079
+      "sha256": "8fd94c22aea29c6d82253e0dd15603dbd6d39fbe68328b20ca025662e48f63b8",
+      "bytes": 11885342
     },
     "findings": {
       "path": "findings.json",
-      "sha256": "c3e72e15e079aaaaf3db7a5600349038532b971869a8b38e5daed2940929f584",
-      "bytes": 1389121
+      "sha256": "9aed3e7149b49004011b43a13fc2e6f5498b07fa198adcd2bd3434f02ae644a8",
+      "bytes": 1392668
     },
     "frozen_902_task_summary": {
       "path": "evidence/source/final-902-task-script-generation-summary.json",
-      "sha256": "d0906cc0610c7e8dda49ee1aaa855b64c0f904cfc4b28886522ee21aa2dd36aa",
-      "bytes": 430463
+      "sha256": "89467a09bd9e0d7597588fd8718c8cd68dfa05cb7ec186a01e8d747c59d85780",
+      "bytes": 421749
     },
     "denominator_adjudication": {
       "path": "evidence/source/canonical-denominator-904-adjudication.json",
-      "sha256": "60e98d2af1b48a95c38c61b51e49b0cafb33e083e276986c881de1d83a91fe90",
-      "bytes": 8098
+      "sha256": "2c3d11dae05ea2dde44cb7eb54d6b55b3953df7303f702f6dbd7137283fba699",
+      "bytes": 7882
     }
   },
   "counts": {
@@ -51,8 +51,8 @@
   "outputs": {
     "directory": "task-scripts/final-904",
     "scorecard": "04-workflow-usability-scorecard-904.csv",
-    "scorecard_sha256": "c5220768ee860ebcf9b896ac67e839317f7dabab842065ae72b10c4718eda9a8",
-    "script_index_sha256": "d643275f9d4a222094210b9bd0160220ba590b456019805af6e2c2682a931ab2",
+    "scorecard_sha256": "60360acbc22337e456ea74e231c2b650d248792f4cce1611046e674e63c28553",
+    "script_index_sha256": "86b1ae5e159d8c2502ba8cde497722af781f14185eb1bc6c7532c8f2b3ab863c",
     "script_index_algorithm": "Ordinal file order; UTF-8 LF/no-terminal-LF feature_id|file|sha256"
   },
   "scripts": [
@@ -419,7 +419,7 @@
     {
       "feature_id": "CAP-CR-SHIFT-HANDOVER",
       "file": "task-scripts/final-904/cap-cr-shift-handover.md",
-      "sha256": "3384ce7e353da844d34e8958a796955c6501ff9eb91826cad065579b779cbd1c"
+      "sha256": "acb2be3a4e65a70fa540d75115acf0b09d50d115997e4aa323e5e3e6bac72314"
     },
     {
       "feature_id": "CAP-CR-SHIFT-OPERATIONS",

@@ -1420,7 +1420,7 @@
             <li>0 of 8 cross-module journeys were executed at all required viewports and failure states.</li>
             <li>585 visual rows and 364 material-state rows remain without exact final ownership.</li>
             <li>No deployed build identity ties the observed browser behavior to the audited source commit.</li>
-            <li>An authenticated Active-shift handover GET currently renders <code>500 Server Error</code> at all four required viewports; without build identity or server evidence, no source/root-cause or task-completion claim is made.</li>
+            <li>One authenticated Active-shift handover GET rendered a page labelled <code>500 Server Error</code>, captured at all four required viewports; transport status, build identity and server evidence remain unknown, so no source/root-cause or task-completion claim is made.</li>
           </ul>
         </article>
       </div>
@@ -1659,7 +1659,7 @@
         <h3>The current handover entry stops at a server error before the workflow renders</h3>
         <p style="max-width:850px;color:#c9d7e2;margin:0">
           On 24 Aug, Demo Admin opened the Active shifts list, discovered the rendered link for existing synthetic shift 9, and followed the safe GET to
-          <code>/control-room/shifts/9/handover</code>. The page rendered only <code>500 Server Error</code> at every required viewport; no handover action was available or submitted.
+          <code>/control-room/shifts/9/handover</code>. One GET rendered a page labelled <code>500 Server Error</code>, which was captured at every required viewport; the HTTP transport status was not independently captured, and no handover action was available or submitted.
         </p>
         <div class="bug-flow">
           <div class="bug-step problem"><strong>1440×900</strong><span>500 Server Error.</span></div>
@@ -1674,6 +1674,27 @@
         <div class="hero-actions">
           <a class="button" href="evidence/browser/deployed-current-control-room-handover-500-2026-08-24.json">Open the bounded evidence</a>
           <a class="button" href="evidence/browser/deployed-current-control-room-handover-500-2026-08-24-390x844.png">Open the mobile screenshot</a>
+        </div>
+      </article>
+      <article class="panel browser-bug" style="margin-top:16px">
+        <p class="eyebrow">Authenticated deployed-current read-only visual resample · 24 Aug 2026 · build identity unknown</p>
+        <h3>All four retained visual-risk families were sampled; current symptoms reproduced without completion credit</h3>
+        <p style="max-width:850px;color:#c9d7e2;margin:0">
+          A bounded Demo Admin pass used safe GET navigation, viewport changes and local overlay interactions only. It sampled all four retained visual families and separately checked two responsive-overflow findings, System Users and Security Alerts &amp; Events.
+        </p>
+        <div class="bug-flow">
+          <div class="bug-step problem"><strong>Retained families · 4/4</strong><span>Mobile navigation and overlay focus-return reproduced; hero density partially reproduced.</span></div>
+          <div class="bug-step problem"><strong>Document overflow</strong><span>My Day overflow reproduced at 1024×768 and 390×844; Corrective actions overflowed at all four viewports.</span></div>
+          <div class="bug-step problem"><strong>Incident draft reset</strong><span>The unsubmitted Injury selection was lost after close and reopen, reproducing the recovery finding.</span></div>
+          <div class="bug-step"><strong>System Users</strong><span>The retained transient negative-KPI symptom did not reproduce in eight bounded samples.</span></div>
+          <div class="bug-step"><strong>Security alerts</strong><span>Alerts &amp; Events rendered without document overflow at all four required viewports; authorization and actions were not tested.</span></div>
+          <div class="bug-step"><strong>Evidence credit</strong><span>Zero task, journey, source-attribution or audited-baseline credit.</span></div>
+        </div>
+        <div class="safe-note">
+          <strong>Evidence boundary:</strong> the deployment exposes no verified commit or release marker, so none of these observations is attributed to the audited commit, published <code>origin/main</code> or reviewed local main. No domain action was submitted.
+        </div>
+        <div class="hero-actions">
+          <a class="button" href="evidence/browser/deployed-current-read-only-visual-resample-2026-08-24.json">Open the deployed-current resample evidence</a>
         </div>
       </article>
       <article class="panel browser-bug" style="margin-top:16px">

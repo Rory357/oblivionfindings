@@ -14,6 +14,9 @@ SOURCE = AUDIT / "evidence" / "source"
 RUN_AT = "2026-08-21T22:50:00+12:00"
 VALIDATION = SOURCE / "validation-report.json"
 POINTER = SOURCE / "canonical-audit-inputs.json"
+CSV_SEMANTIC = SOURCE / "csv-semantic-validation.json"
+CURRENT_SUMMARY = SOURCE / "current-904-summary-generation-report.json"
+TASK_SUMMARY = SOURCE / "final-904-task-script-generation-summary.json"
 MANIFEST = SOURCE / "working-capability-manifest-904.json"
 BENCHMARK = SOURCE / "benchmark-final-904-mapping.json"
 GAP = SOURCE / "route-page-gap-reconciliation-904.json"
@@ -42,6 +45,12 @@ DASHBOARD = AUDIT / "audit-dashboard.html"
 FINDINGS = AUDIT / "findings.json"
 DEPLOYED_LOGIN_RESAMPLE = AUDIT / "evidence" / "browser" / "deployed-public-login-resample-2026-08-21.json"
 DEPLOYED_HANDOVER_500 = AUDIT / "evidence" / "browser" / "deployed-current-control-room-handover-500-2026-08-24.json"
+DEPLOYED_VISUAL_RESAMPLE = AUDIT / "evidence" / "browser" / "deployed-current-read-only-visual-resample-2026-08-24.json"
+ARTIFACT_HYGIENE = SOURCE / "artifact-hygiene-2026-08-24.json"
+LEGACY_HANDOVER_TASK = AUDIT / "task-scripts" / "cr-control-room-handover.md"
+FINALIZER = Path(__file__).resolve()
+NORMALIZER = FINALIZER.with_name("normalize-audit-artifacts-2026-08-24.py")
+SUMMARY_REFRESHER = FINALIZER.with_name("refresh-current-904-summaries.py")
 
 
 def sha(path: Path) -> str:
@@ -60,12 +69,59 @@ def record(path: Path) -> dict[str, Any]:
     return {"path": path.relative_to(AUDIT).as_posix(), "sha256": sha(path), "bytes": path.stat().st_size}
 
 
+def refresh_records(value: Any) -> None:
+    """Refresh every path/hash/bytes record embedded in a derivative artifact."""
+    if isinstance(value, dict):
+        relative_path = value.get("path")
+        if isinstance(relative_path, str) and "sha256" in value:
+            target = AUDIT / relative_path
+            if not target.is_file():
+                raise FileNotFoundError(f"Pinned artifact does not exist: {relative_path}")
+            value["sha256"] = sha(target)
+            if "bytes" in value:
+                value["bytes"] = target.stat().st_size
+        for child in value.values():
+            refresh_records(child)
+    elif isinstance(value, list):
+        for child in value:
+            refresh_records(child)
+
+
+task_summary = load(TASK_SUMMARY)
+refresh_records(task_summary)
+script_index_lines: list[str] = []
+for script in task_summary["scripts"]:
+    script_path = AUDIT / script["file"]
+    script["sha256"] = sha(script_path)
+    script_index_lines.append(f"{script['feature_id']}|{script['file']}|{script['sha256']}")
+task_summary["outputs"]["scorecard_sha256"] = sha(SCORECARD)
+task_summary["outputs"]["script_index_sha256"] = hashlib.sha256("\n".join(script_index_lines).encode("utf-8")).hexdigest()
+write(TASK_SUMMARY, task_summary)
+
+visual_summary_derivative = load(VISUAL_SUMMARY)
+visual_summary_derivative["outputs"]["matrix_sha256"] = sha(VISUAL)
+write(VISUAL_SUMMARY, visual_summary_derivative)
+
+csv_semantic = load(CSV_SEMANTIC)
+csv_semantic["current_csv_shapes"]["04-workflow-usability-scorecard.csv"]["sha256"] = sha(AUDIT / "04-workflow-usability-scorecard.csv")
+csv_semantic["current_csv_shapes"]["05-browser-visual-coverage-matrix.csv"]["sha256"] = sha(AUDIT / "05-browser-visual-coverage-matrix.csv")
+write(CSV_SEMANTIC, csv_semantic)
+
+current_summary = load(CURRENT_SUMMARY)
+refresh_records(current_summary)
+current_summary["outputs"]["deployed_current_control_room_handover_500"] = record(DEPLOYED_HANDOVER_500)
+current_summary["outputs"]["deployed_current_read_only_visual_resample"] = record(DEPLOYED_VISUAL_RESAMPLE)
+current_summary["outputs"]["artifact_hygiene"] = record(ARTIFACT_HYGIENE)
+write(CURRENT_SUMMARY, current_summary)
+
+
 pointer_input = load(POINTER)
 manifest = load(MANIFEST)
 benchmark = load(BENCHMARK)
 visual_summary = load(VISUAL_SUMMARY)
 deployed_login_resample = load(DEPLOYED_LOGIN_RESAMPLE)
 deployed_handover_500 = load(DEPLOYED_HANDOVER_500)
+deployed_visual_resample = load(DEPLOYED_VISUAL_RESAMPLE)
 completion = load(COMPLETION)
 findings_doc = load(FINDINGS)
 findings = findings_doc.get("findings", findings_doc)
@@ -83,6 +139,7 @@ GENERATED_AT = max(
             visual_summary,
             deployed_login_resample,
             deployed_handover_500,
+            deployed_visual_resample,
             completion,
             findings_doc,
             finding_reconciliation,
@@ -249,11 +306,27 @@ validation["checks"].update({
     "deployed_login_resample_retains_release_identity_blocker": (
         deployed_login_resample["source_boundary"]["deployed_git_or_release_identifier_exposed"] is False
     ),
-    "deployed_handover_500_is_read_only_and_unattributed": (
+    "deployed_handover_rendered_error_is_read_only_and_unattributed": (
         deployed_handover_500["source_boundary"]["deployed_build_identity"] is None
+        and deployed_handover_500["environment"]["domain_mutations_submitted"] is False
+        and deployed_handover_500["browser_observation"]["rendered_status_label"] == 500
+        and deployed_handover_500["browser_observation"]["transport_status_code"] is None
         and deployed_handover_500["completion_effect"]["canonical_task_completed"] is False
         and deployed_handover_500["completion_effect"]["canonical_task_numerator_change"] == 0
         and deployed_handover_500["completion_effect"]["immutable_baseline_visual_rows_completed"] == 0
+        and all(
+            sha(AUDIT / row["screenshot"]) == row["screenshot_sha256"]
+            for row in deployed_handover_500["browser_observation"]["viewport_records"]
+        )
+    ),
+    "deployed_visual_resample_is_read_only_unattributed_and_zero_credit": (
+        deployed_visual_resample["source_boundary"]["deployed_build_identity"] is None
+        and deployed_visual_resample["environment"]["domain_mutations_submitted"] is False
+        and deployed_visual_resample["resample_summary"]["retained_visual_risk_families_sampled"] == 4
+        and deployed_visual_resample["resample_summary"]["retained_visual_risk_family_denominator"] == 4
+        and deployed_visual_resample["resample_summary"]["audited_baseline_credit_delta"] == 0
+        and deployed_visual_resample["resample_summary"]["canonical_task_credit_delta"] == 0
+        and deployed_visual_resample["resample_summary"]["journey_credit_delta"] == 0
     ),
 })
 
@@ -286,6 +359,15 @@ hashes.update({
     "audit_dashboard_sha256": sha(DASHBOARD),
     "deployed_public_login_resample_sha256": sha(DEPLOYED_LOGIN_RESAMPLE),
     "deployed_current_control_room_handover_500_sha256": sha(DEPLOYED_HANDOVER_500),
+    "deployed_current_read_only_visual_resample_sha256": sha(DEPLOYED_VISUAL_RESAMPLE),
+    "artifact_hygiene_2026_08_24_sha256": sha(ARTIFACT_HYGIENE),
+    "csv_semantic_validation_sha256": sha(CSV_SEMANTIC),
+    "current_904_summary_generation_report_sha256": sha(CURRENT_SUMMARY),
+    "final_904_task_script_generation_summary_sha256": sha(TASK_SUMMARY),
+    "legacy_control_room_handover_task_script_sha256": sha(LEGACY_HANDOVER_TASK),
+    "finalize_current_904_validation_generator_sha256": sha(FINALIZER),
+    "normalize_audit_artifacts_generator_sha256": sha(NORMALIZER),
+    "refresh_current_904_summaries_generator_sha256": sha(SUMMARY_REFRESHER),
 })
 for prefix, pattern in (
     ("benchmark_wave", "benchmark-target-specific-adjudication-904-wave*.json"),
@@ -306,7 +388,14 @@ pointer["artifacts"]["dashboard"] = record(DASHBOARD)
 pointer["artifacts"]["remediation_delivery_snapshot"] = record(REMEDIATION_DELIVERY)
 pointer["artifacts"]["deployed_public_login_resample"] = record(DEPLOYED_LOGIN_RESAMPLE)
 pointer["artifacts"]["deployed_current_control_room_handover_500"] = record(DEPLOYED_HANDOVER_500)
+pointer["artifacts"]["deployed_current_read_only_visual_resample"] = record(DEPLOYED_VISUAL_RESAMPLE)
+pointer["artifacts"]["artifact_hygiene_2026_08_24"] = record(ARTIFACT_HYGIENE)
+pointer["artifacts"]["supplemental_control_room_handover_task_script"] = record(LEGACY_HANDOVER_TASK)
+pointer["artifacts"]["finalize_current_904_validation_generator"] = record(FINALIZER)
+pointer["artifacts"]["normalize_audit_artifacts_generator"] = record(NORMALIZER)
+pointer["artifacts"]["refresh_current_904_summaries_generator"] = record(SUMMARY_REFRESHER)
 pointer["artifacts"]["route_page_source_provenance_reconciliation"] = record(SURFACE_RECONCILIATION)
+refresh_records(pointer)
 write(POINTER, pointer)
 
 print(json.dumps({"validation": record(VALIDATION), "dashboard": record(DASHBOARD), "active_inputs": record(POINTER), "checks": len(validation["checks"]), "blockers": len(completion["completion_blockers"])}, indent=2))

@@ -68,7 +68,7 @@
   },
   "outputs": {
     "matrix": "05-browser-visual-coverage-matrix-904.csv",
-    "matrix_sha256": "8e6bec4c967e646870487d66fcdd61e020b3007dd9e331732b02efd3c7a2d62a",
+    "matrix_sha256": "4082310f08608b7743316f4a79724c162edfa69881887989215f02876ee3c32e",
     "semantic_tuple_sha256": "5aba32b52bb309e5a3d9be34ca15e69b4dc85cd7327e61c5a8fbe533577b8097",
     "semantic_tuple_algorithm": "Current row order; UTF-8; LF/no trailing LF; visual_id US legacy_feature_id US feature_id US working_feature_ids US feature_link_status US feature_link_evidence"
   },
