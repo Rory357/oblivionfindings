@@ -1,0 +1,2032 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-072",
+  "status": "SOURCE_BOUND_USABILITY_TASK_CONTRACTS_MATERIALIZED_AUDIT_INCOMPLETE",
+  "generated_on": "2026-08-25",
+  "source_pin": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "inputs": {
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "bytes": 507413,
+      "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+    },
+    "canonical_identity": {
+      "path": "evidence/source/current-canonical-feature-identity-wave-01.json",
+      "bytes": 459083,
+      "sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
+    },
+    "inventory": {
+      "path": "inventory.json",
+      "bytes": 2580297,
+      "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa"
+    },
+    "governing_prompt": {
+      "path": "C:/Users/steph/Downloads/oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "bytes": 88305,
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+    },
+    "repository_instructions": {
+      "path": "AGENTS.md",
+      "bytes": 1081,
+      "sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"
+    }
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; use roles, permissions, approved Sites, canonical ownership, direct-object denial, and privacy boundaries.",
+  "counts": {
+    "matrix_rows": 340,
+    "canonical_targets": 340,
+    "H_features": 300,
+    "D_features": 40,
+    "scorecard_columns": 78,
+    "scorecard_rows": 300,
+    "task_script_files": 300,
+    "validated_task_scripts": 0,
+    "representative_role_tasks_executed": 0,
+    "current_ease_scores_measured": 0,
+    "target_ease_scores_measured": 0,
+    "independent_reviews_completed": 0,
+    "entry_point_classifications": {
+      "NOT_ESTABLISHED_CURRENT_AUDIT_NO_ROUTE_OR_PAGE_ANCHOR": 101,
+      "PAGE_SOURCE_ANCHOR_ONLY_UNVALIDATED": 3,
+      "ROUTE_AND_PAGE_SOURCE_ANCHORS_PRESENT_UNVALIDATED": 96,
+      "ROUTE_SOURCE_ANCHOR_ONLY_UNVALIDATED": 100
+    }
+  },
+  "source_anchor_counts": {
+    "navigation_entry_established": 9,
+    "route_names_established": 0,
+    "route_paths_established": 196,
+    "page_files_established": 99,
+    "backend_anchors_established": 292,
+    "test_anchors_established": 166,
+    "features_without_any_source_anchor": 0
+  },
+  "entry_blocked_features": {
+    "definition": "feature_class == H and route_paths == NOT_ESTABLISHED_CURRENT_AUDIT and page_files == NOT_ESTABLISHED_CURRENT_AUDIT",
+    "count": 101,
+    "sha256": "00e6c3c882fe98e218986929c416ba38d1f4c7929ed8d8c54ff6df6b99d21e24",
+    "feature_ids": [
+      "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+      "CAP-CR-SHIFT-HANDOVER",
+      "CAP-DAY-MY-CALENDAR",
+      "CAP-DAY-MY-ROSTER",
+      "CAP-DAY-TASK-REPORT",
+      "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "CAP-FIN-BILL-LIFECYCLE",
+      "CAP-FIN-CASH-FLOW-FORECAST-LIFECYCLE",
+      "CAP-FIN-CLIENT-FUND-LIFECYCLE",
+      "CAP-FIN-CREDIT-NOTE-LIFECYCLE",
+      "CAP-FIN-DONOR-FUND-LIFECYCLE",
+      "CAP-FIN-EFTPOS-BATCH-RECONCILIATION",
+      "CAP-FIN-FIXED-ASSET-LIFECYCLE",
+      "CAP-FIN-PAYMENT-RUN-EXTERNAL-SETTLEMENT",
+      "CAP-FIN-PETTY-CASH-LIFECYCLE",
+      "CAP-FIN-PURCHASE-ORDER-LIFECYCLE",
+      "CAP-FIN-RECEIPT-ALLOCATION-LIFECYCLE",
+      "CAP-FIN-VENDOR-MASTER",
+      "CAP-FLEET-RESIDENT-TRANSPORT",
+      "CAP-FLEET-VEHICLE-BOOKING",
+      "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "CAP-GOV-BOARD-EVALUATION",
+      "CAP-GOV-BOARD-MEMBERSHIP",
+      "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+      "CAP-GOV-BUDGET-ALLOCATIONS-ADJUSTMENTS",
+      "CAP-GOV-CEO-BOARD-REPORT",
+      "CAP-GOV-CLINICAL-INDICATOR-SNAPSHOT",
+      "CAP-GOV-COMPLIANCE-OBLIGATION-EVIDENCE",
+      "CAP-GOV-DASHBOARD-READ-LENS",
+      "CAP-GOV-DOCUMENT-LIBRARY",
+      "CAP-GOV-INTEREST-REGISTER",
+      "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+      "CAP-GOV-PERFORMANCE-REVIEW",
+      "CAP-GOV-POLICY-ATTESTATION",
+      "CAP-GOV-POLICY-LIFECYCLE",
+      "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+      "CAP-GOV-RISK-REGISTER-TREATMENT",
+      "CAP-GOV-SETTINGS-CONTROL",
+      "CAP-GOV-SPEND-APPROVAL",
+      "CAP-GOV-STRATEGY-PLAN-GOALS",
+      "CAP-GOV-TE-TIRITI-OBLIGATION",
+      "CAP-HR-COMPETENCY-ASSESSMENT",
+      "CAP-HR-DOCUMENT-SIGNATURE",
+      "CAP-HR-PAYROLL-RUN-LIFECYCLE",
+      "CAP-HR-POLICY-ATTESTATION",
+      "CAP-HR-TIME-ENTRY-LIFECYCLE",
+      "CAP-HR-TRAINING-LIFECYCLE",
+      "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+      "CAP-HS-DASHBOARD-ANALYTICS",
+      "CAP-HS-EMERGENCY-DRILLS",
+      "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+      "CAP-HS-FIRST-AID-REGISTER",
+      "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+      "CAP-HS-INVESTIGATION-ASSURANCE",
+      "CAP-HS-LONE-WORKER-SAFETY",
+      "CAP-HS-PPE-REGISTER",
+      "CAP-HS-RESTRAINT-REGISTER",
+      "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+      "CAP-HS-SAFE-WORK-PROCEDURES",
+      "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+      "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "CAP-IT-CHANGE-LIFECYCLE",
+      "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+      "CAP-IT-PROBLEM-LIFECYCLE",
+      "CAP-IT-PROVISIONING-LIFECYCLE",
+      "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+      "CAP-OPS-ROSTER-TIME-OFF",
+      "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE",
+      "CAP-PRIV-DASHBOARD-WORKLIST",
+      "CAP-PRIV-LEGAL-HOLD",
+      "CAP-PRIV-PIA-LIFECYCLE",
+      "CAP-SAFE-EXTERNAL-REPORT",
+      "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+      "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+      "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+      "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+      "CAP-SEC-GOVERNED-COMMAND",
+      "CAP-SEC-GROUP-TOPOLOGY",
+      "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+      "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+      "CAP-SEC-MONITORING-COVERAGE-POLICY",
+      "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+      "CAP-SEC-MONITORING-RETENTION-POLICY",
+      "CAP-SET-EMAIL-CONFIG",
+      "CAP-SET-MODULE-CONFIG",
+      "CAP-SET-SESSION-ADMIN",
+      "CAP-SET-SSO-MAPPING",
+      "CAP-SITE-CALENDAR-EVENT-LIFECYCLE",
+      "CAP-SITE-CHECKLIST-RUN",
+      "CAP-SITE-CONTACTS",
+      "CAP-SITE-CREDENTIAL-VAULT",
+      "CAP-SITE-EMERGENCY-PLAN-LIFECYCLE",
+      "CAP-SITE-HARDWARE-REGISTER",
+      "CAP-SITE-HAZARD-REGISTER",
+      "CAP-SITE-HOUSE-LEDGER",
+      "CAP-SITE-INSPECTION-LIFECYCLE",
+      "CAP-SITE-PROFILE-LIFECYCLE",
+      "CAP-SITE-RESOURCE-REGISTER",
+      "CAP-SITE-ROOM-ZONE-LIFECYCLE",
+      "CAP-SITE-TYPE-PLAN-LIFECYCLE",
+      "CAP-SITE-VENDOR-REGISTER"
+    ]
+  },
+  "sentinels": {
+    "current_dimension_scores": "NOT_MEASURED",
+    "target_dimension_scores": "NOT_MEASURED",
+    "friction_measurements": "NOT_MEASURED",
+    "task_success": "NOT_MEASURED",
+    "representative_actor": "NOT_ESTABLISHED_CURRENT_AUDIT",
+    "risk_and_safety": "NOT_ADJUDICATED_CURRENT_AUDIT",
+    "high_risk_alternative_status": "NOT_DETERMINED_CURRENT_AUDIT",
+    "credit": false
+  },
+  "outputs": {
+    "scorecard": {
+      "path": "04-workflow-usability-scorecard.csv",
+      "bytes": 855259,
+      "sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+      "columns": 78,
+      "rows": 300
+    },
+    "task_scripts": {
+      "directory": "task-scripts",
+      "files": 300,
+      "bundle_normalization": "sorted relative_path|sha256|bytes, UTF-8 LF, no terminal LF",
+      "bundle_sha256": "4171e361c5abc17a63af20cc04133826977b6a6b9c11af9e8d528a7815a4ea33",
+      "manifest": [
+        {
+          "feature_id": "CAP-CATER-DIETARY-TAG-LIBRARY",
+          "path": "task-scripts/cap-cater-dietary-tag-library.md",
+          "bytes": 3076,
+          "sha256": "45062e78db5cbf6be6626e6c19634b76bd860ecd544e43d9f20c46ebc5423f74"
+        },
+        {
+          "feature_id": "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-cater-meal-plan-lifecycle.md",
+          "bytes": 3147,
+          "sha256": "5c78c330a759772d81b2ec59d0159f5ed6f4ebd1d8f596cf52ed44d6aa0d9c81"
+        },
+        {
+          "feature_id": "CAP-CATER-PRODUCT-CATALOG",
+          "path": "task-scripts/cap-cater-product-catalog.md",
+          "bytes": 3047,
+          "sha256": "bd7e70cc6e7fde7a91a35e6f40e4825926a85ec4f3a488ab8704cbffba670c0c"
+        },
+        {
+          "feature_id": "CAP-CATER-RECIPE-LIBRARY",
+          "path": "task-scripts/cap-cater-recipe-library.md",
+          "bytes": 3075,
+          "sha256": "0d95f720a450016de4d14d239e2121c69527a99be23494d8f5e406d0b668cdbb"
+        },
+        {
+          "feature_id": "CAP-CATER-SITE-INVENTORY-LIFECYCLE",
+          "path": "task-scripts/cap-cater-site-inventory-lifecycle.md",
+          "bytes": 3109,
+          "sha256": "33059fbb4b7fa80814fb44509c5d2dd4e170258eca0312a5940278b2e1bed484"
+        },
+        {
+          "feature_id": "CAP-CATER-SITE-SHOPPING-LIST",
+          "path": "task-scripts/cap-cater-site-shopping-list.md",
+          "bytes": 3156,
+          "sha256": "b562d266a271e5bd3de890f33c8dbe6e589f05401a9ca70f2816488240414fb5"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-ASSESSMENT",
+          "path": "task-scripts/cap-cli-client-assessment.md",
+          "bytes": 3094,
+          "sha256": "d97f152dee027daa4ddadbb2e9c21bd249370cfdf77bc446f2c9090328e352b3"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-ASSIGNMENT",
+          "path": "task-scripts/cap-cli-client-assignment.md",
+          "bytes": 3116,
+          "sha256": "9933358084c380acd9aab15efadf8eba050ea37746be1ec591e70e325147e091"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-CONSENT-LIFECYCLE",
+          "path": "task-scripts/cap-cli-client-consent-lifecycle.md",
+          "bytes": 3472,
+          "sha256": "1f52e49607da984035997072393d6da5f45ae19cb0486e696557c86f8f883602"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+          "path": "task-scripts/cap-cli-client-document-staff-library.md",
+          "bytes": 3860,
+          "sha256": "ecaf17abf793dabc6b03603632169f302f877d8bdac236562e7f31fa2810e0e9"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-NOTES",
+          "path": "task-scripts/cap-cli-client-notes.md",
+          "bytes": 3114,
+          "sha256": "926b883ca46e4f4cec2fc35f0e0f8060231db7be15ab2ba20e92a412dc4b6610"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-RISK-REGISTER",
+          "path": "task-scripts/cap-cli-client-risk-register.md",
+          "bytes": 3076,
+          "sha256": "6d9939ecce4c32fae5ca3d9c70ba94404661aaed6dc3793daddab7d1946155e5"
+        },
+        {
+          "feature_id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+          "path": "task-scripts/cap-cli-client-support-plan.md",
+          "bytes": 3071,
+          "sha256": "c1681a3171eca1499bad03bd9212ed62b5ba2d522ccb5dfbe982acaa222689b6"
+        },
+        {
+          "feature_id": "CAP-CLIN-ASSESSMENT-RECORD",
+          "path": "task-scripts/cap-clin-assessment-record.md",
+          "bytes": 3203,
+          "sha256": "05c073042eb0102cacacb2553e098dc9b7682dba894ed2734a293f829963fb95"
+        },
+        {
+          "feature_id": "CAP-CLIN-BEHAVIOUR-REGISTER",
+          "path": "task-scripts/cap-clin-behaviour-register.md",
+          "bytes": 3221,
+          "sha256": "b3047f09a22afd695d7f954ca022914140b6a1259d18cbbef704704eb12eab7a"
+        },
+        {
+          "feature_id": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+          "path": "task-scripts/cap-clin-care-plan-review-lens.md",
+          "bytes": 3287,
+          "sha256": "471d19a8c5b84a05a9d50915074b696049a21b744694aeb72efd65d697973c60"
+        },
+        {
+          "feature_id": "CAP-CLIN-CLIENT-SUMMARY-LENS",
+          "path": "task-scripts/cap-clin-client-summary-lens.md",
+          "bytes": 3105,
+          "sha256": "13caa4e4f7d42d713b9b4134adecae7965611ca381bcefc25c6efc824c3092d7"
+        },
+        {
+          "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+          "path": "task-scripts/cap-clin-event-register-record.md",
+          "bytes": 3343,
+          "sha256": "4378076f32c2a1856a1f0fa786aea607425d9194e4798481a91da0956ed521bb"
+        },
+        {
+          "feature_id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+          "path": "task-scripts/cap-clin-event-review-escalation-closure.md",
+          "bytes": 3311,
+          "sha256": "d8eed8bb8d533e69b71bcacd19a2f3977e85a45387266f33b80332949f55d5fb"
+        },
+        {
+          "feature_id": "CAP-CLIN-HEALTH-MONITORING-LENS",
+          "path": "task-scripts/cap-clin-health-monitoring-lens.md",
+          "bytes": 3144,
+          "sha256": "a4fab367f020438005ec73cd85640cb137d1ca300e5b323866572eb0f9613458"
+        },
+        {
+          "feature_id": "CAP-CLIN-MODULE-DASHBOARD",
+          "path": "task-scripts/cap-clin-module-dashboard.md",
+          "bytes": 3321,
+          "sha256": "850acd50601ca341c7014195a374814881321540c8319b5c8ffb7d1f941d8615"
+        },
+        {
+          "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+          "path": "task-scripts/cap-clin-observation-register-record.md",
+          "bytes": 3395,
+          "sha256": "533032c8ec951596c7f4a8eba019e1c087b96b95c58e4d90537a746eadf7ed72"
+        },
+        {
+          "feature_id": "CAP-CLIN-PROTOCOL-LIFECYCLE",
+          "path": "task-scripts/cap-clin-protocol-lifecycle.md",
+          "bytes": 3189,
+          "sha256": "3ee55ce5e2d7f8594ea074ec198977fb903d3d8007d7447fa3cb702ad57645d8"
+        },
+        {
+          "feature_id": "CAP-CLIN-TRENDS-LENS",
+          "path": "task-scripts/cap-clin-trends-lens.md",
+          "bytes": 3150,
+          "sha256": "6df4044af81cf3f3ac63dead47807a7405a1466d2c5b16a80a026f79c49557d4"
+        },
+        {
+          "feature_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+          "path": "task-scripts/cap-comp-exception-command-centre.md",
+          "bytes": 3222,
+          "sha256": "8d1135c0ccba43ce3a7fe38c60204a975b3a90dc55d9c69674edf030ec334dcc"
+        },
+        {
+          "feature_id": "CAP-COMPLAINT-RESPITE-STAY",
+          "path": "task-scripts/cap-complaint-respite-stay.md",
+          "bytes": 3173,
+          "sha256": "b5d3950c61b69345b03b6a37898b2ab42bce77edc5886de2f9d2459038b7cb43"
+        },
+        {
+          "feature_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+          "path": "task-scripts/cap-complaint-site-feedback.md",
+          "bytes": 3123,
+          "sha256": "c7abe85b3312d4ba13cfc72c63265b256809de335d434ae93aa08d0df66a057e"
+        },
+        {
+          "feature_id": "CAP-CR-ALERT-TASK-LIFECYCLE",
+          "path": "task-scripts/cap-cr-alert-task-lifecycle.md",
+          "bytes": 3111,
+          "sha256": "aba87ba26b91956114215196a866dade6386067f2bbc2739b1189c8009c10acc"
+        },
+        {
+          "feature_id": "CAP-CR-ALERT-WATCH",
+          "path": "task-scripts/cap-cr-alert-watch.md",
+          "bytes": 3129,
+          "sha256": "d1038e682c091d202d36e65e877257af6f7fafc54a77509a67be272f32a3e86e"
+        },
+        {
+          "feature_id": "CAP-CR-ALERT-WORKLIST-LIFECYCLE",
+          "path": "task-scripts/cap-cr-alert-worklist-lifecycle.md",
+          "bytes": 3182,
+          "sha256": "9c05ee5ec74e31a79db45fc65bb9646c2bccbd2b3674993bc54d476c20e102f3"
+        },
+        {
+          "feature_id": "CAP-CR-BROADCAST",
+          "path": "task-scripts/cap-cr-broadcast.md",
+          "bytes": 3181,
+          "sha256": "3f4e6ddf40e4580ab9af4b22e50ce5ff00c2c1e07c7b124088e5e435921f38cf"
+        },
+        {
+          "feature_id": "CAP-CR-ESCALATION-QUEUE-LIFECYCLE",
+          "path": "task-scripts/cap-cr-escalation-queue-lifecycle.md",
+          "bytes": 3142,
+          "sha256": "e330b0498ba59b9bc05e2e23f87ace480d3da4a0f21d8fd91d7a0f2747d9c730"
+        },
+        {
+          "feature_id": "CAP-CR-EVIDENCE-PACK-LIFECYCLE",
+          "path": "task-scripts/cap-cr-evidence-pack-lifecycle.md",
+          "bytes": 3113,
+          "sha256": "5095fd2f843c836c3aa67fe86dae4a32e18d5a574a40d6bff058687a3ee4f31d"
+        },
+        {
+          "feature_id": "CAP-CR-LIVE-DEVICE-MAP",
+          "path": "task-scripts/cap-cr-live-device-map.md",
+          "bytes": 3218,
+          "sha256": "6de47e6249b4478a2c042987ed70037ca7fbd2440988be0bdfbcf9b7d18c45d8"
+        },
+        {
+          "feature_id": "CAP-CR-MESSAGING-DISCUSSION",
+          "path": "task-scripts/cap-cr-messaging-discussion.md",
+          "bytes": 3186,
+          "sha256": "0f824fa8f8115a2b8a4d2de070bbcf8e0518018d4d1d761e534efe60c3df1d0b"
+        },
+        {
+          "feature_id": "CAP-CR-PLAYBOOK-LIFECYCLE",
+          "path": "task-scripts/cap-cr-playbook-lifecycle.md",
+          "bytes": 3165,
+          "sha256": "f3b87f08d77587ce6a7d275fee9bf4127e064245256a3a7b87fef2ab0bc115df"
+        },
+        {
+          "feature_id": "CAP-CR-RECOVERY-CONFIGURATION",
+          "path": "task-scripts/cap-cr-recovery-configuration.md",
+          "bytes": 3130,
+          "sha256": "9d40624024e58a07880c62fbaa5f40c7d7bfc5986c0b0b253402d26b965b9f52"
+        },
+        {
+          "feature_id": "CAP-CR-SHIFT-HANDOVER",
+          "path": "task-scripts/cap-cr-shift-handover.md",
+          "bytes": 3186,
+          "sha256": "dac3de1aaf3013070df1f52d4bd1127eb1e6383e0da721c9eddc16bc142b38d5"
+        },
+        {
+          "feature_id": "CAP-CR-SIGNAL-QUEUE-CONFIGURATION",
+          "path": "task-scripts/cap-cr-signal-queue-configuration.md",
+          "bytes": 3126,
+          "sha256": "f3fa38271c5550a8348be88569a1d17f1b11675372f1a6f303b62a6e332f14ff"
+        },
+        {
+          "feature_id": "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER",
+          "path": "task-scripts/cap-cr-task-to-hs-corrective-action-transfer.md",
+          "bytes": 3332,
+          "sha256": "f952fd6012fb1685e399dc24e13182868e5ff05899a49345db802accce31e6ec"
+        },
+        {
+          "feature_id": "CAP-CR-TIME-RECORDING",
+          "path": "task-scripts/cap-cr-time-recording.md",
+          "bytes": 3133,
+          "sha256": "2b63df5e36e97baf765d8e60d2448b17d18dec6e23c9013893edbed6f528b980"
+        },
+        {
+          "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+          "path": "task-scripts/cap-day-all-tasks-workbench.md",
+          "bytes": 4596,
+          "sha256": "7280a8ed2f94a54828fc2cd59e57aa51a4b323693b8db9025761c0497812b857"
+        },
+        {
+          "feature_id": "CAP-DAY-MY-CALENDAR",
+          "path": "task-scripts/cap-day-my-calendar.md",
+          "bytes": 3303,
+          "sha256": "b09634f473a07d801febfa160a462f3d8705cc9233826b2f60c88a204c8c9a7f"
+        },
+        {
+          "feature_id": "CAP-DAY-MY-DAY-WORKSPACE",
+          "path": "task-scripts/cap-day-my-day-workspace.md",
+          "bytes": 3488,
+          "sha256": "c8b52e58657e31b5e49e1cb91a9a9dd30380eaa821bafcd2b206186edadd0f5c"
+        },
+        {
+          "feature_id": "CAP-DAY-MY-ROSTER",
+          "path": "task-scripts/cap-day-my-roster.md",
+          "bytes": 3295,
+          "sha256": "3b5771ef35f54f89b96b3c8b343e443f90d07df13ab892f80a0d9239c07ac467"
+        },
+        {
+          "feature_id": "CAP-DAY-TASK-REPORT",
+          "path": "task-scripts/cap-day-task-report.md",
+          "bytes": 3347,
+          "sha256": "dbc1c94dfdd079b76db8e4cb62475d3481e8f5f91092bc6093d1f1e6ea103688"
+        },
+        {
+          "feature_id": "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+          "path": "task-scripts/cap-day-today-operations-overview.md",
+          "bytes": 3108,
+          "sha256": "b4fce72dc3e316dbce038e7efa48984f62fcf3b692c6e8a8a31a420655e132ec"
+        },
+        {
+          "feature_id": "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+          "path": "task-scripts/cap-fin-accounting-integration-configuration.md",
+          "bytes": 3379,
+          "sha256": "7bebcd54556e346d8d543acf8e2458ac5578e24b51879e5fd8f1ad65abfa1422"
+        },
+        {
+          "feature_id": "CAP-FIN-ACCOUNTING-PERIOD-LIFECYCLE",
+          "path": "task-scripts/cap-fin-accounting-period-lifecycle.md",
+          "bytes": 3082,
+          "sha256": "1e734c11d8189878ef6f16aebc12ab37fe4ad423f94936dd5a1b7994bf1bb74d"
+        },
+        {
+          "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+          "path": "task-scripts/cap-fin-allocation-match-history.md",
+          "bytes": 3161,
+          "sha256": "1733b4c09f9ba8beb877f87901352a1db720f87c752c603e7d78b29fd1bc8c95"
+        },
+        {
+          "feature_id": "CAP-FIN-BANK-STATEMENT-RECONCILIATION",
+          "path": "task-scripts/cap-fin-bank-statement-reconciliation.md",
+          "bytes": 3235,
+          "sha256": "db5847d11738608a7890c6fb79cc2af53d6f3baf129b71e54dbd0f75ce8fb336"
+        },
+        {
+          "feature_id": "CAP-FIN-BILL-LIFECYCLE",
+          "path": "task-scripts/cap-fin-bill-lifecycle.md",
+          "bytes": 3132,
+          "sha256": "7da87ffe0e0467fd5e626f96e6568fd51475f044ffaaff51f6bc8400204a4aa0"
+        },
+        {
+          "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+          "path": "task-scripts/cap-fin-billing-invoice-lifecycle.md",
+          "bytes": 3118,
+          "sha256": "60fe7723e9ebb795dd94cd19478fb88e365ecd3cd6f8dee3c7d60e8640fa8e9b"
+        },
+        {
+          "feature_id": "CAP-FIN-CASH-FLOW-FORECAST-LIFECYCLE",
+          "path": "task-scripts/cap-fin-cash-flow-forecast-lifecycle.md",
+          "bytes": 3177,
+          "sha256": "60a72868cd77751184962243825db8d3705b94b0e2e2d0b5e553b6e2d42af3b2"
+        },
+        {
+          "feature_id": "CAP-FIN-CASH-POSITION",
+          "path": "task-scripts/cap-fin-cash-position.md",
+          "bytes": 3185,
+          "sha256": "5101ba00968ff975c676336d6bf27cc1a5f37dc774d217da269a49d2fa62c2ec"
+        },
+        {
+          "feature_id": "CAP-FIN-CHART-OF-ACCOUNTS",
+          "path": "task-scripts/cap-fin-chart-of-accounts.md",
+          "bytes": 3062,
+          "sha256": "8e8eea85c1098d3ac025cf413fa27d93bdf9d7b87d810c6355083a1799e01b65"
+        },
+        {
+          "feature_id": "CAP-FIN-CLIENT-FINANCIAL-SUMMARY",
+          "path": "task-scripts/cap-fin-client-financial-summary.md",
+          "bytes": 3304,
+          "sha256": "f068569110913d1de7cbfb55ad6ef39022b0f10c0449355867c757c8100894f2"
+        },
+        {
+          "feature_id": "CAP-FIN-CLIENT-FUND-LIFECYCLE",
+          "path": "task-scripts/cap-fin-client-fund-lifecycle.md",
+          "bytes": 3211,
+          "sha256": "1bdf494579bd94d1041dc5ca958923b4bd46e84148af2af99858af000d649b03"
+        },
+        {
+          "feature_id": "CAP-FIN-COST-CENTRE-ADMIN",
+          "path": "task-scripts/cap-fin-cost-centre-admin.md",
+          "bytes": 3032,
+          "sha256": "a6ea249221cbeeb2e0ef22b53f03d19dcd227d1fcdc1158c2df3b4bd7dbad85b"
+        },
+        {
+          "feature_id": "CAP-FIN-CREDIT-NOTE-LIFECYCLE",
+          "path": "task-scripts/cap-fin-credit-note-lifecycle.md",
+          "bytes": 3139,
+          "sha256": "7065d5e8f676fc549ea0e1d94989d000e4c747587a4e4d9f734c3b118350a8cd"
+        },
+        {
+          "feature_id": "CAP-FIN-CURRENCY-ADMIN",
+          "path": "task-scripts/cap-fin-currency-admin.md",
+          "bytes": 3043,
+          "sha256": "26b2e62568abee1865990d6d0983c5d561ce91361cfacc53f944d16941cdd2a2"
+        },
+        {
+          "feature_id": "CAP-FIN-DONOR-FUND-LIFECYCLE",
+          "path": "task-scripts/cap-fin-donor-fund-lifecycle.md",
+          "bytes": 3268,
+          "sha256": "cb8fcf0813665795b48b5f5035434ca3bb8bca1b26fd0f0e3ce5ac60dd2b11f2"
+        },
+        {
+          "feature_id": "CAP-FIN-EFTPOS-BATCH-RECONCILIATION",
+          "path": "task-scripts/cap-fin-eftpos-batch-reconciliation.md",
+          "bytes": 3169,
+          "sha256": "12d633c0c5955f8e504f31e48f3e0ac146a5d388af0cffba34ed213b4fc82097"
+        },
+        {
+          "feature_id": "CAP-FIN-EXECUTIVE-INSIGHTS",
+          "path": "task-scripts/cap-fin-executive-insights.md",
+          "bytes": 3300,
+          "sha256": "f7ca5dc2dcce120f429885dc931d020c5b0ce4a5ea47eb8a87dc69945660f383"
+        },
+        {
+          "feature_id": "CAP-FIN-FIXED-ASSET-LIFECYCLE",
+          "path": "task-scripts/cap-fin-fixed-asset-lifecycle.md",
+          "bytes": 3121,
+          "sha256": "a67d3ebe9a75c8f64762b674a3449e8d9a0f06ed2fec8ca929ce6a9b0a7e2cfc"
+        },
+        {
+          "feature_id": "CAP-FIN-FUNDING-STREAM-ADMIN",
+          "path": "task-scripts/cap-fin-funding-stream-admin.md",
+          "bytes": 3044,
+          "sha256": "6b5548979fd539a8366a41460b2ac16f0af83c577859b761525e3f94b8d88799"
+        },
+        {
+          "feature_id": "CAP-FIN-FX-REVALUATION",
+          "path": "task-scripts/cap-fin-fx-revaluation.md",
+          "bytes": 3379,
+          "sha256": "51a92e5884eef9880aa7de450dc4bd8453c4566230c7f2f3bf47123c15bb1034"
+        },
+        {
+          "feature_id": "CAP-FIN-GST-RETURN-LIFECYCLE",
+          "path": "task-scripts/cap-fin-gst-return-lifecycle.md",
+          "bytes": 3148,
+          "sha256": "e752774ac264d112fb23065fd939ba3723e5752d4017d0eec05ec7a295ab3f92"
+        },
+        {
+          "feature_id": "CAP-FIN-IRD-FILING-LIFECYCLE",
+          "path": "task-scripts/cap-fin-ird-filing-lifecycle.md",
+          "bytes": 3156,
+          "sha256": "008a7df9a9cae056f03205a78f57beaf786950ce6f7237bc9a409110d33a0253"
+        },
+        {
+          "feature_id": "CAP-FIN-MANUAL-JOURNAL-LIFECYCLE",
+          "path": "task-scripts/cap-fin-manual-journal-lifecycle.md",
+          "bytes": 3156,
+          "sha256": "47eedbc2049a7a2b8483b2cd83eac05692fa97f9c2955eb00dc7c9a2f58f068f"
+        },
+        {
+          "feature_id": "CAP-FIN-MODULE-OVERVIEW",
+          "path": "task-scripts/cap-fin-module-overview.md",
+          "bytes": 3333,
+          "sha256": "4090eb3e3e78896e4a5d68b6ea3b3ba3177af41f5835b10ba8f29c76584a2783"
+        },
+        {
+          "feature_id": "CAP-FIN-OBLIGATION-CALENDAR",
+          "path": "task-scripts/cap-fin-obligation-calendar.md",
+          "bytes": 3241,
+          "sha256": "a2e7c48159cc25bf545e1c6b416394cb6949edd1921cd321d1f998d769d55df1"
+        },
+        {
+          "feature_id": "CAP-FIN-PAYMENT-RUN-EXTERNAL-SETTLEMENT",
+          "path": "task-scripts/cap-fin-payment-run-external-settlement.md",
+          "bytes": 3261,
+          "sha256": "e1cd957b7443db4c902e255b34367e141b6c028f42dc9a38771c2b9f2123f74a"
+        },
+        {
+          "feature_id": "CAP-FIN-PAYMENT-RUN-LIFECYCLE",
+          "path": "task-scripts/cap-fin-payment-run-lifecycle.md",
+          "bytes": 3177,
+          "sha256": "d98f76c74cf05561c39689659f342252822e9c1294bc91982861e35318263d36"
+        },
+        {
+          "feature_id": "CAP-FIN-PETTY-CASH-LIFECYCLE",
+          "path": "task-scripts/cap-fin-petty-cash-lifecycle.md",
+          "bytes": 3203,
+          "sha256": "7a2307d9261a622d9337b2176ff0c78f5166a70e0845f50635bb13abad353d09"
+        },
+        {
+          "feature_id": "CAP-FIN-PURCHASE-ORDER-LIFECYCLE",
+          "path": "task-scripts/cap-fin-purchase-order-lifecycle.md",
+          "bytes": 3161,
+          "sha256": "927edd14b1d2b5f16291795438d815849d86e2a9ad772f33e4ed2dc73049c48a"
+        },
+        {
+          "feature_id": "CAP-FIN-QUOTE-LIFECYCLE",
+          "path": "task-scripts/cap-fin-quote-lifecycle.md",
+          "bytes": 3108,
+          "sha256": "0bf5e9d72c8ff33e84d97066a94cea0e4205a4ee4c8202475012c596dbb2d9f9"
+        },
+        {
+          "feature_id": "CAP-FIN-RECEIPT-ALLOCATION-LIFECYCLE",
+          "path": "task-scripts/cap-fin-receipt-allocation-lifecycle.md",
+          "bytes": 3172,
+          "sha256": "8602f749fc4e069683d39c8b788023a3c47d26aa95886df7f5acdf328bc30086"
+        },
+        {
+          "feature_id": "CAP-FIN-SITE-FINANCIAL-DASHBOARD",
+          "path": "task-scripts/cap-fin-site-financial-dashboard.md",
+          "bytes": 3274,
+          "sha256": "b7a517e22911cc07a79fd4a2570ef0e96ddcd381f4165b1fa48f1974077fd78e"
+        },
+        {
+          "feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+          "path": "task-scripts/cap-fin-site-portfolio-overview.md",
+          "bytes": 3286,
+          "sha256": "4e928479e6cbac4bfaa08ac9a8619df0ae741ebfead4770ca77c803cdd96f8a8"
+        },
+        {
+          "feature_id": "CAP-FIN-VENDOR-MASTER",
+          "path": "task-scripts/cap-fin-vendor-master.md",
+          "bytes": 3047,
+          "sha256": "b721c66db596a10a42b9c337753056f1fbef492ef2e529e4534f9222b5e30e75"
+        },
+        {
+          "feature_id": "CAP-FLEET-ASSET-REGISTER",
+          "path": "task-scripts/cap-fleet-asset-register.md",
+          "bytes": 3068,
+          "sha256": "378da4b279c31b01f269b549eb15f045011a694c675b3d3ec00ab9d58972a616"
+        },
+        {
+          "feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+          "path": "task-scripts/cap-fleet-daily-vehicle-check.md",
+          "bytes": 3117,
+          "sha256": "48c79c9c220d1ddfa9ab063ed8e3196d64259eb3389b171a93fc48c404604b34"
+        },
+        {
+          "feature_id": "CAP-FLEET-GEOFENCE-LIFECYCLE",
+          "path": "task-scripts/cap-fleet-geofence-lifecycle.md",
+          "bytes": 3114,
+          "sha256": "667fe0dd7eabd32007fadcf43c59563a34745a15509e995c0977fabb89de06eb"
+        },
+        {
+          "feature_id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+          "path": "task-scripts/cap-fleet-handover-lifecycle.md",
+          "bytes": 3120,
+          "sha256": "546e26449b98c7c3c7aa767748893cabe708ac73b5f94dca257254ea88edf6a6"
+        },
+        {
+          "feature_id": "CAP-FLEET-INCIDENT-RECORD",
+          "path": "task-scripts/cap-fleet-incident-record.md",
+          "bytes": 3069,
+          "sha256": "fb63f042278e2e5b108b67a77c5e4a832bdc788db3114c05aa516c55feed986a"
+        },
+        {
+          "feature_id": "CAP-FLEET-KEY-CUSTODY",
+          "path": "task-scripts/cap-fleet-key-custody.md",
+          "bytes": 3108,
+          "sha256": "8ca43290a61d2bd13099a3a8530e335c435da36ac8727106f3a8df4a1c53cb04"
+        },
+        {
+          "feature_id": "CAP-FLEET-MAINTENANCE-SCHEDULE",
+          "path": "task-scripts/cap-fleet-maintenance-schedule.md",
+          "bytes": 3155,
+          "sha256": "e405af257815a7b22f667928bca3d7290db1010535382c741872941788827d68"
+        },
+        {
+          "feature_id": "CAP-FLEET-MILEAGE-RECORD",
+          "path": "task-scripts/cap-fleet-mileage-record.md",
+          "bytes": 3055,
+          "sha256": "2ce677803a7fcac774cdb8518a1be6a321b94c17bfa5501d2e4e782b0685b867"
+        },
+        {
+          "feature_id": "CAP-FLEET-OUTING-LIFECYCLE",
+          "path": "task-scripts/cap-fleet-outing-lifecycle.md",
+          "bytes": 3097,
+          "sha256": "3afbd9770d8cc9846a3946c9a53fe523e0b642a0f5be04e9a95509ba472ba35d"
+        },
+        {
+          "feature_id": "CAP-FLEET-PANIC-RESPONSE",
+          "path": "task-scripts/cap-fleet-panic-response.md",
+          "bytes": 3097,
+          "sha256": "3586ce10cf88b261ea44d7232a5effa703b550d3cb5426bb6f1db31f216404c1"
+        },
+        {
+          "feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+          "path": "task-scripts/cap-fleet-resident-tracking.md",
+          "bytes": 3165,
+          "sha256": "c35d36b94d3ecec346e396e73e721baa16b441d8d0b42d4f526eb511eb55e4f0"
+        },
+        {
+          "feature_id": "CAP-FLEET-RESIDENT-TRANSPORT",
+          "path": "task-scripts/cap-fleet-resident-transport.md",
+          "bytes": 3174,
+          "sha256": "b1cb292bff82c13d2828253203708ec59b237f899c6a58c80c638d5536ebf413"
+        },
+        {
+          "feature_id": "CAP-FLEET-VEHICLE-BOOKING",
+          "path": "task-scripts/cap-fleet-vehicle-booking.md",
+          "bytes": 3171,
+          "sha256": "476bfbaa9b4e4137b93eefcb45c51786063861095415e5fac6d01ba6578b14c0"
+        },
+        {
+          "feature_id": "CAP-FLEET-VEHICLE-INSPECTION",
+          "path": "task-scripts/cap-fleet-vehicle-inspection.md",
+          "bytes": 3125,
+          "sha256": "c91be96ba78ee2022bea925960f55e96fbeb4691be0b4f1fd6ce025f8a65a48d"
+        },
+        {
+          "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+          "path": "task-scripts/cap-fleet-vehicle-register.md",
+          "bytes": 3050,
+          "sha256": "9dd6e901b7d4ef3f688a246f069c621180b8ebdf72a1ddd6ee30e6dd9f6742bd"
+        },
+        {
+          "feature_id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+          "path": "task-scripts/cap-fleet-work-order-lifecycle.md",
+          "bytes": 3177,
+          "sha256": "8cdd92bad075d9c2e720bc7af383a42dd915543e17a8cbbeffe9031dd0ec4b60"
+        },
+        {
+          "feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+          "path": "task-scripts/cap-gov-action-item-workflow.md",
+          "bytes": 3177,
+          "sha256": "f56e2063a06cdbc711d1894e54aa0e803d8a274919e157922491f6bb051bdec7"
+        },
+        {
+          "feature_id": "CAP-GOV-BOARD-EVALUATION",
+          "path": "task-scripts/cap-gov-board-evaluation.md",
+          "bytes": 3180,
+          "sha256": "e868f9d2a45efebbc4aed0daba569357ed90a81b69866bdd9c9b2ee75ed5d945"
+        },
+        {
+          "feature_id": "CAP-GOV-BOARD-MEMBERSHIP",
+          "path": "task-scripts/cap-gov-board-membership.md",
+          "bytes": 3069,
+          "sha256": "bb9891cee94fdcffcb98cd6a0f87f7f66af76df85397486a0c1cd85b2306ca15"
+        },
+        {
+          "feature_id": "CAP-GOV-BOARD-PACK-DISTRIBUTION",
+          "path": "task-scripts/cap-gov-board-pack-distribution.md",
+          "bytes": 3146,
+          "sha256": "eabd2cbd02125ddbe822bc472f9e048f48f3cfba6c25783f7e749b6d117428f4"
+        },
+        {
+          "feature_id": "CAP-GOV-BUDGET-ALLOCATIONS-ADJUSTMENTS",
+          "path": "task-scripts/cap-gov-budget-allocations-adjustments.md",
+          "bytes": 3196,
+          "sha256": "2fc7346aa62fc1bdda50b9d2a72bd2075716d7fad533497d1ba9323bfcd87835"
+        },
+        {
+          "feature_id": "CAP-GOV-CEO-BOARD-REPORT",
+          "path": "task-scripts/cap-gov-ceo-board-report.md",
+          "bytes": 3132,
+          "sha256": "82757cf62f88cbd1087515ced873344f32f8a2ae11f7a57e7db957729b3fb706"
+        },
+        {
+          "feature_id": "CAP-GOV-CLINICAL-INDICATOR-SNAPSHOT",
+          "path": "task-scripts/cap-gov-clinical-indicator-snapshot.md",
+          "bytes": 3183,
+          "sha256": "2d2c7539c8a49143c06b07bc13459e8db0206dd0de92c9baf75916d3000c7e49"
+        },
+        {
+          "feature_id": "CAP-GOV-COMPLIANCE-OBLIGATION-EVIDENCE",
+          "path": "task-scripts/cap-gov-compliance-obligation-evidence.md",
+          "bytes": 3173,
+          "sha256": "be646986a268685d8e279558d6254400992f2b0bee9c95595049ffb7ef2aa2ca"
+        },
+        {
+          "feature_id": "CAP-GOV-DASHBOARD-READ-LENS",
+          "path": "task-scripts/cap-gov-dashboard-read-lens.md",
+          "bytes": 3183,
+          "sha256": "242613ab31ffbeaef5804b8fba88e6daa145a403553cc0dc75fd934330a5348c"
+        },
+        {
+          "feature_id": "CAP-GOV-DOCUMENT-LIBRARY",
+          "path": "task-scripts/cap-gov-document-library.md",
+          "bytes": 3142,
+          "sha256": "e2183e9ad166ad5407d9a3102cfd60dd764f01e0ee5cdda23039326a5b87c47b"
+        },
+        {
+          "feature_id": "CAP-GOV-INTEREST-REGISTER",
+          "path": "task-scripts/cap-gov-interest-register.md",
+          "bytes": 3209,
+          "sha256": "cf99e77393c65fb738043991dfa69772ce562ff119e681eeb7546be1567c4998"
+        },
+        {
+          "feature_id": "CAP-GOV-MEETING-AGENDA-MINUTES-ATTENDANCE",
+          "path": "task-scripts/cap-gov-meeting-agenda-minutes-attendance.md",
+          "bytes": 3224,
+          "sha256": "fdda100a56ed5aaab5ab6edf98fcc5110a902d077b3ca61585571d2104c10cf7"
+        },
+        {
+          "feature_id": "CAP-GOV-PERFORMANCE-REVIEW",
+          "path": "task-scripts/cap-gov-performance-review.md",
+          "bytes": 3136,
+          "sha256": "d048cd031201c15ca3646216a1ac101aa2ab079d78b9c200d9d69b88d1bdfe63"
+        },
+        {
+          "feature_id": "CAP-GOV-POLICY-ATTESTATION",
+          "path": "task-scripts/cap-gov-policy-attestation.md",
+          "bytes": 3272,
+          "sha256": "932d751c1fbcd19fe9f413e964a9ad46401fa3e16747d16f29f94e036ab69905"
+        },
+        {
+          "feature_id": "CAP-GOV-POLICY-LIFECYCLE",
+          "path": "task-scripts/cap-gov-policy-lifecycle.md",
+          "bytes": 3291,
+          "sha256": "7f06f25fcd5582ca80e8ff08d82fe9e6ebd5351f60fb0f259436446b7e0ff933"
+        },
+        {
+          "feature_id": "CAP-GOV-RESOLUTION-VOTE-QUORUM",
+          "path": "task-scripts/cap-gov-resolution-vote-quorum.md",
+          "bytes": 3176,
+          "sha256": "f98276fceb85079e163a7c7d6007060d3b1468fcbd2f575c1bdb1bbec3678725"
+        },
+        {
+          "feature_id": "CAP-GOV-RISK-REGISTER-TREATMENT",
+          "path": "task-scripts/cap-gov-risk-register-treatment.md",
+          "bytes": 3154,
+          "sha256": "d339e5048b8e4fe169e09fb24795775a95ea081dbda5d71ae5d04c63d24ca2bf"
+        },
+        {
+          "feature_id": "CAP-GOV-SETTINGS-CONTROL",
+          "path": "task-scripts/cap-gov-settings-control.md",
+          "bytes": 3373,
+          "sha256": "c5535f37e09c60ded8f9320ec525818f46ea8e45de7055240615b0c3a1717df9"
+        },
+        {
+          "feature_id": "CAP-GOV-SPEND-APPROVAL",
+          "path": "task-scripts/cap-gov-spend-approval.md",
+          "bytes": 3143,
+          "sha256": "0040d36f2ceb5d521b480aad27d00bb4532ceb37b4a930d9c030f5f36418393e"
+        },
+        {
+          "feature_id": "CAP-GOV-STRATEGY-PLAN-GOALS",
+          "path": "task-scripts/cap-gov-strategy-plan-goals.md",
+          "bytes": 3136,
+          "sha256": "20eb5a352e3d2f91e60df1c9a712bb1189d907a6d28fc1e94c0cfbc450d50b78"
+        },
+        {
+          "feature_id": "CAP-GOV-TE-TIRITI-OBLIGATION",
+          "path": "task-scripts/cap-gov-te-tiriti-obligation.md",
+          "bytes": 3108,
+          "sha256": "a5098f2aece56aed8fa7d3cf4a0dd40a870b6d7248695198880337b14c9eb404"
+        },
+        {
+          "feature_id": "CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE",
+          "path": "task-scripts/cap-hr-candidate-application-lifecycle.md",
+          "bytes": 3345,
+          "sha256": "e4b01102b15ea080ddef24557d300fb0f798782e5759c4a54e88acff50e7ac65"
+        },
+        {
+          "feature_id": "CAP-HR-CANDIDATE-ASSESSMENT",
+          "path": "task-scripts/cap-hr-candidate-assessment.md",
+          "bytes": 3284,
+          "sha256": "b2d0336169d5905e5520569378016ff0e94d54b2b5fc68f63fd2df7fe90dc25d"
+        },
+        {
+          "feature_id": "CAP-HR-CASEWORK-LIFECYCLE",
+          "path": "task-scripts/cap-hr-casework-lifecycle.md",
+          "bytes": 3108,
+          "sha256": "f3f2e8d0c022add0579535dc42d5dafc6f8e4981416870d0c1eeb153c623521d"
+        },
+        {
+          "feature_id": "CAP-HR-COMPETENCY-ASSESSMENT",
+          "path": "task-scripts/cap-hr-competency-assessment.md",
+          "bytes": 3045,
+          "sha256": "211ea66f69219213df1befc5eae2f11207ab87660d4246a54997629ebf045f92"
+        },
+        {
+          "feature_id": "CAP-HR-COMPLIANCE-RECORDS",
+          "path": "task-scripts/cap-hr-compliance-records.md",
+          "bytes": 3310,
+          "sha256": "1385d73003f7a8243169c825f358274dc304b95a9083be5127fe0c5c3f058152"
+        },
+        {
+          "feature_id": "CAP-HR-DOCUMENT-LIBRARY",
+          "path": "task-scripts/cap-hr-document-library.md",
+          "bytes": 3310,
+          "sha256": "0e3e81867055e3eb18c32c32762a9c1551d777b046e14108552c2ec3c69cb499"
+        },
+        {
+          "feature_id": "CAP-HR-DOCUMENT-SIGNATURE",
+          "path": "task-scripts/cap-hr-document-signature.md",
+          "bytes": 3103,
+          "sha256": "167a321b0d81f7ca0c3f5068100bdc35ea0e0e030da93e148ed8a91071a44e4d"
+        },
+        {
+          "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+          "path": "task-scripts/cap-hr-employee-profile-lifecycle.md",
+          "bytes": 3715,
+          "sha256": "7e24c2d687994e03f3a889133f409aee2a7a434b7fa41e180ec6d4acec3e6058"
+        },
+        {
+          "feature_id": "CAP-HR-LEAVE-LIFECYCLE",
+          "path": "task-scripts/cap-hr-leave-lifecycle.md",
+          "bytes": 3819,
+          "sha256": "3890895aefdaa3a8919011cab0d748ac587f1be58105284dd5aafd2fc874b8ba"
+        },
+        {
+          "feature_id": "CAP-HR-OFFBOARDING-LIFECYCLE",
+          "path": "task-scripts/cap-hr-offboarding-lifecycle.md",
+          "bytes": 3349,
+          "sha256": "040317c28b04067d4a9dafa955bd68db2c64eae64ccc9bfdfb085759725c80fb"
+        },
+        {
+          "feature_id": "CAP-HR-ONBOARDING-LIFECYCLE",
+          "path": "task-scripts/cap-hr-onboarding-lifecycle.md",
+          "bytes": 3406,
+          "sha256": "221e3df96fe81d0d5b56fd0fd68147fbdfad00b491c1407953a0b3c9f2024a8e"
+        },
+        {
+          "feature_id": "CAP-HR-PAYROLL-RUN-LIFECYCLE",
+          "path": "task-scripts/cap-hr-payroll-run-lifecycle.md",
+          "bytes": 3138,
+          "sha256": "6d9cf28328a1733f3045dce29d5fac524797d6905a89adcbb5db202e235d973a"
+        },
+        {
+          "feature_id": "CAP-HR-PERFORMANCE-REVIEW",
+          "path": "task-scripts/cap-hr-performance-review.md",
+          "bytes": 3320,
+          "sha256": "1da2e3ffa46cf412895ce3036d5359ae38be64b0db6e49192c957f2c98f60da6"
+        },
+        {
+          "feature_id": "CAP-HR-POLICY-ATTESTATION",
+          "path": "task-scripts/cap-hr-policy-attestation.md",
+          "bytes": 3128,
+          "sha256": "331a442dca22444c2aef4ce3d8300f0ed0d75a04ec21aad9f62e8dff8205ba36"
+        },
+        {
+          "feature_id": "CAP-HR-POLICY-LIFECYCLE",
+          "path": "task-scripts/cap-hr-policy-lifecycle.md",
+          "bytes": 3344,
+          "sha256": "87bafc60f5e58a1509387f992867cf3346864ad28a7c61904562f465e58ff76f"
+        },
+        {
+          "feature_id": "CAP-HR-RECRUITMENT-OFFER-HIRE-LIFECYCLE",
+          "path": "task-scripts/cap-hr-recruitment-offer-hire-lifecycle.md",
+          "bytes": 3343,
+          "sha256": "97427243f4eb3d315afcc9a881ec3ac833f8dc07b9062e60ef41f7e7f7bfbdf7"
+        },
+        {
+          "feature_id": "CAP-HR-RECRUITMENT-REQUISITION-LIFECYCLE",
+          "path": "task-scripts/cap-hr-recruitment-requisition-lifecycle.md",
+          "bytes": 3270,
+          "sha256": "3d96d78c0ac4e748740137e4f2feeb8a3a57b515d175e7c0cc4e5f9e04e5615a"
+        },
+        {
+          "feature_id": "CAP-HR-REPORT-SUBSCRIPTION",
+          "path": "task-scripts/cap-hr-report-subscription.md",
+          "bytes": 3253,
+          "sha256": "105cabd673b056fbdadfbbe5e28b89fa6c5e49c83eb443326f603678142ba1af"
+        },
+        {
+          "feature_id": "CAP-HR-SAVED-REPORT-LIFECYCLE",
+          "path": "task-scripts/cap-hr-saved-report-lifecycle.md",
+          "bytes": 3221,
+          "sha256": "f109a39ad901ad149b125c10396c5179f9de593909110ebe4d93e5b85538cf4a"
+        },
+        {
+          "feature_id": "CAP-HR-TIME-ENTRY-LIFECYCLE",
+          "path": "task-scripts/cap-hr-time-entry-lifecycle.md",
+          "bytes": 3108,
+          "sha256": "d86a07850d1917f096997be47a5c7f93702fabab3da97ece62a69a5668b2e44b"
+        },
+        {
+          "feature_id": "CAP-HR-TRAINING-LIFECYCLE",
+          "path": "task-scripts/cap-hr-training-lifecycle.md",
+          "bytes": 3083,
+          "sha256": "af871e124c9bd702b9fd13620d07672f60357f72400318bb816fe4432ba6b50e"
+        },
+        {
+          "feature_id": "CAP-HR-VETTING-LIFECYCLE",
+          "path": "task-scripts/cap-hr-vetting-lifecycle.md",
+          "bytes": 3304,
+          "sha256": "50c5a3552f98917bc6ed490eebc2e0441ad6ec2fe3526565597ba33bc08589d6"
+        },
+        {
+          "feature_id": "CAP-HR-WEBHOOK-CONFIGURATION",
+          "path": "task-scripts/cap-hr-webhook-configuration.md",
+          "bytes": 3372,
+          "sha256": "447289947a4069ed0bbe8a6bed364f9be4f05f16397ed06c1125be7da978d3e0"
+        },
+        {
+          "feature_id": "CAP-HR-WORKFORCE-REPORT-RUN",
+          "path": "task-scripts/cap-hr-workforce-report-run.md",
+          "bytes": 3169,
+          "sha256": "84e493d55bd27b487997e67c3192b7f29c1268dc01b924275350a2f3aeac2347"
+        },
+        {
+          "feature_id": "CAP-HS-CORRECTIVE-ACTION-EVIDENCE",
+          "path": "task-scripts/cap-hs-corrective-action-evidence.md",
+          "bytes": 3160,
+          "sha256": "5ea3fc83f939a6acd8541aec82d55898053871889e6904edf24dd204a1c35dfc"
+        },
+        {
+          "feature_id": "CAP-HS-DASHBOARD-ANALYTICS",
+          "path": "task-scripts/cap-hs-dashboard-analytics.md",
+          "bytes": 3198,
+          "sha256": "1221724f4d2bcf68c21337a299f3c30ea1b5908f0ffd5a012bb9c7af6160d80a"
+        },
+        {
+          "feature_id": "CAP-HS-EMERGENCY-DRILLS",
+          "path": "task-scripts/cap-hs-emergency-drills.md",
+          "bytes": 3157,
+          "sha256": "6135dfbdf28ab121647bb3291a11f716c7171ff3732d58e60ec09e37cc50db80"
+        },
+        {
+          "feature_id": "CAP-HS-EVENT-CLOSURE-EXCEPTIONS",
+          "path": "task-scripts/cap-hs-event-closure-exceptions.md",
+          "bytes": 3132,
+          "sha256": "5e839bb4f80f712f0efe8ef874bcd55039eb993e445187c44316e71515f091bc"
+        },
+        {
+          "feature_id": "CAP-HS-EVENT-REGISTER",
+          "path": "task-scripts/cap-hs-event-register.md",
+          "bytes": 3016,
+          "sha256": "44eb14527fabfb3b67d7aa0e98a11c147f6a4fb71298414b6930f530a45f1446"
+        },
+        {
+          "feature_id": "CAP-HS-FIRST-AID-REGISTER",
+          "path": "task-scripts/cap-hs-first-aid-register.md",
+          "bytes": 3129,
+          "sha256": "7a4adcea24a6fdbe530334cff7edf8a73d32633ecc6f738d40d952e999258d08"
+        },
+        {
+          "feature_id": "CAP-HS-HAZARDOUS-SUBSTANCES-SDS",
+          "path": "task-scripts/cap-hs-hazardous-substances-sds.md",
+          "bytes": 3183,
+          "sha256": "1a09976800045c09469b86a8efe7f96e24e17898e080491068e768e78e3ef8c2"
+        },
+        {
+          "feature_id": "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+          "path": "task-scripts/cap-hs-incident-handover-acceptance.md",
+          "bytes": 3137,
+          "sha256": "37c2001d5aafbb1a9c9fe5a0ee3cca187cdf9a132a70c7b192dd773aec3c9df0"
+        },
+        {
+          "feature_id": "CAP-HS-INVESTIGATION-ASSURANCE",
+          "path": "task-scripts/cap-hs-investigation-assurance.md",
+          "bytes": 3152,
+          "sha256": "a6002444598454feeeae106eed49c699facad8222fd9219c2ce4d3c2c02dc94e"
+        },
+        {
+          "feature_id": "CAP-HS-LONE-WORKER-SAFETY",
+          "path": "task-scripts/cap-hs-lone-worker-safety.md",
+          "bytes": 3168,
+          "sha256": "5878bc9ea129b14aab9f058d5c52c6a7bed9be5ff6dad2e12454e4b2654e5f8d"
+        },
+        {
+          "feature_id": "CAP-HS-PPE-REGISTER",
+          "path": "task-scripts/cap-hs-ppe-register.md",
+          "bytes": 3125,
+          "sha256": "3f2bbf8849ab409004783a3b5fafcd48b729000f63f7b7aee4444e837a5969da"
+        },
+        {
+          "feature_id": "CAP-HS-RESTRAINT-REGISTER",
+          "path": "task-scripts/cap-hs-restraint-register.md",
+          "bytes": 3132,
+          "sha256": "be43f6c02dd9766397d055629daab5118fadd56fb92f52f3d8a1f9b1652a6525"
+        },
+        {
+          "feature_id": "CAP-HS-RISK-ASSESSMENT-LIFECYCLE",
+          "path": "task-scripts/cap-hs-risk-assessment-lifecycle.md",
+          "bytes": 3185,
+          "sha256": "074096fa8aa559d7eba030b5fd2acb6c91bdd6d22850ea7afd5427568a1f74fb"
+        },
+        {
+          "feature_id": "CAP-HS-SAFE-WORK-PROCEDURES",
+          "path": "task-scripts/cap-hs-safe-work-procedures.md",
+          "bytes": 3152,
+          "sha256": "54fab3e6e19aa5590265a1c94f6532765c67f274878429de93e1572b80aee727"
+        },
+        {
+          "feature_id": "CAP-HS-WORKER-PARTICIPATION",
+          "path": "task-scripts/cap-hs-worker-participation.md",
+          "bytes": 3271,
+          "sha256": "14432b25462bb9f01dae8671bd983b6d5cb1a16aede79bf209794c27de0e5346"
+        },
+        {
+          "feature_id": "CAP-HS-WORKPLACE-INJURY-RTW",
+          "path": "task-scripts/cap-hs-workplace-injury-rtw.md",
+          "bytes": 3320,
+          "sha256": "bff6c26c5002e82ccdf7df6d0c492947226bce94a8d1303541821f214a6342a3"
+        },
+        {
+          "feature_id": "CAP-HS-WORKSAFE-DECISION-NOTIFY-PRESERVE",
+          "path": "task-scripts/cap-hs-worksafe-decision-notify-preserve.md",
+          "bytes": 3176,
+          "sha256": "0ca2a23f6e8afa7de6d5f0692659678e88ca93975e8ff6667a9d477dd2596e2e"
+        },
+        {
+          "feature_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+          "path": "task-scripts/cap-inc-incident-author-template.md",
+          "bytes": 3318,
+          "sha256": "961d03a4263624e6e644dee7ebbb8cbbf1893144dac9e7a93682195de3347249"
+        },
+        {
+          "feature_id": "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+          "path": "task-scripts/cap-inc-incident-evidence-lifecycle.md",
+          "bytes": 3122,
+          "sha256": "cba20de9fc4c3f8f3b70ee931f1c9b742482480bf8e74beb2caf4e02225114cf"
+        },
+        {
+          "feature_id": "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE",
+          "path": "task-scripts/cap-inc-incident-followup-lifecycle.md",
+          "bytes": 3085,
+          "sha256": "a95f40679547d9b916352858b804c31dd7bc4ce99db509d10c9201dba7033de7"
+        },
+        {
+          "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+          "path": "task-scripts/cap-inc-incident-review-closure.md",
+          "bytes": 3226,
+          "sha256": "ce343f9c84d5d7e24746a8b13a325b687c6b2e28eab2781e7e1f6ff578f68baf"
+        },
+        {
+          "feature_id": "CAP-INT-API-KEY-ADMIN",
+          "path": "task-scripts/cap-int-api-key-admin.md",
+          "bytes": 3090,
+          "sha256": "8a5dc628704324caa54cc94cd9a960510750235a1ef5f5fe2e5e3a5d3c13b329"
+        },
+        {
+          "feature_id": "CAP-INT-MAILBOX-CONNECTION",
+          "path": "task-scripts/cap-int-mailbox-connection.md",
+          "bytes": 3090,
+          "sha256": "e2a3ef55b50760d76a85316a64a523980d34f15f6a000daa254a13fe3eae2702"
+        },
+        {
+          "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+          "path": "task-scripts/cap-int-outbound-webhook-connection.md",
+          "bytes": 3126,
+          "sha256": "82a8063ef5052cbab35bac650dfa475aea5468f41eabf8f2e22854307111bb15"
+        },
+        {
+          "feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+          "path": "task-scripts/cap-int-site-provider-connection.md",
+          "bytes": 4764,
+          "sha256": "6755271c9e5fe328f1cc2362dfc6af52df65a65722cde1b094d39a272f52c9d4"
+        },
+        {
+          "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+          "path": "task-scripts/cap-int-site-resource-calendar-connection.md",
+          "bytes": 3338,
+          "sha256": "56696b97248f5939a2025c5ad82045f13e3b68b5da410e203cf551417063701d"
+        },
+        {
+          "feature_id": "CAP-IT-AGENT-TICKET-WORKFLOW",
+          "path": "task-scripts/cap-it-agent-ticket-workflow.md",
+          "bytes": 3150,
+          "sha256": "75b40b9526b11f85934ae18e05b49ce48de30cf0fbd73a6746d359c7e34b2c09"
+        },
+        {
+          "feature_id": "CAP-IT-CHANGE-LIFECYCLE",
+          "path": "task-scripts/cap-it-change-lifecycle.md",
+          "bytes": 3143,
+          "sha256": "52420826a9fe7a09bdd58704df6520b2d2f5db99103f080e69c2312f56061715"
+        },
+        {
+          "feature_id": "CAP-IT-KNOWLEDGE-BASE",
+          "path": "task-scripts/cap-it-knowledge-base.md",
+          "bytes": 3850,
+          "sha256": "958dd8608f2af66be6c7d02e44935f2bcdc7633c593be2d84e738f539b721e1d"
+        },
+        {
+          "feature_id": "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+          "path": "task-scripts/cap-it-major-incident-lifecycle.md",
+          "bytes": 3192,
+          "sha256": "317f7cc89740a980415d694b5c10a3d3efbf0598e75080012c94037d4a1c94f4"
+        },
+        {
+          "feature_id": "CAP-IT-PROBLEM-LIFECYCLE",
+          "path": "task-scripts/cap-it-problem-lifecycle.md",
+          "bytes": 3147,
+          "sha256": "2bb9296bae4a95250da358c68adb06d1537673d7ab82699facfa6a4bfb117163"
+        },
+        {
+          "feature_id": "CAP-IT-PROVISIONING-LIFECYCLE",
+          "path": "task-scripts/cap-it-provisioning-lifecycle.md",
+          "bytes": 3150,
+          "sha256": "b7ab98da6139095c359059e21fbaf57f6702122574a92c72f5798ca93eff9d69"
+        },
+        {
+          "feature_id": "CAP-IT-SELF-SERVICE-TICKET",
+          "path": "task-scripts/cap-it-self-service-ticket.md",
+          "bytes": 3915,
+          "sha256": "b77ec9e5d2f94440d8059bf262e257920f510dda4db810aa90ab2de18253f8b0"
+        },
+        {
+          "feature_id": "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+          "path": "task-scripts/cap-it-service-management-setup.md",
+          "bytes": 3099,
+          "sha256": "5dea64a9c32cf9bd33a1d71ac78314722a15ff09b8fa672c45b5819784983eb2"
+        },
+        {
+          "feature_id": "CAP-MED-ADMINISTRATION-CORRECTION",
+          "path": "task-scripts/cap-med-administration-correction.md",
+          "bytes": 3346,
+          "sha256": "94184ed1e5d0fa1100456a82ec5d51ce854d24eaf4cffd26a92affaf2f85a0b5"
+        },
+        {
+          "feature_id": "CAP-MED-BREAK-GLASS-ACCESS",
+          "path": "task-scripts/cap-med-break-glass-access.md",
+          "bytes": 3129,
+          "sha256": "b526bad8d72c83f180067af9f941109f36367ed690b14cf3d161ea785fc9815f"
+        },
+        {
+          "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+          "path": "task-scripts/cap-med-cd-register-balance.md",
+          "bytes": 3309,
+          "sha256": "8a558ac45a15404d66838ff4cfae3c58084cd181e97782df02c6ad97d6b32e3c"
+        },
+        {
+          "feature_id": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+          "path": "task-scripts/cap-med-client-medical-profile.md",
+          "bytes": 4353,
+          "sha256": "219a5c65b872e5eeea2c31c0b31101e77ac90f95f5ecc803272391dceea61267"
+        },
+        {
+          "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+          "path": "task-scripts/cap-med-destruction-lifecycle.md",
+          "bytes": 3111,
+          "sha256": "093be0723fb4b209b747910cf32e8c30789bb20a940814143a6aa4278f4a1d8f"
+        },
+        {
+          "feature_id": "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+          "path": "task-scripts/cap-med-emar-workspace-order-lifecycle.md",
+          "bytes": 3666,
+          "sha256": "ba8852f9a6bbd1ce7114e29095adca1ed5b185b209ee1e458caf82bd867ef74a"
+        },
+        {
+          "feature_id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+          "path": "task-scripts/cap-med-medication-error-lifecycle.md",
+          "bytes": 3150,
+          "sha256": "53fd6cb43b16ca9ce7914bf0842725429a3816525d20608df453e965ab698a3e"
+        },
+        {
+          "feature_id": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+          "path": "task-scripts/cap-med-medication-order-verification.md",
+          "bytes": 3402,
+          "sha256": "b7d7766b7a5c96c6bca2bfa8b7189364b4320a6f8f5000757d5a57a34cea8278"
+        },
+        {
+          "feature_id": "CAP-MED-MEDICATION-REVIEW",
+          "path": "task-scripts/cap-med-medication-review.md",
+          "bytes": 3100,
+          "sha256": "4653428caba3e47beca480b56304859172f5018a880d7c8493cef945087da24f"
+        },
+        {
+          "feature_id": "CAP-MED-PHARMACY-ACTIONS",
+          "path": "task-scripts/cap-med-pharmacy-actions.md",
+          "bytes": 3119,
+          "sha256": "10f1ad1a370c4119bd92cc9ac586cf43da05ada7360f001c5080ef369a5dfe36"
+        },
+        {
+          "feature_id": "CAP-MED-ROUND-LIFECYCLE",
+          "path": "task-scripts/cap-med-round-lifecycle.md",
+          "bytes": 3124,
+          "sha256": "11e6655e96c758ff8d456459376343456ac219e55a5431a57fd03628c089e193"
+        },
+        {
+          "feature_id": "CAP-MED-SELF-ADMINISTRATION",
+          "path": "task-scripts/cap-med-self-administration.md",
+          "bytes": 3090,
+          "sha256": "6be8db2014fd0488aff74b415e75ed5dfb5588bc949f95eddffff20ecc4d4806"
+        },
+        {
+          "feature_id": "CAP-MED-SHIFT-HANDOVER",
+          "path": "task-scripts/cap-med-shift-handover.md",
+          "bytes": 3178,
+          "sha256": "22e44a07e5a8521a9ed4924ae7932cdfb79ee334c8bf3582b4b616338f82c3bd"
+        },
+        {
+          "feature_id": "CAP-MED-STAFF-COMPETENCY",
+          "path": "task-scripts/cap-med-staff-competency.md",
+          "bytes": 3061,
+          "sha256": "02a9730fe299a759424c05d0ecc7e453a7e7fde6f947dee5fa55851795c0a532"
+        },
+        {
+          "feature_id": "CAP-MED-STOCK-MOVEMENT",
+          "path": "task-scripts/cap-med-stock-movement.md",
+          "bytes": 3143,
+          "sha256": "ba18c1f3df221740d6dfcec5b9a16dd32b19a3b77cfb1ce556865a2ef1cc4d51"
+        },
+        {
+          "feature_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+          "path": "task-scripts/cap-med-worker-dose-prn-lifecycle.md",
+          "bytes": 3435,
+          "sha256": "f672da6db6d329f10f19eab516ddf41fd562e81e939540aa4dfc5f72de83959c"
+        },
+        {
+          "feature_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+          "path": "task-scripts/cap-med-worker-today-worklist.md",
+          "bytes": 3318,
+          "sha256": "a08d59d358c2bf7618de42eab74701aafbc8059e0ed404cbe86c7037a505da5b"
+        },
+        {
+          "feature_id": "CAP-NOTIF-PERSONAL-INBOX-ACK",
+          "path": "task-scripts/cap-notif-personal-inbox-ack.md",
+          "bytes": 3122,
+          "sha256": "de0631534bc4994e82008cb4e0cfdb00cc87341ecae37fb1ea5b25595c8ef606"
+        },
+        {
+          "feature_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+          "path": "task-scripts/cap-ops-attendance-clock-session.md",
+          "bytes": 3613,
+          "sha256": "4d3e165717b0ef553696c7ecd0311c461531a404cf0f63765ba12abe20d92e64"
+        },
+        {
+          "feature_id": "CAP-OPS-ATTENDANCE-SESSION-CORRECTION",
+          "path": "task-scripts/cap-ops-attendance-session-correction.md",
+          "bytes": 3302,
+          "sha256": "0a0ad71d7d7d3e0c471ba293a04e3ea7fdfd2d2d3d7f9c9c4c61fbb4a7802db9"
+        },
+        {
+          "feature_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-ops-care-plan-lifecycle.md",
+          "bytes": 3245,
+          "sha256": "3d6d85fd9163a7af7452b6b60a51c362d30dc9fdc1036a29b0d50d317f861fa9"
+        },
+        {
+          "feature_id": "CAP-OPS-CLIENT-ONBOARDING",
+          "path": "task-scripts/cap-ops-client-onboarding.md",
+          "bytes": 3245,
+          "sha256": "6f19453590804f72cafe469ebc3208d710af7034eedf58f3ce1f279d1e1322a2"
+        },
+        {
+          "feature_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+          "path": "task-scripts/cap-ops-client-record-lifecycle.md",
+          "bytes": 3249,
+          "sha256": "22a7fed711b437648930566d425dca012d74cfff4d19b706b7fe2590232ffeef"
+        },
+        {
+          "feature_id": "CAP-OPS-DASHBOARD-ACTIVITY",
+          "path": "task-scripts/cap-ops-dashboard-activity.md",
+          "bytes": 3266,
+          "sha256": "5235071cff56ab6dc4213636894c8af1e6acc383732d83edf28200e3826a4021"
+        },
+        {
+          "feature_id": "CAP-OPS-FUNDING-CLAIMS",
+          "path": "task-scripts/cap-ops-funding-claims.md",
+          "bytes": 3267,
+          "sha256": "ca9b28d7d8e3aab6b41acc44d4319a7b7a66b65735669e3d6ac77354664a6d0f"
+        },
+        {
+          "feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+          "path": "task-scripts/cap-ops-personal-calendar-connection.md",
+          "bytes": 3259,
+          "sha256": "edb8d3f7de7457343601bb615bf179a5edcd216e662a324219d3f725b5a7ab5e"
+        },
+        {
+          "feature_id": "CAP-OPS-ROSTER-AUTO-SCHEDULE-SUGGESTIONS",
+          "path": "task-scripts/cap-ops-roster-auto-schedule-suggestions.md",
+          "bytes": 3254,
+          "sha256": "245c9242eee516b985f5464131101a0e0a41d96bb03d99570a8cd9d54cb5f786"
+        },
+        {
+          "feature_id": "CAP-OPS-ROSTER-PERIOD-PUBLICATION",
+          "path": "task-scripts/cap-ops-roster-period-publication.md",
+          "bytes": 3255,
+          "sha256": "85ad0deeeb082114cc897e1060734d70b111324fcc3bec8a1d090d48d2798656"
+        },
+        {
+          "feature_id": "CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+          "path": "task-scripts/cap-ops-roster-planning-workspace.md",
+          "bytes": 3237,
+          "sha256": "77a7fa5da0b644736b218af9dda4a0c95073287a601ed65f5b6f627a3a522a8b"
+        },
+        {
+          "feature_id": "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE",
+          "path": "task-scripts/cap-ops-roster-template-lifecycle.md",
+          "bytes": 3156,
+          "sha256": "b4af5d2159eaf68e0ff3c6104dedbe84c654e4e676c7175e73dba65e73d3e4e6"
+        },
+        {
+          "feature_id": "CAP-OPS-ROSTER-TIME-OFF",
+          "path": "task-scripts/cap-ops-roster-time-off.md",
+          "bytes": 3122,
+          "sha256": "07b436d3380668d8d6f4509a1c991b4358d20213092bb9efa458fc07a6de7860"
+        },
+        {
+          "feature_id": "CAP-OPS-SHIFT-COVER-LIFECYCLE",
+          "path": "task-scripts/cap-ops-shift-cover-lifecycle.md",
+          "bytes": 3321,
+          "sha256": "0e09c77f94d699f917c2cb9cd3400ba14bb016169b62894753810a50ad57db8c"
+        },
+        {
+          "feature_id": "CAP-OPS-SHIFT-HANDOVER",
+          "path": "task-scripts/cap-ops-shift-handover.md",
+          "bytes": 3122,
+          "sha256": "c24e3aef5adde7e70abb9908a526ee6e0b39df180b860dd99d9ebbb1e6585f74"
+        },
+        {
+          "feature_id": "CAP-OPS-SHIFT-LIFECYCLE",
+          "path": "task-scripts/cap-ops-shift-lifecycle.md",
+          "bytes": 3241,
+          "sha256": "f3a82cfa671553bc04e9053ce6ba305d04a2c0eb6a1dbade3c6c00d6e9ec9c2c"
+        },
+        {
+          "feature_id": "CAP-OPS-SHIFT-NOTES",
+          "path": "task-scripts/cap-ops-shift-notes.md",
+          "bytes": 2995,
+          "sha256": "2585307c8462b42189fee2875e7ef254f45c4d8bf8b6f2941aa9db9fb8f44435"
+        },
+        {
+          "feature_id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT",
+          "path": "task-scripts/cap-ops-shift-staff-assignment.md",
+          "bytes": 3540,
+          "sha256": "f9b8be1df16221983c576073a014f381a8a30a5cdd4d0a9f63c41b38de10abb1"
+        },
+        {
+          "feature_id": "CAP-OPS-STAFF-AVAILABILITY",
+          "path": "task-scripts/cap-ops-staff-availability.md",
+          "bytes": 3300,
+          "sha256": "db22300e10808b7fde8f3e47c43ac57404dcd72cc3b52da42b71f32cfdebe123"
+        },
+        {
+          "feature_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+          "path": "task-scripts/cap-ops-timesheet-author-submit.md",
+          "bytes": 3595,
+          "sha256": "23a794d4898a4b658f44768f55c6f5efee574a68853b48e1493c9eb2b779b0de"
+        },
+        {
+          "feature_id": "CAP-OPS-TIMESHEET-MANAGER-LIFECYCLE",
+          "path": "task-scripts/cap-ops-timesheet-manager-lifecycle.md",
+          "bytes": 3159,
+          "sha256": "9a992d340c96537185a50f6890d6835c7c2f3b9cf83903532d8f52782dbf9c83"
+        },
+        {
+          "feature_id": "CAP-PLAT-ADMIN-DASHBOARD",
+          "path": "task-scripts/cap-plat-admin-dashboard.md",
+          "bytes": 3084,
+          "sha256": "c883438ff9273d8fd583b090258eddad03a8e2a3258f52211713855204e6ca1d"
+        },
+        {
+          "feature_id": "CAP-PORT-CLIENT-WORKSPACE",
+          "path": "task-scripts/cap-port-client-workspace.md",
+          "bytes": 3183,
+          "sha256": "7fe8d126cdfac26dbe390cc244b2033b6f80c12e474c4436d713de7ba4020842"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-CALENDAR",
+          "path": "task-scripts/cap-port-family-calendar.md",
+          "bytes": 3106,
+          "sha256": "42a2e23d5dbe30d8fc5e972231a3ea4b1f22b57abc2a90a898aaea115c822006"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-DASHBOARD",
+          "path": "task-scripts/cap-port-family-dashboard.md",
+          "bytes": 3120,
+          "sha256": "5c18cd47dfb8d9e51089ec9c8e525366d475e4a4e326c4c526cc09685b135ba5"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-DOCUMENTS",
+          "path": "task-scripts/cap-port-family-documents.md",
+          "bytes": 3105,
+          "sha256": "9ee1bb2a08606d8b9694b2d19f88bc00847637cc3f0b2db462144a8d6ad82e54"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-HEALTH-LENS",
+          "path": "task-scripts/cap-port-family-health-lens.md",
+          "bytes": 3112,
+          "sha256": "bddb3254e6605bf2123707ebed2b88cb54ad489597e9eeaf1311bdf61cdcab06"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-LOCATION-LENS",
+          "path": "task-scripts/cap-port-family-location-lens.md",
+          "bytes": 3113,
+          "sha256": "5747505f5c1f6dbd1fc80568502a67ef2f1b7c8b5a9d2c5e0cd30f39ba43d07e"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-MESSAGING",
+          "path": "task-scripts/cap-port-family-messaging.md",
+          "bytes": 3075,
+          "sha256": "154faa1df679d948eb61dcf63b6510fbd81dd4e401c418355fddbdfc54a60210"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-NOTES",
+          "path": "task-scripts/cap-port-family-notes.md",
+          "bytes": 3047,
+          "sha256": "3614cfb4eb5f0730bb83c8b8c286f5f03e9dc49f841dd2d2c52fe604adcedb62"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-PHOTOS",
+          "path": "task-scripts/cap-port-family-photos.md",
+          "bytes": 3093,
+          "sha256": "52291fa36877b64ce79d41ce108ccd59846a400c86d3a5d1575c83edd4b09ed3"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-SCHEDULE",
+          "path": "task-scripts/cap-port-family-schedule.md",
+          "bytes": 3106,
+          "sha256": "2fcd4af6c9c0168938b7e95a8f3d7b3cbca3a7cb05460736c41195ed2c8b3e08"
+        },
+        {
+          "feature_id": "CAP-PORT-FAMILY-TIMELINE",
+          "path": "task-scripts/cap-port-family-timeline.md",
+          "bytes": 3185,
+          "sha256": "095a4751f1143b668f906139596c760e914961cb83fe9a53dbe85b5a161baa8c"
+        },
+        {
+          "feature_id": "CAP-PRIV-BREACH-LIFECYCLE",
+          "path": "task-scripts/cap-priv-breach-lifecycle.md",
+          "bytes": 3078,
+          "sha256": "e33d338d3ce4d6d06db905bd6089e5c01be46aa55026c24af8843c57872256dd"
+        },
+        {
+          "feature_id": "CAP-PRIV-DASHBOARD-WORKLIST",
+          "path": "task-scripts/cap-priv-dashboard-worklist.md",
+          "bytes": 3128,
+          "sha256": "ed3612facb6bed56b14536ddab442e4b3086150096685a6b14f68751a32bc1c4"
+        },
+        {
+          "feature_id": "CAP-PRIV-DSR-LIFECYCLE",
+          "path": "task-scripts/cap-priv-dsr-lifecycle.md",
+          "bytes": 3125,
+          "sha256": "9a641a2aa3c7190ef690870512cbac881c65df6f344597a8820e17e209373290"
+        },
+        {
+          "feature_id": "CAP-PRIV-LEGAL-HOLD",
+          "path": "task-scripts/cap-priv-legal-hold.md",
+          "bytes": 3079,
+          "sha256": "7685ae4f11066311803866bfb09e0d6b520de370aa5d2ca966eba74887f3ebe3"
+        },
+        {
+          "feature_id": "CAP-PRIV-PIA-LIFECYCLE",
+          "path": "task-scripts/cap-priv-pia-lifecycle.md",
+          "bytes": 3092,
+          "sha256": "258ac3739dc5d80a82d7765b07620e6568d1ada84afd386d1557f43045c0bdaf"
+        },
+        {
+          "feature_id": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+          "path": "task-scripts/cap-priv-retention-policy-lifecycle.md",
+          "bytes": 3160,
+          "sha256": "da95237e32ea81ad317ed8da44084ad6ed2e2ab2b23124da6c1ff8a3199e7516"
+        },
+        {
+          "feature_id": "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE",
+          "path": "task-scripts/cap-pub-careers-application-lifecycle.md",
+          "bytes": 3222,
+          "sha256": "194b53d43cf73c25ce216f3666aecaf2fc38aa92c0ce5026f1c4dda3b95db99f"
+        },
+        {
+          "feature_id": "CAP-PUB-CONTACT-SUBMISSION",
+          "path": "task-scripts/cap-pub-contact-submission.md",
+          "bytes": 3086,
+          "sha256": "212893b4e384b1596a99ab4502fe27c940c1399f32b8084eceb5a65727dc3546"
+        },
+        {
+          "feature_id": "CAP-PUB-MARKETING-PAGES",
+          "path": "task-scripts/cap-pub-marketing-pages.md",
+          "bytes": 3114,
+          "sha256": "ff62a7ee2afacfd69c5b0f901de7f1a9c541cd7a7777b5ea96d8f657e0c81a67"
+        },
+        {
+          "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+          "path": "task-scripts/cap-qual-internal-quality-checklist.md",
+          "bytes": 3236,
+          "sha256": "96c007cc3ac032b0ffa95b78115dc70e2953555a275709990617c35f0f4daaae"
+        },
+        {
+          "feature_id": "CAP-REP-REPORT-CATALOG-HUB",
+          "path": "task-scripts/cap-rep-report-catalog-hub.md",
+          "bytes": 3083,
+          "sha256": "768fdf55692e01243506bd354c0d2ab80e84ebc81b54065f9956370e278fce64"
+        },
+        {
+          "feature_id": "CAP-RESP-BOOKING-LIFECYCLE",
+          "path": "task-scripts/cap-resp-booking-lifecycle.md",
+          "bytes": 3084,
+          "sha256": "69a544ab3af621ed4cce64cba858f60e70ed3205a5564e4a592e9675bd6230c5"
+        },
+        {
+          "feature_id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+          "path": "task-scripts/cap-resp-booking-request-lifecycle.md",
+          "bytes": 3128,
+          "sha256": "4db10d4d0d6f8b4a3476e62b8343cf6ac7367ca9b18d99cabe18bbb9242523aa"
+        },
+        {
+          "feature_id": "CAP-RESP-COMMUNICATION-LOG",
+          "path": "task-scripts/cap-resp-communication-log.md",
+          "bytes": 3125,
+          "sha256": "d8646e3c880550351726635e5a0ca87f13bb42d88962bf99b31a39b15056fe0b"
+        },
+        {
+          "feature_id": "CAP-RESP-DAILY-CARE-NOTES",
+          "path": "task-scripts/cap-resp-daily-care-notes.md",
+          "bytes": 3101,
+          "sha256": "0fd550ba235bb7a1623012a8b56715bdb431b037564d9e227ef3ec4eee5388cc"
+        },
+        {
+          "feature_id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+          "path": "task-scripts/cap-resp-evidence-pack-lifecycle.md",
+          "bytes": 3148,
+          "sha256": "193e667e150061c0b76c15945cc2228a267d19777d982722b78b245821b4c2cd"
+        },
+        {
+          "feature_id": "CAP-RESP-HANDOVER-NOTES",
+          "path": "task-scripts/cap-resp-handover-notes.md",
+          "bytes": 3106,
+          "sha256": "e7f52effe158a110d24f94eb21ac4048c410fdaa53133e93f7ad4dd1e22b8f2e"
+        },
+        {
+          "feature_id": "CAP-RESP-PROCEDURE-LIFECYCLE",
+          "path": "task-scripts/cap-resp-procedure-lifecycle.md",
+          "bytes": 3290,
+          "sha256": "d53bd5ca18d16accc43403b0c59f49ac9d8ddb8249d2c8cdc77ccf651ae67bb2"
+        },
+        {
+          "feature_id": "CAP-RESP-REFERRAL-LIFECYCLE",
+          "path": "task-scripts/cap-resp-referral-lifecycle.md",
+          "bytes": 3076,
+          "sha256": "2cfb2993c3c2b121dc0b58bec73b18619ff01e3f646082198464593b6896b4a7"
+        },
+        {
+          "feature_id": "CAP-RESP-RISK-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-resp-risk-plan-lifecycle.md",
+          "bytes": 3186,
+          "sha256": "2626c1a0cd6d4e94dc6191c3de4c8f446f18babfa857017e2cd176895ff90fa3"
+        },
+        {
+          "feature_id": "CAP-RESP-STAY-LIFECYCLE",
+          "path": "task-scripts/cap-resp-stay-lifecycle.md",
+          "bytes": 3082,
+          "sha256": "fe8bf3a082a7531eba18baaedfa793c420971a110a6cf62e90c4e16b870589ae"
+        },
+        {
+          "feature_id": "CAP-RESP-TASK-LIFECYCLE",
+          "path": "task-scripts/cap-resp-task-lifecycle.md",
+          "bytes": 3111,
+          "sha256": "f6b29d724afb19ddfac94624bff11709fb57c905c4821561308959dcd031aa3e"
+        },
+        {
+          "feature_id": "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE",
+          "path": "task-scripts/cap-road-decision-approval-lifecycle.md",
+          "bytes": 3072,
+          "sha256": "bc49403ed81738f6112973e5361f8965154cc30fdb03d9cef96cba6902615b7d"
+        },
+        {
+          "feature_id": "CAP-ROAD-INITIATIVE-LIFECYCLE",
+          "path": "task-scripts/cap-road-initiative-lifecycle.md",
+          "bytes": 3229,
+          "sha256": "527597cbd24b0a9259bcba3cff9a29b8fae67c7a286d01bfd558651588ebff14"
+        },
+        {
+          "feature_id": "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-road-quarterly-plan-lifecycle.md",
+          "bytes": 3103,
+          "sha256": "d54eb7b1b1d89fee7349340ea2645f36261f60d3f263e85f771b1ca395e87681"
+        },
+        {
+          "feature_id": "CAP-ROAD-SUGGESTION-LIFECYCLE",
+          "path": "task-scripts/cap-road-suggestion-lifecycle.md",
+          "bytes": 3225,
+          "sha256": "5b63b59dacf6475a323418c2a2f0b9fe120ad874962ca5316ed90b493418c607"
+        },
+        {
+          "feature_id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-safe-action-plan-lifecycle.md",
+          "bytes": 3169,
+          "sha256": "842221cc4c1337f9b2438cc100bd54075143a3bfbf987967b7db949f34c0e0a7"
+        },
+        {
+          "feature_id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+          "path": "task-scripts/cap-safe-concern-intake-triage.md",
+          "bytes": 3147,
+          "sha256": "9769d6183f1306d1ccafd150b431b5de03784919d530f6f66e67d2a2d6be9a73"
+        },
+        {
+          "feature_id": "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+          "path": "task-scripts/cap-safe-evidence-attachments.md",
+          "bytes": 3165,
+          "sha256": "c908a543bdc0dfec282ced2a2ca0abfaf3a073da4d2ab6cfea5a7e17f09ab686"
+        },
+        {
+          "feature_id": "CAP-SAFE-EXTERNAL-REPORT",
+          "path": "task-scripts/cap-safe-external-report.md",
+          "bytes": 3135,
+          "sha256": "fd56a31155dcbc1255a76e9343417ace39ff59304a4f24059f516a8cabafa1e1"
+        },
+        {
+          "feature_id": "CAP-SAFE-INVESTIGATION",
+          "path": "task-scripts/cap-safe-investigation.md",
+          "bytes": 3170,
+          "sha256": "7735599f74c2ad9a52195e1ccbe2461bae1094d63e5c21e891f6583dc9688e27"
+        },
+        {
+          "feature_id": "CAP-SAFE-RISK-ASSESSMENT",
+          "path": "task-scripts/cap-safe-risk-assessment.md",
+          "bytes": 3164,
+          "sha256": "364c4ae27ea259876aa3e3a68bb2910b22b7aaaea0b1d3a19e9819617ed7672a"
+        },
+        {
+          "feature_id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+          "path": "task-scripts/cap-safe-sensitivity-declassification.md",
+          "bytes": 3163,
+          "sha256": "5c24cfabf2248d47a2d02b574a3f371f75ae9be67a3cb9dc4e976f483d6cdd77"
+        },
+        {
+          "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
+          "path": "task-scripts/cap-safe-terminal-projection.md",
+          "bytes": 3164,
+          "sha256": "8720cf640f18155e2df4a7459dacad51c9be72a7652bf4d791c44e5d869a5e86"
+        },
+        {
+          "feature_id": "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+          "path": "task-scripts/cap-sec-access-credential-lifecycle.md",
+          "bytes": 3339,
+          "sha256": "1a7db2a80915d8128a08663d680018ba06407c9b7ae505aec9b53d9fe0b54b16"
+        },
+        {
+          "feature_id": "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+          "path": "task-scripts/cap-sec-access-schedule-lifecycle.md",
+          "bytes": 3337,
+          "sha256": "e1d909d612d78ed615880e34634571cd63d4836e0f027852e13aea95c1dbe5e8"
+        },
+        {
+          "feature_id": "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+          "path": "task-scripts/cap-sec-device-registry-custody.md",
+          "bytes": 3192,
+          "sha256": "e8ae600949099a7c3095bd4fe3aeada29081908a2eb63b830115a24d6493abd6"
+        },
+        {
+          "feature_id": "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+          "path": "task-scripts/cap-sec-discovery-scope-lifecycle.md",
+          "bytes": 3267,
+          "sha256": "c3bda7ad8c10df42ed0fecda9c26c3d66527391b00be44f3adde57ef2ee62703"
+        },
+        {
+          "feature_id": "CAP-SEC-GOVERNED-COMMAND",
+          "path": "task-scripts/cap-sec-governed-command.md",
+          "bytes": 3217,
+          "sha256": "54951b03cbff880eed3c557dd8773298774b1d0b9a23568d79958a06aea1682e"
+        },
+        {
+          "feature_id": "CAP-SEC-GROUP-TOPOLOGY",
+          "path": "task-scripts/cap-sec-group-topology.md",
+          "bytes": 3149,
+          "sha256": "8f8f1ad8e02afc59a8f81ee645e84b64752ce3dea4af50e5509b0f96d4065631"
+        },
+        {
+          "feature_id": "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+          "path": "task-scripts/cap-sec-monitor-definition-lifecycle.md",
+          "bytes": 3132,
+          "sha256": "f3ad63ebf2a63eb28f5e9c0fd8cf249be089992992ff07cac6e5149513a9e937"
+        },
+        {
+          "feature_id": "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+          "path": "task-scripts/cap-sec-monitoring-collector-lifecycle.md",
+          "bytes": 3185,
+          "sha256": "953c58749304103b313603f62cf1a8888f28a81d13d57b7a692d87ed0e02d575"
+        },
+        {
+          "feature_id": "CAP-SEC-MONITORING-COVERAGE-POLICY",
+          "path": "task-scripts/cap-sec-monitoring-coverage-policy.md",
+          "bytes": 3136,
+          "sha256": "d461e940351f86213246bc5327c4ee0b2cfcd91ddf1f79c2cd9a8c2bffbe34da"
+        },
+        {
+          "feature_id": "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+          "path": "task-scripts/cap-sec-monitoring-maintenance-policy.md",
+          "bytes": 3160,
+          "sha256": "1a4d36cadd5496b127bda682d1eb91212dfd3e5a53da5f008e75ac67b70d2331"
+        },
+        {
+          "feature_id": "CAP-SEC-MONITORING-RETENTION-POLICY",
+          "path": "task-scripts/cap-sec-monitoring-retention-policy.md",
+          "bytes": 3252,
+          "sha256": "eda5039c2325a639ce87ef3aa8ff03f6eaf15714b243aafd8b1c342b787300f0"
+        },
+        {
+          "feature_id": "CAP-SET-DATA-GOVERNANCE",
+          "path": "task-scripts/cap-set-data-governance.md",
+          "bytes": 3969,
+          "sha256": "24acbb10f898c18db6a34a5702ce516100cf59b095a2f3cd2b908cd8340fe3e6"
+        },
+        {
+          "feature_id": "CAP-SET-EMAIL-CONFIG",
+          "path": "task-scripts/cap-set-email-config.md",
+          "bytes": 3176,
+          "sha256": "f0b6a9f9d80ef006b8a2764816ee07b47f3638f7885e30fa077f1904230f5464"
+        },
+        {
+          "feature_id": "CAP-SET-MODULE-CONFIG",
+          "path": "task-scripts/cap-set-module-config.md",
+          "bytes": 3179,
+          "sha256": "4ea31671fc1b72fe9506f73fc7eee25e6ddf4394aba177473be93239a2abfc96"
+        },
+        {
+          "feature_id": "CAP-SET-NOTIFICATION-CONFIG",
+          "path": "task-scripts/cap-set-notification-config.md",
+          "bytes": 3202,
+          "sha256": "78520b6c730fe5aba7f405b977747b1909f9acf54f132a691638e79dc90ba13f"
+        },
+        {
+          "feature_id": "CAP-SET-PERSONAL-PASSWORD",
+          "path": "task-scripts/cap-set-personal-password.md",
+          "bytes": 3070,
+          "sha256": "b3c8b37da47cff673951780998cb00eb6483313a5fc4dad9f008032cfc8a1351"
+        },
+        {
+          "feature_id": "CAP-SET-PERSONAL-PREFERENCES",
+          "path": "task-scripts/cap-set-personal-preferences.md",
+          "bytes": 3079,
+          "sha256": "f8ba648aa7d0620d111a619da5b76989e3dc7ab739c489ff653adc36bbd29128"
+        },
+        {
+          "feature_id": "CAP-SET-PERSONAL-PROFILE",
+          "path": "task-scripts/cap-set-personal-profile.md",
+          "bytes": 3070,
+          "sha256": "b08628d8ff6ab8211ce8593bc1d090f1afd4f781ce945d25bb47c3b1445900c2"
+        },
+        {
+          "feature_id": "CAP-SET-PERSONAL-TWO-FACTOR",
+          "path": "task-scripts/cap-set-personal-two-factor.md",
+          "bytes": 3107,
+          "sha256": "936a6e3162b81f718fba004e573baba27d5c63a002997f73274a7a82c91f2ba6"
+        },
+        {
+          "feature_id": "CAP-SET-ROLE-PERMISSION-ADMIN",
+          "path": "task-scripts/cap-set-role-permission-admin.md",
+          "bytes": 3142,
+          "sha256": "7215c73f622251f5009d8062057b2d652355dfe2378383056ab30d88ecae72fb"
+        },
+        {
+          "feature_id": "CAP-SET-SECURITY-POLICY",
+          "path": "task-scripts/cap-set-security-policy.md",
+          "bytes": 3159,
+          "sha256": "62def2b6ebad45db95b2525c8ddb1e2f85ba3a92b43d12d0f936c2c31dd455aa"
+        },
+        {
+          "feature_id": "CAP-SET-SESSION-ADMIN",
+          "path": "task-scripts/cap-set-session-admin.md",
+          "bytes": 3208,
+          "sha256": "386f2bbdc819767fe1847e11d2ea72d3f3e24e0a318f3259d3508f0ce0867c62"
+        },
+        {
+          "feature_id": "CAP-SET-SSO-MAPPING",
+          "path": "task-scripts/cap-set-sso-mapping.md",
+          "bytes": 3211,
+          "sha256": "b9796fd2e54e28e21d4e3e1fda52c635e08e821b6a4133560d21eb0c40a2eedd"
+        },
+        {
+          "feature_id": "CAP-SET-TERMINOLOGY-CONFIG",
+          "path": "task-scripts/cap-set-terminology-config.md",
+          "bytes": 3151,
+          "sha256": "0f483c0aec2bbe923625ae35911f29b7a308b3b1bd62dcefdace0b5d9417d189"
+        },
+        {
+          "feature_id": "CAP-SET-USER-ACCESS-ADMIN",
+          "path": "task-scripts/cap-set-user-access-admin.md",
+          "bytes": 3094,
+          "sha256": "49c3ea1abfc111ea856e93acf6c9257026c74c53eb0cb37a120b0d1a7d52e30d"
+        },
+        {
+          "feature_id": "CAP-SITE-CALENDAR-EVENT-LIFECYCLE",
+          "path": "task-scripts/cap-site-calendar-event-lifecycle.md",
+          "bytes": 3182,
+          "sha256": "f70c87421654f5ee8232e47741372bb8472ee75e82d849cd744a263a7a581f40"
+        },
+        {
+          "feature_id": "CAP-SITE-CHECKLIST-RUN",
+          "path": "task-scripts/cap-site-checklist-run.md",
+          "bytes": 3187,
+          "sha256": "03cb8fb7ad3489a6092d1d374b32d59e5a3bed630c503de525f62423ba4cbce3"
+        },
+        {
+          "feature_id": "CAP-SITE-CONTACTS",
+          "path": "task-scripts/cap-site-contacts.md",
+          "bytes": 3033,
+          "sha256": "4857cea9a9fbb3310574911424f151b6a1c1ebd72e0f39941b4fc7fffb60e55f"
+        },
+        {
+          "feature_id": "CAP-SITE-CREDENTIAL-VAULT",
+          "path": "task-scripts/cap-site-credential-vault.md",
+          "bytes": 3176,
+          "sha256": "28310410d29467d229754f958d9f4e14cff02163c06d9dd7329edf7e5235f320"
+        },
+        {
+          "feature_id": "CAP-SITE-EMERGENCY-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-site-emergency-plan-lifecycle.md",
+          "bytes": 3075,
+          "sha256": "a798ef1120377057bcc0ec077efb49276dc6ee299858f00b76dda656dadd8f09"
+        },
+        {
+          "feature_id": "CAP-SITE-HARDWARE-REGISTER",
+          "path": "task-scripts/cap-site-hardware-register.md",
+          "bytes": 3178,
+          "sha256": "b9900357b6c740fe1f75b25f9bc2361c69a3ee81944d196d54f3df94b1610d3f"
+        },
+        {
+          "feature_id": "CAP-SITE-HAZARD-REGISTER",
+          "path": "task-scripts/cap-site-hazard-register.md",
+          "bytes": 3165,
+          "sha256": "3451396afa9542d09943e7ea11734dcc55c8cebc23a3f93d316fe20ccf22dc3f"
+        },
+        {
+          "feature_id": "CAP-SITE-HOUSE-LEDGER",
+          "path": "task-scripts/cap-site-house-ledger.md",
+          "bytes": 3176,
+          "sha256": "a6e534dd39d94d9b05b3cc41414b90939d045f7281a4b633dd04d38268757fcd"
+        },
+        {
+          "feature_id": "CAP-SITE-INSPECTION-LIFECYCLE",
+          "path": "task-scripts/cap-site-inspection-lifecycle.md",
+          "bytes": 3093,
+          "sha256": "d653535cd7a8602e13cfbdc9455d58f4370b3d466519dc85bc3ade13e7279b72"
+        },
+        {
+          "feature_id": "CAP-SITE-PROFILE-LIFECYCLE",
+          "path": "task-scripts/cap-site-profile-lifecycle.md",
+          "bytes": 3143,
+          "sha256": "4b2972e1f079ff597ae2ada02f61bf50525c3a86ab15702ec2a09ca315158ce5"
+        },
+        {
+          "feature_id": "CAP-SITE-RESOURCE-REGISTER",
+          "path": "task-scripts/cap-site-resource-register.md",
+          "bytes": 3126,
+          "sha256": "4d100726604214507022ab685ce93707dc40c78d1f3542be3db0b2912b7fae0b"
+        },
+        {
+          "feature_id": "CAP-SITE-ROOM-ZONE-LIFECYCLE",
+          "path": "task-scripts/cap-site-room-zone-lifecycle.md",
+          "bytes": 3141,
+          "sha256": "d3e5ede6c54348b826507170f5c172d19b3fc679a0d47fb038cf2a270c28bb81"
+        },
+        {
+          "feature_id": "CAP-SITE-TYPE-PLAN-LIFECYCLE",
+          "path": "task-scripts/cap-site-type-plan-lifecycle.md",
+          "bytes": 3080,
+          "sha256": "22a26356b0673844511b8615ded5a5a11ec3b327d03c4fda5be67cae45c14e3c"
+        },
+        {
+          "feature_id": "CAP-SITE-VENDOR-REGISTER",
+          "path": "task-scripts/cap-site-vendor-register.md",
+          "bytes": 3057,
+          "sha256": "33175b3bb44889ea10d82c353ad04718abaed6960be2d3b4770a0038f23a6f86"
+        }
+      ]
+    },
+    "materialized_payload_bundle": {
+      "normalization": "scorecard then sorted task relative_path|sha256|bytes, UTF-8 LF, no terminal LF; evidence JSON excludes itself",
+      "sha256": "247e86aea566218c36978a35dc69519b6d7973958063f9332d5c6376bcf0e2f2"
+    }
+  },
+  "input_set_hashes": {
+    "H_feature_id_set_sha256": "f25d75f69579ef831d4fb69d012b264cbc5503595b57e5cde9bbc52731d7074f",
+    "H_task_input_projection_sha256": "2304837b5b3c363f9ade39637304e7064fa3491ca305dec2464d5a796c7bb892"
+  },
+  "completion_gate": {
+    "source_bound_task_contract_files_present": 300,
+    "validated_representative_role_task_scripts": 0,
+    "ten_dimension_ease_scores_measured": 0,
+    "independent_ease_reviews": 0,
+    "ease_credit": 0,
+    "completion_credit": 0,
+    "gate_satisfied": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "current_audit_inputs_only": true,
+    "historical_artifacts_read": false,
+    "application_runtime_used": false,
+    "tests_executed": false,
+    "browser_used": false,
+    "network_used": false,
+    "human_actor_inferred_from_source_owner": false,
+    "risk_or_safety_inferred_from_keywords": false,
+    "numeric_scores_assigned": false,
+    "ease_or_completion_credit_awarded": false
+  }
+}

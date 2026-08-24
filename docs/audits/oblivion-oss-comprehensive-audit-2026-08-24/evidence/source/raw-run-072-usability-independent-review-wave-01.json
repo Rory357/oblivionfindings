@@ -1,0 +1,72 @@
+{
+  "schema_version": "raw_run_072_usability_independent_review_wave_01_v1",
+  "run_id": "RUN-072-USABILITY-REVIEW",
+  "status": "GO_AFTER_BOUNDED_INPUT_PIN_CORRECTION_ZERO_EASE_OR_COMPLETION_CREDIT",
+  "initial_review": {
+    "verdict": "NO_GO",
+    "blocking_defect": "The raw contract declared the governing prompt and repository instructions as input pins, but the first generator revision rehashed only matrix, canonical identity, and inventory.",
+    "impact": "A change to either governance input would not have failed materialization.",
+    "other_defects": 0,
+    "verified_materialization": {
+      "matrix": {"bytes": 507413, "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"},
+      "canonical_identity": {"bytes": 459083, "sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"},
+      "inventory": {"bytes": 2580297, "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa"},
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+      "matrix_targets": 340,
+      "H_features": 300,
+      "D_features": 40,
+      "scorecard_columns": 78,
+      "scorecard_rows": 300,
+      "scorecard_bytes": 855259,
+      "scorecard_sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+      "task_scripts": 300,
+      "task_script_lines_each": 66,
+      "task_script_aggregate_bytes": 962414,
+      "task_script_bundle_sha256": "4171e361c5abc17a63af20cc04133826977b6a6b9c11af9e8d528a7815a4ea33",
+      "materialized_payload_bundle_sha256": "247e86aea566218c36978a35dc69519b6d7973958063f9332d5c6376bcf0e2f2",
+      "entry_classifications": {"route_and_page": 96, "route_only": 100, "page_only": 3, "neither": 101},
+      "current_dimension_cells_not_measured": 3000,
+      "target_dimension_cells_not_measured": 3000,
+      "numeric_ease_scores_assigned": 0,
+      "human_actor_inferences": 0,
+      "credit_flags_true": 0
+    }
+  },
+  "bounded_correction": {
+    "generator_change": "Added governing_prompt and repository_instructions to INPUT_SPECS with exact path, bytes, and SHA-256. Both are now included in initial, pre-write, and post-write verification and serialized evidence inputs.",
+    "regenerated_artifact": "evidence/source/current-usability-task-script-materialization-wave-01.json",
+    "scorecard_or_task_script_bytes_changed": false
+  },
+  "correction_review": {
+    "verdict": "GO",
+    "input_pins": {
+      "governing_prompt": {"bytes": 88305, "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"},
+      "repository_instructions": {"bytes": 1081, "sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"}
+    },
+    "five_inputs_checked_initially": true,
+    "five_inputs_rehashed_pre_write": true,
+    "five_inputs_rehashed_post_write": true,
+    "five_inputs_represented_in_evidence": true,
+    "scorecard": {"bytes": 855259, "sha256": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa"},
+    "task_script_bundle_sha256": "4171e361c5abc17a63af20cc04133826977b6a6b9c11af9e8d528a7815a4ea33",
+    "materialized_payload_bundle_sha256": "247e86aea566218c36978a35dc69519b6d7973958063f9332d5c6376bcf0e2f2",
+    "evidence": {"bytes": 85186, "sha256": "ad0747f9128b2e92da31c1cff5b1acc5de0a6e1687b2879cf9ddc63b74ba68f"},
+    "residual_defects": 0
+  },
+  "credit_boundary": {
+    "representative_role_execution": false,
+    "browser_observation": false,
+    "test_execution": false,
+    "numeric_ease_score": false,
+    "ease_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "read_only_independent_reviewer": true,
+    "files_changed_by_reviewer": false,
+    "runtime_browser_tests_build_database_network_or_vcs_used": false,
+    "audit_artifact_writes_by_root_only": true
+  }
+}

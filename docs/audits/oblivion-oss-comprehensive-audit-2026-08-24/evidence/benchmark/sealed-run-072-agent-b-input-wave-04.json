@@ -1,0 +1,519 @@
+{
+  "schema_version": "sealed_run_072_agent_b_input_wave_04_v1",
+  "run_id": "RUN-072-B-INPUT",
+  "status": "IDENTITY_STRIPPED_PAYLOADS_ONLY",
+  "allowed_operation": "Derive neutral requirements while preserving unknowns and limitations.",
+  "prohibited_context": [
+    "reattachment appendices",
+    "repository or project identity",
+    "canonical target identity",
+    "current-product source or behavior",
+    "old comparisons or adjudications",
+    "selection, mapping, NCM, benchmark, pass, or completion credit"
+  ],
+  "input_payloads": [
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 3658,
+        "sha256": "718bc43127d6cf94b415c9e34d3da57c0b9620648b4d4b8a2bf0f66f1aefcf0c"
+      },
+      "payload": {
+        "schema": "OBSERVED-BEHAVIOR-PACKET-1",
+        "packet_id": "OBP-72-A-4F2D9C",
+        "packet_kind": "review",
+        "observed_entry_point": [
+          {
+            "id": "R01",
+            "observation": "A record detail page visibly presents an investigation-milestone checklist.",
+            "bindings": [
+              "K1"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "id": "R02",
+            "observation": "The exact reviewer role is not established. Record visibility and authority to close are separate permissions.",
+            "bindings": [
+              "K3",
+              "P1"
+            ]
+          }
+        ],
+        "information_shown": [
+          {
+            "id": "R03",
+            "observation": "The page shows an investigation-milestone checklist.",
+            "bindings": [
+              "K1"
+            ]
+          },
+          {
+            "id": "R04",
+            "observation": "A timeline surface shows factors, root cause, prevention, and linked actions.",
+            "bindings": [
+              "K2"
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "id": "R05",
+            "observation": "The supported viewing sequence is limited to reaching the detail page, inspecting the visible checklist, and inspecting the timeline surface; no completion action or enforced order is established.",
+            "bindings": [
+              "K1",
+              "K2",
+              "A1"
+            ]
+          }
+        ],
+        "states": [
+          {
+            "id": "R06",
+            "observation": "Checklist visibility and timeline content are observed; checklist completion, draft, submitted, approved, rejected, and effectiveness states are not established.",
+            "bindings": [
+              "K1",
+              "K2",
+              "P1"
+            ]
+          }
+        ],
+        "branches": [
+          {
+            "id": "R07",
+            "observation": "No reviewer outcome, rationale, approval, signature, or effectiveness branch is established.",
+            "bindings": [
+              "P1"
+            ]
+          }
+        ],
+        "safeguards": [
+          {
+            "id": "R08",
+            "observation": "Visibility of the record does not itself establish authority to close it.",
+            "bindings": [
+              "K3"
+            ]
+          },
+          {
+            "id": "R09",
+            "observation": "The visible checklist is not established as an enforced review gate.",
+            "bindings": [
+              "A1"
+            ]
+          }
+        ],
+        "feedback": [
+          {
+            "id": "R10",
+            "observation": "The accepted evidence establishes visual presentation of the checklist and timeline, but not save, validation, success, or error feedback for a review action.",
+            "bindings": [
+              "K1",
+              "K2",
+              "P1"
+            ]
+          }
+        ],
+        "recovery": [
+          {
+            "id": "R11",
+            "observation": "Retry, recovery, and runtime behavior for review are not established.",
+            "bindings": [
+              "P1"
+            ]
+          }
+        ],
+        "handoff": [
+          {
+            "id": "R12",
+            "observation": "Linked actions are surfaced in the timeline; assignment, ownership transfer, notification, and completion handoff behavior are not established.",
+            "bindings": [
+              "K2",
+              "P1"
+            ]
+          }
+        ],
+        "output": [
+          {
+            "id": "R13",
+            "observation": "The established output is visible review context only; no durable review decision or signed outcome artifact is established.",
+            "bindings": [
+              "K1",
+              "K2",
+              "P1"
+            ]
+          }
+        ],
+        "audit_history": [
+          {
+            "id": "R14",
+            "observation": "A timeline surface is visible, but it is not established as a durable review audit trail.",
+            "bindings": [
+              "K2",
+              "P1"
+            ]
+          }
+        ],
+        "limitations_unknowns": [
+          {
+            "id": "R15",
+            "observation": "The exact status vocabulary lacks an atom-specific evidence locus.",
+            "bindings": [
+              "P1"
+            ]
+          },
+          {
+            "id": "R16",
+            "observation": "Reviewer outcome, rationale, approval, signature, and effectiveness-gate behavior are unproved.",
+            "bindings": [
+              "P1"
+            ]
+          },
+          {
+            "id": "R17",
+            "observation": "Atomic activity audit, retry, recovery, runtime maturity, and production fitness are unproved.",
+            "bindings": [
+              "P1"
+            ]
+          },
+          {
+            "id": "R18",
+            "observation": "Adjacent workflow and operational-incident observations are not inherited into this packet.",
+            "bindings": [
+              "A1"
+            ]
+          }
+        ],
+        "counts": {
+          "observations": 18,
+          "accepted_direct_claims_used": 3,
+          "accepted_aspect_bindings_used": 1,
+          "project_bound_limitations_retained": 3,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "neutral_requirements": 0,
+          "current_product_comparisons": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "observed_behavior_only": true,
+          "every_observation_has_reattachment_binding": true,
+          "all_direct_record_limitations_retained": true,
+          "identity_stripped": true,
+          "no_target_repo_or_product_identity": true,
+          "no_implementation_details": true,
+          "no_neutral_requirements": true,
+          "no_current_product_comparison": true,
+          "no_selection_mapping_NCM_or_credit": true
+        }
+      }
+    },
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 5224,
+        "sha256": "550776f8f45fddb5b9875c3a660bef95169434660699194c9f30a6956ffa6dd9"
+      },
+      "payload": {
+        "schema": "OBSERVED-BEHAVIOR-PACKET-1",
+        "packet_id": "OBP-72-B-91E7A4",
+        "packet_kind": "closure",
+        "observed_entry_point": [
+          {
+            "id": "C01",
+            "observation": "A detail action presents a status selector whose submission carries the current record and the selected status.",
+            "bindings": [
+              "K1"
+            ]
+          }
+        ],
+        "role": [
+          {
+            "id": "C02",
+            "observation": "Closure requires authority that is separate from owner-Site visibility; visibility alone does not establish permission to close.",
+            "bindings": [
+              "K2"
+            ]
+          }
+        ],
+        "information_shown": [
+          {
+            "id": "C03",
+            "observation": "The action surface shows a status selector.",
+            "bindings": [
+              "K1"
+            ]
+          },
+          {
+            "id": "C04",
+            "observation": "A closure-time unlock control and an activity feed are surfaced.",
+            "bindings": [
+              "K6"
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "id": "C05",
+            "observation": "The actor selects a status and submits it for the current record.",
+            "bindings": [
+              "K1"
+            ]
+          },
+          {
+            "id": "C06",
+            "observation": "A closure change and its closure signal succeed together while concurrent closure changes are serialized.",
+            "bindings": [
+              "K3"
+            ]
+          },
+          {
+            "id": "C07",
+            "observation": "After the closure change succeeds, an activity entry is recorded and the record state is rechecked.",
+            "bindings": [
+              "K4"
+            ]
+          }
+        ],
+        "states": [
+          {
+            "id": "C08",
+            "observation": "A closed state is established, but the exact status vocabulary is not established.",
+            "bindings": [
+              "K3",
+              "P1"
+            ]
+          },
+          {
+            "id": "C09",
+            "observation": "Reversible locked and unlocked behavior is observed; a reopen or reverse-status state is not established.",
+            "bindings": [
+              "K5",
+              "K6",
+              "A3"
+            ]
+          }
+        ],
+        "branches": [
+          {
+            "id": "C10",
+            "observation": "The accepted evidence establishes a close branch for an actor with separate close authority.",
+            "bindings": [
+              "K2",
+              "K3"
+            ]
+          },
+          {
+            "id": "C11",
+            "observation": "An update-authorized lock or unlock branch is established, but no reopen branch is established.",
+            "bindings": [
+              "K5",
+              "K6",
+              "A3"
+            ]
+          }
+        ],
+        "safeguards": [
+          {
+            "id": "C12",
+            "observation": "Owner-Site visibility and close authority are checked as distinct concerns.",
+            "bindings": [
+              "K2"
+            ]
+          },
+          {
+            "id": "C13",
+            "observation": "Concurrent closure changes are serialized, and the closure signal shares success or failure with the close change.",
+            "bindings": [
+              "K3"
+            ]
+          },
+          {
+            "id": "C14",
+            "observation": "Closure does not capture the closing actor.",
+            "bindings": [
+              "K7",
+              "A1"
+            ]
+          },
+          {
+            "id": "C15",
+            "observation": "Verification of separate corrective actions is not enforced before closure.",
+            "bindings": [
+              "K8",
+              "A2"
+            ]
+          }
+        ],
+        "feedback": [
+          {
+            "id": "C16",
+            "observation": "An activity feed exposes recorded activity around the closure and lock controls.",
+            "bindings": [
+              "K6"
+            ]
+          },
+          {
+            "id": "C17",
+            "observation": "The record state is rechecked after closure, but explicit user-visible success, validation-error, or conflict feedback is not established.",
+            "bindings": [
+              "K4",
+              "P1"
+            ]
+          }
+        ],
+        "recovery": [
+          {
+            "id": "C18",
+            "observation": "The close change and closure signal share a success-or-failure boundary, while the activity entry follows afterward; complete audit atomicity, durable retry, and recovery behavior remain unproved.",
+            "bindings": [
+              "K3",
+              "K4",
+              "A4",
+              "P1"
+            ]
+          }
+        ],
+        "handoff": [
+          {
+            "id": "C19",
+            "observation": "A closure signal is produced with the close change; downstream consumption, notification, assignment, and acknowledgement are not established.",
+            "bindings": [
+              "K3",
+              "P1"
+            ]
+          }
+        ],
+        "output": [
+          {
+            "id": "C20",
+            "observation": "The established immediate output is the closed record state paired with a closure signal.",
+            "bindings": [
+              "K3"
+            ]
+          },
+          {
+            "id": "C21",
+            "observation": "An activity entry is recorded and the record state is rechecked after closure, but the closing actor is omitted.",
+            "bindings": [
+              "K4",
+              "K7"
+            ]
+          }
+        ],
+        "audit_history": [
+          {
+            "id": "C22",
+            "observation": "An activity entry follows the close change and activity is surfaced in a feed.",
+            "bindings": [
+              "K4",
+              "K6"
+            ]
+          },
+          {
+            "id": "C23",
+            "observation": "Lock and unlock changes receive a later activity audit, but closure actor attribution is not established.",
+            "bindings": [
+              "K5",
+              "K7"
+            ]
+          }
+        ],
+        "limitations_unknowns": [
+          {
+            "id": "C24",
+            "observation": "The exact status vocabulary lacks an atom-specific evidence locus.",
+            "bindings": [
+              "P1"
+            ]
+          },
+          {
+            "id": "C25",
+            "observation": "Reviewer outcome, rationale, approval, signature, and effectiveness-gate behavior are unproved.",
+            "bindings": [
+              "P1"
+            ]
+          },
+          {
+            "id": "C26",
+            "observation": "Complete activity-audit atomicity, retry, recovery, runtime maturity, and production fitness are unproved.",
+            "bindings": [
+              "P1",
+              "A4"
+            ]
+          },
+          {
+            "id": "C27",
+            "observation": "The closing actor is not captured by the observed closure change.",
+            "bindings": [
+              "K7",
+              "A1"
+            ]
+          },
+          {
+            "id": "C28",
+            "observation": "Separate corrective-action verification is not enforced by closure.",
+            "bindings": [
+              "K8",
+              "A2"
+            ]
+          },
+          {
+            "id": "C29",
+            "observation": "Only reversible lock behavior is established; reopen semantics are unproved.",
+            "bindings": [
+              "A3"
+            ]
+          },
+          {
+            "id": "C30",
+            "observation": "Closure gates beyond separate close authority are not established.",
+            "bindings": [
+              "A1",
+              "K2"
+            ]
+          }
+        ],
+        "counts": {
+          "observations": 30,
+          "accepted_direct_claims_used": 8,
+          "accepted_aspect_bindings_used": 4,
+          "project_bound_limitations_retained": 3,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "neutral_requirements": 0,
+          "current_product_comparisons": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "observed_behavior_only": true,
+          "every_observation_has_reattachment_binding": true,
+          "all_direct_record_limitations_retained": true,
+          "identity_stripped": true,
+          "no_target_repo_or_product_identity": true,
+          "no_implementation_details": true,
+          "no_neutral_requirements": true,
+          "no_current_product_comparison": true,
+          "no_selection_mapping_NCM_or_credit": true
+        }
+      }
+    }
+  ],
+  "counts": {
+    "payloads": 2,
+    "observations": 48,
+    "identity_keys": 0,
+    "implementation_details": 0,
+    "current_product_comparisons": 0,
+    "mapping_or_credit_claims": 0
+  },
+  "attestation": {
+    "identity_stripped": true,
+    "reattachment_appendices_excluded": true,
+    "current_product_context_excluded": true,
+    "zero_credit": true
+  }
+}

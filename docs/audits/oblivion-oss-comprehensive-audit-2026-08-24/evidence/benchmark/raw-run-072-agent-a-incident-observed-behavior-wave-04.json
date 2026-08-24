@@ -1,0 +1,386 @@
+{
+  "schema_version": "raw_run_072_agent_a_incident_observed_behavior_wave_04_v1",
+  "run_id": "RUN-072-A",
+  "status": "COMPLETE_ZERO_DOWNSTREAM_CREDIT",
+  "agent_role": "observed_behavior_extractor",
+  "source_boundary": "Only AGENTS.md plus the accepted RUN-065 project packet and RUN-066 independent review were read. Current-product evidence, adjacent-project claims, network, browser, runtime, and old comparisons were excluded.",
+  "repository_pin": {
+    "branch": "main",
+    "head": "23a40c9b97dea6ee455f91dc439e3a3b8bd493ef",
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "packets": [
+    {
+      "payload": {
+        "schema": "OBSERVED-BEHAVIOR-PACKET-1",
+        "packet_id": "OBP-72-A-4F2D9C",
+        "packet_kind": "review",
+        "observed_entry_point": [
+          {
+            "id": "R01",
+            "observation": "A record detail page visibly presents an investigation-milestone checklist.",
+            "bindings": ["K1"]
+          }
+        ],
+        "role": [
+          {
+            "id": "R02",
+            "observation": "The exact reviewer role is not established. Record visibility and authority to close are separate permissions.",
+            "bindings": ["K3", "P1"]
+          }
+        ],
+        "information_shown": [
+          {
+            "id": "R03",
+            "observation": "The page shows an investigation-milestone checklist.",
+            "bindings": ["K1"]
+          },
+          {
+            "id": "R04",
+            "observation": "A timeline surface shows factors, root cause, prevention, and linked actions.",
+            "bindings": ["K2"]
+          }
+        ],
+        "steps": [
+          {
+            "id": "R05",
+            "observation": "The supported viewing sequence is limited to reaching the detail page, inspecting the visible checklist, and inspecting the timeline surface; no completion action or enforced order is established.",
+            "bindings": ["K1", "K2", "A1"]
+          }
+        ],
+        "states": [
+          {
+            "id": "R06",
+            "observation": "Checklist visibility and timeline content are observed; checklist completion, draft, submitted, approved, rejected, and effectiveness states are not established.",
+            "bindings": ["K1", "K2", "P1"]
+          }
+        ],
+        "branches": [
+          {
+            "id": "R07",
+            "observation": "No reviewer outcome, rationale, approval, signature, or effectiveness branch is established.",
+            "bindings": ["P1"]
+          }
+        ],
+        "safeguards": [
+          {
+            "id": "R08",
+            "observation": "Visibility of the record does not itself establish authority to close it.",
+            "bindings": ["K3"]
+          },
+          {
+            "id": "R09",
+            "observation": "The visible checklist is not established as an enforced review gate.",
+            "bindings": ["A1"]
+          }
+        ],
+        "feedback": [
+          {
+            "id": "R10",
+            "observation": "The accepted evidence establishes visual presentation of the checklist and timeline, but not save, validation, success, or error feedback for a review action.",
+            "bindings": ["K1", "K2", "P1"]
+          }
+        ],
+        "recovery": [
+          {
+            "id": "R11",
+            "observation": "Retry, recovery, and runtime behavior for review are not established.",
+            "bindings": ["P1"]
+          }
+        ],
+        "handoff": [
+          {
+            "id": "R12",
+            "observation": "Linked actions are surfaced in the timeline; assignment, ownership transfer, notification, and completion handoff behavior are not established.",
+            "bindings": ["K2", "P1"]
+          }
+        ],
+        "output": [
+          {
+            "id": "R13",
+            "observation": "The established output is visible review context only; no durable review decision or signed outcome artifact is established.",
+            "bindings": ["K1", "K2", "P1"]
+          }
+        ],
+        "audit_history": [
+          {
+            "id": "R14",
+            "observation": "A timeline surface is visible, but it is not established as a durable review audit trail.",
+            "bindings": ["K2", "P1"]
+          }
+        ],
+        "limitations_unknowns": [
+          {
+            "id": "R15",
+            "observation": "The exact status vocabulary lacks an atom-specific evidence locus.",
+            "bindings": ["P1"]
+          },
+          {
+            "id": "R16",
+            "observation": "Reviewer outcome, rationale, approval, signature, and effectiveness-gate behavior are unproved.",
+            "bindings": ["P1"]
+          },
+          {
+            "id": "R17",
+            "observation": "Atomic activity audit, retry, recovery, runtime maturity, and production fitness are unproved.",
+            "bindings": ["P1"]
+          },
+          {
+            "id": "R18",
+            "observation": "Adjacent workflow and operational-incident observations are not inherited into this packet.",
+            "bindings": ["A1"]
+          }
+        ],
+        "counts": {
+          "observations": 18,
+          "accepted_direct_claims_used": 3,
+          "accepted_aspect_bindings_used": 1,
+          "project_bound_limitations_retained": 3,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "neutral_requirements": 0,
+          "current_product_comparisons": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "observed_behavior_only": true,
+          "every_observation_has_reattachment_binding": true,
+          "all_direct_record_limitations_retained": true,
+          "identity_stripped": true,
+          "no_target_repo_or_product_identity": true,
+          "no_implementation_details": true,
+          "no_neutral_requirements": true,
+          "no_current_product_comparison": true,
+          "no_selection_mapping_NCM_or_credit": true
+        }
+      },
+      "reattachment_appendix": {
+        "schema": "ROOT-REATTACHMENT-APPENDIX-1",
+        "packet_id": "OBP-72-A-4F2D9C",
+        "payload_seal": {
+          "algorithm": "SHA-256",
+          "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+          "bytes": 3658,
+          "sha256": "718bc43127d6cf94b415c9e34d3da57c0b9620648b4d4b8a2bf0f66f1aefcf0c"
+        },
+        "accepted_source": {
+          "packet_id": "RUN-065",
+          "packet_path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+          "packet_sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec",
+          "independent_review_id": "RUN-065-R",
+          "independent_review_path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+          "independent_review_sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864",
+          "hash_match": true,
+          "independent_reviewer": true,
+          "formal_upstream_record_accepted": true
+        },
+        "accepted_record": {
+          "id": "PRJ-INC-BEACONHS",
+          "sha256": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8",
+          "relation": "DIRECT_EXACT_OBJECT_LOCATOR_FOR_LATER_COMPARISON_ONLY",
+          "promotable": false
+        },
+        "binding_reattachment": [
+          {"key": "K1", "type": "accepted_claim", "id": "BHS-C02", "sha256": "bca97c7b027d7bd0cff0aedd292475817d6cd7fd58dd23de0622fa271eef2ca7"},
+          {"key": "K2", "type": "accepted_claim", "id": "BHS-C03", "sha256": "769e9dffca179db41c297c7fa2e7c4b19014f11d7c718233a2a5eabb0fb7b8e3"},
+          {"key": "K3", "type": "accepted_claim", "id": "BHS-C04", "sha256": "787a0a4a1fb2fffe4266ae889a6d4fe4475f6ef16a61dca053be35ad29b98e0b"},
+          {"key": "A1", "type": "accepted_aspect_binding", "id": "ASP-INC-REVIEW", "sha256": "6dd32f63a8a921956433bd41b4a4aa2d7d41d604fbd1a5a1c4448872e44dbfae"},
+          {"key": "P1", "type": "accepted_record_boundary", "id": "PRJ-INC-BEACONHS", "sha256": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8", "limitation_ids": ["BHS-Q01", "BHS-Q02", "BHS-Q03"]}
+        ],
+        "counts": {
+          "source_packets": 2,
+          "accepted_records": 1,
+          "accepted_claims": 3,
+          "accepted_aspect_bindings": 1,
+          "project_bound_limitations": 3,
+          "payload_binding_keys": 5,
+          "unresolved_binding_keys": 0
+        },
+        "attestation": {
+          "appendix_separate_from_identity_stripped_payload": true,
+          "exact_ids_and_hashes_transcribed": true,
+          "acceptance_used_for_integrity_only": true,
+          "adjacent_project_claims_used": 0,
+          "downstream_interpretation_omitted": true
+        }
+      }
+    },
+    {
+      "payload": {
+        "schema": "OBSERVED-BEHAVIOR-PACKET-1",
+        "packet_id": "OBP-72-B-91E7A4",
+        "packet_kind": "closure",
+        "observed_entry_point": [
+          {
+            "id": "C01",
+            "observation": "A detail action presents a status selector whose submission carries the current record and the selected status.",
+            "bindings": ["K1"]
+          }
+        ],
+        "role": [
+          {
+            "id": "C02",
+            "observation": "Closure requires authority that is separate from owner-Site visibility; visibility alone does not establish permission to close.",
+            "bindings": ["K2"]
+          }
+        ],
+        "information_shown": [
+          {"id": "C03", "observation": "The action surface shows a status selector.", "bindings": ["K1"]},
+          {"id": "C04", "observation": "A closure-time unlock control and an activity feed are surfaced.", "bindings": ["K6"]}
+        ],
+        "steps": [
+          {"id": "C05", "observation": "The actor selects a status and submits it for the current record.", "bindings": ["K1"]},
+          {"id": "C06", "observation": "A closure change and its closure signal succeed together while concurrent closure changes are serialized.", "bindings": ["K3"]},
+          {"id": "C07", "observation": "After the closure change succeeds, an activity entry is recorded and the record state is rechecked.", "bindings": ["K4"]}
+        ],
+        "states": [
+          {"id": "C08", "observation": "A closed state is established, but the exact status vocabulary is not established.", "bindings": ["K3", "P1"]},
+          {"id": "C09", "observation": "Reversible locked and unlocked behavior is observed; a reopen or reverse-status state is not established.", "bindings": ["K5", "K6", "A3"]}
+        ],
+        "branches": [
+          {"id": "C10", "observation": "The accepted evidence establishes a close branch for an actor with separate close authority.", "bindings": ["K2", "K3"]},
+          {"id": "C11", "observation": "An update-authorized lock or unlock branch is established, but no reopen branch is established.", "bindings": ["K5", "K6", "A3"]}
+        ],
+        "safeguards": [
+          {"id": "C12", "observation": "Owner-Site visibility and close authority are checked as distinct concerns.", "bindings": ["K2"]},
+          {"id": "C13", "observation": "Concurrent closure changes are serialized, and the closure signal shares success or failure with the close change.", "bindings": ["K3"]},
+          {"id": "C14", "observation": "Closure does not capture the closing actor.", "bindings": ["K7", "A1"]},
+          {"id": "C15", "observation": "Verification of separate corrective actions is not enforced before closure.", "bindings": ["K8", "A2"]}
+        ],
+        "feedback": [
+          {"id": "C16", "observation": "An activity feed exposes recorded activity around the closure and lock controls.", "bindings": ["K6"]},
+          {"id": "C17", "observation": "The record state is rechecked after closure, but explicit user-visible success, validation-error, or conflict feedback is not established.", "bindings": ["K4", "P1"]}
+        ],
+        "recovery": [
+          {"id": "C18", "observation": "The close change and closure signal share a success-or-failure boundary, while the activity entry follows afterward; complete audit atomicity, durable retry, and recovery behavior remain unproved.", "bindings": ["K3", "K4", "A4", "P1"]}
+        ],
+        "handoff": [
+          {"id": "C19", "observation": "A closure signal is produced with the close change; downstream consumption, notification, assignment, and acknowledgement are not established.", "bindings": ["K3", "P1"]}
+        ],
+        "output": [
+          {"id": "C20", "observation": "The established immediate output is the closed record state paired with a closure signal.", "bindings": ["K3"]},
+          {"id": "C21", "observation": "An activity entry is recorded and the record state is rechecked after closure, but the closing actor is omitted.", "bindings": ["K4", "K7"]}
+        ],
+        "audit_history": [
+          {"id": "C22", "observation": "An activity entry follows the close change and activity is surfaced in a feed.", "bindings": ["K4", "K6"]},
+          {"id": "C23", "observation": "Lock and unlock changes receive a later activity audit, but closure actor attribution is not established.", "bindings": ["K5", "K7"]}
+        ],
+        "limitations_unknowns": [
+          {"id": "C24", "observation": "The exact status vocabulary lacks an atom-specific evidence locus.", "bindings": ["P1"]},
+          {"id": "C25", "observation": "Reviewer outcome, rationale, approval, signature, and effectiveness-gate behavior are unproved.", "bindings": ["P1"]},
+          {"id": "C26", "observation": "Complete activity-audit atomicity, retry, recovery, runtime maturity, and production fitness are unproved.", "bindings": ["P1", "A4"]},
+          {"id": "C27", "observation": "The closing actor is not captured by the observed closure change.", "bindings": ["K7", "A1"]},
+          {"id": "C28", "observation": "Separate corrective-action verification is not enforced by closure.", "bindings": ["K8", "A2"]},
+          {"id": "C29", "observation": "Only reversible lock behavior is established; reopen semantics are unproved.", "bindings": ["A3"]},
+          {"id": "C30", "observation": "Closure gates beyond separate close authority are not established.", "bindings": ["A1", "K2"]}
+        ],
+        "counts": {
+          "observations": 30,
+          "accepted_direct_claims_used": 8,
+          "accepted_aspect_bindings_used": 4,
+          "project_bound_limitations_retained": 3,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "neutral_requirements": 0,
+          "current_product_comparisons": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "observed_behavior_only": true,
+          "every_observation_has_reattachment_binding": true,
+          "all_direct_record_limitations_retained": true,
+          "identity_stripped": true,
+          "no_target_repo_or_product_identity": true,
+          "no_implementation_details": true,
+          "no_neutral_requirements": true,
+          "no_current_product_comparison": true,
+          "no_selection_mapping_NCM_or_credit": true
+        }
+      },
+      "reattachment_appendix": {
+        "schema": "ROOT-REATTACHMENT-APPENDIX-1",
+        "packet_id": "OBP-72-B-91E7A4",
+        "payload_seal": {
+          "algorithm": "SHA-256",
+          "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+          "bytes": 5224,
+          "sha256": "550776f8f45fddb5b9875c3a660bef95169434660699194c9f30a6956ffa6dd9"
+        },
+        "accepted_source": {
+          "packet_id": "RUN-065",
+          "packet_path": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+          "packet_sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec",
+          "independent_review_id": "RUN-065-R",
+          "independent_review_path": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+          "independent_review_sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864",
+          "hash_match": true,
+          "independent_reviewer": true,
+          "formal_upstream_record_accepted": true
+        },
+        "accepted_record": {
+          "id": "PRJ-INC-BEACONHS",
+          "sha256": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8",
+          "relation": "DIRECT_EXACT_OBJECT_LOCATOR_FOR_LATER_COMPARISON_ONLY",
+          "promotable": false
+        },
+        "binding_reattachment": [
+          {"key": "K1", "type": "accepted_claim", "id": "BHS-C01", "sha256": "abed24cd5ff2c3d4eea73645d11fe7b9632a24471ca4d8428d99dd254afef143"},
+          {"key": "K2", "type": "accepted_claim", "id": "BHS-C04", "sha256": "787a0a4a1fb2fffe4266ae889a6d4fe4475f6ef16a61dca053be35ad29b98e0b"},
+          {"key": "K3", "type": "accepted_claim", "id": "BHS-C05", "sha256": "fb0be9c910fe3876be655c3a2694670b4d3d631d620f33c2c3e67bf9f48e8054"},
+          {"key": "K4", "type": "accepted_claim", "id": "BHS-C06", "sha256": "8c32ac95c588acabfe2e331e7c9913cef9b1cc806fc6db9326523aa8603a0abd"},
+          {"key": "K5", "type": "accepted_claim", "id": "BHS-C07", "sha256": "4afc6c970bfe79e7288bbf0b86b65dbb805e97d79d41b6df71ae9cd56494cd76"},
+          {"key": "K6", "type": "accepted_claim", "id": "BHS-C08", "sha256": "4b24808411b313a01a55191be3a04220a10eef844f297f9b7be4242ccabba957"},
+          {"key": "K7", "type": "accepted_claim", "id": "BHS-C09", "sha256": "6bd81d8830867bd1efc52a73f13dc3eb7c159ca2af7879287045cef93ea35f7a"},
+          {"key": "K8", "type": "accepted_claim", "id": "BHS-C10", "sha256": "c3220f161551f0f7309b62018709024220875f56c11914accf4c873818f0a6db"},
+          {"key": "A1", "type": "accepted_aspect_binding", "id": "ASP-INC-CLOSURE", "sha256": "ca221af818cd802a8521b2de6272f3759f12ef1a100b31e1458b48931a9b1474"},
+          {"key": "A2", "type": "accepted_aspect_binding", "id": "ASP-INC-VERIFY-BEFORE-CLOSE", "sha256": "7d31aa26823b7dbf9af925420c5c5107491a08419f878c62d034ad3e0467a9af"},
+          {"key": "A3", "type": "accepted_aspect_binding", "id": "ASP-INC-REOPEN-LOCK", "sha256": "f6e34f63606bd3bcb26d9e3cf5fb9c10c3a9d658960af5ca00707b9249d4383d"},
+          {"key": "A4", "type": "accepted_aspect_binding", "id": "ASP-INC-RECOVERY", "sha256": "637487db75b9852f6e1cf9300e1ea4c84c382a72ff3360341a779746e425a2c3"},
+          {"key": "P1", "type": "accepted_record_boundary", "id": "PRJ-INC-BEACONHS", "sha256": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8", "limitation_ids": ["BHS-Q01", "BHS-Q02", "BHS-Q03"]}
+        ],
+        "counts": {
+          "source_packets": 2,
+          "accepted_records": 1,
+          "accepted_claims": 8,
+          "accepted_aspect_bindings": 4,
+          "project_bound_limitations": 3,
+          "payload_binding_keys": 13,
+          "unresolved_binding_keys": 0
+        },
+        "attestation": {
+          "appendix_separate_from_identity_stripped_payload": true,
+          "exact_ids_and_hashes_transcribed": true,
+          "acceptance_used_for_integrity_only": true,
+          "adjacent_project_claims_used": 0,
+          "downstream_interpretation_omitted": true
+        }
+      }
+    }
+  ],
+  "counts": {
+    "packets": 2,
+    "observations": 48,
+    "accepted_direct_claim_bindings": 11,
+    "accepted_aspect_bindings": 5,
+    "project_bound_limitations_retained_per_packet": 3,
+    "mapping_or_credit_claims": 0
+  },
+  "credit_boundary": {
+    "target_mapping_credit": false,
+    "benchmark_credit": false,
+    "ncm_credit": false,
+    "runtime_credit": false,
+    "browser_credit": false,
+    "pass_credit": false,
+    "completion_credit": false
+  },
+  "attestation": {
+    "agent_a_only": true,
+    "identity_stripped_payloads_sealed_separately": true,
+    "reattachment_appendices_withheld_from_agent_b": true,
+    "current_product_not_read": true,
+    "no_downstream_decision": true,
+    "audit_artifact_writes_by_root_only": true
+  }
+}

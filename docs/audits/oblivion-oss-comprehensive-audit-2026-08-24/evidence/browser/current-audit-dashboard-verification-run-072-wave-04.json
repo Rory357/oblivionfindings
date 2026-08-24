@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-072-DASHBOARD",
+  "status": "FINAL_GENERATED_AUDIT_DASHBOARD_RESPONSIVE_VERIFICATION_PASS_ZERO_APPLICATION_CREDIT",
+  "observed_at": "2026-08-25T08:12:06+12:00",
+  "root_writer_only": true,
+  "artifact": {
+    "path": "audit-dashboard.html",
+    "bytes": 55920,
+    "sha256": "1664b2e3e1799491382ae584712baa733825fbe60bcdac909e730cd5a5ebcdb4"
+  },
+  "generator": {
+    "path": "generators/build-current-audit-dashboard.py",
+    "sha256": "e791d4c6a5f21afde4a4ce653a29d8c9e2a88acf824e8312e173493dbd61ebd3",
+    "evidence_integrated_through": "RUN-072"
+  },
+  "browser_surface": "Codex in-app browser",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-run072#checkpoint",
+  "checks": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Oblivion Findings current-source audit",
+      "body_scroll_width": 1425,
+      "body_client_width": 1425,
+      "page_level_horizontal_overflow": false,
+      "table_wrap_count": 8,
+      "overflowing_table_wrap_count": 0,
+      "unbounded_wide_table_count": 0,
+      "checkpoint_heading": "RUN-071–072 completion-gate checkpoint",
+      "checkpoint_static_chain_copy_present": true,
+      "checkpoint_not_measured_sentinel_copy_present": true,
+      "checkpoint_candidate_only_copy_present": true,
+      "checkpoint_evidence_hash_count": 18,
+      "fresh_verification_panel_present": true,
+      "console_warning_or_error_count": 0
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "body_scroll_width": 375,
+      "body_client_width": 375,
+      "page_level_horizontal_overflow": false,
+      "table_wrap_count": 8,
+      "overflowing_table_wrap_count": 8,
+      "unbounded_wide_table_count": 0,
+      "navigation_overflow_x": "auto",
+      "navigation_scrollable": true,
+      "checkpoint_width": 347,
+      "checkpoint_fits_viewport": true,
+      "checkpoint_heading": "RUN-071–072 completion-gate checkpoint",
+      "checkpoint_evidence_hash_count": 18,
+      "fresh_verification_panel_present": true,
+      "console_warning_or_error_count": 0
+    }
+  ],
+  "relative_href_validation": {
+    "status": "PASS",
+    "missing_targets": 0
+  },
+  "retention": {
+    "screenshots_retained": 0,
+    "application_data_retained": false
+  },
+  "credit_boundary": {
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application": false,
+    "workflow": false,
+    "finding": false,
+    "runtime": false,
+    "test": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  }
+}

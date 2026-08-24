@@ -1,0 +1,139 @@
+{
+  "schema_version": "run_072_agent_d_incident_adjudication_wave_04_v1",
+  "run_id": "RUN-072-D",
+  "status": "COMPLETE_ZERO_CREDIT",
+  "input_verification": {
+    "result": "PASS",
+    "bytes": 67855,
+    "sha256": "6e53ebdadf67af0ff68152c6c488740a80422cf9e2222acce4d518cc2e53e8c8",
+    "manifest_roles": ["agent_a", "agent_b", "agent_c_input", "agent_c"],
+    "manifest_roles_unique": true,
+    "every_role_represented_once": true,
+    "raw_manifest_artifacts_reopened": false,
+    "raw_manifest_boundary_note": "Raw-file byte and hash declarations were preserved but not externally rehashed because only the sealed Agent D input was authorized."
+  },
+  "packet_verification": {
+    "review": {
+      "packet_id": "OBP-72-A-4F2D9C",
+      "canonical_bytes": 3658,
+      "sha256": "718bc43127d6cf94b415c9e34d3da57c0b9620648b4d4b8a2bf0f66f1aefcf0c",
+      "seal_recomputed": true,
+      "seal_match": true,
+      "observations": 18,
+      "accepted_claim_bindings": 3,
+      "accepted_aspect_bindings": 1,
+      "binding_keys": 5,
+      "unresolved_binding_keys": 0
+    },
+    "closure": {
+      "packet_id": "OBP-72-B-91E7A4",
+      "canonical_bytes": 5224,
+      "sha256": "550776f8f45fddb5b9875c3a660bef95169434660699194c9f30a6956ffa6dd9",
+      "seal_recomputed": true,
+      "seal_match": true,
+      "observations": 30,
+      "accepted_claim_bindings": 8,
+      "accepted_aspect_bindings": 4,
+      "binding_keys": 13,
+      "unresolved_binding_keys": 0
+    },
+    "total_observations": 48,
+    "observation_ids_unique": true
+  },
+  "neutral_specification_verification": {
+    "result": "PASS",
+    "must": 14,
+    "should": 0,
+    "not_established": 25,
+    "total": 39,
+    "unique_source_observation_ids_cited": 48,
+    "uncited_observations": 0,
+    "unknown_observation_ids": 0
+  },
+  "comparison_verification": {
+    "result": "PASS",
+    "rows_reviewed": 39,
+    "requirement_ids_unique": true,
+    "missing_rows": [],
+    "extra_rows": [],
+    "outcomes": {"MET": 5, "PARTIAL": 3, "GAP": 0, "CONTRADICTED": 0, "NOT_COMPARABLE": 31},
+    "must_review": {"MET": 1, "PARTIAL": 0, "NOT_COMPARABLE": 4, "total": 5},
+    "must_closure": {"MET": 4, "PARTIAL": 3, "NOT_COMPARABLE": 2, "total": 9},
+    "not_established_rows": 25,
+    "not_established_all_preserved_as_not_comparable": true,
+    "corrections": []
+  },
+  "identity_and_pin_verification": {
+    "result": "PASS_WITH_SEALED_BOUNDARY",
+    "identity_free_payloads": true,
+    "appendix_packet_ids_match": true,
+    "accepted_record": "PRJ-INC-BEACONHS",
+    "accepted_record_relation": "LOCATOR_ONLY",
+    "accepted_record_promotable": false,
+    "identity_reattached_only_after_agent_c": true,
+    "agent_b_and_agent_c_identity_boundaries_clean": true,
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "pin_internally_consistent": true,
+    "agent_c_independently_inspected_pin": false,
+    "agent_d_external_pin_inspection": false
+  },
+  "preservation": {
+    "collision_notes_reviewed": 8,
+    "ownership_collisions_preserved": true,
+    "unknowns_preserved": true,
+    "current_behavior_not_inherited_upstream": true,
+    "adjacent_semantics_not_inherited": true,
+    "database_row_lock_not_equated_to_user_locking": true,
+    "audit_provenance_not_equated_to_visible_feed": true
+  },
+  "adjudication": {
+    "review_facet": {
+      "disposition": "NO_GO",
+      "scope": "THIS_CANDIDATE_EDGE_ONLY",
+      "reason": "Only one of five MUST rows is MET; the remaining four concern visible review surfaces that cannot be equated with the sealed state-transition command."
+    },
+    "closure_facet": {
+      "disposition": "NO_GO",
+      "scope": "THIS_CANDIDATE_EDGE_ONLY",
+      "reason": "Four of nine MUST rows are MET, three are PARTIAL, and two are NOT_COMPARABLE. The overlap is insufficient for an exact mapping."
+    },
+    "combined_target": {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "disposition": "NO_GO",
+      "scope": "THIS_CANDIDATE_EDGE_ONLY",
+      "reason": "Neither independently adjudicated facet achieved GO."
+    }
+  },
+  "canonical_changes": {
+    "canonical_matrix_row_may_change": false,
+    "benchmark_register_row_may_change": false,
+    "current_mapping_credit_remains": false
+  },
+  "credit": {
+    "target_edge": false,
+    "final_no_match": false,
+    "NCM": false,
+    "selection": false,
+    "mapping": false,
+    "benchmark": false,
+    "runtime": false,
+    "browser": false,
+    "pass": false,
+    "ease": false,
+    "release": false,
+    "completion": false,
+    "final_no_match_reason": "The sealed comparison was not an exhaustive target-specific search."
+  },
+  "clean_boundary_attestation": {
+    "files_read": [
+      "AGENTS.md",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/benchmark/sealed-run-072-agent-d-incident-adjudication-input-wave-04.json"
+    ],
+    "other_files_read": false,
+    "source_git_prior_comparison_browser_network_runtime_test_build_database_used": false,
+    "files_edited": false,
+    "vcs_mutated": false,
+    "audit_artifact_writes_by_root_only": true
+  }
+}

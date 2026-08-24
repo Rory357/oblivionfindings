@@ -1,0 +1,136 @@
+{
+  "schema_version": "raw_run_072_usability_materialization_contract_wave_01_v1",
+  "run_id": "RUN-072-USABILITY-CONTRACT",
+  "status": "GENERATOR_READY_ZERO_EASE_OR_COMPLETION_CREDIT",
+  "input_pins": {
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "bytes": 507413,
+      "sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+    },
+    "canonical_identity": {
+      "path": "evidence/source/current-canonical-feature-identity-wave-01.json",
+      "bytes": 459083,
+      "sha256": "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
+    },
+    "inventory": {
+      "path": "inventory.json",
+      "bytes": 2580297,
+      "sha256": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa"
+    },
+    "governing_prompt": {
+      "path": "C:/Users/steph/Downloads/oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+      "bytes": 88305,
+      "sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f"
+    },
+    "repository_instructions": {
+      "path": "AGENTS.md",
+      "bytes": 1081,
+      "sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"
+    }
+  },
+  "reconciliation": {
+    "matrix_rows": 340,
+    "canonical_identity_targets": 340,
+    "feature_class_counts": {
+      "H": 300,
+      "D": 40,
+      "M": 0
+    },
+    "missing_ids": 0,
+    "core_field_mismatches": 0,
+    "unique_h_feature_ids": 300,
+    "unique_h_user_jobs": 300,
+    "sorted_h_id_set_sha256": "f25d75f69579ef831d4fb69d012b264cbc5503595b57e5cde9bbc52731d7074f",
+    "task_input_projection_sha256": "2304837b5b3c363f9ade39637304e7064fa3491ca305dec2464d5a796c7bb892"
+  },
+  "h_source_support": {
+    "route_and_page": 96,
+    "route_only": 100,
+    "page_only": 3,
+    "neither_route_nor_page": 101,
+    "navigation_established": 9,
+    "route_names_established": 0,
+    "route_paths_established": 196,
+    "page_anchors_established": 99,
+    "backend_anchors_established": 292,
+    "test_anchors_established": 166,
+    "lacking_every_source_anchor": 0,
+    "sorted_no_route_or_page_id_set_sha256": "00e6c3c882fe98e218986929c416ba38d1f4c7929ed8d8c54ff6df6b99d21e24"
+  },
+  "scorecard_contract": {
+    "rows": 300,
+    "columns": 78,
+    "four_explicit_matrix_provenance_columns": [
+      "matrix_current_ease_score",
+      "matrix_target_ease_score",
+      "feature_identity_status",
+      "matrix_completion_status"
+    ],
+    "task_script_id_rule": "TASK- plus exact feature_id",
+    "task_script_path_rule": "task-scripts/ plus lower-case feature_id plus .md",
+    "actor": "NOT_ESTABLISHED_CURRENT_AUDIT",
+    "observed_or_inferred": "SOURCE_BOUND_STATIC_IDENTITY_ONLY",
+    "validation_status": "NOT_EXECUTED_REPRESENTATIVE_ROLE",
+    "score_measurement_status": "NOT_MEASURED",
+    "score_scale": "0-5; NOT_MEASURED is not 0",
+    "independent_review": "NOT_PERFORMED",
+    "risk_and_safety_status": "NOT_ADJUDICATED_CURRENT_AUDIT",
+    "high_risk_alternative_status": "NOT_DETERMINED_CURRENT_AUDIT",
+    "credit_fields": false,
+    "numeric_scores_allowed": false
+  },
+  "entry_point_categories": [
+    "ROUTE_AND_PAGE_SOURCE_ANCHORS_PRESENT_UNVALIDATED",
+    "ROUTE_SOURCE_ANCHOR_ONLY_UNVALIDATED",
+    "PAGE_SOURCE_ANCHOR_ONLY_UNVALIDATED",
+    "NOT_ESTABLISHED_CURRENT_AUDIT_NO_ROUTE_OR_PAGE_ANCHOR"
+  ],
+  "source_bound_script_boundary": {
+    "all_h_rows_can_receive_static_contract": true,
+    "executable_entry_point_established": false,
+    "representative_actor_established": false,
+    "planned_numbered_steps_are_measured_user_steps": false,
+    "browser_observation": false,
+    "executed_test_evidence": false,
+    "ease_credit": false,
+    "completion_credit": false
+  },
+  "generator_contract": {
+    "path": "generators/materialize-source-bound-usability-wave-01.py",
+    "standard_library_only": true,
+    "construct_outputs_in_memory_before_write": true,
+    "unexpected_task_script_files_fail": true,
+    "existing_different_bytes_fail": true,
+    "deletion_allowed": false,
+    "encoding": "UTF-8 without BOM",
+    "line_endings": "LF",
+    "terminal_newline": true,
+    "scorecard_output": "04-workflow-usability-scorecard.csv",
+    "task_script_directory": "task-scripts",
+    "evidence_output": "evidence/source/current-usability-task-script-materialization-wave-01.json",
+    "rehash_inputs_after_generation": true
+  },
+  "historical_boundary": {
+    "historical_material_used_for_schema_shape_only": true,
+    "historical_scorecard_rows": 790,
+    "historical_scorecard_sha256": "60360acbc22337e456ea74e231c2b650d248792f4cce1611046e674e63c28553",
+    "historical_timesheet_example_sha256": "fd26fdcc15c4173dab2a283785447128dc36a10973e0e1d10e67c6e866ce9eff",
+    "historical_attendance_example_sha256": "f3bae21899e976f54ac693a3e2e90ae343fb9ee2480b32d4ff47371ed17782be",
+    "generator_may_read_historical_artifacts": false,
+    "historical_actor_step_recovery_finding_score_or_credit_inheritance": false
+  },
+  "attestation": {
+    "read_only_agent": true,
+    "application_files_changed": 0,
+    "audit_files_changed_by_agent": 0,
+    "runtime_calls": 0,
+    "browser_calls": 0,
+    "tests_executed": 0,
+    "ease_scores_awarded": 0,
+    "completion_credit_awarded": 0,
+    "audit_artifact_writes_by_root_only": true
+  }
+}

@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-071B",
+  "status": "THREE_TARGETS_START_READY_ZERO_MAPPING_READY_ZERO_CREDIT",
+  "observed_at": "2026-08-25T07:16:00+12:00",
+  "agent_task_path": "/root/run071_downstream_mapping_readiness",
+  "role": "formal-upstream to canonical-target readiness tracer",
+  "pass_lens": "Pass 2 benchmark clean-boundary readiness without selection or credit",
+  "pins": {
+    "audit_head": "23a40c9b97dea6ee455f91dc439e3a3b8bd493ef",
+    "audit_head_tree": "c6de5f69a9a808a675968bba417be0ffef8eb7ea",
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "application_paths_changed_from_pin": 0,
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "run_070_output_sha256": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277",
+    "run_070_agent_register_sha256": "6c1ac20161f965fde680ff26d9363d79e0a257b3d3af6604be567156f155ce33",
+    "matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "benchmark_register_sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "run_049_current_source_facet_packet_sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a",
+    "run_057_diagnostic_chain_sha256": "c672dfa178ef5e4f8412e3492506d13ecb702e0dd05826b669476c613b89fb0e"
+  },
+  "counts": {
+    "accepted_projects": 9,
+    "accepted_project_candidate_traces": 4,
+    "accepted_project_zero_traces": 5,
+    "accepted_facets": 12,
+    "accepted_facet_single_target_traces": 12,
+    "maximum_targets_per_accepted_object": 1,
+    "start_ready_targets": 3,
+    "mapping_ready_targets": 0,
+    "credit_ready_targets": 0,
+    "not_ready_selected_targets": 3,
+    "formal_target_edges": 0,
+    "final_no_matches": 0,
+    "ncm": 0
+  },
+  "accepted_project_trace": [
+    {
+      "record_id": "PRJ-HF-BIGCAP",
+      "project": "bigcapitalhq/bigcapital",
+      "candidate_target_ids": ["CAP-FIN-ALLOCATION-MATCH-HISTORY"]
+    },
+    {
+      "record_id": "PRJ-INC-BEACONHS",
+      "project": "braedonsaunders/beaconhs",
+      "candidate_target_ids": ["CAP-INC-INCIDENT-REVIEW-CLOSURE"]
+    },
+    {
+      "record_id": "PRJ-HF-ERP",
+      "project": "frappe/erpnext",
+      "candidate_target_ids": ["CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE"],
+      "excluded_collision": "Adjacent finance evidence cannot create a second target trace."
+    },
+    {
+      "record_id": "PRJ-HF-HORILLA",
+      "project": "horilla/horilla-hr",
+      "candidate_target_ids": ["CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE"]
+    },
+    {
+      "record_id": "PRJ-HF-HRMS",
+      "project": "frappe/hrms",
+      "candidate_target_ids": [],
+      "reason": "Owner collision with the accepted ERPNext employee record."
+    },
+    {
+      "record_id": "PRJ-HF-ORANGE",
+      "project": "orangehrm/orangehrm",
+      "candidate_target_ids": [],
+      "reason": "Reactivation is not rehire."
+    },
+    {
+      "record_id": "PRJ-HF-ODOO",
+      "project": "odoo/odoo",
+      "candidate_target_ids": [],
+      "reason": "Edition and source-binding exclusion."
+    },
+    {
+      "record_id": "PRJ-INC-ONEUPTIME",
+      "project": "oneuptime/oneuptime",
+      "candidate_target_ids": [],
+      "reason": "Operational incident adjacency is non-promotable."
+    },
+    {
+      "record_id": "PRJ-INC-OPENPROJECT",
+      "project": "opf/openproject",
+      "candidate_target_ids": [],
+      "reason": "Generic workflow adjacency is non-promotable."
+    }
+  ],
+  "start_ready_targets": [
+    {
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "readiness": "FRESH_AGENT_A_CAN_START",
+      "source_packet": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+      "source_packet_sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118",
+      "independent_review": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+      "independent_review_sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a",
+      "direct_project_records": [
+        {
+          "record_id": "PRJ-HF-ERP",
+          "semantic_hash": "6a8ebc70ce323e42a404469b998c71a4bd8dbcf10896e8cb27446fe2f7d48eda"
+        },
+        {
+          "record_id": "PRJ-HF-HORILLA",
+          "semantic_hash": "eb77dab49a326e8104eaae9204b35ac9a6c82779a56853d2e6fe3a8645213942"
+        }
+      ],
+      "project_array_jcs_sha256": "cd300fbb06e5ddf697d0e65281ab51ca54f3f953113ea8e1c99732ba0597cf84",
+      "direct_candidate_facets": [
+        "FAC-HR-CREATE",
+        "FAC-HR-HISTORY",
+        "FAC-HR-SET-ACTIVE",
+        "FAC-HR-UPDATE",
+        "FAC-HR-VIEW"
+      ],
+      "bounded_no_candidate_not_ncm": ["FAC-HR-INVITE", "FAC-HR-REHIRE"],
+      "facet_source_hashes": {
+        "FAC-HR-CREATE": "62de9bf8acc2aae9e052cfb4eb794ad3d675421cbaa536ffeb25bc25c9ca21b1",
+        "FAC-HR-HISTORY": "903b4da71fc4ef92cdac233d592745466358b685e4002c6fb1e25cf112163ccb",
+        "FAC-HR-INVITE": "39fce4745b1462f0ecdd412cf082deed30005b667ce2ddbfc84b20d20ed36ca7",
+        "FAC-HR-REHIRE": "d82950e966d27dac395ea760ca89c6ef1ebfce8f141ab3b17b9b3e2e588ad029",
+        "FAC-HR-SET-ACTIVE": "234491e9931bab588a0e2db204445c80e0e24252c35c7a65b0a3629d955b10ef",
+        "FAC-HR-UPDATE": "7a51dac6fa48853aa9eb9446a129ed075345a6b9979a71a7ee4c255cdb8af1e6",
+        "FAC-HR-VIEW": "4f58eeb3711e859bc65ca4a8d00058359e13f6f53b998e6576108af64fa7b75d"
+      },
+      "remaining_stages": [
+        "Fresh Agent A for the five direct candidate facets",
+        "Broader official-source searches for invite and rehire",
+        "Identity-stripped Agent B",
+        "Sealed current-source Agent C",
+        "Fresh Agent D"
+      ]
+    },
+    {
+      "feature_id": "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+      "readiness": "FRESH_AGENT_A_CAN_START",
+      "source_packet": "evidence/benchmark/raw-run-067b-corrected-hr-finance-reseal-wave-03.json",
+      "source_packet_sha256": "e1c269c2fd971c37db6b1b6b7273193ee29bcbdf25879c33deb242a3c8093118",
+      "independent_review": "evidence/benchmark/raw-run-068-independent-hr-finance-exact-file-review-wave-03.json",
+      "independent_review_sha256": "984eed1586257233d70cf6d1a3cb586e6d24ec160bdbc68b3045a55cb6f8f26a",
+      "direct_project_records": [
+        {
+          "record_id": "PRJ-HF-BIGCAP",
+          "semantic_hash": "b8be5457f430a19eeae077ed916e3995cab1901cdfc3dfcd2f844aff61124208"
+        }
+      ],
+      "direct_candidate_facets": ["FAC-FIN-SUGGEST", "FAC-FIN-CONFIRM"],
+      "bounded_no_candidate_not_ncm": ["FAC-FIN-REJECT", "FAC-FIN-HISTORY", "FAC-FIN-REPLAY"],
+      "facet_source_hashes": {
+        "FAC-FIN-CONFIRM": "a3048481a12ee56ad35eb02561811e8333525308fe008ff4d9188d5d7ef72446",
+        "FAC-FIN-HISTORY": "91855c10407e5b5dccd45a8875fca866ac43255d6948a54fdc75d865b18adff0",
+        "FAC-FIN-REJECT": "8f35c3b78c387c7da20e8da186d05e6153ece686dac3e5c58ba1fb73903a5b61",
+        "FAC-FIN-REPLAY": "bf9af9a8f0dad2ef761380c654211306ef92c2e7196d42c2783bd5662d3127c2",
+        "FAC-FIN-SUGGEST": "61aaa9a4f8ba97f715a970459464776a45ff209d0c3033fe8af587e78ba5f853"
+      },
+      "collision_limits": [
+        "Only BigCapital's selected portion may feed Agent A for confirmation.",
+        "ERPNext remains adjacent finance evidence and cannot become a second direct finance project."
+      ],
+      "remaining_stages": [
+        "Fresh Agent A for suggest and direct confirmation behavior",
+        "Broader official-source searches for reject, history and replay",
+        "Identity-stripped Agent B",
+        "Sealed current-source Agent C",
+        "Fresh Agent D"
+      ]
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "readiness": "FRESH_AGENT_A_CAN_START_FROM_PROJECT_RECORD_ONLY",
+      "source_packet": "evidence/benchmark/raw-run-065-corrected-incident-reseal-wave-03.json",
+      "source_packet_sha256": "0dc787b4646be83edee158ac7d15103aecbfb0dc4d9b8c67328a02cd05df5fec",
+      "independent_review": "evidence/benchmark/raw-run-066-independent-corrected-incident-reseal-review-wave-03.json",
+      "independent_review_sha256": "dc439693111e3da8f6f61daa18b595853b4f94846d5aa8fcbcc16ebf9b480864",
+      "direct_project_record": {
+        "record_id": "PRJ-INC-BEACONHS",
+        "record_hash": "75fbd924df3e7acb803ac37efc89619c024dfbabe478a5d148e99dda416e33c8"
+      },
+      "formal_facets_accepted": 0,
+      "agent_a_rule": "Derive fresh review and closure observations from accepted project claims; do not treat the seven aspect summaries as accepted facets.",
+      "remaining_stages": [
+        "Two identity-strippable Agent A packets",
+        "Identity-stripped Agent B",
+        "Agent C against the sealed current-source review and closure packets",
+        "Fresh independent Agent D"
+      ]
+    }
+  ],
+  "not_ready_targets": [
+    {
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "status": "BLOCKED_AT_FORMAL_UPSTREAM_RECORD_LAYER"
+    },
+    {
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "status": "BLOCKED_AT_FORMAL_UPSTREAM_RECORD_LAYER"
+    },
+    {
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "status": "BLOCKED_AT_FORMAL_UPSTREAM_RECORD_LAYER"
+    }
+  ],
+  "not_ready_reason": "RUN-067C and RUN-069 reproduced V2 digests but could not re-prove FTC-01, FTC-02 through FTC-22 or FTC-24 because durable normalizer session/turn identity and normative control definitions are absent.",
+  "smallest_next_wave": {
+    "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+    "reason": "One direct accepted project record and two current-source facets make this the smallest clean chain.",
+    "stages": [
+      "Agent A reads only the exact accepted BeaconHS record and produces separate review and closure observations.",
+      "Agent B receives only identity-stripped Agent A payloads.",
+      "Agent C receives only the neutral specification and sealed current-source review and closure extracts.",
+      "Fresh Agent D reattaches identity and checks all collisions and adjacency limits.",
+      "Root joins role-keyed exact hashes and preserves the matrix/register unless D explicitly passes."
+    ]
+  },
+  "credit_boundary": "Start-ready means only that a fresh clean-specification chain may begin. No object is selected, mapped, a final no-match, an NCM or credit-ready.",
+  "attestation": {
+    "read_only_agent": true,
+    "wrote_files": false,
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "browser_used": false,
+    "network_used": false,
+    "runtime_used": false,
+    "tests_used": false,
+    "build_used": false,
+    "database_used": false,
+    "no_inherited_credit": true
+  }
+}

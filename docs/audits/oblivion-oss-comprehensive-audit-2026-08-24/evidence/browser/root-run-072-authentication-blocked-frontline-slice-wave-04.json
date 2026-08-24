@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-072-BROWSER-BLOCK",
+  "status": "AUTHENTICATION_EXPIRED_ZERO_ROUTE_CELLS_ZERO_CREDIT",
+  "observed_at": "2026-08-25T07:22:00+12:00",
+  "root_writer_only": true,
+  "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+  "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+  "deployed_build_identity": "UNKNOWN",
+  "environment_identity": "UNKNOWN",
+  "actor_role_identity": "UNKNOWN",
+  "site_scope_identity": "UNKNOWN",
+  "fixture_safety_identity": "UNKNOWN",
+  "selected_targets": [
+    "CAP-DAY-MY-DAY-WORKSPACE",
+    "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+    "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT"
+  ],
+  "selected_routes": [
+    "/my-day",
+    "/attendance",
+    "/operations/timesheets"
+  ],
+  "attempts": [
+    {
+      "browser_surface": "in-app browser selected for target URL",
+      "target_url": "https://oblivionfindings.com/my-day",
+      "viewport": {"width": 1440, "height": 900},
+      "final_path": "/login",
+      "access_outcome": "AUTHENTICATION_REQUIRED",
+      "structural_heading": "Log in to your account",
+      "console_log_count": 0,
+      "screenshot_retained": false,
+      "page_data_retained": false
+    },
+    {
+      "browser_surface": "connected Chrome checked after the first surface lacked authentication",
+      "target_url": "https://oblivionfindings.com/my-day",
+      "viewport": "default",
+      "final_path": "/login",
+      "access_outcome": "AUTHENTICATION_REQUIRED",
+      "structural_heading": "Log in to your account",
+      "screenshot_retained": false,
+      "page_data_retained": false
+    }
+  ],
+  "counts": {
+    "selected_routes": 3,
+    "routes_attempted_before_fail_closed": 1,
+    "authenticated_routes": 0,
+    "completed_base_route_viewport_cells": 0,
+    "completed_pre_submit_state_cells": 0,
+    "screenshots": 0,
+    "forms_submitted": 0,
+    "records_changed": 0,
+    "meaningful_mutations": 0,
+    "credentials_entered": 0,
+    "cookies_or_storage_inspected": 0
+  },
+  "fail_closed_actions": [
+    "Stopped after both available browser surfaces returned the login page.",
+    "Did not attempt attendance or timesheet routes without authentication.",
+    "Did not type credentials, inspect cookies/storage, probe direct IDs or use an admin workaround.",
+    "Reset the temporary in-app viewport override.",
+    "Kept the in-app sign-in page available for manual authentication."
+  ],
+  "next_action": "A user may manually sign in again. Resume only the selected read-only GET, viewport, DOM, focus and pre-submit open/close checks; retain the unknown-build and zero-credit boundary unless deployment identity is separately proven.",
+  "credit_boundary": {
+    "current_source_browser_routes": 0,
+    "unknown_build_browser_routes": 0,
+    "task_completion_credit": 0,
+    "ease_credit": 0,
+    "visual_credit": 0,
+    "pass_credit": 0,
+    "audit_completion_credit": 0
+  }
+}

@@ -19,6 +19,16 @@ This fresh run therefore starts with a new deterministic current-source census. 
 - Governing prompt SHA-256: `4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f`
 - Architecture rule: single tenant, multiple Sites; assess Site access, role/action capability, canonical ownership, direct-object concealment, and privacy boundaries—not tenant isolation.
 
+## RUN-071–072 completion-gate checkpoint
+
+RUN-071 reconciles all 26 governing completion gates without promoting source evidence into execution credit. Eleven of the 18 required top-level audit artifacts are now materialized; the seven still absent are `07-module-findings.md`, `08-cross-module-journeys.md`, `09-ui-ux-accessibility-visual-consistency.md`, `10-architecture-data-integration-security.md`, `11-prioritised-roadmap.md`, `12-native-build-and-do-not-copy-register.md`, and `findings.json`. Gate 26 remains open because the audit is not complete.
+
+RUN-072 deterministically materializes one source-bound usability contract for each of the 300 frozen H targets and a 78-column scorecard. The 300 contracts are structural execution specifications only: 0/300 tasks have been run, 0/3,000 required current/target measurements are populated, and no ease, workflow, browser, runtime, Pass, or completion credit is awarded. An independent reviewer first returned NO-GO because the generator did not pin the governing prompt and root instructions; the bounded generator correction added both inputs, regenerated the same task/scorecard outputs, and then received GO.
+
+A bounded current-source route/page ownership slice covers three targets and 16 primary static route declarations. It remains source-only. The attempted signed-in browser slice was stopped after the existing session redirected to login, so it records 0/3 current-build browser targets and retains no screenshots or application data.
+
+The clean incident comparison chain preserves the Agent A → B → C → D boundary: 48 identity-stripped observations became 39 neutral requirements; current-source comparison produced 5 `MET`, 3 `PARTIAL`, and 31 `NOT_COMPARABLE` outcomes; and the independent adjudicator returned NO-GO for both incident facets and their combined target. This is a candidate-edge rejection only—not an exhaustive final no-match—and it changes neither the canonical matrix nor benchmark register. Target-edge, final-no-match, NCM, selection, mapping, benchmark, runtime, browser, test, ease, release, Pass, and completion credit all remain zero.
+
 ## Current raw source census
 
 These are deterministic path counts, not semantic feature or runtime denominators.

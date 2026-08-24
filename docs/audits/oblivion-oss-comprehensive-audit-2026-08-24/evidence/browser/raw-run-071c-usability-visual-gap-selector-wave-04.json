@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-071C",
+  "status": "USABILITY_AND_VISUAL_GAPS_ACCOUNTED_SAFE_UNKNOWN_BUILD_SLICE_SELECTED_ZERO_CREDIT",
+  "observed_at": "2026-08-25T07:16:00+12:00",
+  "agent_task_path": "/root/run071_usability_visual_gap_selector",
+  "role": "Pass 2 usability and Pass 4 browser/visual gap selector",
+  "pins": {
+    "audit_head": "23a40c9b97dea6ee455f91dc439e3a3b8bd493ef",
+    "audit_head_tree": "c6de5f69a9a808a675968bba417be0ffef8eb7ea",
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "feature_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "visual_matrix_sha256": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "architecture_rule": "One operating organisation across multiple Sites."
+  },
+  "usability_counts": {
+    "canonical_targets": 340,
+    "human_targets": 300,
+    "document_api_targets": 40,
+    "static_human_user_jobs": 300,
+    "current_task_scripts": 0,
+    "required_current_human_task_scripts": 300,
+    "validated_representative_role_tasks": 0,
+    "required_ease_dimensions": 3000,
+    "measured_ease_dimensions": 0,
+    "numeric_current_ease_scores": 0,
+    "p2_not_started_rows": 340,
+    "p4_not_started_rows": 340,
+    "human_with_route_anchor": 196,
+    "human_with_page_anchor": 99,
+    "human_with_both_route_and_page": 96,
+    "human_with_neither_route_nor_page": 101
+  },
+  "historical_boundary": {
+    "historical_structural_scripts": 790,
+    "historical_scorecard_rows": 790,
+    "historical_executed_tasks": 0,
+    "historical_measured_scores": 0,
+    "historical_independent_reviews": 0,
+    "current_credit": 0
+  },
+  "visual_counts": {
+    "hero_definitions": 57,
+    "hero_instances": 659,
+    "rendered_hero_credit": 0,
+    "overlay_definitions": 473,
+    "overlay_instances": 1211,
+    "rendered_overlay_credit": 0,
+    "overlay_controlled_state": 795,
+    "overlay_literal_open": 162,
+    "overlay_conditional_mount": 155,
+    "overlay_no_explicit_open_locator": 99,
+    "declarative_trigger_rows": 115,
+    "direct_inline_trigger_rows": 689,
+    "named_handler_trigger_rows": 138,
+    "trigger_interaction_credit": 0,
+    "required_visual_rows": 2812,
+    "blocked_visual_rows": 2812,
+    "redacted_screenshots": 0,
+    "current_source_browser_routes": 0,
+    "current_source_route_viewport_cells": 0,
+    "current_source_rendered_overlays": 0
+  },
+  "prior_unknown_build_slice": {
+    "routes": 6,
+    "viewports": 4,
+    "route_viewport_cells": 24,
+    "pre_submit_overlay_families": 5,
+    "provisional_candidates": 2,
+    "screenshots": 0,
+    "mutations": 0,
+    "credited_current_source_cells": 0
+  },
+  "selected_safe_slice": {
+    "name": "frontline work and pay handoff",
+    "viewports": [
+      {"width": 1440, "height": 900},
+      {"width": 1280, "height": 800},
+      {"width": 1024, "height": 768},
+      {"width": 390, "height": 844}
+    ],
+    "baseline_route_cells": 12,
+    "pre_submit_state_cells": 6,
+    "differentiated_observations": 18,
+    "source_visual_rows_in_scope": 39,
+    "source_heroes_in_scope": 4,
+    "source_overlays_in_scope": 18,
+    "source_direct_triggers_in_scope": 10,
+    "source_named_triggers_in_scope": 7,
+    "targets": [
+      {
+        "feature_id": "CAP-DAY-MY-DAY-WORKSPACE",
+        "route_path": "/my-day",
+        "route_name": "my-day",
+        "representative_actor": "Authenticated frontline worker assigned to an approved Site",
+        "safe_states": ["baseline", "date popover open and closed"],
+        "source_anchors": [
+          "routes/web.php:147-153",
+          "app/Http/Controllers/MyTasksController.php:145-150",
+          "resources/js/pages/my-day/index.tsx:730-825"
+        ],
+        "visual_ids": [
+          "VIS-HERO-1A73199AC635DAD1",
+          "VIS-HERO-B9F9583E0945E8A6",
+          "VIS-OVR-C7EEB5FAAAA96911"
+        ]
+      },
+      {
+        "feature_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+        "route_path": "/attendance",
+        "route_name": "attendance.index",
+        "representative_actor": "Frontline worker with assigned-shift or timesheet viewing and clock permission",
+        "safe_states": ["baseline", "ClockInWizard open and closed without selection or submit"],
+        "source_anchors": [
+          "routes/shifts.php:19",
+          "routes/shifts.php:96-104",
+          "app/Http/Controllers/AttendanceController.php:196-202",
+          "resources/js/pages/attendance/index.tsx:1183-1335",
+          "resources/js/pages/attendance/index.tsx:1464-1468"
+        ],
+        "visual_ids": [
+          "VIS-HERO-6D07FDB5D03B294B",
+          "VIS-OVR-2F382130EFA5C37B",
+          "VIS-ITR-18F46CC84C1E8FF2"
+        ]
+      },
+      {
+        "feature_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+        "route_path": "/operations/timesheets",
+        "route_name": "operations.timesheets.index",
+        "representative_actor": "Worker with timesheets.viewAssigned; create state only if timesheets.create is visibly available",
+        "safe_states": ["baseline", "CreateTimesheetDialog open and closed through GET create=1 without entry or submit"],
+        "source_anchors": [
+          "routes/operations.php:84",
+          "routes/operations.php:1009-1011",
+          "app/Http/Controllers/TimesheetController.php:218",
+          "app/Http/Controllers/TimesheetController.php:347",
+          "resources/js/pages/operations/timesheets/index.tsx:593-609",
+          "resources/js/pages/operations/timesheets/index.tsx:790-808",
+          "resources/js/pages/operations/timesheets/index.tsx:1278-1285"
+        ],
+        "visual_ids": [
+          "VIS-HERO-AD07F223D8336188",
+          "VIS-OVR-29E67FD11B4C5E79",
+          "VIS-ITR-1626D896C933822B"
+        ]
+      }
+    ]
+  },
+  "allowed_browser_actions": [
+    "GET navigation and redirects",
+    "viewport changes",
+    "redacted DOM geometry, structural headings and visible-control counts",
+    "tab order, focus restoration, body-scroll lock and console inspection",
+    "open and close the three named pre-submit states without selecting or entering data"
+  ],
+  "prohibited_browser_actions": [
+    "Every POST, PATCH, PUT and DELETE",
+    "Clock in or out, start or end break, force end or correct a session",
+    "Task, medication, incident, vitals, meal, handover or timesheet mutation",
+    "Client creation, exports, direct-ID probing or any action that may reveal additional records"
+  ],
+  "sensitive_data_exclusions": [
+    "No names, IDs, email, phone, Site names or client allocations",
+    "No attendance times, pay, hours, shift locations, health, medication, incident or handover content",
+    "No screenshots while build, role, Site, fixture and environment identity are unknown",
+    "A visible account label is not role proof"
+  ],
+  "completion_test": [
+    "All 12 base and six pre-submit cells must record target/final URL, access outcome, heading, geometry, inner scrolling, focus and console result.",
+    "Forms submitted, records changed and meaningful mutations remain exactly zero.",
+    "No sensitive values or screenshots are retained.",
+    "Build, actor, Site, fixture and environment identities remain UNKNOWN unless independently proven.",
+    "Three task-script candidates may be source-bound, but all ten ease scores remain Not measured.",
+    "A different reviewer checks the sealed artifact and zero-credit boundary."
+  ],
+  "credit_boundary": "The selected slice may add independently reviewed unknown-build structural observations only. It grants zero current-source route, responsive, hero, overlay, workflow, task, ease, accessibility, finding, runtime, test, release, Pass or audit-completion credit.",
+  "attestation": {
+    "read_only_agent": true,
+    "wrote_files": false,
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "browser_used": false,
+    "network_used": false,
+    "runtime_used": false,
+    "tests_used": false,
+    "build_used": false,
+    "database_used": false,
+    "no_inherited_credit": true
+  }
+}

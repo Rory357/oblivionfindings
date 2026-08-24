@@ -1,0 +1,205 @@
+{
+  "schema_version": "raw_run_072_current_source_route_page_ownership_slice_wave_04_v1",
+  "run_id": "RUN-072-ROUTE-SLICE",
+  "status": "THREE_TARGET_STATIC_OWNERSHIP_SLICE_COMPLETE_ZERO_RUNTIME_OR_BROWSER_CREDIT",
+  "pins": {
+    "audit_head": "23a40c9b97dea6ee455f91dc439e3a3b8bd493ef",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "application_pin_is_ancestor_of_audit_head": true,
+    "scoped_source_diff_application_to_audit_head": "none",
+    "matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "matrix_rows": {
+      "CAP-DAY-MY-DAY-WORKSPACE": "03-feature-to-benchmark-matrix.csv:46",
+      "CAP-OPS-ATTENDANCE-CLOCK-SESSION": "03-feature-to-benchmark-matrix.csv:223",
+      "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT": "03-feature-to-benchmark-matrix.csv:243"
+    },
+    "architecture_boundary": "One operating organisation across multiple Sites; roles, permissions, approved Sites, canonical ownership, direct-object denial, and privacy boundaries; never tenant."
+  },
+  "targets": [
+    {
+      "feature_id": "CAP-DAY-MY-DAY-WORKSPACE",
+      "primary_routes": [
+        {"method": "GET", "path": "/my-day", "name": "my-day", "declared_middleware": ["auth"], "handler": "MyTasksController::__invoke", "anchor": "routes/web.php:151-153"}
+      ],
+      "compatibility_aliases": [
+        {"method": "GET", "path": "/my-tasks", "name": "my-tasks", "declared_middleware": ["auth"], "effect": "redirect /my-day; no second workspace", "anchor": "routes/web.php:286-290"}
+      ],
+      "controller": {
+        "entry_and_auth": "app/Http/Controllers/MyTasksController.php:58-64",
+        "Site_and_personal_day_assembly": "app/Http/Controllers/MyTasksController.php:72-115",
+        "render": "app/Http/Controllers/MyTasksController.php:145-198",
+        "component": "my-day/index"
+      },
+      "page": {
+        "component": "resources/js/pages/my-day/index.tsx:120",
+        "composition_contract": "resources/js/pages/my-day/index.tsx:75-91",
+        "hero": "resources/js/pages/my-day/index.tsx:792-825",
+        "workspace_rails_and_panels": "resources/js/pages/my-day/index.tsx:827-944",
+        "dialog_note": "The workspace is an aggregator. Its dialogs are projections of other action owners, not My Day workspace ownership."
+      },
+      "navigation": [
+        {"surface": "main application sidebar", "href": "/my-day", "anchor": "resources/js/components/app-sidebar.tsx:377-390"},
+        {"surface": "frontline bottom navigation Home", "href": "/my-day", "anchor": "resources/js/components/staff-bottom-nav.tsx:51-57"},
+        {"surface": "frontline More menu", "href": "/my-day", "anchor": "resources/js/layouts/staff-page-shell.tsx:68-74"}
+      ],
+      "excluded_embedded_actions": [
+        {"anchor": "routes/web.php:301", "action": "complete shift task", "owner": "task-execution capability"},
+        {"anchor": "routes/web.php:302-303", "action": "ensure or submit timesheet", "owner": "timesheet author action"},
+        {"anchor": "routes/web.php:308-309", "action": "acknowledge or snooze alert", "owner": "alert action capability"},
+        {"anchor": "routes/web.php:315-317", "action": "administer, refuse, or snooze medication", "owner": "medication administration capability"},
+        {"anchor": "resources/js/pages/my-day/index.tsx:400-434", "action": "clock-in, break, and clock-out projection", "owner": "attendance-session capability"},
+        {"anchor": "resources/js/pages/my-day/index.tsx:983-1019", "action": "timesheet review and end-of-shift dialogs", "owner": "timesheet and attendance capabilities"},
+        {"anchor": "resources/js/pages/my-day/index.tsx:1020-1027", "action": "write handover", "owner": "handover capability"}
+      ]
+    },
+    {
+      "feature_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+      "route_group": {"declared_middleware": ["auth"], "anchor": "routes/shifts.php:19"},
+      "primary_routes": [
+        {"method": "GET", "path": "/attendance", "name": "attendance.index", "permission_any": ["timesheets.viewAny", "timesheets.viewAssigned", "timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "anchor": "routes/shifts.php:96-98"},
+        {"method": "POST", "path": "/attendance/clock-in", "name": "attendance.clockIn", "permission_any": ["timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "anchor": "routes/shifts.php:99-101"},
+        {"method": "POST", "path": "/attendance/clock-out", "name": "attendance.clockOut", "permission_any": ["timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "anchor": "routes/shifts.php:102-104"},
+        {"method": "POST", "path": "/attendance/sessions/{session}/end", "name": "attendance.sessions.end", "permission_all": ["timesheets.manageAny"], "constraint": "session numeric", "anchor": "routes/shifts.php:105-108"},
+        {"method": "POST", "path": "/attendance/sessions/{session}/correct", "name": "attendance.sessions.correct", "route_permission_any": ["timesheets.manageAny", "timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "controller_effective_rule": "timesheets.manageAny OR own session plus canClock", "constraint": "session numeric", "anchor": "routes/shifts.php:109-114"},
+        {"method": "POST", "path": "/attendance/break/start", "name": "attendance.break.start", "permission_any": ["timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "anchor": "routes/shifts.php:115-117"},
+        {"method": "POST", "path": "/attendance/break/end", "name": "attendance.break.end", "permission_any": ["timesheets.create", "shifts.viewAssigned", "shifts.update", "shifts.manageAny"], "anchor": "routes/shifts.php:118-120"}
+      ],
+      "controller": {
+        "index_auth_scope": "app/Http/Controllers/AttendanceController.php:31-67",
+        "render": "app/Http/Controllers/AttendanceController.php:196-250",
+        "correct": "app/Http/Controllers/AttendanceController.php:259-292",
+        "clock_in": "app/Http/Controllers/AttendanceController.php:294-329",
+        "clock_out": "app/Http/Controllers/AttendanceController.php:331-403",
+        "manager_end": "app/Http/Controllers/AttendanceController.php:409-440",
+        "break_start_end": "app/Http/Controllers/AttendanceController.php:442-485",
+        "permission_helpers": "app/Http/Controllers/AttendanceController.php:488-505"
+      },
+      "service": {
+        "clock_in": "app/Domain/Hr/Services/AttendanceService.php:37",
+        "clock_out": "app/Domain/Hr/Services/AttendanceService.php:90",
+        "manager_end": "app/Domain/Hr/Services/AttendanceService.php:284",
+        "correct": "app/Domain/Hr/Services/AttendanceService.php:391",
+        "break_start": "app/Domain/Hr/Services/AttendanceService.php:626",
+        "break_end": "app/Domain/Hr/Services/AttendanceService.php:655"
+      },
+      "page": {
+        "component": "resources/js/pages/attendance/index.tsx:696",
+        "break_actions": "resources/js/pages/attendance/index.tsx:854-879",
+        "hero_and_clock_controls": "resources/js/pages/attendance/index.tsx:1180-1338",
+        "workflow_mounts": "resources/js/pages/attendance/index.tsx:1463-1478",
+        "clock_in_dialog": "resources/js/pages/attendance/components/clock-in-wizard.tsx:71,118-140",
+        "clock_out_dialog": "resources/js/pages/attendance/components/clock-out-wizard.tsx:98,222-240",
+        "correction_dialog": "resources/js/pages/attendance/components/fix-clock-out-wizard.tsx:66,166-190",
+        "manager_end_dialog": "resources/js/pages/attendance/index.tsx:1553-1580"
+      },
+      "secondary_page_projections": [
+        {"surface": "My Day hero clock and break controls", "anchor": "resources/js/pages/my-day/index.tsx:400-434"},
+        {"surface": "My Day end-of-shift clock-out dialog", "anchor": "resources/js/pages/my-day/index.tsx:991-1019; resources/js/components/end-of-shift-checklist.tsx:338-346,502-525"},
+        {"surface": "frontline bottom navigation Clock", "href": "/my-day#clock", "anchor": "resources/js/components/staff-bottom-nav.tsx:55-57"}
+      ],
+      "navigation": [
+        {"surface": "Workforce sidebar", "href": "/attendance", "anchor": "resources/js/components/app-sidebar.tsx:1026-1039"},
+        {"surface": "frontline More menu", "href": "/attendance", "anchor": "resources/js/layouts/staff-page-shell.tsx:87-92"}
+      ],
+      "excluded_adjacent": [
+        {"anchors": "routes/shifts.php:121-126; resources/js/pages/attendance/index.tsx:1450-1523", "actions": "handover submit, acknowledge, detail, and wizard", "owner": "handover capability"},
+        {"anchor": "resources/js/pages/attendance/index.tsx:130-133", "action": "open linked timesheet", "owner": "timesheet capability"},
+        {"anchors": "routes/hr.php:1298-1305; app/Http/Controllers/Hr/TimeTrackingController.php:639-690", "actions": "HR time clock-in and clock-out", "owner": "HR time-entry surface"}
+      ],
+      "unresolved_cross_surface_overlap": {
+        "anchors": "routes/hr.php:74-83,115-117; app/Http/Controllers/Hr/MyHrController.php:1451-1520",
+        "fact": "My HR self-service routes call AttendanceService and sync HrTimeEntry.",
+        "status": "Excluded pending separate canonical arbitration; the three permitted matrix rows do not bind these routes to this target."
+      }
+    },
+    {
+      "feature_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+      "route_group": {"prefix": "/operations", "declared_middleware": ["auth"], "anchor": "routes/operations.php:84"},
+      "primary_routes": [
+        {"method": "GET", "path": "/operations/timesheets", "name": "operations.timesheets.index", "permission_any": ["timesheets.viewAny", "timesheets.viewAssigned"], "anchor": "routes/operations.php:1009-1011"},
+        {"method": "GET", "path": "/operations/timesheets/create", "name": "operations.timesheets.create", "permission_all": ["timesheets.create"], "effect": "redirect to index with create=1 and optional shift_id", "anchor": "routes/operations.php:1032-1047"},
+        {"method": "POST", "path": "/operations/timesheets", "name": "operations.timesheets.store", "permission_all": ["timesheets.create"], "controller_note": "submit=true transitions through TimesheetApprovalService without a separate timesheets.submit check", "anchor": "routes/operations.php:1048-1050; app/Http/Controllers/TimesheetController.php:663-825"},
+        {"method": "GET", "path": "/operations/timesheets/{timesheet}", "name": "operations.timesheets.show", "route_permission_any": ["timesheets.viewAny", "timesheets.viewAssigned"], "controller_effective_rule": "view permission plus owner, manager, or reviewer visibility plus Site access", "anchor": "routes/operations.php:1061-1063"},
+        {"method": "GET", "path": "/operations/timesheets/{timesheet}/edit", "name": "operations.timesheets.edit", "route_permission_any": ["timesheets.viewAny", "timesheets.viewAssigned"], "controller_effective_rule": "timesheets.update plus owner-or-manageAny plus Site access", "anchor": "routes/operations.php:1064-1066"},
+        {"method": "PUT", "path": "/operations/timesheets/{timesheet}", "name": "operations.timesheets.update", "permission_all": ["timesheets.update"], "controller_effective_rule": "owner-or-manageAny plus Site access; draft or returned only", "anchor": "routes/operations.php:1067-1069"},
+        {"method": "POST", "path": "/operations/timesheets/{timesheet}/submit", "name": "operations.timesheets.submit", "route_permission_any": ["timesheets.submit", "timesheets.manageAny"], "controller_effective_rule": "timesheets.submit is mandatory; manageAny broadens ownership only; Site access remains required", "anchor": "routes/operations.php:1072-1074"},
+        {"method": "POST", "path": "/operations/timesheets/{timesheet}/resubmit", "name": "operations.timesheets.resubmit", "route_permission_any": ["timesheets.update", "timesheets.manageAny"], "controller_effective_rule": "timesheets.update AND timesheets.submit; owner-or-manageAny plus Site access; draft or returned only", "anchor": "routes/operations.php:1075-1080"}
+      ],
+      "legacy_redirects": {
+        "GET": "routes/shifts.php:64-71",
+        "method_preserving_308": "routes/shifts.php:73-80",
+        "paths": ["/timesheets", "/timesheets/create", "/timesheets/{timesheet}", "/timesheets/{timesheet}/edit", "POST /timesheets", "PUT /timesheets/{timesheet}", "POST /timesheets/{timesheet}/submit", "POST /timesheets/{timesheet}/resubmit"],
+        "note": "Each alias redirects to the named operations route and is not a second controller owner."
+      },
+      "controller": {
+        "index_scope_and_render": "app/Http/Controllers/TimesheetController.php:218-365",
+        "show": "app/Http/Controllers/TimesheetController.php:606-649",
+        "store": "app/Http/Controllers/TimesheetController.php:663-825",
+        "edit_redirect": "app/Http/Controllers/TimesheetController.php:904-917",
+        "update": "app/Http/Controllers/TimesheetController.php:919-1042",
+        "submit": "app/Http/Controllers/TimesheetController.php:1044-1086",
+        "resubmit": "app/Http/Controllers/TimesheetController.php:1091-1235",
+        "view_edit_Site_guards": "app/Http/Controllers/TimesheetController.php:1490-1525"
+      },
+      "workflow_service": {
+        "submit": "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:28-49",
+        "update_editable": "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:57-82",
+        "atomic_resubmit": "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:87-116",
+        "manager_approve_begins": "app/Domain/Shifts/Timesheets/TimesheetApprovalService.php:118"
+      },
+      "page": {
+        "component": "resources/js/pages/operations/timesheets/index.tsx:563",
+        "dialog_deep_links": "resources/js/pages/operations/timesheets/index.tsx:601-619",
+        "hero_create_entry": "resources/js/pages/operations/timesheets/index.tsx:778-798",
+        "dialog_mounts": "resources/js/pages/operations/timesheets/index.tsx:1266-1285",
+        "create_dialog": "resources/js/components/timesheets/create-timesheet-dialog.tsx:477-489,650-685,705-718",
+        "edit_dialog": "resources/js/components/timesheets/edit-timesheet-dialog.tsx:51,106-129,131-147",
+        "view_dialog": "resources/js/components/timesheets/view-timesheet-dialog.tsx:188,232-250,723-738",
+        "resubmit_frontend_binding": "No static call to the resubmit route was found in the permitted target page/dialog source at this pin; the route, controller, and service exist."
+      },
+      "secondary_cross_surface_entrypoints": [
+        {"method": "POST", "path": "/my-tasks/timesheet/ensure-today", "name": "my-day.timesheet.ensure-today", "effective_rule": "timesheets.create; signed-in worker's current shift", "anchors": "routes/web.php:300-303; app/Http/Controllers/MyDayActionsController.php:72-140; resources/js/pages/my-day/index.tsx:436-473"},
+        {"method": "POST", "path": "/my-tasks/timesheet/{timesheet}/submit", "name": "my-day.timesheet.submit", "effective_rule": "timesheets.submit; owner only; draft or returned", "anchors": "routes/web.php:300-303; app/Http/Controllers/MyDayActionsController.php:158-198; resources/js/pages/my-day/_dialogs.tsx:1496-1517,1697-1708", "ownership_status": "Timesheet action on the My Day aggregate surface; not ownership of My Day itself."}
+      ],
+      "navigation": [
+        {"surface": "Workforce sidebar", "href": "/operations/timesheets", "condition": "timesheets.viewAny OR timesheets.viewAssigned", "anchor": "resources/js/components/app-sidebar.tsx:1020-1025"},
+        {"surface": "My Day global links", "href": "/operations/timesheets", "anchor": "resources/js/pages/my-day/index.tsx:747-755"},
+        {"surface": "Timesheets breadcrumb", "href": "/operations/timesheets", "anchor": "resources/js/pages/operations/timesheets/index.tsx:778-787"}
+      ],
+      "excluded_adjacent": [
+        {"anchors": "routes/operations.php:1021-1029", "actions": "approval redirect, payroll adjustments, bulk approve, return, or reject", "owner": "manager approval and payroll capability"},
+        {"anchors": "routes/operations.php:1052-1058", "actions": "archive and restore", "owner": "manager catalogue and lifecycle capability"},
+        {"anchors": "routes/operations.php:1081-1089", "actions": "approve, reject, and return for changes", "owner": "manager approval decision capability"},
+        {"anchors": "resources/js/components/timesheets/view-timesheet-dialog.tsx:690-720", "actions": "reject, return, and approve controls", "owner": "manager approval decision capability"},
+        {"anchors": "routes/shifts.php:66,81-89", "actions": "legacy approvals and manager decisions", "owner": "manager approval capability"},
+        {"anchors": "app/Domain/Hr/Services/AttendanceService.php:90", "action": "clock-out creates or reconciles an attendance-backed draft", "owner": "attendance capability; no author-submit inheritance"}
+      ]
+    }
+  ],
+  "cross_target_partition": [
+    {"source": "resources/js/pages/my-day/index.tsx", "workspace_owner": "CAP-DAY-MY-DAY-WORKSPACE", "attendance_projection_owner": "CAP-OPS-ATTENDANCE-CLOCK-SESSION", "timesheet_projection_owner": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT", "rule": "Shared placement does not transfer endpoint, behavior, benchmark, or completion ownership."},
+    {"source": "resources/js/pages/attendance/index.tsx", "attendance_owner": "CAP-OPS-ATTENDANCE-CLOCK-SESSION", "excluded_projections": ["handover workflow", "linked timesheet viewing"], "rule": "No page-wide inheritance from a mixed surface."},
+    {"source": "resources/js/pages/operations/timesheets/index.tsx", "author_slice_owner": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT", "excluded_projections": ["manager approval decisions", "bulk approval", "payroll adjustments", "archive or restore"], "rule": "Isolate the worker-author path."}
+  ],
+  "counts": {
+    "targets": 3,
+    "primary_routes": 16,
+    "runtime_routes_executed": 0,
+    "browser_routes_completed": 0,
+    "target_edges_awarded": 0,
+    "completion_credit_awarded": 0
+  },
+  "attestation": {
+    "read_only_agent": true,
+    "files_edited_by_agent": false,
+    "application_or_runtime_started": false,
+    "tests_or_build_run": false,
+    "database_browser_or_network_used": false,
+    "static_git_and_file_inspection_only": true,
+    "target_edge_awarded": false,
+    "NCM_awarded": false,
+    "benchmark_mapping_runtime_browser_or_completion_credit_awarded": false,
+    "audit_artifact_writes_by_root_only": true
+  }
+}

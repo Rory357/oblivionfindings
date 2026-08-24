@@ -52,6 +52,21 @@ facet_refinement = read_json("evidence/benchmark/current-facet-neutral-compariso
 facet_refinement_agents = read_json("evidence/benchmark/current-facet-neutral-comparison-agent-register.json")
 formal_upstream = read_json("evidence/benchmark/current-formal-upstream-triage-wave-03.json")
 formal_upstream_agents = read_json("evidence/benchmark/current-formal-upstream-triage-agent-register.json")
+completion_accounting = read_json("evidence/source/raw-run-071a-completion-gate-accounting-wave-04.json")
+downstream_readiness = read_json("evidence/benchmark/raw-run-071b-downstream-mapping-readiness-wave-04.json")
+usability_gap_selector = read_json("evidence/browser/raw-run-071c-usability-visual-gap-selector-wave-04.json")
+frontline_auth_block = read_json("evidence/browser/root-run-072-authentication-blocked-frontline-slice-wave-04.json")
+usability_contract = read_json("evidence/source/raw-run-072-usability-materialization-contract-wave-01.json")
+usability_materialization = read_json("evidence/source/current-usability-task-script-materialization-wave-01.json")
+usability_review = read_json("evidence/source/raw-run-072-usability-independent-review-wave-01.json")
+route_page_slice = read_json("evidence/source/raw-run-072-current-source-route-page-ownership-slice-wave-04.json")
+incident_agent_a = read_json("evidence/benchmark/raw-run-072-agent-a-incident-observed-behavior-wave-04.json")
+incident_agent_b_input = read_json("evidence/benchmark/sealed-run-072-agent-b-input-wave-04.json")
+incident_agent_b = read_json("evidence/benchmark/raw-run-072-agent-b-neutral-incident-requirements-wave-04.json")
+incident_agent_c_input = read_json("evidence/benchmark/sealed-run-072-agent-c-incident-comparison-input-wave-04.json")
+incident_agent_c = read_json("evidence/benchmark/raw-run-072-agent-c-incident-current-comparison-wave-04.json")
+incident_agent_d_input = read_json("evidence/benchmark/sealed-run-072-agent-d-incident-adjudication-input-wave-04.json")
+incident_agent_d = read_json("evidence/benchmark/raw-run-072-agent-d-incident-adjudication-wave-04.json")
 assert sha256_file("evidence/source/current-canonical-feature-identity-wave-01.json") == "f4feae2598622afe346b1163fed2bb842305a8d973a89ec890c02746d99b5999"
 assert sha256_file("evidence/source/current-canonical-identity-agent-register.json") == "21ebd8b004b5ade11aa01281958cda2be2ca966d1fb7c46576e039fab5f47baf"
 assert sha256_file("03-feature-to-benchmark-matrix.csv") == "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
@@ -79,6 +94,23 @@ assert sha256_file("evidence/browser/raw-run-059b-independent-unknown-build-brow
 assert sha256_file("generators/integrate-deployed-selected-feature-observation-wave-03.py") == "ca190ab113ab5a18e31fe0f533f2ae536410d0663932bd615be384b5ae0c87e3"
 assert sha256_file("evidence/browser/current-deployed-selected-feature-observation-wave-03.json") == "e9c95d695212875a756e704ec0754b0d6998476f9e34d6dce166f8e520027fc3"
 assert sha256_file("evidence/browser/raw-run-060r-s-independent-browser-normalization-adjudication-wave-03.json") == "32c3aa6deb03e4da94c2dc09b9662fd0f33bea775a9d8e2a93ae4fa6fda49e16"
+assert sha256_file("evidence/source/raw-run-071a-completion-gate-accounting-wave-04.json") == "6f481a03a2ebba8fcfeaef15735b37d3137a14bd90977db8f8c566ed0ff9fa7d"
+assert sha256_file("evidence/benchmark/raw-run-071b-downstream-mapping-readiness-wave-04.json") == "e737cd336f12e32c4cb0304a8da3b5746dcebf93875ebb9b3376f380f5002832"
+assert sha256_file("evidence/browser/raw-run-071c-usability-visual-gap-selector-wave-04.json") == "4579ecef6607ca2ddb74af4c54085f04f7d132ee216cd7910b39bf8379e434dc"
+assert sha256_file("evidence/browser/root-run-072-authentication-blocked-frontline-slice-wave-04.json") == "1bbba21a0f700ee490042dba30dc1234b99952d217e3471d199813b5766d0731"
+assert sha256_file("evidence/source/raw-run-072-usability-materialization-contract-wave-01.json") == "dd55a43c25f0300947b48146887869c69652fe61ae0c8a1cf823b810e312b8aa"
+assert sha256_file("generators/materialize-source-bound-usability-wave-01.py") == "b73e2f85b5571f3bc74fb6cf00d4d2c8c04246fcdcd258388c2b965be2334483"
+assert sha256_file("04-workflow-usability-scorecard.csv") == "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa"
+assert sha256_file("evidence/source/current-usability-task-script-materialization-wave-01.json") == "ad0747f9128b2e92da31c1cff5b1acc5de0a6e1687b2879cf9ddc63b74ba68f7"
+assert sha256_file("evidence/source/raw-run-072-usability-independent-review-wave-01.json") == "d3af5436e4170a67396a3cb6c919d8b970775a2811a7328685931cbe7dbd5854"
+assert sha256_file("evidence/source/raw-run-072-current-source-route-page-ownership-slice-wave-04.json") == "ce1e69b31b331bcbabd7ce583be4f6ca1d936b597854823ec9620cd722d5ecf9"
+assert sha256_file("evidence/benchmark/raw-run-072-agent-a-incident-observed-behavior-wave-04.json") == "c8b513225613053253207d457a0556e9888510950ec53534d8d23c85ec51e8b1"
+assert sha256_file("evidence/benchmark/sealed-run-072-agent-b-input-wave-04.json") == "9036d2e1faf9c53b727665cdfa23e3c79ef736249550768806830b7b4999b4b5"
+assert sha256_file("evidence/benchmark/raw-run-072-agent-b-neutral-incident-requirements-wave-04.json") == "425f9c38320e37915e5ceff33a4f65b8d96b8183cb6e2b70955e07b1145e8c97"
+assert sha256_file("evidence/benchmark/sealed-run-072-agent-c-incident-comparison-input-wave-04.json") == "8090a913c2ddda885d4175bb44fb8c49b8bb997af4bd97b97e4bb124990371e3"
+assert sha256_file("evidence/benchmark/raw-run-072-agent-c-incident-current-comparison-wave-04.json") == "948da9127b609ea3737a9eeeaa90c5e5c2e053dff9e6a2845cc4633363dee4eb"
+assert sha256_file("evidence/benchmark/sealed-run-072-agent-d-incident-adjudication-input-wave-04.json") == "6e53ebdadf67af0ff68152c6c488740a80422cf9e2222acce4d518cc2e53e8c8"
+assert sha256_file("evidence/benchmark/raw-run-072-agent-d-incident-adjudication-wave-04.json") == "e70433e5130a7ffb914a3f96c86f943511489d757452a2b83c0a2f7f7530fb6d"
 
 candidates = wave1["candidates"] + wave2["candidates"] + wave3["candidates"]
 candidate_ids = [row["candidate_id"] for row in candidates]
@@ -657,6 +689,152 @@ formal_evidence_links += (
     f'{html.escape(formal_upstream["run_id"])} formal-upstream agent register</a> '
     f'<code>{formal_agents_sha256}</code></li>'
 )
+run_071_072_evidence = [
+    ("RUN-071A completion-gate accounting", "evidence/source/raw-run-071a-completion-gate-accounting-wave-04.json"),
+    ("RUN-071B downstream mapping readiness", "evidence/benchmark/raw-run-071b-downstream-mapping-readiness-wave-04.json"),
+    ("RUN-071C usability and visual gap selection", "evidence/browser/raw-run-071c-usability-visual-gap-selector-wave-04.json"),
+    ("RUN-072 usability materialization contract", "evidence/source/raw-run-072-usability-materialization-contract-wave-01.json"),
+    ("RUN-072 deterministic usability materializer", "generators/materialize-source-bound-usability-wave-01.py"),
+    ("RUN-072 300-row usability scorecard", "04-workflow-usability-scorecard.csv"),
+    ("RUN-072 usability materialization evidence", "evidence/source/current-usability-task-script-materialization-wave-01.json"),
+    ("RUN-072 independent materialization review", "evidence/source/raw-run-072-usability-independent-review-wave-01.json"),
+    ("RUN-072 three-target route/page slice", "evidence/source/raw-run-072-current-source-route-page-ownership-slice-wave-04.json"),
+    ("RUN-072 expired-auth browser blocker", "evidence/browser/root-run-072-authentication-blocked-frontline-slice-wave-04.json"),
+    ("RUN-072 incident Agent A observations", "evidence/benchmark/raw-run-072-agent-a-incident-observed-behavior-wave-04.json"),
+    ("RUN-072 sealed Agent B input", "evidence/benchmark/sealed-run-072-agent-b-input-wave-04.json"),
+    ("RUN-072 incident Agent B neutral requirements", "evidence/benchmark/raw-run-072-agent-b-neutral-incident-requirements-wave-04.json"),
+    ("RUN-072 sealed Agent C input", "evidence/benchmark/sealed-run-072-agent-c-incident-comparison-input-wave-04.json"),
+    ("RUN-072 incident Agent C comparison", "evidence/benchmark/raw-run-072-agent-c-incident-current-comparison-wave-04.json"),
+    ("RUN-072 sealed Agent D input", "evidence/benchmark/sealed-run-072-agent-d-incident-adjudication-input-wave-04.json"),
+    ("RUN-072 incident Agent D adjudication", "evidence/benchmark/raw-run-072-agent-d-incident-adjudication-wave-04.json"),
+]
+checkpoint_evidence_links = "".join(
+    f'<li><a href="{html.escape(path, quote=True)}">{html.escape(label)}</a> '
+    f'<code>{sha256_file(path)}</code></li>'
+    for label, path in run_071_072_evidence
+)
+checkpoint_evidence_links += (
+    '<li><a href="task-scripts/">RUN-072 task-script directory (300 files)</a> '
+    f'<code>{html.escape(usability_materialization["outputs"]["task_scripts"]["bundle_sha256"])}</code></li>'
+)
+start_ready_ids = "<br>".join(
+    html.escape(row["feature_id"])
+    for row in downstream_readiness["start_ready_targets"]
+)
+assert completion_accounting["run_id"] == "RUN-071A"
+assert len(completion_accounting["completion_gates"]) == 26
+assert [row["gate"] for row in completion_accounting["completion_gates"]] == list(range(1, 27))
+assert len({row["name"] for row in completion_accounting["completion_gates"]}) == 26
+assert completion_accounting["completion_gates"][5]["status"] == "ZERO"
+assert completion_accounting["completion_gates"][25]["status"] == "OPEN_UNTIL_FINALIZATION"
+assert completion_accounting["required_artifact_snapshot"]["present"] == 9
+assert completion_accounting["required_artifact_snapshot"]["required"] == 18
+assert downstream_readiness["counts"]["accepted_projects"] == 9
+assert downstream_readiness["counts"]["accepted_facets"] == 12
+assert downstream_readiness["counts"]["start_ready_targets"] == 3
+assert downstream_readiness["counts"]["mapping_ready_targets"] == 0
+assert downstream_readiness["counts"]["credit_ready_targets"] == 0
+assert {
+    row["feature_id"] for row in downstream_readiness["start_ready_targets"]
+} == {
+    "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+    "CAP-FIN-ALLOCATION-MATCH-HISTORY",
+    "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+}
+assert downstream_readiness["counts"]["formal_target_edges"] == 0
+assert downstream_readiness["counts"]["final_no_matches"] == 0
+assert downstream_readiness["counts"]["ncm"] == 0
+assert usability_gap_selector["usability_counts"]["human_targets"] == 300
+assert usability_gap_selector["usability_counts"]["current_task_scripts"] == 0
+assert usability_contract["run_id"] == "RUN-072-USABILITY-CONTRACT"
+assert frontline_auth_block["counts"]["selected_routes"] == 3
+assert frontline_auth_block["status"] == "AUTHENTICATION_EXPIRED_ZERO_ROUTE_CELLS_ZERO_CREDIT"
+assert frontline_auth_block["selected_routes"] == ["/my-day", "/attendance", "/operations/timesheets"]
+assert frontline_auth_block["counts"]["routes_attempted_before_fail_closed"] == 1
+assert frontline_auth_block["counts"]["authenticated_routes"] == 0
+assert frontline_auth_block["counts"]["completed_base_route_viewport_cells"] == 0
+assert frontline_auth_block["counts"]["completed_pre_submit_state_cells"] == 0
+assert frontline_auth_block["counts"]["screenshots"] == 0
+assert frontline_auth_block["counts"]["forms_submitted"] == 0
+assert frontline_auth_block["counts"]["records_changed"] == 0
+assert frontline_auth_block["counts"]["meaningful_mutations"] == 0
+assert frontline_auth_block["counts"]["credentials_entered"] == 0
+assert len(frontline_auth_block["attempts"]) == 2
+assert all(row["final_path"] == "/login" for row in frontline_auth_block["attempts"])
+assert all(row["access_outcome"] == "AUTHENTICATION_REQUIRED" for row in frontline_auth_block["attempts"])
+assert {
+    frontline_auth_block["deployed_build_identity"],
+    frontline_auth_block["environment_identity"],
+    frontline_auth_block["actor_role_identity"],
+    frontline_auth_block["site_scope_identity"],
+    frontline_auth_block["fixture_safety_identity"],
+} == {"UNKNOWN"}
+assert all(value == 0 for value in frontline_auth_block["credit_boundary"].values())
+assert usability_materialization["counts"]["H_features"] == 300
+assert usability_materialization["counts"]["scorecard_columns"] == 78
+assert usability_materialization["counts"]["scorecard_rows"] == 300
+assert usability_materialization["counts"]["task_script_files"] == 300
+assert usability_materialization["counts"]["validated_task_scripts"] == 0
+assert usability_materialization["counts"]["representative_role_tasks_executed"] == 0
+assert usability_materialization["counts"]["current_ease_scores_measured"] == 0
+assert usability_materialization["counts"]["target_ease_scores_measured"] == 0
+assert usability_materialization["counts"]["independent_reviews_completed"] == 0
+assert all(
+    usability_materialization["sentinels"][key] == "NOT_MEASURED"
+    for key in (
+        "current_dimension_scores",
+        "target_dimension_scores",
+        "friction_measurements",
+        "task_success",
+    )
+)
+assert usability_materialization["completion_gate"]["ease_credit"] == 0
+assert usability_materialization["completion_gate"]["completion_credit"] == 0
+assert usability_review["status"] == "GO_AFTER_BOUNDED_INPUT_PIN_CORRECTION_ZERO_EASE_OR_COMPLETION_CREDIT"
+assert usability_review["correction_review"]["residual_defects"] == 0
+assert route_page_slice["counts"]["targets"] == 3
+assert route_page_slice["counts"]["primary_routes"] == 16
+assert route_page_slice["counts"]["runtime_routes_executed"] == 0
+assert route_page_slice["counts"]["browser_routes_completed"] == 0
+assert route_page_slice["counts"]["target_edges_awarded"] == 0
+assert route_page_slice["counts"]["completion_credit_awarded"] == 0
+assert {row["feature_id"] for row in route_page_slice["targets"]} == {
+    "CAP-DAY-MY-DAY-WORKSPACE",
+    "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+    "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+}
+assert incident_agent_a["counts"]["packets"] == 2
+assert incident_agent_a["counts"]["observations"] == 48
+assert incident_agent_b_input["run_id"] == "RUN-072-B-INPUT"
+assert incident_agent_b["counts"]["requirements"] == {
+    "MUST": 14, "SHOULD": 0, "NOT_ESTABLISHED": 25, "total": 39,
+}
+assert incident_agent_c_input["run_id"] == "RUN-072-C-INPUT"
+assert len(incident_agent_c["comparisons"]) == 39
+assert incident_agent_c["counts"]["outcomes"] == {
+    "MET": 5, "PARTIAL": 3, "GAP": 0, "CONTRADICTED": 0, "NOT_COMPARABLE": 31,
+}
+assert incident_agent_d_input["counts"]["agent_c_comparisons"] == 39
+assert incident_agent_d_input["counts"]["credit_awards_before_adjudication"] == 0
+assert incident_agent_d["comparison_verification"]["rows_reviewed"] == 39
+assert incident_agent_d["comparison_verification"]["corrections"] == []
+assert incident_agent_d["status"] == "COMPLETE_ZERO_CREDIT"
+assert incident_agent_d["input_verification"]["sha256"] == sha256_file(
+    "evidence/benchmark/sealed-run-072-agent-d-incident-adjudication-input-wave-04.json"
+)
+assert incident_agent_d["adjudication"]["review_facet"]["disposition"] == "NO_GO"
+assert incident_agent_d["adjudication"]["closure_facet"]["disposition"] == "NO_GO"
+assert incident_agent_d["adjudication"]["combined_target"]["disposition"] == "NO_GO"
+assert all(value is False for value in incident_agent_d["canonical_changes"].values())
+assert incident_agent_d["credit"]["final_no_match"] is False
+assert incident_agent_d["credit"]["final_no_match_reason"] == (
+    "The sealed comparison was not an exhaustive target-specific search."
+)
+assert not any(
+    value is True
+    for key, value in incident_agent_d["credit"].items()
+    if key != "final_no_match_reason"
+)
 assert visual_matrix["matrix"]["rows"] == 2812
 assert visual_matrix["credit_boundary"]["browser"] == 0
 
@@ -664,6 +842,40 @@ module_labels = sorted({row["module"] for row in targets})
 assert len(module_labels) == 29
 findings = wave1["provisional_findings"] + wave2["provisional_findings"]
 assert len(findings) == 12
+
+required_artifacts = [
+    "00-executive-summary.md", "01-repository-module-map.md",
+    "02-eight-pass-coverage-ledger.csv", "03-feature-to-benchmark-matrix.csv",
+    "04-workflow-usability-scorecard.csv", "05-browser-visual-coverage-matrix.csv",
+    "06-open-source-benchmark-register.csv", "07-module-findings.md",
+    "08-cross-module-journeys.md", "09-ui-ux-accessibility-visual-consistency.md",
+    "10-architecture-data-integration-security.md", "11-prioritised-roadmap.md",
+    "12-native-build-and-do-not-copy-register.md",
+    "13-unresolved-questions-and-evidence-gaps.md", "audit-dashboard.html",
+    "findings.json", "inventory.json", "task-scripts",
+]
+generated_artifact = "audit-dashboard.html"
+required_present = [
+    path
+    for path in required_artifacts
+    if path == generated_artifact or (AUDIT_DIR / path).exists()
+]
+required_missing = [
+    path
+    for path in required_artifacts
+    if path != generated_artifact and not (AUDIT_DIR / path).exists()
+]
+assert len(required_artifacts) == 18
+assert len(required_present) == 11
+assert set(required_missing) == {
+    "07-module-findings.md",
+    "08-cross-module-journeys.md",
+    "09-ui-ux-accessibility-visual-consistency.md",
+    "10-architecture-data-integration-security.md",
+    "11-prioritised-roadmap.md",
+    "12-native-build-and-do-not-copy-register.md",
+    "findings.json",
+}
 
 finding_rows = "".join(
     "<tr><td class=\"mono\">{}</td><td>{}</td><td class=\"partial\">independent review pending</td></tr>".format(
@@ -702,29 +914,47 @@ TEMPLATE = Template(r"""<!doctype html>
 </head>
 <body>
   <header><div class="eyebrow">Oblivion Findings · comprehensive audit restart</div><div class="hero"><div><h1>Fresh current-source audit</h1><p>Evidence is pinned to application commit <span class="mono">$application_short</span>. Historical percentages remain provenance only.</p></div><div class="badge">IN PROGRESS · NOT COMPREHENSIVE</div></div></header>
-  <nav aria-label="Audit sections"><div><a href="#progress">Progress</a><a href="#pages">Pages</a><a href="#static-census">Static census</a><a href="#runtime">Runtime gates</a><a href="#benchmarks">Benchmarks</a><a href="#modules">Modules</a><a href="#findings">Provisional findings</a><a href="#gaps">Gaps</a></div></nav>
+  <nav aria-label="Audit sections"><div><a href="#progress">Progress</a><a href="#checkpoint">RUN-072</a><a href="#pages">Pages</a><a href="#static-census">Static census</a><a href="#runtime">Runtime gates</a><a href="#benchmarks">Benchmarks</a><a href="#modules">Modules</a><a href="#findings">Provisional findings</a><a href="#gaps">Gaps</a></div></nav>
   <main>
     <div class="notice" role="status"><strong>No completion claim:</strong> RUN-030 freezes 340 current-source static canonical targets (300 H · 40 D · 0 M). RUN-034–038 retain 88 complete observer-only and 7 partial project records without formal triage credit. RUN-039–046 approve 0 formal edges for the first six-target overlay. RUN-047–052 remain an immutable historical diagnostic checkpoint with a missing clean Agent A-to-B handoff. RUN-053–057 reconstruct that handoff through 24 selected facet packets (8 exact · 4 partial-adjacent · 12 insufficient-adjacent), 252 blind atoms (165 consumed · 87 retained unknown), 144 fresh-C lens ratings, and 226 fresh-D reviews. D accepts 225 reviews and makes one bounded correction to AO-A53-024-01; it creates 0 formal edges and 0 final no-matches. RUN-058-BROWSER–060 preserve a read-only signed-in observation of $unknown_build_routes selected routes, $unknown_build_cells route/viewport cells, and $unknown_build_overlays overlay families on an unattributed deployed build; $unknown_build_candidates provisional candidates remain unknown-build only. Formal upstream RUN-058A–070 preserves $formal_attempts initial project records across $formal_targets selected targets and $formal_subrecords initial facet/aspect records; independent controls accept $formal_accepted formal project records and $formal_facets bounded facet records, while all target edges and final no-matches remain zero. The canonical matrix remains byte-identical at 0/340, and current-source runtime, browser, rendered visual, executed-test, benchmark, ease, release, Pass, and audit-completion credit remain zero.</div>
+    <div class="notice" role="status"><strong>RUN-071–072 current checkpoint:</strong> all 26 completion gates are reconciled; the RUN-071 9/18 figure is a historical pre-materialization snapshot and the current generated state is 11/18. RUN-072 materializes 300/300 source-bound H contracts with 0 validated tasks and every current/target measurement retained as <span class="mono">NOT_MEASURED</span>; the sentinel is not numeric zero. The three-target route/page slice is static only, the expired-auth attempt produced 0 authenticated cells, and the incident Agent A/B/C/D chain ended in candidate-edge NO-GO with zero mapping, final-no-match, NCM, or downstream credit.</div>
     <section id="progress" class="cards" aria-label="Current audit progress">
       <div class="card"><strong>8,454</strong><span>tracked source paths</span><small>committed-tree census</small></div><div class="card"><strong>$route_calls</strong><span>static route callsites</span><small>not runtime routes</small></div><div class="card"><strong>$page_root_count</strong><span>static Inertia page roots</span><small>$resolver_count paths partitioned; prompt gate open</small></div><div class="card"><strong>$canonical_count</strong><span>canonical static targets</span><small>$h_count H · $d_count D · $m_count M</small></div>
       <div class="card"><strong>$mapped_sources / $source_count</strong><span>discovery sources mapped</span><small>one bounded source excluded</small></div><div class="card"><strong class="partial">$finding_count</strong><span>provisional P1 claims</span><small>none final</small></div><div class="card"><strong class="zero">0</strong><span>current runtime tests</span><small>vendor absent; setup not run</small></div><div class="card"><strong class="zero">0</strong><span>current-source browser routes</span><small>$unknown_build_routes unknown-build routes observed; attribution unproved</small></div>
     </section>
+    <section id="checkpoint" class="panel">
+      <h2>RUN-071–072 completion-gate checkpoint</h2>
+      <p>The 26 literal completion gates were reconciled before RUN-072 materialized the missing source-bound usability structure and completed one static clean-specification incident A→B→C→D chain. Static artifacts are not measured task, runtime, browser, mapping, Pass, or completion evidence.</p>
+      <div class="table-wrap"><table><thead><tr><th>Gate slice</th><th>Current denominator</th><th>Evidence boundary</th></tr></thead><tbody>
+        <tr><td>Required deliverables present</td><td><strong>$required_present / 18</strong></td><td class="partial">$required_missing remain absent</td></tr>
+        <tr><td>H-feature task contracts</td><td><strong>$task_contracts / 300</strong></td><td class="partial">source-bound only · $validated_tasks representative-role validations · all 3,000 current and 3,000 target cells are <span class="mono">NOT_MEASURED</span> sentinels, not numeric zero · 0 independent ease reviews/credit</td></tr>
+        <tr><td>Materialization review</td><td><strong>GO after bounded correction</strong></td><td class="partial">independent materialization review after governing-prompt and root-instruction input pins were added; 0 representative-role validation</td></tr>
+        <tr><td>Three-target route/page ownership slice</td><td><strong>$route_slice_targets targets · $route_slice_routes primary routes</strong></td><td class="partial">static source only · 0 framework route executions</td></tr>
+        <tr><td>Current-build frontline browser slice</td><td><strong class="zero">0 / 3 authenticated routes</strong></td><td class="zero">only <span class="mono">/my-day</span> attempted; both contexts ended at <span class="mono">/login</span>; no credentials, mutations, screenshots, base cells, or pre-submit cells</td></tr>
+        <tr><td>Incident clean chain</td><td><strong>2 packets · 48 observations · 39 requirements</strong></td><td class="partial">5 MET · 3 PARTIAL · 31 NOT_COMPARABLE; review, closure, and combined target all NO-GO for this candidate edge only</td></tr>
+        <tr><td>Canonical matrix/register changes</td><td><strong class="zero">0</strong></td><td class="zero">0 target edges · 0 final no-matches · 0 NCM · unchanged 0 / 340</td></tr>
+      </tbody></table></div>
+      <ul class="list">$checkpoint_evidence_links</ul>
+    </section>
     <section id="pages" class="panel"><h2>Current static Inertia page partition</h2><p>RUN-010 partitioned every resolver TSX path for render/import identity. The 711-file denominator is committed-source evidence only; final prompt classification remains open.</p><div class="table-wrap"><table><thead><tr><th>Partition</th><th>Count</th><th>Current static identity</th></tr></thead><tbody><tr><td>Existing literal backend render roots</td><td>$page_root_count</td><td class="partial">static file-backed page roots</td></tr><tr><td>Unrendered but imported</td><td>$support_count</td><td class="partial">support/components, not page roots</td></tr><tr><td>Unrendered/unimported aliases or legacy</td><td>$legacy_count</td><td class="partial">10 Redirect/legacy + 10 Duplicate</td></tr><tr><td>Unrendered/unimported dead or demo</td><td>$dead_demo_count</td><td class="partial">3 Dead/unreachable + 2 Out of product scope</td></tr><tr><td>Missing backend render literals</td><td>$missing_target_count</td><td class="zero">retired/unrouted liabilities; zero page credit</td></tr><tr><td><strong>Resolver TSX partitioned</strong></td><td><strong>$resolver_count</strong></td><td class="partial">963/963 static render/import identity; prompt gate open</td></tr></tbody></table></div></section>
-    <div class="split"><section class="panel"><h2>Evidence waves represented</h2><p>RUN-001 through RUN-070 are represented by audit artifacts; none grants current-source application runtime, browser, executed-test, benchmark-mapping, or completion credit.</p><ul class="list"><li>RUN-001–016: census, discovery, page/static visual, and benchmark-metadata foundations</li><li>RUN-017–022: frontline/platform identity adjudication and blocked-owner reconciliation</li><li>RUN-023–025: cross-scope and remaining-owner arbitration</li><li>RUN-026–030: report/medical ownership, denominator integration, red team, and frozen 340-target identity</li><li>RUN-031–038: complete observer-only project materialization and blocker review; 88 complete observer-only · 7 partial</li><li>RUN-039–046: first six-target comparison overlay; 6 NO-GO · 0 formal edges · unchanged 0/340</li><li>RUN-047–052: historical 24-packet diagnostic checkpoint; mechanically complete but missing the clean Agent A-to-B derivation</li><li>RUN-053–054: identity-stripped Agent A packets, 252-atom crosswalk, fresh Agent B neutralization, and provenance-only correction</li><li>RUN-055: sealed fresh Agent C comparison; 24 rows · 144 lenses · 24 units · 58 outcomes · 85 unknowns preserved</li><li>RUN-056: sealed fresh Agent D adjudication; 226 reviews · 225 accepted · 1 bounded correction · 0 rejected</li><li>RUN-057: deterministic corrected-chain integration; 0 formal edges · 0 final no-matches · unchanged 0/340</li><li>RUN-058-BROWSER–060: $unknown_build_routes routes · $unknown_build_viewports viewports · $unknown_build_cells cells · $unknown_build_overlays overlays · $unknown_build_candidates provisional candidates · 0 current-source credit</li><li>RUN-058A–070 formal upstream: $formal_attempts project records · $formal_prompt_repos prompt repositories · $formal_historical historical extra · $formal_targets targets · $formal_subrecords initial facet/aspect records · $formal_accepted project records accepted · $formal_facets facet records accepted</li></ul></section><section class="panel"><h2>Execution credit</h2><p>Static, observer, source-comparison, formal-upstream triage records, and unknown-build deployed observations are not attributable current-source runtime evidence.</p><ul class="list"><li><span class="zero">0</span> framework route executions</li><li><span class="zero">0</span> current application tests</li><li><span class="zero">0</span> rendered current-build visual instances</li><li><span class="zero">0</span> current-build application browser routes</li><li><span class="zero">0</span> benchmark mappings promoted</li><li><span class="zero">0</span> completed Pass 1–8 modules</li></ul></section></div>
+    <div class="split"><section class="panel"><h2>Evidence waves represented</h2><p>RUN-001 through RUN-072 are represented by audit artifacts; none grants current-source application runtime, browser, executed-test, benchmark-mapping, or completion credit.</p><ul class="list"><li>RUN-001–016: census, discovery, page/static visual, and benchmark-metadata foundations</li><li>RUN-017–022: frontline/platform identity adjudication and blocked-owner reconciliation</li><li>RUN-023–025: cross-scope and remaining-owner arbitration</li><li>RUN-026–030: report/medical ownership, denominator integration, red team, and frozen 340-target identity</li><li>RUN-031–038: complete observer-only project materialization and blocker review; 88 complete observer-only · 7 partial</li><li>RUN-039–046: first six-target comparison overlay; 6 NO-GO · 0 formal edges · unchanged 0/340</li><li>RUN-047–052: historical 24-packet diagnostic checkpoint; mechanically complete but missing the clean Agent A-to-B derivation</li><li>RUN-053–054: identity-stripped Agent A packets, 252-atom crosswalk, fresh Agent B neutralization, and provenance-only correction</li><li>RUN-055: sealed fresh Agent C comparison; 24 rows · 144 lenses · 24 units · 58 outcomes · 85 unknowns preserved</li><li>RUN-056: sealed fresh Agent D adjudication; 226 reviews · 225 accepted · 1 bounded correction · 0 rejected</li><li>RUN-057: deterministic corrected-chain integration; 0 formal edges · 0 final no-matches · unchanged 0/340</li><li>RUN-058-BROWSER–060: $unknown_build_routes routes · $unknown_build_viewports viewports · $unknown_build_cells cells · $unknown_build_overlays overlays · $unknown_build_candidates provisional candidates · 0 current-source credit</li><li>RUN-058A–070 formal upstream: $formal_attempts project records · $formal_prompt_repos prompt repositories · $formal_historical historical extra · $formal_targets targets · $formal_subrecords initial facet/aspect records · $formal_accepted project records accepted · $formal_facets facet records accepted</li><li>RUN-071: 26 literal completion gates and downstream/usability/visual readiness reconciled; historical pre-materialization snapshot 9/18 required deliverables</li><li>RUN-072: current 11/18 deliverables · 300/300 source-bound H contracts · 0 validated tasks · all current/target scores <span class="mono">NOT_MEASURED</span> · 3-target static slice · expired-auth 0 cells · completed incident A/B/C/D candidate chain with Agent D NO-GO and zero edge/final-no-match/NCM credit</li></ul></section><section class="panel"><h2>Execution credit</h2><p>Static, observer, source-comparison, formal-upstream triage records, and unknown-build deployed observations are not attributable current-source runtime evidence.</p><ul class="list"><li><span class="zero">0</span> framework route executions</li><li><span class="zero">0</span> current application tests</li><li><span class="zero">0</span> rendered current-build visual instances</li><li><span class="zero">0</span> current-build application browser routes</li><li><span class="zero">0</span> benchmark mappings promoted</li><li><span class="zero">0</span> completed Pass 1–8 modules</li></ul></section></div>
     <section id="static-census" class="panel"><h2>Expanded static coverage wave</h2><p>RUN-030 freezes canonical static identity; rendered coverage, schema truth, runtime, benchmark, ease, release, and completion gates remain open.</p><div class="table-wrap"><table><thead><tr><th>Static universe</th><th>Denominator</th><th>Current boundary</th></tr></thead><tbody><tr><td>Discovery sources / Layer-A edges</td><td>$mapped_sources of $source_count / $layer_a_edges</td><td class="partial">one bounded source excluded; $layer_a_targets Layer-A targets</td></tr><tr><td>Canonical targets</td><td>$canonical_count / $h_count H · $d_count D · $m_count M</td><td class="partial">static identity frozen; no downstream credit</td></tr><tr><td>Missing route / page / both anchors</td><td>$route_gap_count / $page_gap_count / $both_gap_count</td><td class="partial">static anchor completion remains open</td></tr><tr><td>Route source files / callsites</td><td>$route_file_count / $route_calls</td><td class="partial">all files classified; no framework expansion</td></tr><tr><td>Named navigation/tab source files</td><td>$nav_file_count</td><td class="partial">definitions, not runtime-visible links</td></tr><tr><td>Hero definitions / instances</td><td>$hero_definitions / $hero_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Overlay definitions / instances</td><td>$overlay_definitions / $overlay_instances</td><td class="partial">static AST; 0 rendered</td></tr><tr><td>Declarative / direct / named triggers</td><td>$declarative_triggers / $direct_triggers / $named_triggers</td><td class="partial">row-level static locators; 0 interactions</td></tr><tr><td>Required visual matrix rows</td><td>$visual_matrix_rows</td><td class="partial">49 columns complete; every row browser-blocked</td></tr><tr><td>Models / policies / service entries</td><td>$models / $policies / $services</td><td class="partial">directory/declaration census, not ownership completion</td></tr><tr><td>Jobs / events / listeners</td><td>$jobs / $events / $listeners</td><td class="partial">static owners, no queue execution</td></tr><tr><td>Migrations / lexical PHP test cases</td><td>$migrations / $php_test_cases</td><td class="partial">history and locators; 0 database/test execution</td></tr></tbody></table></div></section>
-    <section id="runtime" class="panel"><h2>Runtime and deployed-build identity gates</h2><p>These checks record whether execution is safe and attributable. None grants current-source application execution credit.</p><div class="table-wrap"><table><thead><tr><th>Gate</th><th>Observed fact</th><th>Result</th></tr></thead><tbody><tr><td>Local PHP/runtime</td><td>PHP $php_version; test-oriented settings; <span class="mono">vendor/autoload.php</span> absent</td><td class="zero">Laravel not booted; 0 runtime tests</td></tr><tr><td>Repository setup</td><td>Combined setup includes dependencies, forced migration, frontend build, and device configuration</td><td class="zero">State-changing setup not run</td></tr><tr><td>Signed-in deployment</td><td>Inertia component <span class="mono">$deployed_component</span> and deployed assets recorded read-only</td><td class="zero">No authoritative commit/tree marker</td></tr><tr><td>Selected unknown-build sample</td><td>$unknown_build_routes routes across $unknown_build_viewports prompt viewports · $unknown_build_cells cells · $unknown_build_overlays pre-submit overlays · $unknown_build_candidates provisional candidates</td><td class="zero">Accepted as unknown-build observation only; 0 current-source credit</td></tr><tr><td>Local build manifest</td><td>Present locally but not tracked at the application source pin</td><td class="zero">Cannot identify the deployed build</td></tr></tbody></table></div></section>
+    <section id="runtime" class="panel"><h2>Runtime and deployed-build identity gates</h2><p>These checks record whether execution is safe and attributable. None grants current-source application execution credit.</p><div class="table-wrap"><table><thead><tr><th>Gate</th><th>Observed fact</th><th>Result</th></tr></thead><tbody><tr><td>Local PHP/runtime</td><td>PHP $php_version; test-oriented settings; <span class="mono">vendor/autoload.php</span> absent</td><td class="zero">Laravel not booted; 0 runtime tests</td></tr><tr><td>Repository setup</td><td>Combined setup includes dependencies, forced migration, frontend build, and device configuration</td><td class="zero">State-changing setup not run</td></tr><tr><td>Signed-in deployment</td><td>Inertia component <span class="mono">$deployed_component</span> and deployed assets recorded read-only</td><td class="zero">No authoritative commit/tree marker</td></tr><tr><td>Selected unknown-build sample</td><td>$unknown_build_routes routes across $unknown_build_viewports prompt viewports · $unknown_build_cells cells · $unknown_build_overlays pre-submit overlays · $unknown_build_candidates provisional candidates</td><td class="zero">Accepted as unknown-build observation only; 0 current-source credit</td></tr><tr><td>RUN-072 expired-auth attempt</td><td>3 routes selected; only <span class="mono">/my-day</span> attempted; both contexts ended at <span class="mono">/login</span>; 0 authenticated/base/pre-submit cells, credentials, mutations, or screenshots</td><td class="zero">Build, environment, role, Site, and fixture identities all UNKNOWN; fail-closed with zero credit</td></tr><tr><td>Local build manifest</td><td>Present locally but not tracked at the application source pin</td><td class="zero">Cannot identify the deployed build</td></tr></tbody></table></div></section>
     <section id="benchmarks" class="panel"><h2>Current benchmark wave</h2><p>The prompt denominator remains 98 URL occurrences / 95 unique repositories. RUN-047–052 are preserved as a historical defective checkpoint. RUN-053–057 supply a corrected diagnostic clean-spec chain for 24 selected packets. RUN-058A–070 preserves $formal_attempts initial upstream project records across the same six selected targets. Independent exact-hash FTC review accepts $formal_accepted bounded project records across incident and HR/finance plus $formal_facets bounded HR/finance facet records; medication/clinical remains NO-GO. Formal project/facet-record acceptance is not project or facet selection, a target mapping, or an exhaustive final no-match. All 340 target mappings or final no-matches remain open.</p><div class="table-wrap"><table><thead><tr><th>Evidence slice</th><th>Count</th><th>Current credit</th></tr></thead><tbody><tr><td>Prompt-listed URL occurrences</td><td>$prompt_occurrences</td><td class="partial">$prompt_unique unique repositories; three repeated</td></tr><tr><td>Physical carry-forward register rows</td><td>$register_physical</td><td class="partial">95 exact prompt repos + $extra_rows historical extras</td></tr><tr><td>Official GitHub metadata prerequisite</td><td>$metadata_unique / $prompt_unique</td><td class="partial">$metadata_occurrences / $prompt_occurrences weighted entries; metadata only</td></tr><tr><td>Observer project triage</td><td>$triage_observer_unique / $prompt_unique</td><td class="partial">$triage_observer_occurrences / $prompt_occurrences weighted entries; $triage_complete complete observer-only · $triage_partial partial</td></tr><tr><td>Partial-record review</td><td>$partial_reviewed / 16</td><td class="partial">$partial_resolved resolved observer-only · $partial_retained retained partial; zero downstream credit</td></tr><tr><td>Formal full project triage</td><td>$formal_accepted / $prompt_unique</td><td class="partial">$formal_accepted_weight / $prompt_occurrences weighted entries; project records only</td></tr><tr><td>Formal upstream wave-03 attempts</td><td>$formal_attempts unique records</td><td class="partial">$formal_prompt_repos prompt repositories · $formal_historical historical extra · occurrence weight $formal_weight</td></tr><tr><td>Independently accepted formal records</td><td>$formal_accepted / $formal_attempts</td><td class="partial">$formal_targets targets inspected · $formal_subrecords initial facet/aspect records · $formal_facets bounded facet records accepted · 0 edges · 0 final no-matches</td></tr><tr><td>First six-target overlay</td><td>$target_wave_targets / $canonical_count</td><td class="partial">$target_candidate_packets candidate locators · $target_no_candidate_packets bounded no-candidate; overlay only</td></tr><tr><td>Historical RUN-047–052 diagnostic</td><td>$facet_wave_facets packets / $facet_wave_features features</td><td class="partial">superseded for corrected comparison; retained as provenance only</td></tr><tr><td>Corrected Agent A packets</td><td>$facet_exact exact / $facet_partial partial / $facet_insufficient insufficient</td><td class="partial">all adjacent packets remain non-promotable</td></tr><tr><td>Corrected Agent B atom lineage</td><td class="partial">$facet_atoms total / $facet_consumed consumed / $facet_unknown_atoms unknown</td><td class="partial">$facet_units units · $facet_outcomes outcomes · zero neutral credit</td></tr><tr><td>Fresh Agent C comparison</td><td>$facet_ratings lenses / $facet_unknowns unknowns</td><td class="partial">same-packet citations only; static comparison credit zero</td></tr><tr><td>Pinned source evidence</td><td>$facet_anchors occurrences / $facet_unique_anchors unique / $facet_anchor_files paths</td><td class="partial">mechanically validated; no mapping credit</td></tr><tr><td>Fresh Agent D adjudication</td><td>$facet_d_reviews reviews / $facet_d_corrections correction</td><td class="partial">24 row lineages pass; AO-A53-024-01 corrected to partial</td></tr><tr><td>Promoted feature mappings or final no-matches</td><td>$promoted_count</td><td class="zero">$facet_edges formal edges · $facet_final_no_matches final no-matches · 0 / 340 credited</td></tr></tbody></table></div></section>
+    <section class="panel"><h2>RUN-071B downstream readiness and RUN-072 incident disposition</h2><p>Three exact target IDs were start-ready for a fresh clean-specification chain; none was mapping-ready or credit-ready. The completed incident chain closes only this candidate edge with Agent D NO-GO. It is not an exhaustive final no-match or NCM.</p><div class="table-wrap"><table><thead><tr><th>Start-ready target IDs</th><th>Readiness</th><th>Current disposition</th></tr></thead><tbody><tr><td class="mono">$start_ready_ids</td><td class="partial">3 start-ready · 0 mapping-ready · 0 credit-ready</td><td class="zero">Incident candidate NO-GO · 0 edges · 0 final no-matches · 0 NCM</td></tr></tbody></table></div></section>
     <section id="modules" class="panel"><h2>Canonical static feature modules</h2><p>$module_count module labels across $canonical_count canonical static targets. Module completion credit remains zero.</p><div class="table-wrap"><table><thead><tr><th>Module label</th><th>H</th><th>D</th><th>M</th><th>Total</th></tr></thead><tbody>$module_rows</tbody></table></div></section>
     <section id="findings" class="panel"><h2>Provisional current-source P1 claims</h2><p>None is a final finding, verified exploit, remediated issue, or closed gate.</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Static concern</th><th>Status</th></tr></thead><tbody>$finding_rows</tbody></table></div></section>
-    <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Framework route reachability and route/page-to-feature mapping</li><li>Static anchor completion: $route_gap_count targets lack route anchors, $page_gap_count lack page anchors, and $both_gap_count lack both</li><li>Complete backend/data/test ownership</li><li>Full current project behaviour/licence/edition triage and one final mapping or documented no-match per frozen feature</li><li>Task scripts and ten ease dimensions per H feature</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Rendered hero, overlay, trigger, and material-state coverage from the completed static matrix</li><li>Build-attributed independent resampling of both unknown-build provisional candidates</li><li>Safe current-build application browser/runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8, final artifact freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
+    <section id="gaps" class="panel"><h2>Literal completion gates still open</h2><div class="split"><ul class="list"><li>Framework route reachability and route/page-to-feature mapping</li><li>Static anchor completion: $route_gap_count targets lack route anchors, $page_gap_count lack page anchors, and $both_gap_count lack both</li><li>Complete backend/data/test ownership</li><li>Full current project behaviour/licence/edition triage and one final mapping or documented no-match per frozen feature</li><li>Representative-role validation of all 300 source-bound contracts plus ten current and ten target dimension measurements per H target: 0 validated · 0 measured · 0 independent ease reviews</li></ul><ul class="list"><li>Eight cross-module journeys at required viewports</li><li>Rendered hero, overlay, trigger, and material-state coverage from the completed static matrix</li><li>Build-attributed independent resampling of both unknown-build provisional candidates</li><li>Safe current-build application browser/runtime lanes</li><li>Every module through Passes 1–8</li><li>Fresh Pass 8, final artifact freeze, reconciliation, and no-live-agent gate</li></ul></div></section>
     <section class="panel"><h2>Formal upstream evidence</h2><p>Every materialized producer, reviewer, correction, provenance, feasibility, checklist, and integration artifact is linked with its sealed SHA-256. Bounded project/facet-record acceptance remains separate from project/facet selection, comparison, mapping, NCM, and completion credit.</p><ul class="list">$formal_evidence_links</ul></section>
-    <section class="panel"><h2>RUN-070 audit-dashboard verification</h2><p>The generated audit dashboard was checked at 1440×900 and 390×844. Page-level horizontal overflow is absent, while the mobile navigation and six data tables retain bounded internal scrolling. This verifies the audit artifact only and grants no application-browser, responsive, visual, workflow, finding, runtime, test, release, Pass, completion, or audit-complete credit.</p><ul class="list"><li><a href="evidence/browser/current-audit-dashboard-verification-formal-upstream-wave-03.json">RUN-070 responsive audit-dashboard verification</a></li></ul></section>
+    <section class="panel"><h2>Prior RUN-070 audit-dashboard verification</h2><p>The RUN-070 responsive verification is superseded for this changed generated HTML. No prior viewport, overflow, navigation, or table proof transfers to the RUN-072 dashboard; fresh verification is required and grants no application-browser or downstream credit.</p><ul class="list"><li><a href="evidence/browser/current-audit-dashboard-verification-formal-upstream-wave-03.json">Superseded RUN-070 responsive audit-dashboard verification</a></li></ul></section>
+    <section class="panel"><h2>Fresh RUN-072 audit-dashboard verification</h2><p>The final generated dashboard is checked at 1440×900 and 390×844. Page-level horizontal overflow is absent, all eight wide-table containers retain bounded internal scrolling at mobile width, the navigation remains locally scrollable, and the browser console has zero warnings or errors. This verifies the audit artifact only and grants no application-browser, responsive, visual, workflow, finding, runtime, test, release, Pass, completion, or audit-complete credit.</p><ul class="list"><li><a href="evidence/browser/current-audit-dashboard-verification-run-072-wave-04.json">RUN-072 responsive audit-dashboard verification</a></li></ul></section>
+    <section class="panel"><h2>RUN-071–072 evidence lineage</h2><p>Every new raw, sealed, generated, reviewed, and adjudicated artifact is linked with its current SHA-256. The task-script directory link carries the deterministic 300-file bundle hash.</p><ul class="list">$checkpoint_evidence_links</ul></section>
     <section class="panel"><h2>Evidence files</h2><ul class="list"><li><a href="00-executive-summary.md">Executive summary</a></li><li><a href="01-repository-module-map.md">Current repository and page map</a></li><li><a href="02-repository-module-map-wave-02.md">Wave 02 module map</a></li><li><a href="02-eight-pass-coverage-ledger.csv">Provisional eight-pass route-file ledger</a></li><li><a href="03-feature-to-benchmark-matrix.csv">340-row canonical static feature matrix</a></li><li><a href="05-browser-visual-coverage-matrix.csv">2,812-row static visual matrix</a></li><li><a href="06-open-source-benchmark-register.csv">Current carry-forward benchmark register</a></li><li><a href="evidence/source/current-canonical-feature-identity-wave-01.json">RUN-030 canonical feature identity</a></li><li><a href="evidence/source/current-canonical-identity-agent-register.json">RUN-030 identity agent register</a></li><li><a href="evidence/source/current-static-semantic-census.json">Initial semantic census JSON</a></li><li><a href="evidence/source/current-route-navigation-gap-wave-01.json">Route/navigation reconciliation</a></li><li><a href="evidence/source/current-visual-static-census-wave-01.json">Visual static census</a></li><li><a href="evidence/source/current-visual-matrix-materialization-wave-01.json">Visual matrix materialization evidence</a></li><li><a href="evidence/source/current-visual-matrix-agent-register.json">Visual matrix agent register</a></li><li><a href="evidence/source/current-backend-data-test-census-wave-01.json">Backend/data/test census</a></li><li><a href="evidence/source/current-static-coverage-agent-register.json">Static coverage agent register</a></li><li><a href="evidence/source/current-page-adjudication-wave-01.json">Page adjudication evidence</a></li><li><a href="evidence/source/current-page-agent-register.json">Page agent register</a></li><li><a href="evidence/source/current-feature-discovery-wave-01.json">Feature wave 01 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-02.json">Feature wave 02 JSON</a></li><li><a href="evidence/source/current-feature-discovery-wave-03.json">Feature wave 03 gap additions</a></li><li><a href="evidence/benchmark/current-benchmark-wave-01.json">Benchmark wave evidence</a></li><li><a href="evidence/benchmark/current-benchmark-agent-register.json">Benchmark agent register</a></li><li><a href="evidence/benchmark/current-benchmark-metadata-agent-register.json">Benchmark metadata agent register</a></li><li><a href="evidence/benchmark/current-github-project-metadata-snapshot.json">Official GitHub metadata snapshot</a></li><li><a href="evidence/benchmark/current-prompt-project-denominator-reconciliation.json">Prompt project denominator reconciliation</a></li><li><a href="evidence/benchmark/current-upstream-project-triage-wave-01.json">RUN-034 upstream observer triage</a></li><li><a href="evidence/benchmark/current-upstream-project-triage-agent-register.json">RUN-034 upstream triage agent register</a></li><li><a href="evidence/benchmark/current-upstream-partial-resolution-wave-01.json">RUN-038 partial-record review</a></li><li><a href="evidence/benchmark/current-upstream-partial-resolution-agent-register.json">RUN-038 partial-review agent register</a></li><li><a href="evidence/runtime/current-runtime-safety-assessment.json">Runtime safety assessment</a></li><li><a href="evidence/browser/deployed-build-identity-assessment.json">Deployed build identity assessment</a></li><li><a href="evidence/browser/deployed-selected-feature-observation-wave-03.json">RUN-058-BROWSER sealed unknown-build observation</a></li><li><a href="evidence/browser/raw-run-059b-independent-unknown-build-browser-review-wave-03.json">RUN-059B independent observation review</a></li><li><a href="evidence/browser/current-deployed-selected-feature-observation-wave-03.json">RUN-060 normalized unknown-build observation</a></li><li><a href="evidence/browser/raw-run-060r-s-independent-browser-normalization-adjudication-wave-03.json">RUN-060R/S normalization adjudication</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-unknown-build-browser-wave-03.json">RUN-060 responsive audit-dashboard verification</a></li><li><a href="13-unresolved-questions-and-evidence-gaps.md">Unresolved evidence gaps</a></li></ul></section>
     <section class="panel"><h2>RUN-058-BROWSER–060 unknown-build browser evidence</h2><p>The signed-in sample is preserved as an independently accepted observation of an unattributed deployed build only. It records $unknown_build_routes selected routes, $unknown_build_viewports prompt dimensions, $unknown_build_cells route/viewport cells, $unknown_build_overlays pre-submit overlays, and $unknown_build_candidates provisional unknown-build candidates. No forms were submitted, no records changed, no screenshots retained, and no current-source browser, responsive, visual, workflow, finding, ease, release, Pass, or completion credit is awarded.</p><ul class="list"><li><a href="evidence/browser/deployed-selected-feature-observation-wave-03.json">RUN-058-BROWSER sealed raw observation</a></li><li><a href="evidence/browser/raw-run-059b-independent-unknown-build-browser-review-wave-03.json">RUN-059B independent review</a></li><li><a href="generators/integrate-deployed-selected-feature-observation-wave-03.py">RUN-060 deterministic normalizer</a></li><li><a href="evidence/browser/current-deployed-selected-feature-observation-wave-03.json">RUN-060 normalized observation</a></li><li><a href="evidence/browser/raw-run-060r-s-independent-browser-normalization-adjudication-wave-03.json">RUN-060R/S independent lineage adjudication</a></li><li><a href="evidence/browser/current-audit-dashboard-verification-unknown-build-browser-wave-03.json">RUN-060 responsive audit-dashboard verification</a></li></ul></section>
     <section class="panel"><h2>RUN-039–046 target comparison evidence</h2><p>Clean-stage packets and deterministic integration for the first six-target wave; all formal edges and downstream credits remain zero.</p><ul class="list"><li><a href="evidence/benchmark/raw-run-039-target-upstream-behaviour-wave-01.json">RUN-039 upstream behaviour locators</a></li><li><a href="evidence/benchmark/raw-run-040-current-product-source-packets-wave-01.json">RUN-040 current-source packets</a></li><li><a href="evidence/benchmark/raw-run-041-current-source-red-team-wave-01.json">RUN-041 scope red-team</a></li><li><a href="evidence/benchmark/raw-run-042-neutral-requirements-wave-01.json">RUN-042 blind neutral requirements</a></li><li><a href="evidence/benchmark/raw-run-043-current-neutral-comparison-wave-01.json">RUN-043 clean current-neutral comparisons</a></li><li><a href="evidence/benchmark/raw-run-044-current-source-facet-reconciliation-wave-01.json">RUN-044 composite facet reconciliation</a></li><li><a href="evidence/benchmark/raw-run-045-wave-01-independent-adjudication.json">RUN-045 independent adjudication</a></li><li><a href="evidence/benchmark/current-target-neutral-comparison-wave-01.json">RUN-046 integrated comparison overlay</a></li><li><a href="evidence/benchmark/current-target-neutral-comparison-agent-register.json">RUN-046 comparison agent register</a></li></ul></section>
     <section class="panel"><h2>RUN-047–052 historical diagnostic evidence</h2><p>The former 24-packet chain is retained only as an immutable zero-credit checkpoint. Its missing sanitized Agent A-to-B derivation is historical and its RUN-048/RUN-050/RUN-051 payloads are prohibited as corrected comparison evidence.</p><ul class="list"><li><a href="evidence/benchmark/raw-run-047-upstream-facet-refinement-clinical-incident-wave-02.json">RUN-047 clinical and incident upstream packets</a></li><li><a href="evidence/benchmark/raw-run-047-upstream-facet-refinement-composites-wave-02.json">RUN-047 HR, medication, and finance upstream packets</a></li><li><a href="evidence/benchmark/current-upstream-facet-refinement-wave-02.json">RUN-047 integrated upstream refinement</a></li><li><a href="evidence/benchmark/current-upstream-facet-refinement-agent-register.json">RUN-047 upstream agent register</a></li><li><a href="evidence/benchmark/raw-run-048-blind-neutral-facet-requirements-wave-02.json">RUN-048 historical source-independent requirements</a></li><li><a href="evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json">RUN-049 pinned current-source packets</a></li><li><a href="evidence/benchmark/raw-run-050-clean-facet-comparison-reconciled-wave-02.json">RUN-050 historical reconciled comparison</a></li><li><a href="evidence/benchmark/raw-run-051-independent-facet-adjudication-wave-02.json">RUN-051 historical independent adjudication</a></li></ul></section>
     <section class="panel"><h2>RUN-053–057 corrected clean-spec evidence</h2><p>Fresh A/B/C/D stages reconstruct the required clean handoff for 24 selected packets. Fresh D validates all 226 reviews, corrects one outcome from met to partial, and preserves zero formal edges, zero final no-matches, and 0/340 credit.</p><ul class="list"><li><a href="evidence/benchmark/raw-run-053-agent-a-blind-observed-behaviour-packets-wave-02.json">RUN-053 identity-stripped Agent A packets</a></li><li><a href="evidence/benchmark/root-run-053-agent-a-source-atom-crosswalk-wave-02.json">RUN-053 root-held atom and identity crosswalk</a></li><li><a href="evidence/benchmark/raw-run-054-fresh-agent-b-neutral-requirements-wave-02.json">RUN-054 fresh Agent B neutral requirements</a></li><li><a href="evidence/benchmark/raw-run-054-agent-b-input-boundary-correction-wave-02.json">RUN-054 provenance-only boundary correction</a></li><li><a href="evidence/benchmark/raw-run-055-agent-c-comparison-input-wave-02.json">RUN-055 sealed Agent C input</a></li><li><a href="evidence/benchmark/raw-run-055-fresh-agent-c-current-comparison-wave-02.json">RUN-055 fresh Agent C comparison</a></li><li><a href="evidence/benchmark/raw-run-056-independent-adjudicator-input-wave-02.json">RUN-056 sealed Agent D input</a></li><li><a href="evidence/benchmark/raw-run-056-fresh-independent-corrected-chain-adjudication-wave-02.json">RUN-056 fresh independent adjudication</a></li><li><a href="evidence/benchmark/current-facet-neutral-comparison-wave-02.json">RUN-057 integrated corrected-chain overlay</a></li><li><a href="evidence/benchmark/current-facet-neutral-comparison-agent-register.json">RUN-057 corrected-chain agent register</a></li></ul></section>
-    <p class="footer">Generated deterministically at $generated_at. Audit artifacts only; no application remediation is authorised.</p>
+    <p class="footer">Generated deterministically from evidence integrated through RUN-072. Audit artifacts only; no application remediation is authorised.</p>
   </main>
 </body>
 </html>
@@ -748,6 +978,12 @@ dashboard = TEMPLATE.substitute(
     h_count=class_counts["H"],
     d_count=class_counts["D"],
     m_count=canonical["counts"]["classes"]["M"],
+    required_present=len(required_present),
+    required_missing=len(required_missing),
+    task_contracts=usability_materialization["counts"]["task_script_files"],
+    validated_tasks=usability_materialization["counts"]["validated_task_scripts"],
+    route_slice_targets=route_page_slice["counts"]["targets"],
+    route_slice_routes=route_page_slice["counts"]["primary_routes"],
     route_gap_count=canonical["static_evidence_gaps"]["targets_missing_route_anchor"],
     page_gap_count=canonical["static_evidence_gaps"]["targets_missing_page_anchor"],
     both_gap_count=canonical["static_evidence_gaps"]["targets_missing_both_route_and_page_anchor"],
@@ -782,6 +1018,8 @@ dashboard = TEMPLATE.substitute(
     formal_facets=formal_upstream["counts"]["formal_facets_accepted"],
     formal_accepted_weight=formal_upstream["denominator_reconciliation"]["accepted_prompt_occurrence_weight"],
     formal_evidence_links=formal_evidence_links,
+    checkpoint_evidence_links=checkpoint_evidence_links,
+    start_ready_ids=start_ready_ids,
     observer_records=benchmark["observer"]["mapping_records"],
     observer_unique=benchmark["observer"]["unique_current_candidates"],
     neutralizer_count=len(benchmark["neutralizer"]["adjudications"]),
@@ -842,7 +1080,6 @@ dashboard = TEMPLATE.substitute(
     listeners=f"{backend['module_arithmetic']['listeners']['total']:,}",
     migrations=f"{backend['migration_filename_primary_mapping']['total']:,}",
     php_test_cases=f"{backend['tests_static']['lexical_cases']:,}",
-    generated_at=facet_refinement["generated_at"],
 )
 
 (AUDIT_DIR / "audit-dashboard.html").write_text(dashboard.rstrip() + "\n", encoding="utf-8", newline="\n")

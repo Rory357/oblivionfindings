@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-071A",
+  "status": "TWENTY_SIX_PROMPT_GATES_ACCOUNTED_AUDIT_INCOMPLETE",
+  "observed_at": "2026-08-25T07:16:00+12:00",
+  "agent_task_path": "/root/run071_completion_gate_accountant",
+  "role": "completion-gate accountant and contradiction reviewer",
+  "pass_lens": "adversarial completion accounting across Passes 1-8",
+  "pins": {
+    "branch": "main",
+    "audit_head": "23a40c9b97dea6ee455f91dc439e3a3b8bd493ef",
+    "audit_head_tree": "c6de5f69a9a808a675968bba417be0ffef8eb7ea",
+    "origin_main_local_ref": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "application_paths_changed_from_pin": 0,
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "architecture_rule": "One operating organisation across multiple Sites; Site access, action capability, ownership, direct-object concealment and privacy are the boundaries."
+  },
+  "authoritative_hashes": {
+    "02-eight-pass-coverage-ledger.csv": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+    "03-feature-to-benchmark-matrix.csv": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
+    "05-browser-visual-coverage-matrix.csv": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "06-open-source-benchmark-register.csv": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "current-formal-upstream-triage-wave-03.json": "97a3aa18ca21544728b668733f7e0db5a5164f37afc1a7e2df358f7aef4fd277"
+  },
+  "required_artifact_snapshot": {
+    "present": 9,
+    "required": 18,
+    "missing": [
+      "04-workflow-usability-scorecard.csv",
+      "07-module-findings.md",
+      "08-cross-module-journeys.md",
+      "09-ui-ux-accessibility-visual-consistency.md",
+      "10-architecture-data-integration-security.md",
+      "11-prioritised-roadmap.md",
+      "12-native-build-and-do-not-copy-register.md",
+      "findings.json",
+      "task-scripts/"
+    ]
+  },
+  "completion_gates": [
+    {
+      "gate": 1,
+      "name": "routes_classified",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR",
+      "evidence": "38 route files and 3217 static callsites are locators only; framework route denominator is not established."
+    },
+    {
+      "gate": 2,
+      "name": "inertia_pages_classified",
+      "numerator": 0,
+      "denominator": 711,
+      "status": "ZERO",
+      "evidence": "963 resolver paths are partitioned, but final prompt classification of the 711 static page roots remains open."
+    },
+    {
+      "gate": 3,
+      "name": "features_in_canonical_register",
+      "numerator": 340,
+      "denominator": 340,
+      "status": "PARTIAL_BOUNDED_STATIC",
+      "evidence": "340 frozen static identities: 300 H and 40 D; no downstream or execution credit."
+    },
+    {
+      "gate": 4,
+      "name": "routes_and_pages_mapped_to_feature_id",
+      "numerator": null,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR",
+      "evidence": "No route/page-level crosswalk denominator; 120 targets lack a route anchor, 226 lack a page anchor and 116 lack both."
+    },
+    {
+      "gate": 5,
+      "name": "features_with_verified_benchmark_or_final_ncm",
+      "numerator": 0,
+      "denominator": 340,
+      "status": "ZERO",
+      "evidence": "All matrix benchmark_mapping_credit values are false; RUN-070 has zero edges, final no-matches and NCMs."
+    },
+    {
+      "gate": 6,
+      "name": "human_features_with_task_script_and_ten_scores",
+      "numerator": 0,
+      "denominator": 300,
+      "status": "ZERO",
+      "evidence": "Current scorecard and task-scripts directory are absent; 0 of 300 H features is measured."
+    },
+    {
+      "gate": 7,
+      "name": "common_and_safety_journeys_cross_reviewed",
+      "numerator": 0,
+      "denominator": 8,
+      "status": "ZERO_NAMED_MINIMUM",
+      "evidence": "The prompt names eight minimum journeys; current cross-module journey report and review evidence are absent."
+    },
+    {
+      "gate": 8,
+      "name": "hero_banner_instances_classified",
+      "numerator": 659,
+      "denominator": 659,
+      "status": "PARTIAL_BOUNDED_STATIC",
+      "evidence": "All 659 static instance rows are source-inferred and browser-blocked; rendered and final feature linkage credit is zero."
+    },
+    {
+      "gate": 9,
+      "name": "overlay_implementations_and_triggers_classified",
+      "numerator": 1415,
+      "denominator": 1415,
+      "status": "PARTIAL_BOUNDED_STATIC",
+      "evidence": "473 definitions plus 942 trigger sites are classified statically; all browser interaction credit is zero."
+    },
+    {
+      "gate": 10,
+      "name": "safe_routes_observed_at_desktop",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR_ZERO_CREDIT",
+      "evidence": "Safe reachable-route denominator is absent; six RUN-060 routes belong to an unattributed deployed build."
+    },
+    {
+      "gate": 11,
+      "name": "selected_families_and_journeys_all_viewports",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR_ZERO_CREDIT",
+      "evidence": "RUN-060 has 24 unknown-build cells; selected family/journey denominator and current-build attribution are absent."
+    },
+    {
+      "gate": 12,
+      "name": "required_visual_states_classified",
+      "numerator": null,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR",
+      "evidence": "2812 source projections do not establish route by role by Site by viewport by material-state denominator."
+    },
+    {
+      "gate": 13,
+      "name": "material_visual_finding_families_resampled",
+      "numerator": 0,
+      "denominator": 2,
+      "status": "ZERO_PROVISIONAL_FLOOR",
+      "evidence": "Two RUN-060 unknown-build candidates still require build-attributed browser resampling."
+    },
+    {
+      "gate": 14,
+      "name": "models_classified",
+      "numerator": 0,
+      "denominator": 782,
+      "status": "ZERO_PROMPT_GRADE",
+      "evidence": "The model census is a locator set, not semantic ownership classification."
+    },
+    {
+      "gate": 15,
+      "name": "policies_classified",
+      "numerator": 0,
+      "denominator": 75,
+      "status": "ZERO_PROMPT_GRADE",
+      "evidence": "No semantic ownership/classification ledger exists for the 75 policy paths."
+    },
+    {
+      "gate": 16,
+      "name": "service_domain_entries_classified",
+      "numerator": 0,
+      "denominator": 735,
+      "status": "ZERO_PROMPT_GRADE",
+      "evidence": "The 735-entry union is a locator set; prior exact links do not establish final ownership."
+    },
+    {
+      "gate": 17,
+      "name": "critical_async_owners_classified",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_DENOMINATOR_ZERO_CREDIT",
+      "evidence": "126 jobs, 14 events, 12 listeners and named outbox owners are static candidates; critical subset is not adjudicated."
+    },
+    {
+      "gate": 18,
+      "name": "modules_with_all_eight_passes",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_CANONICAL_MODULE_DENOMINATOR_ZERO_CREDIT",
+      "evidence": "The 38 ledger rows are provisional route-file rows, not the required module/submodule denominator; none is complete."
+    },
+    {
+      "gate": 19,
+      "name": "prompt_benchmark_projects_formally_triaged",
+      "numerator": 9,
+      "denominator": 95,
+      "weighted_numerator": 10,
+      "weighted_denominator": 98,
+      "status": "PARTIAL_RECORD_ACCEPTANCE_ONLY",
+      "evidence": "RUN-070 formal record acceptance is 9 of 95 unique and 10 of 98 weighted; 88 of 95 is observer-only."
+    },
+    {
+      "gate": 20,
+      "name": "p0_p1_complete_finding_fields",
+      "numerator": 0,
+      "denominator": 12,
+      "status": "ZERO_KNOWN_FLOOR",
+      "evidence": "Twelve provisional P1 claims lack the required final schema; findings.json and 07-module-findings.md are absent."
+    },
+    {
+      "gate": 21,
+      "name": "redesigns_neutral_native_no_copy",
+      "numerator": 0,
+      "denominator": null,
+      "status": "UNKNOWN_NOT_YET_TRIGGERED",
+      "evidence": "No completed redesign corpus exists and required native/no-copy reporting artifacts are absent."
+    },
+    {
+      "gate": 22,
+      "name": "ease_4_5_claims_independently_reviewed",
+      "numerator": 0,
+      "denominator": 0,
+      "status": "NO_CURRENT_TRIGGER_NO_COVERAGE_CREDIT",
+      "evidence": "No current ease scores or affirmative easy claims exist; Gate 6 remains 0 of 300."
+    },
+    {
+      "gate": 23,
+      "name": "browser_claims_labeled",
+      "numerator": 2812,
+      "denominator": 2812,
+      "status": "PROVED_BOUNDED_MATRIX_ONLY",
+      "evidence": "Every visual row is Source-inferred and Blocked; unknown-build observations are separately labeled and zero-credit."
+    },
+    {
+      "gate": 24,
+      "name": "visual_inconsistencies_complete_context",
+      "numerator": 0,
+      "denominator": 2,
+      "status": "ZERO_PROVISIONAL_FLOOR",
+      "evidence": "Two provisional candidates lack the complete contextual and root-cause package; all matrix finding links are absent."
+    },
+    {
+      "gate": 25,
+      "name": "official_source_inference_specialist_split",
+      "numerator": 6,
+      "denominator": 6,
+      "status": "PARTIAL_BOUNDED_BASELINE",
+      "evidence": "Six official-source baseline records separate facts, inference and specialist decision; application mapping and global report remain open."
+    },
+    {
+      "gate": 26,
+      "name": "all_agents_returned_reconciled_represented_none_live",
+      "numerator": 0,
+      "denominator": 1,
+      "status": "OPEN_UNTIL_FINALIZATION",
+      "evidence": "RUN-071 assignments returned, but subsequent audit waves and final no-live-agent reconciliation remain open."
+    }
+  ],
+  "contradictions": [
+    "Wave-level completion_test_met is not audit completion.",
+    "Non-empty CSV sentinel fields are not completed mappings.",
+    "Observer-only 88 of 95 cannot become the formal project-triage numerator.",
+    "Twenty-four unattributed deployed viewport cells cannot become current-source responsive coverage.",
+    "The 2812 visual rows do not establish the material visual-state denominator.",
+    "The physical 98-row register is 95 prompt repositories plus three historical extras, not 98 unique prompt projects."
+  ],
+  "ranked_next_waves": [
+    {
+      "rank": 1,
+      "name": "current-build task journey and rendered-visual execution",
+      "gates": [6, 7, 8, 9, 10, 11, 12, 13, 22, 23, 24],
+      "blocker": "Disposable non-sensitive current-source runtime, build attribution, representative roles/Sites/fixtures and exact cleanup authority are absent."
+    },
+    {
+      "rank": 2,
+      "name": "route page backend ownership and canonical module denominator",
+      "gates": [1, 2, 4, 14, 15, 16, 17, 18]
+    },
+    {
+      "rank": 3,
+      "name": "formal upstream closure and target-edge adjudication",
+      "gates": [5, 19, 21]
+    }
+  ],
+  "credit_boundary": "This is adversarial completion accounting only. It awards no route, page, mapping, task, ease, browser, visual, finding, runtime, test, release, Pass or audit-completion credit.",
+  "attestation": {
+    "read_only_agent": true,
+    "wrote_files": false,
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "browser_used": false,
+    "network_used": false,
+    "runtime_used": false,
+    "tests_used": false,
+    "build_used": false,
+    "database_used": false,
+    "no_inherited_credit": true
+  }
+}

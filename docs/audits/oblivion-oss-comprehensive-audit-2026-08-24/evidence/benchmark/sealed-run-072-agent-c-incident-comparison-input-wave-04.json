@@ -1,0 +1,563 @@
+{
+  "schema_version": "sealed_run_072_agent_c_incident_comparison_input_wave_04_v1",
+  "run_id": "RUN-072-C-INPUT",
+  "status": "NEUTRAL_SPECIFICATION_PLUS_PINNED_CURRENT_SOURCE_ONLY",
+  "input_seals": {
+    "neutral_specification": {
+      "path": "evidence/benchmark/raw-run-072-agent-b-neutral-incident-requirements-wave-04.json",
+      "bytes": 11474,
+      "sha256": "425f9c38320e37915e5ceff33a4f65b8d96b8183cb6e2b70955e07b1145e8c97"
+    },
+    "current_source_packet": {
+      "path": "evidence/benchmark/raw-run-049-current-source-facet-refinement-wave-02.json",
+      "bytes": 46917,
+      "sha256": "2ed6b9bae1270a4c00b3b427daa077c145cfb370aa26cc4d12e4a3e68acc765a"
+    }
+  },
+  "application_source_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "read_mode": "PINNED_GIT_OBJECT_ONLY"
+  },
+  "neutral_specification": {
+    "schema_version": "raw_run_072_agent_b_neutral_incident_requirements_wave_04_v1",
+    "run_id": "RUN-072-B",
+    "status": "CLEAN_NEUTRAL_SPECIFICATION_COMPLETE_ZERO_CREDIT",
+    "scope": "Two identity-stripped packet kinds, review and closure, specified side by side. No end-to-end ordering, dependency, or gate between them is established.",
+    "normative_interpretation": {
+      "MUST": "Directly established behavior.",
+      "SHOULD": "Evidence-backed preference.",
+      "NOT_ESTABLISHED": "Unknown, unproved, expressly limited, or absent behavior that must not be inferred."
+    },
+    "must_requirements": [
+      {
+        "id": "MUST-REV-01",
+        "packet_kind": "review",
+        "requirement": "A record detail page must visibly present an investigation-milestone checklist.",
+        "source_observation_ids": [
+          "R01",
+          "R03"
+        ]
+      },
+      {
+        "id": "MUST-REV-02",
+        "packet_kind": "review",
+        "requirement": "A timeline surface must show factors, root cause, prevention, and linked actions.",
+        "source_observation_ids": [
+          "R04"
+        ]
+      },
+      {
+        "id": "MUST-REV-03",
+        "packet_kind": "review",
+        "requirement": "The supported viewing interaction must include reaching the detail page, inspecting the checklist, and inspecting the timeline surface.",
+        "source_observation_ids": [
+          "R05"
+        ]
+      },
+      {
+        "id": "MUST-REV-04",
+        "packet_kind": "review",
+        "requirement": "Record visibility and authority to close must remain distinct permissions; visibility alone is insufficient evidence of close authority.",
+        "source_observation_ids": [
+          "R02",
+          "R08"
+        ]
+      },
+      {
+        "id": "MUST-REV-05",
+        "packet_kind": "review",
+        "requirement": "The evidence-backed review output must be limited to visible review context.",
+        "source_observation_ids": [
+          "R13"
+        ]
+      },
+      {
+        "id": "MUST-CLO-01",
+        "packet_kind": "closure",
+        "requirement": "A detail action must present a status selector, and submission must carry the current record and selected status.",
+        "source_observation_ids": [
+          "C01",
+          "C03",
+          "C05"
+        ]
+      },
+      {
+        "id": "MUST-CLO-02",
+        "packet_kind": "closure",
+        "requirement": "A close branch must require separate close authority, distinct from owner-Site visibility.",
+        "source_observation_ids": [
+          "C02",
+          "C10",
+          "C12"
+        ]
+      },
+      {
+        "id": "MUST-CLO-03",
+        "packet_kind": "closure",
+        "requirement": "The immediate established output must be a closed record state paired with a closure signal, without prescribing exact status terminology.",
+        "source_observation_ids": [
+          "C08",
+          "C20"
+        ]
+      },
+      {
+        "id": "MUST-CLO-04",
+        "packet_kind": "closure",
+        "requirement": "The closure change and closure signal must share the same success-or-failure boundary.",
+        "source_observation_ids": [
+          "C06",
+          "C13",
+          "C18",
+          "C20"
+        ]
+      },
+      {
+        "id": "MUST-CLO-05",
+        "packet_kind": "closure",
+        "requirement": "Concurrent closure changes must be serialized.",
+        "source_observation_ids": [
+          "C06",
+          "C13"
+        ]
+      },
+      {
+        "id": "MUST-CLO-06",
+        "packet_kind": "closure",
+        "requirement": "After closure succeeds, an activity entry must be recorded and the record state must be rechecked; no relative order between those two post-success operations is prescribed.",
+        "source_observation_ids": [
+          "C07",
+          "C21",
+          "C22"
+        ]
+      },
+      {
+        "id": "MUST-CLO-07",
+        "packet_kind": "closure",
+        "requirement": "Reversible locked and unlocked behavior and an update-authorized lock-or-unlock branch must be supported, including a surfaced closure-time unlock control.",
+        "source_observation_ids": [
+          "C04",
+          "C09",
+          "C11"
+        ]
+      },
+      {
+        "id": "MUST-CLO-08",
+        "packet_kind": "closure",
+        "requirement": "An activity feed must surface recorded activity around closure and lock controls.",
+        "source_observation_ids": [
+          "C04",
+          "C16",
+          "C22"
+        ]
+      },
+      {
+        "id": "MUST-CLO-09",
+        "packet_kind": "closure",
+        "requirement": "Lock and unlock changes must receive a later activity audit.",
+        "source_observation_ids": [
+          "C23"
+        ]
+      }
+    ],
+    "should_requirements": [],
+    "should_boundary": "No evidence-backed preference was present that could be classified as a normative SHOULD.",
+    "not_established_requirements": [
+      {
+        "id": "NE-REV-01",
+        "packet_kind": "review",
+        "requirement": "No exact reviewer role is established.",
+        "source_observation_ids": [
+          "R02"
+        ]
+      },
+      {
+        "id": "NE-REV-02",
+        "packet_kind": "review",
+        "requirement": "Checklist completion action and enforced viewing or completion order are not established.",
+        "source_observation_ids": [
+          "R05"
+        ]
+      },
+      {
+        "id": "NE-REV-03",
+        "packet_kind": "review",
+        "requirement": "Checklist-completion, draft, submitted, approved, rejected, effectiveness, and exact status vocabulary are not established.",
+        "source_observation_ids": [
+          "R06",
+          "R15"
+        ]
+      },
+      {
+        "id": "NE-REV-04",
+        "packet_kind": "review",
+        "requirement": "Reviewer outcome, rationale, approval, signature, and effectiveness branches are not established.",
+        "source_observation_ids": [
+          "R07",
+          "R16"
+        ]
+      },
+      {
+        "id": "NE-REV-05",
+        "packet_kind": "review",
+        "requirement": "The visible checklist is not established as an enforced review gate.",
+        "source_observation_ids": [
+          "R09"
+        ]
+      },
+      {
+        "id": "NE-REV-06",
+        "packet_kind": "review",
+        "requirement": "Save, validation, success, and error feedback for a review action are not established.",
+        "source_observation_ids": [
+          "R10"
+        ]
+      },
+      {
+        "id": "NE-REV-07",
+        "packet_kind": "review",
+        "requirement": "Review retry and recovery behavior are not established.",
+        "source_observation_ids": [
+          "R11",
+          "R17"
+        ]
+      },
+      {
+        "id": "NE-REV-08",
+        "packet_kind": "review",
+        "requirement": "Assignment, ownership transfer, notification, and completion-handoff semantics for linked actions are not established.",
+        "source_observation_ids": [
+          "R12"
+        ]
+      },
+      {
+        "id": "NE-REV-09",
+        "packet_kind": "review",
+        "requirement": "A durable review decision or signed outcome artifact is not established.",
+        "source_observation_ids": [
+          "R13"
+        ]
+      },
+      {
+        "id": "NE-REV-10",
+        "packet_kind": "review",
+        "requirement": "The visible timeline is not established as a durable review audit trail.",
+        "source_observation_ids": [
+          "R14"
+        ]
+      },
+      {
+        "id": "NE-REV-11",
+        "packet_kind": "review",
+        "requirement": "Atomic activity audit, runtime behavior or maturity, and production fitness are not established.",
+        "source_observation_ids": [
+          "R11",
+          "R17"
+        ]
+      },
+      {
+        "id": "NE-REV-12",
+        "packet_kind": "review",
+        "requirement": "Adjacent workflow and operational-incident observations are not inherited into the review packet.",
+        "source_observation_ids": [
+          "R18"
+        ]
+      },
+      {
+        "id": "NE-CLO-01",
+        "packet_kind": "closure",
+        "requirement": "No exact role name or authorization model beyond distinct close authority and owner-Site visibility is established.",
+        "source_observation_ids": [
+          "C02",
+          "C10",
+          "C12",
+          "C30"
+        ]
+      },
+      {
+        "id": "NE-CLO-02",
+        "packet_kind": "closure",
+        "requirement": "Exact closure-status vocabulary is not established.",
+        "source_observation_ids": [
+          "C08",
+          "C24"
+        ]
+      },
+      {
+        "id": "NE-CLO-03",
+        "packet_kind": "closure",
+        "requirement": "Reopen and reverse-status semantics are not established; only reversible lock behavior is established.",
+        "source_observation_ids": [
+          "C09",
+          "C11",
+          "C29"
+        ]
+      },
+      {
+        "id": "NE-CLO-04",
+        "packet_kind": "closure",
+        "requirement": "Closing-actor capture or attribution is not established as supported behavior; the observed closure change omits the closing actor.",
+        "source_observation_ids": [
+          "C14",
+          "C21",
+          "C23",
+          "C27"
+        ]
+      },
+      {
+        "id": "NE-CLO-05",
+        "packet_kind": "closure",
+        "requirement": "An enforced separate-corrective-action verification gate is not established; observed closure does not enforce it.",
+        "source_observation_ids": [
+          "C15",
+          "C28"
+        ]
+      },
+      {
+        "id": "NE-CLO-06",
+        "packet_kind": "closure",
+        "requirement": "Explicit user-visible success, validation-error, and conflict feedback are not established.",
+        "source_observation_ids": [
+          "C17"
+        ]
+      },
+      {
+        "id": "NE-CLO-07",
+        "packet_kind": "closure",
+        "requirement": "Complete activity-audit atomicity is not established; only the closure change and closure signal share the observed success-or-failure boundary, while activity follows afterward.",
+        "source_observation_ids": [
+          "C18",
+          "C26"
+        ]
+      },
+      {
+        "id": "NE-CLO-08",
+        "packet_kind": "closure",
+        "requirement": "Durable retry and recovery behavior are not established.",
+        "source_observation_ids": [
+          "C18",
+          "C26"
+        ]
+      },
+      {
+        "id": "NE-CLO-09",
+        "packet_kind": "closure",
+        "requirement": "Runtime maturity and production fitness are not established.",
+        "source_observation_ids": [
+          "C26"
+        ]
+      },
+      {
+        "id": "NE-CLO-10",
+        "packet_kind": "closure",
+        "requirement": "Downstream consumption, notification, assignment, and acknowledgement of the closure signal are not established.",
+        "source_observation_ids": [
+          "C19"
+        ]
+      },
+      {
+        "id": "NE-CLO-11",
+        "packet_kind": "closure",
+        "requirement": "Reviewer outcome, rationale, approval, signature, and effectiveness-gate behavior are not established for closure.",
+        "source_observation_ids": [
+          "C25"
+        ]
+      },
+      {
+        "id": "NE-CLO-12",
+        "packet_kind": "closure",
+        "requirement": "Closure gates beyond separate close authority are not established.",
+        "source_observation_ids": [
+          "C30"
+        ]
+      },
+      {
+        "id": "NE-X-01",
+        "packet_kind": "cross_packet",
+        "requirement": "No ordering, dependency, workflow-state transition, enforcement gate, or inherited semantics between the review and closure packet kinds are established.",
+        "source_observation_ids": [
+          "R05",
+          "R09",
+          "R18",
+          "C15",
+          "C25",
+          "C28",
+          "C30"
+        ]
+      }
+    ],
+    "counts": {
+      "input_packets": 2,
+      "packet_kinds": {
+        "review": 1,
+        "closure": 1
+      },
+      "source_observations": {
+        "review": 18,
+        "closure": 30,
+        "total": 48
+      },
+      "requirements": {
+        "MUST": 14,
+        "SHOULD": 0,
+        "NOT_ESTABLISHED": 25,
+        "total": 39
+      },
+      "unique_source_observation_ids_cited": 48,
+      "uncited_source_observation_ids": 0,
+      "identity_keys": 0,
+      "implementation_details": 0,
+      "current_product_comparisons": 0,
+      "credit_awards": {
+        "selection": 0,
+        "mapping": 0,
+        "NCM": 0,
+        "benchmark": 0,
+        "runtime": 0,
+        "browser": 0,
+        "pass": 0,
+        "completion": 0
+      }
+    },
+    "input_seal_checks": [
+      {
+        "packet_id": "OBP-72-A-4F2D9C",
+        "packet_kind": "review",
+        "declared_bytes": 3658,
+        "declared_sha256": "718bc43127d6cf94b415c9e34d3da57c0b9620648b4d4b8a2bf0f66f1aefcf0c",
+        "schema_check": "MATCH",
+        "observation_id_check": "R01-R18_PRESENT",
+        "declared_count_check": "18_EQUALS_ENUMERATED_18",
+        "cryptographic_recomputation": "NOT_PERFORMED_BY_AGENT_B",
+        "seal_result": "DECLARED_SEAL_PRESERVED_NOT_INDEPENDENTLY_VERIFIED_BY_AGENT_B"
+      },
+      {
+        "packet_id": "OBP-72-B-91E7A4",
+        "packet_kind": "closure",
+        "declared_bytes": 5224,
+        "declared_sha256": "550776f8f45fddb5b9875c3a660bef95169434660699194c9f30a6956ffa6dd9",
+        "schema_check": "MATCH",
+        "observation_id_check": "C01-C30_PRESENT",
+        "declared_count_check": "30_EQUALS_ENUMERATED_30",
+        "cryptographic_recomputation": "NOT_PERFORMED_BY_AGENT_B",
+        "seal_result": "DECLARED_SEAL_PRESERVED_NOT_INDEPENDENTLY_VERIFIED_BY_AGENT_B"
+      }
+    ],
+    "attestation": {
+      "inputs_used": [
+        "OBP-72-A-4F2D9C",
+        "OBP-72-B-91E7A4"
+      ],
+      "filesystem_access": false,
+      "repository_access": false,
+      "browser_access": false,
+      "network_access": false,
+      "runtime_access": false,
+      "comparison_performed": false,
+      "identity_stripping_preserved": true,
+      "every_requirement_has_source_observation_ids": true,
+      "all_48_source_observations_cited": true,
+      "unknowns_and_limitations_retained": true,
+      "exact_role_inferred": false,
+      "exact_status_vocabulary_inferred": false,
+      "additional_workflow_state_inferred": false,
+      "review_or_closure_gate_inferred": false,
+      "complete_audit_atomicity_inferred": false,
+      "retry_or_recovery_semantics_inferred": false,
+      "reopen_semantics_inferred": false,
+      "selection_mapping_NCM_benchmark_runtime_browser_pass_or_completion_credit_awarded": false,
+      "audit_artifact_writes_by_root_only": true
+    }
+  },
+  "current_source_facets": [
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_closure",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "routes/incidents.php:93-104",
+        "app/Policies/ClientIncidentPolicy.php:62-75",
+        "app/Http/Controllers/IncidentController.php:1341-1351,1621-1725",
+        "app/Services/UserSiteAccessService.php:185-244,246-279",
+        "app/Services/Incidents/IncidentJourneyService.php:124-170,637-718",
+        "app/Services/Incidents/IncidentAlertLifecycleSignalService.php:27-60,155-167,172-249",
+        "app/Models/ClientIncident.php:16-20,24-73,97-104",
+        "app/Models/Concerns/AuditableChanges.php:8-52",
+        "database/migrations/2026_08_14_000063_create_incident_lifecycle_signal_outbox.php:12-94",
+        "tests/Feature/Incidents/IncidentJourneyServiceTest.php:219-288",
+        "tests/Feature/Incidents/IncidentAlertLifecycleSignalTest.php:166-245"
+      ],
+      "authority": "The route and policy require incidents.approve and reviewed state. closed_outcome is required; closed_notes is optional. healthSafety.viewAllSites or reports.viewAny may broaden Site scope but do not replace incidents.approve.",
+      "site_direct_object": "Site access is asserted before and under the incident lock. Foreign-Site denial is explicit 403, not concealed 404. A malformed or conflicting canonical journey is converted to 404.",
+      "state_read_effects": "Closure requires review actor/time evidence, no incomplete follow-ups, completed required high/critical investigation, and closed linked H&S governance. It transitions reviewed to closed with closer, time, outcome, notes, and a lifecycle signal outbox.",
+      "audit_provenance": "ClientIncident stores closure actor/time/outcome/notes and uses AuditableChanges. The same transaction records an append-only lifecycle signal containing actor, Client, Site, H&S tuple, sequence, fingerprint, and idempotency key plus a recoverable outbox. Database triggers make lifecycle signals immutable.",
+      "transaction_locking_replay": "A three-attempt transaction locks the parent incident, canonicalizes and locks journey parents, evaluates the gate, writes closure, locks the latest lifecycle signal, and writes the outbox. Repeat close is state-rejected rather than same-result replay. Outbox dispatch is recoverable; the separate CRUD notification has no exactly-once contract.",
+      "collisions_gaps": [
+        "Investigation, follow-ups, corrective actions, H&S governance, and Control Room processing are external prerequisites, not incident-closure ownership.",
+        "Foreign-Site denial is 403.",
+        "No caller request key or same-result close replay exists.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    },
+    {
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "facet_key": "incident_review",
+      "source_status": "RUN_049_INDEPENDENT_SOURCE_VERIFICATION",
+      "ownership_class": "STATE_TRANSITION_COMMAND",
+      "anchors": [
+        "routes/incidents.php:88-100",
+        "app/Policies/ClientIncidentPolicy.php:11-70",
+        "app/Http/Controllers/IncidentController.php:1560-1618",
+        "app/Models/ClientIncident.php:16-20,24-73,97-104",
+        "app/Services/Incidents/IncidentJourneyService.php:124-170",
+        "app/Models/Concerns/AuditableChanges.php:8-52",
+        "tests/Feature/IncidentControllerTest.php:2257-2390"
+      ],
+      "authority": "The route and policy require incidents.approve and submitted state. Review notes are optional.",
+      "site_direct_object": "Neither ClientIncidentPolicy::review nor the review controller performs an approved-Site assertion before or after locking. A submitted direct-bound incident is therefore authorized by action capability and state without a Site boundary. Concealment is not established.",
+      "state_read_effects": "Transitions submitted to reviewed, recording reviewer, time, and optional notes. It ensures the canonical incident journey, which may create or repair linked H&S and alert records, then sends a notification after the transaction.",
+      "audit_provenance": "Reviewer/time/notes and ClientIncident AuditableChanges exist. No dedicated durable review outbox exists; the notification is outside the transaction.",
+      "transaction_locking_replay": "A three-attempt transaction locks the incident and re-authorizes the locked state. Competing review transitions serialize, but repeat review is rejected by state rather than returning the original result. No request key exists.",
+      "collisions_gaps": [
+        "Investigation, root cause, corrective actions, H&S governance, and closure remain separate owners.",
+        "The missing Site assertion is a direct source gap.",
+        "Review notification durability and exactly-once delivery are not established.",
+        "Tests are source locators only and were not executed."
+      ],
+      "credit": false,
+      "completion_credit": false
+    }
+  ],
+  "comparison_contract": {
+    "unit": "Each of the 39 neutral requirements, compared independently to the applicable pinned current-source facet.",
+    "allowed_outcomes": [
+      "MET",
+      "PARTIAL",
+      "GAP",
+      "CONTRADICTED",
+      "NOT_COMPARABLE"
+    ],
+    "unknowns_must_be_preserved": true,
+    "current_source_static_only": true,
+    "upstream_identity_withheld": true,
+    "project_selection_or_mapping_decision_allowed": false,
+    "credit_allowed": false
+  },
+  "counts": {
+    "neutral_requirements": 39,
+    "current_source_facets": 2,
+    "upstream_identity_records": 0,
+    "old_comparison_records": 0,
+    "credit_awards": 0
+  },
+  "attestation": {
+    "upstream_project_identity_excluded": true,
+    "reattachment_appendices_excluded": true,
+    "unrelated_current_source_facets_excluded": true,
+    "runtime_browser_test_network_evidence_excluded": true,
+    "zero_credit": true
+  }
+}
