@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-038",
+  "status": "THREE_DISJOINT_PARTIAL_RESOLUTION_REVIEWS_INTEGRATED",
+  "generated_at": "2026-08-24T22:20:00+12:00",
+  "agents": [
+    {
+      "role": "upstream_partial_resolution_partition_1",
+      "run_id": "RUN-035",
+      "raw_file": "evidence/benchmark/raw-run-035-upstream-partial-resolution-partition-01.json",
+      "raw_sha256": "baaf5056749c26c8f4a251c63738200006f895de6244a87cd72db184f9417ad6",
+      "partition": 1,
+      "ordinals": [
+        3,
+        4,
+        19,
+        20,
+        22,
+        23
+      ],
+      "project_count": 6,
+      "decisions": {
+        "RESOLVED_OBSERVER_EVIDENCE": 4,
+        "RETAIN_PARTIAL": 2
+      },
+      "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    },
+    {
+      "role": "upstream_partial_resolution_partition_2",
+      "run_id": "RUN-036",
+      "raw_file": "evidence/benchmark/raw-run-036-upstream-partial-resolution-partition-02.json",
+      "raw_sha256": "f74676e9520fe1eeaf68abf3a9c1a62ad9532b0142858ac7b575d4c403c351c8",
+      "partition": 2,
+      "ordinals": [
+        39,
+        46,
+        48,
+        58,
+        71
+      ],
+      "project_count": 5,
+      "decisions": {
+        "RESOLVED_OBSERVER_EVIDENCE": 3,
+        "RETAIN_PARTIAL": 2
+      },
+      "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    },
+    {
+      "role": "upstream_partial_resolution_partition_3",
+      "run_id": "RUN-037",
+      "raw_file": "evidence/benchmark/raw-run-037-upstream-partial-resolution-partition-03.json",
+      "raw_sha256": "c29546b9373ac6354cfe1379648f1afee70fa0fb30aab5a5692df63ff5ac1724",
+      "partition": 3,
+      "ordinals": [
+        74,
+        76,
+        83,
+        85,
+        90
+      ],
+      "project_count": 5,
+      "decisions": {
+        "RESOLVED_OBSERVER_EVIDENCE": 2,
+        "RETAIN_PARTIAL": 3
+      },
+      "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+      "target_specific_mapping_credit": false,
+      "benchmark_completion_credit": false
+    }
+  ],
+  "agreement": {
+    "disjoint_partial_records_reviewed": 16,
+    "remaining_unreviewed_run_034_partial_records": 0,
+    "resolution_decisions": {
+      "RESOLVED_OBSERVER_EVIDENCE": 9,
+      "RETAIN_PARTIAL": 7
+    },
+    "effective_observer_statuses": {
+      "COMPLETE_OBSERVER_TRIAGE": 88,
+      "PARTIAL_BLOCKED": 7
+    }
+  },
+  "credit_boundary": {
+    "partial_records_reviewed": 16,
+    "upstream_full_triage_credit": 0,
+    "neutral_requirement_credit": 0,
+    "current_product_comparison_credit": 0,
+    "target_specific_mapping_credit": 0,
+    "benchmark_completion_credit": 0,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "ease_credit": 0,
+    "release_credit": 0,
+    "completion_credit": 0,
+    "audit_complete": false
+  }
+}

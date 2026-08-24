@@ -1,0 +1,356 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-036",
+  "generated_at": "2026-08-24T22:20:00+12:00",
+  "role": "UPSTREAM_PARTIAL_RESOLUTION_OBSERVER",
+  "status": "PARTITION_REVIEW_COMPLETE_3_RESOLVED_2_RETAINED_NO_CREDIT",
+  "partition": {
+    "number": 2,
+    "ordinals": [39, 46, 48, 58, 71],
+    "project_count": 5
+  },
+  "input_pins": {
+    "base_wave_sha256": "ea0bb6bde44aa8f227d6e4133788e8fcb08c3069e2aecab4e0bc194cee2f3651",
+    "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+  },
+  "methodology": {
+    "allowed_sources": "Official GitHub repository files at immutable commit SHAs only.",
+    "decision_boundary": "Resolve only the explicit RUN-034 observer blocker when official immutable evidence closes it; otherwise retain PARTIAL_BLOCKED.",
+    "prohibited_inferences": [
+      "repository ancestry",
+      "repository equivalence",
+      "runtime behavior",
+      "maintenance quality",
+      "target mapping",
+      "benchmark equivalence",
+      "completion"
+    ]
+  },
+  "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+  "results": [
+    {
+      "ordinal": 39,
+      "project": "intuitem/ciso-assistant-community",
+      "baseline_inspected_ref": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+      "baseline_observer_record_sha256": "31904cb4c1f88ceee649a29929b957429046fb25f51836658d37feab35ac8b5b",
+      "original_issues": ["reported_partial_blocker"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The immutable root licence states a path-specific community/commercial boundary, so a single repository-wide SPDX is not applicable and does not block the community-source observation.",
+      "official_evidence": [
+        {
+          "evidence_id": "ciso-license-head",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/LICENSE.md#L1-L11",
+          "commit_sha": "3d7e4ff810b1031509a8ca63fac63f6e6f2e798d",
+          "assertion": "Commercial licensing applies inside enterprise/ and AGPLv3 applies outside that path; the exact AGPL only/or-later qualifier is not stated."
+        },
+        {
+          "evidence_id": "ciso-behaviour-community-path",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/intuitem/ciso-assistant-community/blob/1ba187b0117f4dba9e00605bd7d5319ded61cee3/backend/core/models.py#L6930-L7013",
+          "commit_sha": "1ba187b0117f4dba9e00605bd7d5319ded61cee3",
+          "assertion": "The bounded observed model slice is outside enterprise/."
+        }
+      ],
+      "issue_dispositions": [
+        {
+          "issue": "reported_partial_blocker",
+          "disposition": "RESOLVED",
+          "rationale": "The earlier blocker incorrectly required one root-wide SPDX where the root file declares an exact path boundary.",
+          "evidence_refs": ["ciso-license-head", "ciso-behaviour-community-path"]
+        }
+      ],
+      "root_licence_boundary": {
+        "status": "VERIFIED_MIXED_PATH_BOUNDARY",
+        "spdx": "MULTIPLE_BY_PATH",
+        "locus": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/LICENSE.md#L1-L11"
+      },
+      "edition_boundary": {
+        "status": "BOUNDED_COMMUNITY_PATHS_EXCLUDING_ENTERPRISE",
+        "locus": "https://github.com/intuitem/ciso-assistant-community/blob/3d7e4ff810b1031509a8ca63fac63f6e6f2e798d/LICENSE.md#L1-L11"
+      },
+      "behaviour_boundary": {
+        "status": "OBSERVED_IMMUTABLE_COMMUNITY_PATH",
+        "locus": "https://github.com/intuitem/ciso-assistant-community/blob/1ba187b0117f4dba9e00605bd7d5319ded61cee3/backend/core/models.py#L6930-L7013"
+      },
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 46,
+      "project": "ledgersmb/ledgersmb",
+      "baseline_inspected_ref": "fc8472baf609a4d609b176a835e8b408fae9caf9",
+      "baseline_observer_record_sha256": "3f29d1e40d522be8084492b658263eaa3d466adb8c66e3fb61d899bc0db3ed85",
+      "original_issues": ["reported_partial_blocker", "root_licence_status_blocked"],
+      "resolution_status": "RETAIN_PARTIAL",
+      "decision_basis": "The root text and README establish GPLv2 but not a repository-wide only/or-later qualifier; a notice in the observed behavior file cannot establish the entire repository licence expression.",
+      "official_evidence": [
+        {
+          "evidence_id": "ledgersmb-license-head",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/ledgersmb/LedgerSMB/blob/91cee95127dbf033510a65e857b28c8ae32ea146/LICENSE",
+          "commit_sha": "91cee95127dbf033510a65e857b28c8ae32ea146",
+          "assertion": "The root contains the GNU GPL version 2 licence text."
+        },
+        {
+          "evidence_id": "ledgersmb-readme-head",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/ledgersmb/LedgerSMB/blob/91cee95127dbf033510a65e857b28c8ae32ea146/README.md#L198-L202",
+          "commit_sha": "91cee95127dbf033510a65e857b28c8ae32ea146",
+          "assertion": "The root README describes the project as GPLv2 without an only/or-later qualifier."
+        },
+        {
+          "evidence_id": "ledgersmb-behaviour-file",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/ledgersmb/LedgerSMB/blob/fc8472baf609a4d609b176a835e8b408fae9caf9/lib/LedgerSMB/Workflow/Condition/SeparateDuties.pm#L36-L57",
+          "commit_sha": "fc8472baf609a4d609b176a835e8b408fae9caf9",
+          "assertion": "This behavior file declares GPL version 2 or later, but that notice is path-specific."
+        }
+      ],
+      "issue_dispositions": [
+        {
+          "issue": "reported_partial_blocker",
+          "disposition": "RETAINED",
+          "rationale": "The repository-wide exact licence qualifier remains unsupported.",
+          "evidence_refs": ["ledgersmb-license-head", "ledgersmb-readme-head", "ledgersmb-behaviour-file"]
+        },
+        {
+          "issue": "root_licence_status_blocked",
+          "disposition": "RETAINED",
+          "rationale": "A file-specific or-later notice cannot establish the repository-wide qualifier.",
+          "evidence_refs": ["ledgersmb-license-head", "ledgersmb-readme-head", "ledgersmb-behaviour-file"]
+        }
+      ],
+      "root_licence_boundary": {
+        "status": "VERIFIED_ROOT_GPLV2_TEXT_QUALIFIER_UNRESOLVED",
+        "spdx": "NOT_ESTABLISHED",
+        "locus": "https://github.com/ledgersmb/LedgerSMB/blob/91cee95127dbf033510a65e857b28c8ae32ea146/LICENSE"
+      },
+      "edition_boundary": {
+        "status": "BOUNDED_REPOSITORY_ONLY",
+        "locus": "https://github.com/ledgersmb/LedgerSMB/blob/91cee95127dbf033510a65e857b28c8ae32ea146/README.md#L198-L202"
+      },
+      "behaviour_boundary": {
+        "status": "OBSERVED_IMMUTABLE_SOURCE",
+        "locus": "https://github.com/ledgersmb/LedgerSMB/blob/fc8472baf609a4d609b176a835e8b408fae9caf9/lib/LedgerSMB/Workflow/Condition/SeparateDuties.pm#L36-L57"
+      },
+      "residual_blockers": ["Repository-wide GPL-2.0-only versus GPL-2.0-or-later remains unestablished."],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 48,
+      "project": "librenms/librenms",
+      "baseline_inspected_ref": "9831e4e438e438f17445000c872817eb72511b1e",
+      "baseline_observer_record_sha256": "a8de59601797d2e3268dbbb908b6cc8c3eda070f211e75bc21da3fd2e754c633",
+      "original_issues": ["reported_partial_blocker", "root_licence_status_blocked"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root project licence, exact composer SPDX expression, and observed first-party behavior-file notice agree on GPL version 3 or later while retaining separate third-party licences.",
+      "official_evidence": [
+        {
+          "evidence_id": "librenms-root-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/librenms/librenms/blob/9212d2599feff10c58d43b2200ef46b0c2e6d3dc/LICENSE.txt#L1-L5",
+          "commit_sha": "9212d2599feff10c58d43b2200ef46b0c2e6d3dc",
+          "assertion": "LibreNMS is declared GPLv3 while separately licensed bundled packages retain their own terms."
+        },
+        {
+          "evidence_id": "librenms-composer-spdx",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/librenms/librenms/blob/9212d2599feff10c58d43b2200ef46b0c2e6d3dc/composer.json#L15",
+          "commit_sha": "9212d2599feff10c58d43b2200ef46b0c2e6d3dc",
+          "assertion": "The first-party package declares GPL-3.0-or-later."
+        },
+        {
+          "evidence_id": "librenms-behaviour-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/librenms/librenms/blob/9831e4e438e438f17445000c872817eb72511b1e/LibreNMS/Alert/RunAlerts.php#L1-L10",
+          "commit_sha": "9831e4e438e438f17445000c872817eb72511b1e",
+          "assertion": "The observed first-party alert runner declares GPL version 3 or later."
+        }
+      ],
+      "issue_dispositions": [
+        {
+          "issue": "reported_partial_blocker",
+          "disposition": "RESOLVED",
+          "rationale": "Separately licensed dependencies do not prevent a bounded first-party project licence observation.",
+          "evidence_refs": ["librenms-root-license", "librenms-composer-spdx"]
+        },
+        {
+          "issue": "root_licence_status_blocked",
+          "disposition": "RESOLVED",
+          "rationale": "The package manifest supplies the exact first-party SPDX expression and the behavior file confirms the qualifier.",
+          "evidence_refs": ["librenms-composer-spdx", "librenms-behaviour-license"]
+        }
+      ],
+      "root_licence_boundary": {
+        "status": "VERIFIED_FIRST_PARTY_LICENSE_EXPRESSION",
+        "spdx": "GPL-3.0-or-later",
+        "locus": "https://github.com/librenms/librenms/blob/9212d2599feff10c58d43b2200ef46b0c2e6d3dc/composer.json#L15"
+      },
+      "edition_boundary": {
+        "status": "BOUNDED_FIRST_PARTY_PROJECT_SLICE",
+        "locus": "https://github.com/librenms/librenms/blob/9212d2599feff10c58d43b2200ef46b0c2e6d3dc/LICENSE.txt#L1-L5"
+      },
+      "behaviour_boundary": {
+        "status": "OBSERVED_IMMUTABLE_FIRST_PARTY_SOURCE",
+        "locus": "https://github.com/librenms/librenms/blob/9831e4e438e438f17445000c872817eb72511b1e/LibreNMS/Alert/RunAlerts.php#L514-L655"
+      },
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 58,
+      "project": "novuhq/novu",
+      "baseline_inspected_ref": "4926ef59192017a3be329ab06e9d3ea68e085fb2",
+      "baseline_observer_record_sha256": "e8e5ad89a0ef6908b000b98618cb8703598cb08e74f3cb0806f75988a8a4576f",
+      "original_issues": ["reported_partial_blocker", "root_licence_immutable_locus_missing", "root_licence_status_blocked"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root uses LICENSE-MIT and LICENSE-ENTERPRISE rather than a generic LICENSE filename; both immutable refs establish the mixed path boundary and the observed path is outside the declared enterprise/EE union.",
+      "official_evidence": [
+        {
+          "evidence_id": "novu-mit-head",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/novuhq/novu/blob/596b388c205aaefc18d48357d643905bc7a14e55/LICENSE-MIT#L1-L17",
+          "commit_sha": "596b388c205aaefc18d48357d643905bc7a14e55",
+          "assertion": "The repository contains an immutable root MIT licence file."
+        },
+        {
+          "evidence_id": "novu-enterprise-head",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/novuhq/novu/blob/596b388c205aaefc18d48357d643905bc7a14e55/LICENSE-ENTERPRISE#L1-L19",
+          "commit_sha": "596b388c205aaefc18d48357d643905bc7a14e55",
+          "assertion": "The root enterprise licence establishes proprietary enterprise paths."
+        },
+        {
+          "evidence_id": "novu-readme-boundary",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/novuhq/novu/blob/596b388c205aaefc18d48357d643905bc7a14e55/README.md#L274-L280",
+          "commit_sha": "596b388c205aaefc18d48357d643905bc7a14e55",
+          "assertion": "The README enumerates enterprise and EE paths; the conservative exclusion is the union of every declared commercial path."
+        },
+        {
+          "evidence_id": "novu-behaviour-core",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/novuhq/novu/blob/4926ef59192017a3be329ab06e9d3ea68e085fb2/apps/api/src/app/events/usecases/process-bulk-trigger/process-bulk-trigger.usecase.ts#L18-L111",
+          "commit_sha": "4926ef59192017a3be329ab06e9d3ea68e085fb2",
+          "assertion": "The observed bulk-trigger source is outside the declared enterprise/EE path union."
+        }
+      ],
+      "issue_dispositions": [
+        {
+          "issue": "reported_partial_blocker",
+          "disposition": "RESOLVED",
+          "rationale": "The mixed licence boundary is explicit and the observed behavior is in the MIT-bounded source slice.",
+          "evidence_refs": ["novu-mit-head", "novu-enterprise-head", "novu-readme-boundary", "novu-behaviour-core"]
+        },
+        {
+          "issue": "root_licence_immutable_locus_missing",
+          "disposition": "RESOLVED",
+          "rationale": "The earlier root-name scan omitted LICENSE-MIT and LICENSE-ENTERPRISE.",
+          "evidence_refs": ["novu-mit-head", "novu-enterprise-head"]
+        },
+        {
+          "issue": "root_licence_status_blocked",
+          "disposition": "RESOLVED",
+          "rationale": "The immutable non-generic root files establish MIT and enterprise boundaries without relying on GitHub detector inference.",
+          "evidence_refs": ["novu-mit-head", "novu-enterprise-head", "novu-readme-boundary"]
+        }
+      ],
+      "root_licence_boundary": {
+        "status": "VERIFIED_MIXED_ROOT_LICENSE_FILES",
+        "spdx": "MIT",
+        "locus": "https://github.com/novuhq/novu/blob/596b388c205aaefc18d48357d643905bc7a14e55/LICENSE-MIT#L1-L17"
+      },
+      "edition_boundary": {
+        "status": "BOUNDED_CORE_EXCLUDING_ENTERPRISE_EE_UNION",
+        "locus": "https://github.com/novuhq/novu/blob/596b388c205aaefc18d48357d643905bc7a14e55/README.md#L274-L280"
+      },
+      "behaviour_boundary": {
+        "status": "OBSERVED_IMMUTABLE_CORE_SOURCE",
+        "locus": "https://github.com/novuhq/novu/blob/4926ef59192017a3be329ab06e9d3ea68e085fb2/apps/api/src/app/events/usecases/process-bulk-trigger/process-bulk-trigger.usecase.ts#L18-L111"
+      },
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 71,
+      "project": "openmrs/openmrs-esm-task-list",
+      "baseline_inspected_ref": "f22e24d0cf933b3e2268844e4aa68364c3d2d475",
+      "baseline_observer_record_sha256": "d05b4686313cdbd73c81101e7352fa538ec26d29ade93a5a5766bf7e06cb8e0f",
+      "original_issues": ["edition_boundary_blocked", "reported_partial_blocker", "repository_archived"],
+      "resolution_status": "RETAIN_PARTIAL",
+      "decision_basis": "The immutable frontend explicitly requires a separately versioned backend that RUN-034 did not pin, and the frontend repository remains archived.",
+      "official_evidence": [
+        {
+          "evidence_id": "openmrs-task-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/LICENSE#L1-L20",
+          "commit_sha": "f22e24d0cf933b3e2268844e4aa68364c3d2d475",
+          "assertion": "The frontend root licence is MPL-2.0."
+        },
+        {
+          "evidence_id": "openmrs-task-readme",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/README.md#L5-L9",
+          "commit_sha": "f22e24d0cf933b3e2268844e4aa68364c3d2d475",
+          "assertion": "The frontend declares a dependency on the separate openmrs-module-tasks backend."
+        },
+        {
+          "evidence_id": "openmrs-task-frontend",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/src/workspace/task-list.resource.ts#L97-L180",
+          "commit_sha": "f22e24d0cf933b3e2268844e4aa68364c3d2d475",
+          "assertion": "The bounded behavior evidence covers the frontend resource only."
+        }
+      ],
+      "issue_dispositions": [
+        {
+          "issue": "edition_boundary_blocked",
+          "disposition": "RETAINED",
+          "rationale": "The required backend ref, licence, and compatibility remain unpinned.",
+          "evidence_refs": ["openmrs-task-readme", "openmrs-task-frontend"]
+        },
+        {
+          "issue": "reported_partial_blocker",
+          "disposition": "RETAINED",
+          "rationale": "Frontend-only evidence cannot establish the split product workflow.",
+          "evidence_refs": ["openmrs-task-readme", "openmrs-task-frontend"]
+        },
+        {
+          "issue": "repository_archived",
+          "disposition": "RETAINED",
+          "rationale": "No successor or migration relationship was established, and archive status is preserved from RUN-034 without a quality inference.",
+          "evidence_refs": ["openmrs-task-license", "openmrs-task-readme"]
+        }
+      ],
+      "root_licence_boundary": {
+        "status": "VERIFIED_ROOT_LICENSE",
+        "spdx": "MPL-2.0",
+        "locus": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/LICENSE#L1-L20"
+      },
+      "edition_boundary": {
+        "status": "BLOCKED_SPLIT_UNPINNED_BACKEND",
+        "locus": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/README.md#L5-L9"
+      },
+      "behaviour_boundary": {
+        "status": "OBSERVED_IMMUTABLE_FRONTEND_ONLY",
+        "locus": "https://github.com/openmrs/openmrs-esm-task-list/blob/f22e24d0cf933b3e2268844e4aa68364c3d2d475/src/workspace/task-list.resource.ts#L97-L180"
+      },
+      "residual_blockers": [
+        "Required backend ref, licence, compatibility, and runtime behavior remain unestablished.",
+        "Archive status remains; no successor or migration relationship is established."
+      ],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    }
+  ]
+}

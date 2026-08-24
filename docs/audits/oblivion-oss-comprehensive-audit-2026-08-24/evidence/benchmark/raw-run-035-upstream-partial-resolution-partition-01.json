@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-035",
+  "generated_at": "2026-08-24T22:20:00+12:00",
+  "role": "UPSTREAM_PARTIAL_RESOLUTION_OBSERVER",
+  "status": "PARTITION_REVIEW_COMPLETE_4_RESOLVED_2_RETAINED_NO_CREDIT",
+  "partition": {
+    "number": 1,
+    "ordinals": [3, 4, 19, 20, 22, 23],
+    "project_count": 6
+  },
+  "input_pins": {
+    "base_wave_sha256": "ea0bb6bde44aa8f227d6e4133788e8fcb08c3069e2aecab4e0bc194cee2f3651",
+    "canonical_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4"
+  },
+  "methodology": {
+    "allowed_sources": "Official GitHub repository files at immutable commit SHAs only.",
+    "decision_boundary": "Resolve only the explicit RUN-034 observer blocker when official immutable evidence closes it; otherwise retain PARTIAL_BLOCKED.",
+    "prohibited_inferences": ["repository ancestry", "repository equivalence", "runtime behavior", "maintenance quality", "target mapping", "benchmark equivalence", "completion"]
+  },
+  "external_mutations_attestation": "NONE_READ_ONLY_OFFICIAL_SOURCE_REVIEW",
+  "results": [
+    {
+      "ordinal": 3,
+      "project": "bahmni/openmrs-module-ipd-frontend",
+      "baseline_inspected_ref": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+      "baseline_observer_record_sha256": "d46eed268990ac9b2092694b4d1fe03ef75d614a2c65d4eb708c57fe061c6b67",
+      "original_issues": ["edition_boundary_blocked", "reported_partial_blocker", "root_licence_spdx_unresolved", "root_licence_status_blocked"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root licence and package manifest identify MPL-2.0, while the README bounds this repository to the IPD micro-frontend and the behavior remains cited from that same immutable repository.",
+      "official_evidence": [
+        {
+          "evidence_id": "ipd-package-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/package.json#L1-L7",
+          "commit_sha": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+          "assertion": "The repository package manifest declares exact SPDX MPL-2.0."
+        },
+        {
+          "evidence_id": "ipd-readme-boundary",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/README.md#L1-L11",
+          "commit_sha": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+          "assertion": "The README identifies a React IPD micro-frontend loaded by Bahmni and a federated entry."
+        },
+        {
+          "evidence_id": "ipd-task-behaviour",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/src/features/DisplayControls/NursingTasks/utils/NursingTasksUtils.js#L49-L249",
+          "commit_sha": "cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9",
+          "assertion": "The immutable source separates scheduled, completed, stopped, not-done, missed, and PRN presentation states."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "edition_boundary_blocked", "disposition": "RESOLVED", "rationale": "This repository-only micro-frontend boundary is explicit; host and external modules remain excluded.", "evidence_refs": ["ipd-readme-boundary"]},
+        {"issue": "reported_partial_blocker", "disposition": "RESOLVED", "rationale": "The licence, repository boundary, and behavior slice are independently anchored.", "evidence_refs": ["ipd-package-license", "ipd-readme-boundary", "ipd-task-behaviour"]},
+        {"issue": "root_licence_spdx_unresolved", "disposition": "RESOLVED", "rationale": "The package manifest supplies exact SPDX MPL-2.0.", "evidence_refs": ["ipd-package-license"]},
+        {"issue": "root_licence_status_blocked", "disposition": "RESOLVED", "rationale": "Manual immutable evidence closes the detector NOASSERTION gap.", "evidence_refs": ["ipd-package-license"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_PACKAGE_LICENSE_EXPRESSION", "spdx": "MPL-2.0", "locus": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/package.json#L1-L7"},
+      "edition_boundary": {"status": "BOUNDED_IPD_MICRO_FRONTEND_REPOSITORY", "locus": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/README.md#L1-L11"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_REPOSITORY_SOURCE", "locus": "https://github.com/Bahmni/openmrs-module-ipd-frontend/blob/cd5aff98be8b6b46cf85ac4e61964c5f27eb59d9/src/features/DisplayControls/NursingTasks/utils/NursingTasksUtils.js#L49-L249"},
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 4,
+      "project": "bahmni/openmrs-module-medicationadministration",
+      "baseline_inspected_ref": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+      "baseline_observer_record_sha256": "cbd47b13b5eb268269c7a37fac9785b5bcddc76276daf1b1f6c050084e509867",
+      "original_issues": ["edition_boundary_blocked", "reported_partial_blocker", "root_licence_spdx_unresolved", "root_licence_status_blocked"],
+      "resolution_status": "RETAIN_PARTIAL",
+      "decision_basis": "The module boundary and behavior are supportable, but the repository declares Mozilla Public License 2.0 with a Healthcare Disclaimer without an exact project-declared SPDX expression for the combination.",
+      "official_evidence": [
+        {
+          "evidence_id": "medadmin-pom-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/pom.xml#L10-L15",
+          "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+          "assertion": "The project declares Mozilla Public License 2.0 with Healthcare Disclaimer without an exact combined SPDX expression."
+        },
+        {
+          "evidence_id": "medadmin-module-boundary",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/pom.xml#L29-L44",
+          "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+          "assertion": "The local module list is api and omod; OpenMRS and FHIR dependencies are external."
+        },
+        {
+          "evidence_id": "medadmin-model-behaviour",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java#L27-L54",
+          "commit_sha": "acb65f75d3515b4f2b36083345bfbafc2ee146b0",
+          "assertion": "The immutable model records medication-administration actor, order, state, reason, time, dose, route, site, and notes."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "edition_boundary_blocked", "disposition": "RESOLVED", "rationale": "The local api/omod boundary and external dependencies are explicit.", "evidence_refs": ["medadmin-module-boundary"]},
+        {"issue": "reported_partial_blocker", "disposition": "RETAINED", "rationale": "The combined licence declaration still lacks an exact project-declared SPDX expression.", "evidence_refs": ["medadmin-pom-license"]},
+        {"issue": "root_licence_spdx_unresolved", "disposition": "RETAINED", "rationale": "Reducing the healthcare-disclaimer combination to plain MPL-2.0 would be an inference.", "evidence_refs": ["medadmin-pom-license"]},
+        {"issue": "root_licence_status_blocked", "disposition": "RETAINED", "rationale": "The exact combined root licence expression remains unresolved.", "evidence_refs": ["medadmin-pom-license"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_COMPOSITE_DECLARATION_EXACT_SPDX_UNRESOLVED", "spdx": "NOT_ESTABLISHED", "locus": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/pom.xml#L10-L15"},
+      "edition_boundary": {"status": "BOUNDED_API_OMOD_MODULE_REPOSITORY", "locus": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/pom.xml#L29-L44"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_REPOSITORY_SOURCE", "locus": "https://github.com/Bahmni/openmrs-module-medicationadministration/blob/acb65f75d3515b4f2b36083345bfbafc2ee146b0/api/src/main/java/org/openmrs/module/ipd/api/model/MedicationAdministration.java#L27-L54"},
+      "residual_blockers": ["No exact project-declared SPDX expression covers the MPL-2.0 plus Healthcare Disclaimer combination."],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 19,
+      "project": "faveosuite/faveo-helpdesk",
+      "baseline_inspected_ref": "6568aa45f89b78028b05cddfb2d37c171d2fbab1",
+      "baseline_observer_record_sha256": "795e221c64e9c5dc84786c578b2986fe83aada58d519a6bef50c03b0225baa22",
+      "original_issues": ["reported_partial_blocker"],
+      "resolution_status": "RETAIN_PARTIAL",
+      "decision_basis": "The root licence and edition boundary are visible, but root OSL-3.0 conflicts with package metadata marked MIT and divergent activity timestamps do not establish maintenance quality.",
+      "official_evidence": [
+        {
+          "evidence_id": "faveo-root-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/LICENSE#L1-L5",
+          "commit_sha": "6568aa45f89b78028b05cddfb2d37c171d2fbab1",
+          "assertion": "The root file self-identifies Open Software License 3.0."
+        },
+        {
+          "evidence_id": "faveo-package-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/composer.json#L1-L8",
+          "commit_sha": "6568aa45f89b78028b05cddfb2d37c171d2fbab1",
+          "assertion": "Package metadata says MIT and must not silently replace the conflicting root evidence."
+        },
+        {
+          "evidence_id": "faveo-community-boundary",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/README.md#L18-L24",
+          "commit_sha": "6568aa45f89b78028b05cddfb2d37c171d2fbab1",
+          "assertion": "The README separates Community, Freelancer, Enterprise, and Service Desk offerings."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "reported_partial_blocker", "disposition": "RETAINED", "rationale": "Maintenance quality and the root-versus-package licence scope remain unresolved.", "evidence_refs": ["faveo-root-license", "faveo-package-license", "faveo-community-boundary"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_ROOT_OSL_WITH_PACKAGE_METADATA_CONFLICT", "spdx": "OSL-3.0", "locus": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/LICENSE#L1-L5"},
+      "edition_boundary": {"status": "BOUNDED_COMMUNITY_REPOSITORY", "locus": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/README.md#L18-L24"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_COMMUNITY_SOURCE", "locus": "https://github.com/faveosuite/faveo-helpdesk/blob/6568aa45f89b78028b05cddfb2d37c171d2fbab1/app/Http/Controllers/Agent/helpdesk/TicketController.php#L1077-L1208"},
+      "residual_blockers": ["Maintenance quality is unresolved from divergent timestamps.", "Root OSL-3.0 and package MIT scope are not reconciled."],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 20,
+      "project": "fleetbase/fleetbase",
+      "baseline_inspected_ref": "007a83389960bd4be281fb6b51d7350e5dc047f7",
+      "baseline_observer_record_sha256": "ea87cf3fa3492ba7b2c98924c12582eb0477020c64bdf026429807b87c7f37f5",
+      "original_issues": ["edition_boundary_blocked", "observed_behaviour_status_blocked", "reported_partial_blocker"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root repository can be bounded as a composition/deployment project: its licence, separately versioned submodule boundary, and executable deployment behavior are all immutable and explicit.",
+      "official_evidence": [
+        {
+          "evidence_id": "fleetbase-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/LICENSE.md#L1-L8",
+          "commit_sha": "007a83389960bd4be281fb6b51d7350e5dc047f7",
+          "assertion": "The root source is declared AGPL version 3."
+        },
+        {
+          "evidence_id": "fleetbase-submodules",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/.gitmodules#L1-L47",
+          "commit_sha": "007a83389960bd4be281fb6b51d7350e5dc047f7",
+          "assertion": "FleetOps, core API, UI, IAM, ledger, portal, AI, and other components are separately versioned submodules and remain excluded."
+        },
+        {
+          "evidence_id": "fleetbase-deployment-behaviour",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/scripts/docker-install.sh#L299-L486",
+          "commit_sha": "007a83389960bd4be281fb6b51d7350e5dc047f7",
+          "assertion": "The root script uses temporary configuration files and atomic moves, starts containers, waits for database health, and invokes deployment."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "edition_boundary_blocked", "disposition": "RESOLVED", "rationale": "The root is bounded to composition and deployment; all separately versioned submodule behavior is excluded.", "evidence_refs": ["fleetbase-submodules"]},
+        {"issue": "observed_behaviour_status_blocked", "disposition": "RESOLVED", "rationale": "Executable deployment behavior exists in the canonical root itself.", "evidence_refs": ["fleetbase-deployment-behaviour"]},
+        {"issue": "reported_partial_blocker", "disposition": "RESOLVED", "rationale": "Root licence, composition boundary, and root executable behavior are explicit.", "evidence_refs": ["fleetbase-license", "fleetbase-submodules", "fleetbase-deployment-behaviour"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_ROOT_LICENSE", "spdx": "AGPL-3.0", "locus": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/LICENSE.md#L1-L8"},
+      "edition_boundary": {"status": "BOUNDED_ROOT_COMPOSITION_EXCLUDING_SUBMODULES", "locus": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/.gitmodules#L1-L47"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_ROOT_DEPLOYMENT_SOURCE", "locus": "https://github.com/fleetbase/fleetbase/blob/007a83389960bd4be281fb6b51d7350e5dc047f7/scripts/docker-install.sh#L299-L486"},
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 22,
+      "project": "fleetdm/fleet",
+      "baseline_inspected_ref": "fda3c41a5b3e62df97e2ec82fd788398b502c562",
+      "baseline_observer_record_sha256": "6b575686816a96cb1e1706f19efce0bac0a40f1b51be3bccf6ccd6078770eb65",
+      "original_issues": ["reported_partial_blocker", "root_licence_spdx_unresolved", "root_licence_status_blocked"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root declares explicit path-scoped licences, and the observed server/service path is outside ee/ and docs so it falls within the root's stated MIT scope.",
+      "official_evidence": [
+        {
+          "evidence_id": "fleetdm-scoped-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/LICENSE#L1-L24",
+          "commit_sha": "fda3c41a5b3e62df97e2ec82fd788398b502c562",
+          "assertion": "Docs, ee/, client JavaScript, and remaining ordinary content receive explicit different licence scopes."
+        },
+        {
+          "evidence_id": "fleetdm-ee-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/ee/LICENSE#L1-L27",
+          "commit_sha": "fda3c41a5b3e62df97e2ec82fd788398b502c562",
+          "assertion": "The enterprise path has its own non-community licence boundary."
+        },
+        {
+          "evidence_id": "fleetdm-host-behaviour",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/server/service/hosts.go#L398-L499",
+          "commit_sha": "fda3c41a5b3e62df97e2ec82fd788398b502c562",
+          "assertion": "The observed host-list service is outside ee/ and applies authorization and team/viewer scope."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "reported_partial_blocker", "disposition": "RESOLVED", "rationale": "A path-scoped multi-license boundary is sufficient for the bounded community behavior slice.", "evidence_refs": ["fleetdm-scoped-license", "fleetdm-ee-license", "fleetdm-host-behaviour"]},
+        {"issue": "root_licence_spdx_unresolved", "disposition": "RESOLVED", "rationale": "No fabricated root-wide SPDX is needed; the root explicitly scopes MIT, CC-BY-SA, and enterprise paths.", "evidence_refs": ["fleetdm-scoped-license", "fleetdm-ee-license"]},
+        {"issue": "root_licence_status_blocked", "disposition": "RESOLVED", "rationale": "Manual immutable path evidence closes the detector NOASSERTION gap.", "evidence_refs": ["fleetdm-scoped-license", "fleetdm-ee-license"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_SCOPED_MULTI_LICENSE_BOUNDARY", "spdx": "MULTIPLE_BY_PATH", "locus": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/LICENSE#L1-L24"},
+      "edition_boundary": {"status": "BOUNDED_NON_ENTERPRISE_SERVER_SOURCE", "locus": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/ee/LICENSE#L1-L27"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_COMMUNITY_SOURCE", "locus": "https://github.com/fleetdm/fleet/blob/fda3c41a5b3e62df97e2ec82fd788398b502c562/server/service/hosts.go#L398-L499"},
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    },
+    {
+      "ordinal": 23,
+      "project": "formbricks/formbricks",
+      "baseline_inspected_ref": "b344ddd73cfb0f7af86573176d53534a5321d982",
+      "baseline_observer_record_sha256": "26a098656713023c74550e1d2ccfa0190fc3a1dbc598af222474768cd5edb026",
+      "original_issues": ["reported_partial_blocker", "root_licence_spdx_unresolved", "root_licence_status_blocked"],
+      "resolution_status": "RESOLVED_OBSERVER_EVIDENCE",
+      "decision_basis": "The root explicitly scopes enterprise, named MIT packages, and default AGPLv3 content; the observed response source is outside the enterprise module path.",
+      "official_evidence": [
+        {
+          "evidence_id": "formbricks-scoped-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/LICENSE#L1-L8",
+          "commit_sha": "b344ddd73cfb0f7af86573176d53534a5321d982",
+          "assertion": "The root assigns enterprise modules, named MIT packages, and remaining AGPLv3 content to explicit scopes."
+        },
+        {
+          "evidence_id": "formbricks-ee-license",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/apps/web/modules/ee/LICENSE#L1-L28",
+          "commit_sha": "b344ddd73cfb0f7af86573176d53534a5321d982",
+          "assertion": "The enterprise module path has a separate proprietary licence."
+        },
+        {
+          "evidence_id": "formbricks-response-behaviour",
+          "source_type": "OFFICIAL_GITHUB_IMMUTABLE",
+          "url": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/apps/web/app/api/v2/client/%5BworkspaceId%5D/responses/lib/response.ts#L39-L80",
+          "commit_sha": "b344ddd73cfb0f7af86573176d53534a5321d982",
+          "assertion": "The observed response source lies outside modules/ee and validates context and partial-versus-finished response state."
+        }
+      ],
+      "issue_dispositions": [
+        {"issue": "reported_partial_blocker", "disposition": "RESOLVED", "rationale": "The explicit path boundary supports the bounded non-enterprise behavior observation.", "evidence_refs": ["formbricks-scoped-license", "formbricks-ee-license", "formbricks-response-behaviour"]},
+        {"issue": "root_licence_spdx_unresolved", "disposition": "RESOLVED", "rationale": "No single root-wide SPDX is applicable; exact path scopes are preserved instead.", "evidence_refs": ["formbricks-scoped-license", "formbricks-ee-license"]},
+        {"issue": "root_licence_status_blocked", "disposition": "RESOLVED", "rationale": "Manual immutable evidence closes the detector NOASSERTION gap.", "evidence_refs": ["formbricks-scoped-license", "formbricks-ee-license"]}
+      ],
+      "root_licence_boundary": {"status": "VERIFIED_SCOPED_MULTI_LICENSE_BOUNDARY", "spdx": "MULTIPLE_BY_PATH", "locus": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/LICENSE#L1-L8"},
+      "edition_boundary": {"status": "BOUNDED_NON_ENTERPRISE_APPLICATION_SOURCE", "locus": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/apps/web/modules/ee/LICENSE#L1-L28"},
+      "behaviour_boundary": {"status": "OBSERVED_IMMUTABLE_NON_ENTERPRISE_SOURCE", "locus": "https://github.com/formbricks/formbricks/blob/b344ddd73cfb0f7af86573176d53534a5321d982/apps/web/app/api/v2/client/%5BworkspaceId%5D/responses/lib/response.ts#L39-L80"},
+      "residual_blockers": [],
+      "target_specific_mapping_credit": false,
+      "benchmark_credit": false,
+      "completion_credit": false
+    }
+  ]
+}
