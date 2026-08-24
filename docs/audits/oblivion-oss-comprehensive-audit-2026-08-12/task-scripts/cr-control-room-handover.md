@@ -5,12 +5,12 @@
 - Owning module: Control Room
 - Legacy family: `CR-CONTROL-ROOM-HANDOVER`
 - Audited source: `081ef198f9f992f224e8c0c9fba33df33dde40be`
-- Validation: **Blocked—static source-specific script; not runtime-executed or independently semantically validated**
+- Validation: **Blocked—authenticated deployed-current GET attempted, but all four required viewports rendered `500 Server Error`; deployed build identity and independent semantic validation remain absent**
 - Benchmark: Pass 3 pending separate capability-level adjudication
 
 ## Start condition and entry
 
-Start at `control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`). Route existence is exact; visibility and access are unexecuted.
+Start at `control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`). Route existence is exact. On 24 Aug 2026, an authenticated Demo Admin discovered an existing Active-shift link and attempted the GET, but the deployed-current page failed before the handover UI rendered.
 
 ## Goal and completion state
 
@@ -25,11 +25,11 @@ Retrieve and understand the exact routed information/file without claiming a mut
 
 ## Ordered task and decisions
 
-1. Enter through `GET|HEAD control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`); the route is exact, but menu visibility and runtime access were not executed.
+1. Enter through `GET|HEAD control-room/shifts/{shift}/handover` (`control-room.shifts.handover-page`). An authenticated rendered link supplied shift ID 9; the GET was attempted at 1440×900, 1280×800, 1024×768 and 390×844 and rendered `500 Server Error` at each viewport.
 
 ## Source-applicable states and transitions
 
-- **information presented** is applicable only to `show` / `ROUTE-0306` at `app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php:19`; it is not runtime-observed.
+- **information presented** is applicable only to `show` / `ROUTE-0306` at `app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php:19`; it was not observed because the deployed-current GET rendered a generic server-error page.
 - Presentation-state applicability must be determined from exact signals in `resources/js/pages/control-room/shifts/handover.tsx`; page presence alone is not loading/empty/error proof.
 
 ## Validation and source-visible errors
@@ -38,11 +38,11 @@ Retrieve and understand the exact routed information/file without claiming a mut
 
 ## Failure and recovery paths
 
-- No source-defined failure/recovery branch was extracted from the assigned methods; no retry, correction, denial rendering, offline, concurrency, or queue recovery is claimed.
+- The deployed-current GET rendered a generic `500 Server Error` page with no task-specific recovery control. No source-defined root cause, retry, correction, denial rendering, offline, concurrency or queue recovery is attributed because the deployed build identity and server exception evidence are unavailable.
 
 ## Completion evidence and next handoff
 
-- Completion is limited to  the requested information being presented for the actor's decision. No persisted outcome is claimed.
+- Completion would be limited to the requested information being presented for the actor's decision. The 24 Aug deployed-current attempt did not reach that state, and no persisted outcome is claimed.
 - No source-defined downstream handoff/event/job/notification was extracted from the assigned methods; no next owner or worklist is invented.
 
 ## Route/action evidence
@@ -55,3 +55,4 @@ Retrieve and understand the exact routed information/file without claiming a mut
 - Exact render/action page relationships: `resources/js/pages/control-room/shifts/handover.tsx`.
 - Capability basis: unchanged current family; no >6-write umbrella split triggered
 - No task success, accessibility, recovery, notification delivery, handoff ownership, or comprehension is claimed. Independent review remains blocked.
+- Supplemental evidence: `evidence/browser/deployed-current-control-room-handover-500-2026-08-24.json`. This failed entry attempt changes neither the 0/790 canonical task numerator nor the 1,876/1,880 immutable-baseline visual-measurement numerator.

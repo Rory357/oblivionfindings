@@ -87,7 +87,7 @@
       "denominator": 1880,
       "percent": 99.79,
       "status": "blocked",
-      "detail": "Four immutable-baseline Control Room handover rows lack full geometry; 469/470 families are fully measured. A separate current-main pass measured the materially changed handover component at all four viewports without horizontal overflow, so it does not retroactively change baseline credit."
+      "detail": "Four immutable-baseline Control Room handover rows lack full geometry; 469/470 families are fully measured. A separate historical browser-evidence pass measured the materially changed handover component at all four viewports without horizontal overflow. On 24 Aug an authenticated unknown-build deployment instead rendered 500 Server Error at all four viewports. Neither supplemental result retroactively changes baseline credit."
     },
     "browser_claims_use_allowed_labels": {
       "completed": 8753,
@@ -115,14 +115,14 @@
       "denominator": 659,
       "percent": 38.39,
       "status": "blocked",
-      "detail": "144 are source-inferred candidates and 262 unresolved or blocked; runtime interaction coverage is 0/659."
+      "detail": "All 659 custom usages are statically classified. The 253 numerator means exact trigger pairing, not classification coverage; 144 are source-inferred candidates and 262 are unresolved or blocked. Runtime interaction coverage is 0/659."
     },
     "primitive_overlay_static_trigger_classification": {
       "completed": 242,
       "denominator": 477,
       "percent": 50.73,
       "status": "blocked",
-      "detail": "235 primitive roots remain without an exact statically reachable resolved activator; runtime interaction coverage is 0/477."
+      "detail": "All 477 primitive roots are statically classified. The 242 numerator means exact trigger pairing, not classification coverage; 235 roots remain without an exact statically reachable resolved activator. Runtime interaction coverage is 0/477."
     },
     "material_required_states_classified": {
       "completed": 4312,

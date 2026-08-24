@@ -41,6 +41,7 @@ REMEDIATION_DELIVERY = SOURCE / "remediation-delivery-snapshot-2026-08-23.json"
 DASHBOARD = AUDIT / "audit-dashboard.html"
 FINDINGS = AUDIT / "findings.json"
 DEPLOYED_LOGIN_RESAMPLE = AUDIT / "evidence" / "browser" / "deployed-public-login-resample-2026-08-21.json"
+DEPLOYED_HANDOVER_500 = AUDIT / "evidence" / "browser" / "deployed-current-control-room-handover-500-2026-08-24.json"
 
 
 def sha(path: Path) -> str:
@@ -64,6 +65,7 @@ manifest = load(MANIFEST)
 benchmark = load(BENCHMARK)
 visual_summary = load(VISUAL_SUMMARY)
 deployed_login_resample = load(DEPLOYED_LOGIN_RESAMPLE)
+deployed_handover_500 = load(DEPLOYED_HANDOVER_500)
 completion = load(COMPLETION)
 findings_doc = load(FINDINGS)
 findings = findings_doc.get("findings", findings_doc)
@@ -80,6 +82,7 @@ GENERATED_AT = max(
             benchmark,
             visual_summary,
             deployed_login_resample,
+            deployed_handover_500,
             completion,
             findings_doc,
             finding_reconciliation,
@@ -246,6 +249,12 @@ validation["checks"].update({
     "deployed_login_resample_retains_release_identity_blocker": (
         deployed_login_resample["source_boundary"]["deployed_git_or_release_identifier_exposed"] is False
     ),
+    "deployed_handover_500_is_read_only_and_unattributed": (
+        deployed_handover_500["source_boundary"]["deployed_build_identity"] is None
+        and deployed_handover_500["completion_effect"]["canonical_task_completed"] is False
+        and deployed_handover_500["completion_effect"]["canonical_task_numerator_change"] == 0
+        and deployed_handover_500["completion_effect"]["immutable_baseline_visual_rows_completed"] == 0
+    ),
 })
 
 hashes = validation["current_artifact_hashes"]
@@ -276,6 +285,7 @@ hashes.update({
     "remediation_delivery_snapshot_sha256": sha(REMEDIATION_DELIVERY),
     "audit_dashboard_sha256": sha(DASHBOARD),
     "deployed_public_login_resample_sha256": sha(DEPLOYED_LOGIN_RESAMPLE),
+    "deployed_current_control_room_handover_500_sha256": sha(DEPLOYED_HANDOVER_500),
 })
 for prefix, pattern in (
     ("benchmark_wave", "benchmark-target-specific-adjudication-904-wave*.json"),
@@ -295,6 +305,7 @@ pointer["artifacts"]["validation_report"] = record(VALIDATION)
 pointer["artifacts"]["dashboard"] = record(DASHBOARD)
 pointer["artifacts"]["remediation_delivery_snapshot"] = record(REMEDIATION_DELIVERY)
 pointer["artifacts"]["deployed_public_login_resample"] = record(DEPLOYED_LOGIN_RESAMPLE)
+pointer["artifacts"]["deployed_current_control_room_handover_500"] = record(DEPLOYED_HANDOVER_500)
 pointer["artifacts"]["route_page_source_provenance_reconciliation"] = record(SURFACE_RECONCILIATION)
 write(POINTER, pointer)
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-08-24T14:39:31+12:00",
+  "generated_at": "2026-08-24T15:06:48+12:00",
   "scope": "Audit artifacts only; no application source or audit-credit mutation.",
   "machine_path_replacements": 178,
   "machine_path_files": [
@@ -31,7 +31,7 @@
     "generators/reconcile-remediation-wave-2026-08-22.py"
   ],
   "remaining_machine_local_paths": 0,
-  "normalized_jpeg_named_png_count": 52,
+  "normalized_jpeg_named_png_count": 56,
   "normalized_images": [
     {
       "path": "evidence/browser/BVIS-0001-dashboard-1600x1000-observed-cropped.png",
@@ -344,6 +344,30 @@
       "width": 3425,
       "height": 1299,
       "pixel_sha256": "0461ed3f06aa28c8ab5a47d33e55f91d21b8a3119e857ba6257532e088b507ac"
+    },
+    {
+      "path": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1024x768.png",
+      "width": 1024,
+      "height": 768,
+      "pixel_sha256": "de27da998311c18f030c9ac5d6599bf2f96cab50b4299f8b2cc0fd5383c969d9"
+    },
+    {
+      "path": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1280x800.png",
+      "width": 1280,
+      "height": 800,
+      "pixel_sha256": "30094146dc61d119f434189a7fe99446a15a8aab60f25e1b205532f9ab663f36"
+    },
+    {
+      "path": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1440x900.png",
+      "width": 1440,
+      "height": 900,
+      "pixel_sha256": "7befe79e1a0f492e8376d88430ae386f53ad0da3f2d13b47e4e3bcbacb55eb76"
+    },
+    {
+      "path": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-390x844.png",
+      "width": 390,
+      "height": 844,
+      "pixel_sha256": "c2ab812b9c6bc2aee863eee0b91a9cd2cd05d1340e3a94c761435de3b8245586"
     }
   ],
   "remaining_jpeg_named_png": [],

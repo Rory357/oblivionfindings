@@ -1,0 +1,100 @@
+{
+  "schema_version": "1.0",
+  "artifact": "deployed-current-control-room-handover-500",
+  "generated_at": "2026-08-24T14:50:05+12:00",
+  "observed_from": "2026-08-24T14:49:54+12:00",
+  "observed_to": "2026-08-24T14:50:05+12:00",
+  "classification": "supplemental_authenticated_deployed_current_failure_unknown_build_no_audit_credit",
+  "source_boundary": {
+    "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
+    "published_origin_main_at_review": "20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4",
+    "reviewed_local_application_main": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "deployed_build_identity": null,
+    "attribution": "The deployed build does not expose an independently verified commit or release marker. The observation is not attributed to the audited commit, published origin/main, or reviewed local main."
+  },
+  "environment": {
+    "origin": "https://oblivionfindings.com",
+    "actor": "Demo Admin",
+    "authentication": "Existing user-supplied authenticated session; no credential is retained in this artifact.",
+    "site_scope": "not visibly selected",
+    "interaction_boundary": "Read-only GET navigation, rendered-link discovery, DOM text/count reads, responsive viewport changes and screenshots only. No form, handover, acknowledgement, preparation, override, acceptance, alert, shift or other domain action was submitted."
+  },
+  "target": {
+    "feature_id": "CAP-CR-SHIFT-HANDOVER",
+    "legacy_family_id": "CR-CONTROL-ROOM-HANDOVER",
+    "task_script_id": "TASK-CAP-CR-SHIFT-HANDOVER",
+    "route_id": "ROUTE-0306",
+    "route_name": "control-room.shifts.handover-page",
+    "method": "GET",
+    "path_template": "/control-room/shifts/{shift}/handover",
+    "middleware_atoms_from_audited_source": [
+      "web",
+      "auth",
+      "permission:controlRoom.alerts.manage"
+    ]
+  },
+  "safe_discovery": {
+    "list_url": "https://oblivionfindings.com/control-room/shifts",
+    "active_shift_id": 9,
+    "active_shift_label": "[INCIDENT-HANDOVER-E2E] Incoming closure desk",
+    "lead_label": "Playwright Incoming Control Room Operator",
+    "discovered_handover_path": "/control-room/shifts/9/handover",
+    "id_source": "Rendered link on the authenticated Active shifts list; the ID was not guessed or copied from historical evidence."
+  },
+  "browser_observation": {
+    "final_url": "https://oblivionfindings.com/control-room/shifts/9/handover",
+    "rendered_title": "Server Error",
+    "rendered_body_text": "500\nServer Error",
+    "rendered_status_code": 500,
+    "transport_status_independently_captured": false,
+    "handover_ui_rendered": false,
+    "forms_present": 0,
+    "buttons_present": 0,
+    "viewport_records": [
+      {
+        "viewport": "1440x900",
+        "document_horizontal_overflow": false,
+        "result": "rendered_500_server_error",
+        "screenshot": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1440x900.png",
+        "screenshot_sha256": "6d5587b9e61f82c02ddf7565d3c121dbe9f7b4cd86a27e7882adeda6d702cdbf"
+      },
+      {
+        "viewport": "1280x800",
+        "document_horizontal_overflow": false,
+        "result": "rendered_500_server_error",
+        "screenshot": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1280x800.png",
+        "screenshot_sha256": "46ba6c750ce11006cf94542b444af4647c6286e91e34584af7ab77dda3235dce"
+      },
+      {
+        "viewport": "1024x768",
+        "document_horizontal_overflow": false,
+        "result": "rendered_500_server_error",
+        "screenshot": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-1024x768.png",
+        "screenshot_sha256": "48066f7e99bf8e63880f8399bb4c5b5fc637df5769c8820ac88c7552db76d4b3"
+      },
+      {
+        "viewport": "390x844",
+        "document_horizontal_overflow": false,
+        "result": "rendered_500_server_error",
+        "screenshot": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24-390x844.png",
+        "screenshot_sha256": "5436448b331bf6fff4b55da82de31fbd9ffc9c5216d63ab2d53a541ee966c339"
+      }
+    ]
+  },
+  "completion_effect": {
+    "safe_entry_attempted": true,
+    "canonical_task_completed": false,
+    "canonical_task_numerator_change": 0,
+    "ease_score_change": false,
+    "journey_numerator_change": 0,
+    "immutable_baseline_visual_rows_completed": 0,
+    "finding_created": false,
+    "reason": "The first safe GET step stopped at a generic server-error page. The canonical task's rendered workflow, mutation, persistence, denial, recovery and handoff states were not exercised. Unknown deployed source identity prevents root-cause or audited-baseline attribution."
+  },
+  "minimum_next_evidence": [
+    "Expose a non-secret deployed commit or release marker.",
+    "Retain the corresponding non-sensitive server exception class and source locus for this exact request.",
+    "Repair or identify the failed deployed build in an isolated, resettable test/development environment.",
+    "Repeat the safe GET at all four required viewports before any separately authorised mutation workflow."
+  ]
+}

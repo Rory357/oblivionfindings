@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "artifact": "canonical-audit-inputs",
-  "generated_at": "2026-08-23T16:32:00+12:00",
+  "generated_at": "2026-08-24T14:50:05+12:00",
   "audited_commit": "081ef198f9f992f224e8c0c9fba33df33dde40be",
   "status": "active_904_static_denominator_runtime_and_completion_blocked",
   "active_denominator": {
@@ -103,13 +103,13 @@
     },
     "validation_report": {
       "path": "evidence/source/validation-report.json",
-      "sha256": "00989bf66a903f90f549263f58c88feb62616d7eef0402bade4fd68c98a1afc7",
-      "bytes": 24393
+      "sha256": "a41f545d61a501044e7fe12f58958dfac6b741dc17588d8585654fcfb059a19b",
+      "bytes": 24583
     },
     "dashboard": {
       "path": "audit-dashboard.html",
-      "sha256": "7e4ad296c31bd1c9a911bece7d2f88fca08059f7dc16ff686f27248846418789",
-      "bytes": 237444
+      "sha256": "d86971f1b567854302b989bd8f68f4a400b94bc79aebe4ae7b51907c2b2a614d",
+      "bytes": 250511
     },
     "overlay_trigger_classification": {
       "path": "evidence/source/overlay-trigger-classification.json",
@@ -483,8 +483,13 @@
     },
     "remediation_delivery_snapshot": {
       "path": "evidence/source/remediation-delivery-snapshot-2026-08-23.json",
-      "sha256": "8947654aa9155c5adf8a4e8534ea00fbf2e32d9fcce8064d86bf83af75dd13a8",
-      "bytes": 3555
+      "sha256": "830e749f1c1aa63eb104a7cda6239e798a1958ae82ab6c66b7b7dad5d7cdec3b",
+      "bytes": 3549
+    },
+    "deployed_current_control_room_handover_500": {
+      "path": "evidence/browser/deployed-current-control-room-handover-500-2026-08-24.json",
+      "sha256": "1e040252ffc42c767e169d01672ed2a36fe7bb930c5f5895e1c17c2549870c34",
+      "bytes": 5083
     }
   },
   "historical_denominator": {

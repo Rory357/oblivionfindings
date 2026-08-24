@@ -143,7 +143,7 @@ def main() -> None:
             else "FAIL"
         ),
     }
-    EVIDENCE.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    EVIDENCE.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({key: report[key] for key in (
         "machine_path_replacements",
         "remaining_machine_local_paths",

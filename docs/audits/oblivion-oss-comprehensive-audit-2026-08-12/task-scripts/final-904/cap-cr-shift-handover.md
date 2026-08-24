@@ -1,6 +1,6 @@
 # CAP-CR-SHIFT-HANDOVER — Shift Handover
 
-Status: **Blocked — source-derived final-ID script; representative-role execution and independent task validation not performed.**
+Status: **Blocked — authenticated deployed-current entry attempted, but the first safe GET rendered `500 Server Error` at all four required viewports; deployed build identity, representative task completion and independent task validation remain absent.**
 
 ## Evidence boundary
 
@@ -18,6 +18,7 @@ Status: **Blocked — source-derived final-ID script; representative-role execut
 - Other accepted IDs sharing retained routes: No other accepted working IDs share these retained route relations.
 - Backend anchors: `app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php`, `app/Http/Controllers/ControlRoom/ControlRoomShiftController.php`
 - Exact working-ID findings: No exact working-ID finding link is currently established.
+- Supplemental runtime evidence: `evidence/browser/deployed-current-control-room-handover-500-2026-08-24.json` records a rendered-link-derived Active shift and a read-only GET failure at 1440×900, 1280×800, 1024×768 and 390×844. The deployed build identity is unknown, so the observation is not source/root-cause or immutable-baseline proof.
 
 Blank or source-family-envelope evidence must not be read as proof that this capability has no route/page or that every family route belongs exclusively to it.
 
@@ -68,3 +69,7 @@ All ten current scores are **Not measured**. Under the audit rubric, numeric 0 m
 | Cross-module continuity | Not measured |
 
 Target scores are not assigned until the task is executed and independently reviewed. No ease or completion claim is made.
+
+## 24 Aug 2026 deployed-current attempt
+
+An authenticated Demo Admin session opened the Active shifts list, discovered the existing synthetic shift link `/control-room/shifts/9/handover`, and attempted the safe GET at all four required viewports. Every viewport rendered only `500 Server Error`; no handover UI, form or action was available and nothing was submitted. This is a failed entry attempt, not one of the 790 completed canonical tasks: the audit-wide task numerator remains **0/790**, all ease scores remain **Not measured**, and the deployment cannot be tied to audited commit `081ef198…` without a build marker.

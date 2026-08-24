@@ -1103,7 +1103,7 @@
       </div>
       <div class="snapshot">
         <span>Remediation mode: <strong>24 Aug 2026 · no further audit waves; work restricted to the canonical 100 findings</strong></span>
-        <span>Current checkpoint: <strong>24 Aug 2026 · frozen 904 audit plus reviewed local-main integration evidence</strong></span>
+        <span>Current checkpoint: <strong>24 Aug 2026 · frozen 904 audit, reviewed local-main integration and authenticated handover-failure evidence</strong></span>
         <span id="orchestrationSummary"><strong>0 background tasks active:</strong> audit expansion stopped · branch reconciliation closed · unfinished completion gates remain blocked</span>
         <span id="currentMainRelease">Published origin/main: <code>20ad5cef0aacb3d055e685d2f8b7b583cb8d78f4</code> · reviewed local application main: <code>a0493442b9e392d324055c35bf25b69421dc2d35</code> (57 commits ahead; not pushed)</span>
         <span>Audited source: <code>081ef198f9f992f224e8c0c9fba33df33dde40be</code></span>
@@ -1138,8 +1138,8 @@
       </div>
       <div class="decision-grid">
         <article class="decision-card bad">
-          <span class="decision-label">Canonical finding register</span>
-          <h3>49 of 100 are beyond open</h3>
+          <span class="decision-label">Canonical finding register snapshot · 22 Aug</span>
+          <h3>49 of 100 were beyond open in that snapshot</h3>
           <ul>
             <li>17 are marked in progress.</li>
             <li>30 are fixed pending verification.</li>
@@ -1266,7 +1266,7 @@
       <article class="panel tracker">
         <div class="tracker-head">
           <div><h3>Completion-gate tracker</h3><p>Green is structurally complete. Orange is partial. Red needs runtime access, fixtures or execution.</p></div>
-          <div class="update-stamp"><strong>Checkpoint 904 · blocked audit plus reviewed local-main integration</strong><br>Last dashboard update: 24 Aug 2026</div>
+          <div class="update-stamp"><strong>Checkpoint 904 · blocked audit, reviewed local-main integration and authenticated handover-failure evidence</strong><br>Last dashboard update: 24 Aug 2026</div>
         </div>
         <div class="track-list">
           <div class="track-row complete">
@@ -1278,11 +1278,11 @@
             <div class="track-bar"><span style="width:100.00%"></span></div><div class="track-count">3,751 / 3,751</div><div class="track-state">Complete static</div>
           </div>
           <div class="track-row complete">
-            <div class="track-name"><strong>Project catalogue metadata</strong><span>Identity, licence boundary and explicit disposition</span></div>
+            <div class="track-name"><strong>Project catalogue metadata</strong><span>97 prompt-listed projects; register also retains 1 explicit supplemental project</span></div>
             <div class="track-bar"><span style="width:100%"></span></div><div class="track-count">97 / 97</div><div class="track-state">Complete metadata</div>
           </div>
           <div class="track-row complete">
-            <div class="track-name"><strong>Substantive project triage</strong><span>Project-specific behaviour, maturity and edition-boundary review</span></div>
+            <div class="track-name"><strong>Substantive project triage</strong><span>97/97 prompt-listed; the 98th register row is supplemental and outside this denominator</span></div>
             <div class="track-bar"><span style="width:100.00%"></span></div><div class="track-count">97 / 97</div><div class="track-state">Complete substantive</div>
           </div>
           <div class="track-row">
@@ -1420,6 +1420,7 @@
             <li>0 of 8 cross-module journeys were executed at all required viewports and failure states.</li>
             <li>585 visual rows and 364 material-state rows remain without exact final ownership.</li>
             <li>No deployed build identity ties the observed browser behavior to the audited source commit.</li>
+            <li>An authenticated Active-shift handover GET currently renders <code>500 Server Error</code> at all four required viewports; without build identity or server evidence, no source/root-cause or task-completion claim is made.</li>
           </ul>
         </article>
       </div>
@@ -1472,8 +1473,8 @@
             <div class="priority p2"><strong>12</strong><span>P2 important</span></div>
           </div>
           <div class="safe-note" style="margin-top:18px">
-            <strong id="remediationSummary">17 marked in progress · 30 awaiting verification · 2 verified fixed · 51 open</strong><br>
-            All 100 findings have a current capability link. Ownership is not the same as remediation.
+            <strong id="remediationSummary">Historical 22 Aug snapshot: 17 marked in progress · 30 awaiting verification · 2 verified fixed · 51 open</strong><br>
+            All 100 findings have a current capability link. These snapshot statuses are not a live recomputation from the 24 Aug local-main tree; ownership is not the same as remediation.
           </div>
           <div class="hero-actions">
             <a class="button" href="findings.json">Open all 100 findings</a>
@@ -1632,7 +1633,7 @@
       </article>
       <article class="panel browser-bug" style="margin-top:16px">
         <p class="eyebrow">Supplemental historical browser evidence (<code>ad19f99…</code>) · baseline unchanged</p>
-        <h3>Control Room handover now measures cleanly at all four required widths</h3>
+        <h3>The historical browser-evidence pin measured Control Room handover cleanly at all four required widths</h3>
         <p style="max-width:850px;color:#c9d7e2;margin:0">
           A read-only Demo Manager pass opened the existing synthetic shift handover and measured its rendered document at
           1440×900, 1280×800, 1024×768 and 390×844. Every viewport had <code>scrollWidth == clientWidth</code> and no unnamed-control signal.
@@ -1651,6 +1652,28 @@
         <div class="hero-actions">
           <a class="button" href="evidence/browser/control-room-shift-handover-390x844.png">Open the mobile screenshot</a>
           <a class="button" href="evidence/browser/current-main-control-room-handover-viewport-evidence.json">Open the four-viewport evidence</a>
+        </div>
+      </article>
+      <article class="panel browser-bug" style="margin-top:16px">
+        <p class="eyebrow">Authenticated deployed-current observation · build identity unknown · zero completion credit</p>
+        <h3>The current handover entry stops at a server error before the workflow renders</h3>
+        <p style="max-width:850px;color:#c9d7e2;margin:0">
+          On 24 Aug, Demo Admin opened the Active shifts list, discovered the rendered link for existing synthetic shift 9, and followed the safe GET to
+          <code>/control-room/shifts/9/handover</code>. The page rendered only <code>500 Server Error</code> at every required viewport; no handover action was available or submitted.
+        </p>
+        <div class="bug-flow">
+          <div class="bug-step problem"><strong>1440×900</strong><span>500 Server Error.</span></div>
+          <div class="bug-step problem"><strong>1280×800</strong><span>500 Server Error.</span></div>
+          <div class="bug-step problem"><strong>1024×768</strong><span>500 Server Error.</span></div>
+          <div class="bug-step problem"><strong>390×844</strong><span>500 Server Error.</span></div>
+        </div>
+        <div class="safe-note">
+          <strong>Evidence boundary:</strong> the deployment exposes no verified commit or release marker, and no server exception trace was available.
+          This is a failed entry attempt, not a new root-cause finding: canonical tasks remain 0/790, journeys remain 0/8, and immutable-baseline geometry remains 1,876/1,880.
+        </div>
+        <div class="hero-actions">
+          <a class="button" href="evidence/browser/deployed-current-control-room-handover-500-2026-08-24.json">Open the bounded evidence</a>
+          <a class="button" href="evidence/browser/deployed-current-control-room-handover-500-2026-08-24-390x844.png">Open the mobile screenshot</a>
         </div>
       </article>
       <article class="panel browser-bug" style="margin-top:16px">
@@ -1855,7 +1878,7 @@
 
       var summary = dashboardData.summary;
       document.getElementById('remediationSummary').textContent =
-        summary.findingsInProgress + ' marked in progress · ' +
+        'Historical 22 Aug snapshot: ' + summary.findingsInProgress + ' marked in progress · ' +
         summary.findingsFixedPendingVerification + ' awaiting verification · ' +
         summary.findingsVerified + ' verified fixed · ' +
         summary.findingsOpen + ' open';
