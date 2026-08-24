@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "status": "DEPLOYED_BUILD_IDENTITY_NOT_ESTABLISHED_NO_CURRENT_SOURCE_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T17:16:51.7510804+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "deployed_observation": {
+    "url": "https://oblivionfindings.com/my-day",
+    "existing_signed_in_session_observed": true,
+    "inertia_component": "home",
+    "inertia_version": "84e8ccc59d2676356b165b4327abb9bc",
+    "javascript_asset": "https://oblivionfindings.com/build/assets/app-DpCHbvaC.js",
+    "stylesheet_asset": "https://oblivionfindings.com/build/assets/app-B1fPkNR-.css",
+    "build_commit_or_release_meta_found": false,
+    "application_interactions_performed": 0,
+    "mutations_performed": 0
+  },
+  "local_build_observation": {
+    "manifest_path": "public/build/manifest.json",
+    "manifest_exists_in_worktree": true,
+    "manifest_tracked_at_application_source_pin": false,
+    "manifest_sha256": "3341666d30499a8d4449382641c27a96d36046d1901b709901bed2a2393ef1e2",
+    "app_entry_javascript_asset": "assets/app-Dkf5auCE.js",
+    "app_entry_stylesheet_asset": "assets/app-Bi8NMgrD.css"
+  },
+  "identity_assessment": {
+    "deployed_assets_equal_local_manifest_assets": false,
+    "local_manifest_is_source_pinned_evidence": false,
+    "deployed_commit_or_tree_proven": false,
+    "inference": "The differing asset names and the untracked local manifest establish only that the observed deployment cannot be identified as the pinned current source from this evidence. They do not prove which source commit produced either build."
+  },
+  "gate_result": {
+    "deployment_identity_established": false,
+    "current_source_application_pages_observed": 0,
+    "current_source_routes_observed": 0,
+    "current_source_workflows_executed": 0,
+    "browser_credit": 0,
+    "minimum_next_evidence": "Expose an authoritative deployed commit/tree or reproducible build identifier that can be matched to the pinned source before using the signed-in deployment for current-source browser coverage."
+  },
+  "credit_boundary": "This records a read-only deployment/build-identity check. It grants zero current-source browser, visual, responsive, route, workflow, journey, runtime, test, release, or audit-completion credit."
+}

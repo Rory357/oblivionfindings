@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "status": "AUDIT_DASHBOARD_RENDER_AND_LINKS_VERIFIED_NO_APPLICATION_BROWSER_CREDIT",
+  "observed_at": "2026-08-24T17:21:53.4351109+12:00",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=runtime-gates-01",
+  "dashboard_sha256": "ed5b7fb37ff4b54e4a13c69ec62926db9fea58efc750e4d9395536ad72549fbb",
+  "application_commit_displayed": "a0493442b9e3",
+  "dashboard_status_displayed": "IN PROGRESS · NOT COMPREHENSIVE",
+  "expected_runtime_gate_content_observed": {
+    "runtime_gate_panel": true,
+    "php_version": "8.4.16",
+    "vendor_autoload_absent": true,
+    "state_changing_setup_not_run": true,
+    "deployed_inertia_component": "home",
+    "authoritative_deployed_commit_or_tree_marker": false,
+    "current_runtime_tests_credited": 0,
+    "current_source_browser_routes_credited": 0
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "document_scroll_width": 1425,
+      "body_scroll_width": 1425,
+      "document_horizontal_overflow": false,
+      "runtime_gate_heading_observed": true,
+      "console_logs": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "document_scroll_width": 375,
+      "body_scroll_width": 375,
+      "document_horizontal_overflow": false,
+      "navigation_scroll_width": 661,
+      "navigation_client_width": 375,
+      "navigation_horizontal_scroll_intentional": true,
+      "runtime_gate_heading_observed": true,
+      "console_logs": []
+    }
+  ],
+  "evidence_links": {
+    "method": "Rendered href inventory plus HTTP HEAD against the same local audit-only server",
+    "checked": 15,
+    "http_200": 15,
+    "failures": []
+  },
+  "generator_determinism": {
+    "successful_runs": 2,
+    "identical_sha256": true
+  },
+  "viewport_override_reset": true,
+  "credit_boundary": "This verifies only the audit progress dashboard and its local evidence links. It grants zero current-build application browser, route, workflow, benchmark, runtime, test, build, release, or audit-completion credit."
+}

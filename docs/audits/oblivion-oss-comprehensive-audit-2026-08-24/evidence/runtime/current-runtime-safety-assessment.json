@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "RUNTIME_LANE_NOT_STARTED_MISSING_VENDOR_AND_STATEFUL_SETUP",
+  "observed_at": "2026-08-24T17:16:51.3732509+12:00",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "sanitized_environment_observations": {
+    "php_available": true,
+    "php_version": "8.4.16",
+    "env_file_exists": true,
+    "app_env_is_testing": true,
+    "app_url_is_local": true,
+    "db_connection_family": "mysql",
+    "db_host_is_loopback": true,
+    "db_name_looks_test": true,
+    "queue_is_sync": true,
+    "cache_is_array": true,
+    "session_driver_is_file": true,
+    "vendor_autoload_exists": false,
+    "node_modules_exists": true
+  },
+  "setup_boundary": {
+    "composer_setup_contains_dependency_install": true,
+    "composer_setup_contains_key_generation": true,
+    "composer_setup_contains_forced_migration": true,
+    "composer_setup_contains_npm_install_and_build": true,
+    "composer_setup_contains_device_integration_install": true,
+    "setup_executed": false,
+    "reason_not_executed": "The combined setup is state-changing, may use the network, writes dependencies and generated assets, forces database migrations, and installs device-integration configuration. Those actions are outside this read-only audit lane without a separately bounded runtime grant."
+  },
+  "actions_not_performed": [
+    "No Artisan command or Laravel application boot was attempted because vendor/autoload.php is absent.",
+    "No Composer or npm dependency installation was run.",
+    "No migration, schema query, fixture load, queue execution, device setup, application test, or frontend build was run.",
+    "No environment secret or raw database identifier is retained in this evidence."
+  ],
+  "gate_result": {
+    "framework_route_denominator_established": false,
+    "current_schema_snapshot_established": false,
+    "tests_executed": 0,
+    "runtime_credit": 0,
+    "minimum_next_evidence": "Provide or establish a disposable, non-sensitive current-source runtime with already-hydrated dependencies, an exact database ownership and cleanup boundary, representative roles/Sites/fixtures, and separate permission for the specific migrations, tests, or builds required."
+  },
+  "credit_boundary": "This is a sanitized safety assessment only. It grants zero framework-route, database, test, build, workflow, concurrency, recovery, browser, release, or audit-completion credit."
+}

@@ -87,6 +87,12 @@ The six official-source families required by the governing prompt were refreshed
 
 The official HISO PDF asset was identified, but direct retrieval returned 403, so no complete HISO control mapping is claimed. WorkSafe's page records passed amendments that take effect on 1 April 2027; they are tracked as future-effective and are not treated as current law at the 24 August 2026 audit date. No legal, clinical, certification, interoperability, security, or compliance credit is awarded from this source baseline alone.
 
+## Runtime and deployed-build identity gates
+
+A sanitized local safety assessment found PHP 8.4.16 and test-oriented local settings, but `vendor/autoload.php` is absent. The repository's combined setup script would install dependencies, generate a key, force database migrations, install and build frontend dependencies, and install device-integration configuration. It was not executed because those state-changing steps are outside this read-only audit lane without a separately bounded runtime grant. No Laravel boot, framework route list, schema query, migration, test, queue job, or application build receives credit.
+
+The existing signed-in deployed session at `https://oblivionfindings.com/my-day` was inspected without interaction. Its Inertia version and deployed asset names were recorded, but no authoritative commit/tree or release marker was present. The local `public/build/manifest.json` is not tracked at the application source pin and names different assets. That establishes only that deployed-current-source identity is unproved; it does not identify which commit built either asset set. Current-source application browser coverage therefore remains 0.
+
 ## Evidence created in this batch
 
 - `inventory.json`: the full current committed-file census, including Git object IDs, byte sizes, and conservative path categories.
@@ -102,6 +108,9 @@ The official HISO PDF asset was identified, but direct retrieval returned 403, s
 - `evidence/official-sources/nz-source-baseline-2026-08-24.json`: current official NZ source facts, audit inferences, specialist decisions, and explicit completion limits.
 - `evidence/benchmark/current-benchmark-wave-01.json`: normalized RUN-007 through RUN-009 project-register, observer, neutralizer, collision, comparator, and zero-credit evidence.
 - `evidence/benchmark/current-benchmark-agent-register.json`: reconciled benchmark-agent returns, no-write attestations, the corrected RUN-009 follow-up, and the cumulative 9-assignment state.
+- `evidence/runtime/current-runtime-safety-assessment.json`: sanitized environment and setup-boundary evidence with zero runtime credit.
+- `evidence/browser/deployed-build-identity-assessment.json`: read-only deployed/local asset identity assessment with zero current-source application-browser credit.
+- `evidence/browser/current-audit-dashboard-verification-runtime-gates-01.json`: responsive audit-dashboard and local evidence-link verification after the runtime/build gate update.
 - `01-repository-module-map.md`: human-readable module/capability map for discovery wave 01.
 - `02-repository-module-map-wave-02.md`: human-readable module/capability map for discovery wave 02.
 - `03-feature-to-benchmark-matrix.csv`: interim 172-row grouped-candidate matrix with all unfinished route/page, benchmark, ease, and P1–P8 cells labelled explicitly and zero completion credit.
