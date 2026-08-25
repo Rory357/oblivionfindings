@@ -39,6 +39,22 @@ The complete committed static input contains 3,217 primary route-facade callsite
 
 All classification, review, and integration evidence is committed-source static evidence. It establishes no framework route execution, build resolution, final feature mapping, benchmark equivalence, ease, release, Pass, finding, or audit-completion credit.
 
+## RUN-082 static candidate census and reachability preflight
+
+| Candidate-only measure | Current static result | Credit boundary |
+|---|---:|---|
+| Explicit-unmapped route-like denominator | 3,003 | unchanged RUN-078 evidence-gap rows |
+| Exact route-name candidates | 527 single · 46 multiple · 2,430 none | relation only; no ownership |
+| Exact controller-method containment | 610 single · 55 multiple · 2,214 none | 2,879 exact arrays; 124 non-exact retained |
+| Page evidence-gap denominator | 393 | unchanged RUN-078 evidence-gap rows |
+| Exact render-owner containment | 43 single · 2 multiple · 348 none | relation only; no ownership or rendered-page evidence |
+| Static route-file registration closure | 38 / 38 | 5 bootstrap + 33 web requires; not framework reachability |
+| Matrix rows / cells changed | 0 / 0 | SHA-256 unchanged `dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390` |
+| RUN-082R independent red-team / final mappings | GO / 0 | candidate-only static evidence; no feature-mapping, matrix-mutation, or downstream-integration authority |
+| Framework runtime / build / tests / application browser | 0 / 0 / 0 / 0 | explicit NO-GO, not executed |
+
+RUN-082 establishes reproducible static candidate relations and route-file registration closure; RUN-082R independently reproduces them with zero discrepancies and returns GO only for that static candidate scope. Neither creates a final finding, feature mapping, matrix-mutation authority, runtime, browser, build, executed-test, benchmark, ease, release, Pass, or completion evidence.
+
 ## Exact accounting
 
 | Item | Current evidence | Credit |

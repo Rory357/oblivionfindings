@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-082R-INDEPENDENT-EXACT-OWNER-CONTAINMENT-REVIEW",
+  "status": "GO_STATIC_CANDIDATE_CENSUS_REVIEWED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25T14:05:00+12:00",
+  "reviewer": {
+    "task": "run082_route_gap_census",
+    "role": "INDEPENDENT_READ_ONLY_RED_TEAM",
+    "producer_independent": true
+  },
+  "pins": {
+    "checkpoint_commit": "35a5228b26c54684718495c33281b24c0992de02",
+    "checkpoint_tree": "8ba4e28575cdb53682824a9ae604c718646d8a18",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "classification_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "run_082_generator_sha256": "5bb0bccde65856a63e7944106d28539156a81449b0963c05c4bebddd7db6d230",
+    "run_082_output_sha256": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85"
+  },
+  "reviewed_files": [
+    "generators/build-exact-owner-containment-candidate-manifest-wave-08.py",
+    "evidence/source/root-run-082-exact-owner-containment-candidate-manifest-wave-08.json"
+  ],
+  "verdict": {
+    "decision": "GO",
+    "scope": "STATIC_CANDIDATE_RELATIONS_AND_STATIC_ROUTE_REGISTRATION_CLOSURE_ONLY",
+    "feature_mapping_authorized": false,
+    "matrix_mutation_authorized": false,
+    "downstream_integration_authorized": false
+  },
+  "reconciled_counts": {
+    "route_records": 3003,
+    "route_name_candidates": {
+      "zero": 2430,
+      "one": 527,
+      "many": 46
+    },
+    "resolved_class_method_actions": 2879,
+    "non_exact_class_method_actions": 124,
+    "resolved_backend_containment": {
+      "zero": 2214,
+      "one": 610,
+      "many": 55
+    },
+    "all_route_backend_candidates": {
+      "zero": 2338,
+      "one": 610,
+      "many": 55
+    },
+    "page_records": 393,
+    "page_render_containment": {
+      "zero": 348,
+      "one": 43,
+      "many": 2
+    },
+    "static_route_registration": {
+      "route_files": 38,
+      "direct_bootstrap_surfaces": 5,
+      "web_required_surfaces": 33,
+      "missing": 0,
+      "extra": 0,
+      "framework_route_tables_executed": 0
+    },
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0,
+    "final_feature_mappings": 0
+  },
+  "identity_hashes": {
+    "route_record_ids_sha256": "b22bb80cbcf457574e4125e6415d54fbdaa902ad05feb102c24a098f69ffe1cc",
+    "resolved_backend_zero_ids_sha256": "e369fd12975d40b5d15f08368f4b66c3446e4f825ed8e5712662ff225255024c",
+    "resolved_backend_one_ids_sha256": "127090e3e925f545a66c0c322a3ea689d59bb48409683f54faf4fd1315eecdf6",
+    "resolved_backend_many_ids_sha256": "d3220f633d378a52b119231dce29ca38dd9fa8d3665daf97d9cb9bde3bc5235a",
+    "page_render_zero_ids_sha256": "d50b0e4a270163fa84897f59ca3171d7e6511b4f0c0d3699d0f1f1dbf183e162",
+    "page_render_one_ids_sha256": "724f0c203fa3cf4199a27bc119fc4a1250664ad7950b3a77661da9285b8344ed",
+    "page_render_many_ids_sha256": "d8db37ba00e29b830cc45ee933e8f8899055b5fcf6a1f084885fc172e3e873ea"
+  },
+  "checks": {
+    "pins_exact": true,
+    "generator_pin_matches_output": true,
+    "route_denominator_and_relations_recomputed": true,
+    "page_denominator_and_relations_recomputed": true,
+    "whole_file_backend_anchor_inheritance_rejected": true,
+    "non_explicit_backend_anchor_tokens_excluded": 18,
+    "page_multi_candidate_rows_reconciled": [
+      "resources/js/pages/reports/module.tsx",
+      "resources/js/pages/sites/credentials/audit.tsx"
+    ],
+    "static_registration_closure_recomputed": true,
+    "channels_and_console_zero_row_files_retained": true,
+    "json_schema_and_record_hashes_valid": true,
+    "deterministic_two_run_output_sha256_observed_from_producer": true,
+    "review_discrepancies": 0
+  },
+  "mutation_attestation": {
+    "review_execution_wrote_files": false,
+    "receipt_materialized_by_orchestrator_from_final_reviewer_return": true,
+    "application_source_changed": false,
+    "matrix_changed": false,
+    "runtime_or_external_system_changed": false
+  },
+  "credit_boundary": {
+    "candidate_relation_as_feature_mapping": false,
+    "static_registration_as_framework_reachability": false,
+    "runtime": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "final_finding": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Independent read-only red-team review reproduced the pinned RUN-082 route, page, exact-line containment, and static registration results with zero discrepancies. GO is limited to candidate-only static evidence and awards no ownership, framework, runtime, build, browser, test, benchmark, finding, Pass, or completion credit."
+}

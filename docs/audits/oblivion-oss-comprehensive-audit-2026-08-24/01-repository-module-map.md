@@ -31,6 +31,12 @@ RUN-077 materializes 3,217 primary route-facade callsites, one separate route-li
 
 RUN-080 establishes 78 route-name and 2 page-file matrix fields. It retains 166 route-name, 1 route-path, 4 page-file, 0 backend-anchor, and 8 static test-anchor sentinels. These are reviewed static-source classifications and locators, not framework-expanded routes, runtime reachability, rendered pages, executed tests, or final route/page-to-`FEATURE-ID` mappings.
 
+## RUN-082 exact static candidate-relation overlay
+
+The retained RUN-078 evidence-gap denominators are unchanged: 3,003 route-like records and 393 page records. Exact route-name candidates partition as 527 single / 46 multiple / 2,430 none. Exact import-aware controller-method containment partitions 2,879 resolvable rows as 610 single / 55 multiple / 2,214 none, with 124 non-exact action arrays retained outside that lane. Exact render-owner containment partitions page gaps as 43 single / 2 multiple / 348 none.
+
+All 38/38 route PHP files have a literal static registration path, but no Laravel route table, build, test, or application browser lane was executed. RUN-082R independently reproduces the candidate relations and static registration closure with zero discrepancies and returns GO limited to candidate-only static evidence. It awards 0 feature mappings and 0 downstream credit; the matrix remains `dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390`.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |

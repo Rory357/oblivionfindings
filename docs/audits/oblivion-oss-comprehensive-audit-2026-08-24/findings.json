@@ -5,7 +5,7 @@
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
-    "audit_checkpoint_parent": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
+    "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
     "current_matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
@@ -14,7 +14,9 @@
     "route_page_manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
     "route_page_normalized_producer_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
     "route_page_independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
-    "route_page_static_linkage_integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8"
+    "route_page_static_linkage_integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
+    "route_page_candidate_census_sha256": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
+    "route_page_candidate_independent_review_sha256": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -46,7 +48,20 @@
     "route_page_matrix_field_changes": 80,
     "remaining_route_name_gap_targets": 166,
     "remaining_non_route_name_scoped_gap_targets": 10,
-    "remaining_any_linkage_gap_targets": 172
+    "remaining_any_linkage_gap_targets": 172,
+    "route_page_candidate_route_records": 3003,
+    "route_page_candidate_page_records": 393,
+    "route_page_exact_name_single_candidates": 527,
+    "route_page_exact_name_multi_candidates": 46,
+    "route_page_exact_name_no_candidates": 2430,
+    "route_page_controller_single_candidates": 610,
+    "route_page_controller_multi_candidates": 55,
+    "route_page_controller_no_candidates": 2214,
+    "route_page_non_exact_action_rows": 124,
+    "route_page_render_owner_single_candidates": 43,
+    "route_page_render_owner_multi_candidates": 2,
+    "route_page_render_owner_no_candidates": 348,
+    "static_route_files_registered": 38
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -2324,6 +2339,77 @@
     "runtime": false,
     "application_browser": false,
     "executed_tests": false,
+    "completion": false
+  },
+  "current_route_page_candidate_census": {
+    "status": "STATIC_CANDIDATE_RELATIONS_MATERIALIZED_PENDING_INDEPENDENT_REVIEW_ZERO_CREDIT",
+    "route_denominator": 3003,
+    "page_denominator": 393,
+    "exact_route_name_cardinalities": {
+      "zero": {
+        "count": 2430,
+        "record_ids_sha256": "79fd3ae8664e757b21c7a844bfc3aabbfb59314285a5ce7bc66eefd26929060e"
+      },
+      "one": {
+        "count": 527,
+        "record_ids_sha256": "da65370569cab6ef1145af6cfaf58a461d04abd6f1cd8527dacc144ec974ca4b"
+      },
+      "many": {
+        "count": 46,
+        "record_ids_sha256": "a8365c3409b5c3671fed3b855d0e865681b956c74060ed78d073800d1c25d970"
+      }
+    },
+    "controller_method_containment_cardinalities": {
+      "zero": {
+        "count": 2214,
+        "record_ids_sha256": "e369fd12975d40b5d15f08368f4b66c3446e4f825ed8e5712662ff225255024c"
+      },
+      "one": {
+        "count": 610,
+        "record_ids_sha256": "127090e3e925f545a66c0c322a3ea689d59bb48409683f54faf4fd1315eecdf6"
+      },
+      "many": {
+        "count": 55,
+        "record_ids_sha256": "d3220f633d378a52b119231dce29ca38dd9fa8d3665daf97d9cb9bde3bc5235a"
+      }
+    },
+    "non_exact_class_method_array_records": 124,
+    "render_owner_containment_cardinalities": {
+      "zero": {
+        "count": 348,
+        "record_ids_sha256": "d50b0e4a270163fa84897f59ca3171d7e6511b4f0c0d3699d0f1f1dbf183e162"
+      },
+      "one": {
+        "count": 43,
+        "record_ids_sha256": "724f0c203fa3cf4199a27bc119fc4a1250664ad7950b3a77661da9285b8344ed"
+      },
+      "many": {
+        "count": 2,
+        "record_ids_sha256": "d8db37ba00e29b830cc45ee933e8f8899055b5fcf6a1f084885fc172e3e873ea"
+      }
+    },
+    "static_route_registration_closure": {
+      "represented": 38,
+      "denominator": 38,
+      "direct_bootstrap": 5,
+      "web_requires": 33
+    },
+    "independent_review": "GO_STATIC_CANDIDATE_ONLY_ZERO_DOWNSTREAM_CREDIT",
+    "review_discrepancies": 0,
+    "feature_mapping_authorized": false,
+    "matrix_mutation_authorized": false,
+    "downstream_integration_authorized": false,
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0,
+    "final_feature_mappings": 0,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
     "completion": false
   }
 }
