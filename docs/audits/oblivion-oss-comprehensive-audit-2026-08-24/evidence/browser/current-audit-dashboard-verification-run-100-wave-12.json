@@ -1,0 +1,136 @@
+{
+  "schema_version": "run-100-audit-dashboard-verification-wave-12-v2",
+  "run_id": "RUN-100-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "checkpoint_commit": "76e03b1d57826e18b0965405279215d56122e7a1",
+    "checkpoint_tree": "7c00f20aedbcc6d3f091747abc19bd9d831b3aff",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "dashboard_html_sha256": "0fca7753e2d8ed9e08c692a2be780132c3d85a8462eaa31f924b2d959d45e45d",
+    "dashboard_generator_sha256": "07df34a4af597797f210d05cd5a6aedad4dfd4faa44a78e6cd1c47ae17f6521d",
+    "reporting_materializer_sha256": "a90885d12b24055253fb4ce1c7738d1d589610cc7da2b0c95df96a565c41b575",
+    "reporting_receipt_sha256": "84e6e9a46c02a82bf9775253919bfde6b1b86a587be280d8248e4b2e38691514",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser with viewport capability and semantic DOM inspection",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-0fca7753e2d8#progress",
+      "exact_dashboard_loaded": true,
+      "response_status": 200,
+      "cachebuster": "main-0fca7753e2d8",
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": true,
+      "screenshot_retained": false,
+      "navigation_only": true,
+      "application_or_external_state_changed": false
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual": "1440x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual": "1280x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual": "1024x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "390x844",
+        "actual": "390x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0
+      }
+    ],
+    "viewports_verified": 4,
+    "viewports_required": 4,
+    "local_link_occurrences": 324,
+    "unique_local_links": "209/209",
+    "local_link_failures": [],
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "missing_navigation_targets": [],
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "artifact_authored_ids": 10,
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_boundary_checks": {
+      "cumulative_source_owner_records_571": true,
+      "route_page_split_244_327": true,
+      "distinct_feature_ids_246": true,
+      "controller_action_bridges_32": true,
+      "route_action_owner_delta_23": true,
+      "page_owner_delta_0": true,
+      "current_queue_accounting_33_owned_2_shared_472_unreviewed_474_without_ownership": true,
+      "bounded_residual_3358": true,
+      "historical_run_092_frozen_at_548_owners_and_9_bridges": true,
+      "one_operating_organisation_across_multiple_sites": true,
+      "site_permission_privacy_lifecycle_boundaries_unproved": true,
+      "gate_4_open": true,
+      "completion_credit_zero": true,
+      "matrix_mapping_remains_0_of_340": true
+    }
+  },
+  "mutation_attestation": {
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false,
+    "audit_artifact_only": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}

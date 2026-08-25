@@ -57,6 +57,14 @@ Complete semantic review accepts nine chains and excludes two shared chains. RUN
 
 The two excluded chains remain explicit `SHARED_RELATION` records: the Milesight connection/settings page also implements provider-sync behaviour, and the resource-calendar connection/settings page also implements calendar-sync behaviour. The queue remains 495 rows unreviewed and 497 rows without ownership. These closed-chain bridges do not imply framework reachability, navigation, runtime, build, Site/permission/privacy correctness, tests, mapping completeness, benchmark equivalence, findings, Passes, or completion.
 
+## RUN-097–098 reviewed route/controller-only overlay
+
+RUN-097 freezes 23 pending route surfaces across 22 FEATURE-IDs for exact controller-action review. Three fresh reviewers independently accept all 23 as `OWNER_ROUTE_ACTION`. The accepted relations add no page roots: nine observed literal render callsites were already owned and are context only.
+
+RUN-098 therefore adds exactly 23 route owners and 23 controller-action bridges to the RUN-092 checkpoint. The cumulative bounded ledger is 571 source owners (244 route + 327 page) across 246 FEATURE-IDs (226 H + 20 D). The route/page feature sets are 56/234 with overlap 44, and the action-bridge count is 32. Queue accounting is 507 total, 35 reviewed, 33 owned, two shared, 472 pending, and 474 without ownership.
+
+These relations establish bounded static route/action ownership only. They do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |
