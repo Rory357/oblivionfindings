@@ -89,15 +89,15 @@ RUN-110 adds exactly two page owners, zero route owners, and zero controller-act
 
 RUN-110R verifies exact final bytes, canonical IDs, queue reconciliation, and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit reviewed-shared classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
-## RUN-113–119 reviewed route/action and respite handover page-gap overlays
+## RUN-113–123 reviewed route/action and page-ownership lineage
 
-RUN-113/R freeze and review 24 name-only route actions as 23 explicit owners and one alias. RUN-114/R integrate 23 route owners and 23 controller-action bridges with zero page ownership; RUN-115 reports that result and RUN-116 verifies the exact superseded dashboard.
+RUN-113/R–120 remain historical reviewed route/action and Respite page-owner checkpoints with exact reporting and dashboard receipts.
 
-RUN-117/R separately review the four Respite handover page gaps left by Wave 16. All four are explicit `OWNER_PAGE` decisions for `CAP-RESP-HANDOVER-NOTES`, based on complete page semantics rather than inherited route ownership. RUN-118/R integrate and independently verify exactly four page owners, zero route owners, zero bridges, and zero queue changes.
+RUN-121/R review 22 Finance name-only route actions without treating literal name equality as ownership. Seven Chart of Accounts actions are explicit owners. Seven rows are shared relations, `ledger.index` is a redirect alias, and seven manual-journal/fiscal-period rows remain evidence gaps. RUN-122/R integrate and independently verify only seven route owners and seven controller-action bridges, preserve 15 non-owner outcomes, and add zero page ownership.
 
-The cumulative bounded ledger is 641 source owners (288 route + 353 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets remain 61/242 with overlap 47, and the action-bridge count remains 76. Route accounting is 3,218 = 288 owners + 5 shared + 4 aliases + 2,921 residual. Page accounting is 711 = 353 owners + 9 shared + 349 residual. RUN-090 queue accounting remains 507 total, 84 reviewed, 77 owned, three shared, four aliases, 423 pending, and 430 without ownership.
+The cumulative bounded ledger is 648 source owners (295 route + 353 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets are 62/242 with overlap 48, and the action-bridge count is 83. Route accounting is 3,218 = 295 owners + 12 shared + 5 aliases + 2,906 residual, with seven evidence gaps tagged within residual. Page accounting remains 711 = 353 owners + 9 shared + 349 residual, with one earlier tagged evidence gap. RUN-090 queue accounting is 507 total, 106 reviewed, 84 owned, 10 shared, 5 aliases, 7 evidence gaps, 401 pending, and 423 without ownership.
 
-RUN-118R verifies exact final bytes, the complete 641-record owner ledger, parent route/bridge provenance, unchanged queue accounting, and all semantic boundaries with zero discrepancies. These relations establish bounded static page ownership only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, sensitive-data privacy, lifecycle, concurrency, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
+Accounting Period, Cost Centre, Funding Stream, and Manual Journal retain dedicated canonical FEATURE-IDs requiring later mapping repair. Six page callsites remain context only: two already owned and four unowned. These relations establish bounded static route ownership, bridges, and explicit reviewed non-owner classes only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy, ledger/lifecycle/concurrency correctness, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
 ## Candidate register
 
