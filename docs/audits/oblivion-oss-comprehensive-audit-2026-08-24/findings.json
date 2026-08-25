@@ -22,7 +22,10 @@
     "run_084_page_graph_sha256": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
     "run_084_page_graph_independent_review_sha256": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
     "run_084b_backend_semantic_sha256": "ff1bf008d6dd9d5d478b14328415a4c8187b6e09fa9e2ef57bea8daeec7de879",
-    "run_084br_backend_semantic_independent_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63"
+    "run_084br_backend_semantic_independent_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63",
+    "run_086_static_source_feature_ownership_generator_sha256": "d6933ea5d4078cc8de459552d43a471d57974cb271977654fdb4d8866b387567",
+    "run_086_static_source_feature_ownership_ledger_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+    "run_086r_static_source_feature_ownership_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -79,7 +82,11 @@
     "backend_semantic_unique_paths": 1755,
     "backend_semantic_async_role_rows": 197,
     "backend_semantic_async_unique_paths": 189,
-    "backend_whole_file_semantically_reviewed": 0
+    "backend_whole_file_semantically_reviewed": 0,
+    "static_source_feature_ownership_records": 530,
+    "static_source_feature_ownership_route_records": 212,
+    "static_source_feature_ownership_page_records": 318,
+    "static_source_feature_ownership_distinct_feature_ids": 235
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -2520,5 +2527,39 @@
     "pass_credit": false,
     "final_finding_credit": false,
     "completion_credit": false
+  },
+  "current_static_source_feature_ownership": {
+    "run_id": "RUN-086-REVIEWED-STATIC-ROUTE-PAGE-FEATURE-OWNERSHIP-WAVE-10",
+    "review_run_id": "RUN-086R-INDEPENDENT-REVIEWED-STATIC-ROUTE-PAGE-FEATURE-OWNERSHIP",
+    "status": "GO_STATIC_SOURCE_FEATURE_OWNERSHIP_ONLY",
+    "ledger_records": 530,
+    "route_records": 212,
+    "page_records": 318,
+    "distinct_feature_ids": 235,
+    "ledger_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+    "independent_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+    "independent_review_discrepancies": 0,
+    "gate_4": {
+      "status": "PARTIAL_BOUNDED_STATIC_SOURCE_OWNERSHIP_INCOMPLETE",
+      "static_records": 530,
+      "canonical_route_page_denominator": null,
+      "complete": false
+    },
+    "credit_boundary": {
+      "STATIC_SOURCE_FEATURE_OWNERSHIP": true,
+      "feature_mapping_complete": false,
+      "framework_route_reachability": false,
+      "runtime": false,
+      "database": false,
+      "build": false,
+      "application_browser": false,
+      "executed_tests": false,
+      "benchmark_mapping": false,
+      "ease": false,
+      "pass": false,
+      "final_finding": false,
+      "completion": false,
+      "audit_complete": false
+    }
   }
 }

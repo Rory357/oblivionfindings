@@ -43,6 +43,12 @@ The independently reviewed current page-tree census contains 1,058 physical file
 
 The independently reviewed backend structural ledger contains 1,789 overlapping role rows over 1,755 unique paths: 782 models, 75 policies, 735 services, 126 jobs, 14 events, 12 listeners, 45 outbox-related rows, and 197 async role rows over 189 paths. Every role row is classified `Evidence gap`, and whole-file semantic review remains 0. These denominators establish inspectable source queues only; canonical ownership, action/Site/privacy semantics, runtime, tests, feature mapping, benchmark mapping, findings, Pass, and completion remain open.
 
+## RUN-086/R bounded static source ownership overlay
+
+RUN-086/R independently establishes 530 one-to-one static source-owner records: 212 route records and 318 rendered page-root records across 235 canonical `FEATURE-ID`s. Each row retains its exact source record, anchor, source/blob/content digest, canonical identity projection, and ledger-row digest. The three `SHARED_RELATION` routes remain excluded pending a discriminator.
+
+This ledger is a bounded source subset, not an all-route/all-page crosswalk. `FEATURE-ID` ownership must not be inherited through support imports, route-group prefixes, controller containment, whole-file symbols, names, presence, or candidate overlap. The framework-expanded route/page denominator, reachability, Site/permission/privacy behaviour, runtime, browser, test, benchmark, Pass, finding, and completion evidence all remain open.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |

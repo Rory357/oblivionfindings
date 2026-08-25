@@ -1,0 +1,262 @@
+{
+  "schema_version": "run-086r-independent-reviewed-static-route-page-feature-ownership-wave-10-v1",
+  "run_id": "RUN-086R-INDEPENDENT-REVIEWED-STATIC-ROUTE-PAGE-FEATURE-OWNERSHIP",
+  "status": "GO_THREE_PART_FRESH_INDEPENDENT_REVIEW_STATIC_SOURCE_FEATURE_OWNERSHIP_ONLY",
+  "reviewed_on": "2026-08-25",
+  "decision": {
+    "verdict": "GO",
+    "discrepancies": 0,
+    "static_source_feature_ownership_authorized": true,
+    "complete_route_page_feature_crosswalk_authorized": false,
+    "matrix_mutation_authorized": false,
+    "downstream_credit_authorized": false,
+    "gate_4_complete": false
+  },
+  "pins": {
+    "checkpoint_commit": "821314b6a8c3c279ff7937d4cd2ee1576b0a47d6",
+    "checkpoint_tree": "1564890364fd1c7ee54455075fa90ebe22801a7a",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "classification_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "prior_independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+    "producer": "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json",
+    "producer_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+    "generator": "generators/build-reviewed-static-route-page-feature-ownership-wave-10.py",
+    "generator_sha256": "d6933ea5d4078cc8de459552d43a471d57974cb271977654fdb4d8866b387567"
+  },
+  "methods": [
+    "Three producer-independent read-only reviewers each reconstructed one disjoint partition directly from the pinned matrix, RUN-077 manifest, RUN-078 classification, and RUN-079 review before comparing with the RUN-086 ledger.",
+    "Each reviewer recomputed singleton selection, source joins, manifest and classification digests, feature projections, joined-evidence digests, ledger-row digests, record-set hashes, exclusions, and the producer's false downstream boundaries.",
+    "Reviewers rejected route-group prefixes, support imports, controller containment, whole-file symbols, names, presence, candidate overlap, SHARED_RELATION rows, and non-singleton relations as inherited ownership proof.",
+    "A source path and literal render call were accepted only where the corrected prior decision already established one exact canonical relation and the fresh reviewer reproduced its complete pinned evidence chain."
+  ],
+  "verified_counts": {
+    "partition_reviews": 3,
+    "go_reviews": 3,
+    "records": 530,
+    "route_records": 212,
+    "page_records": 318,
+    "distinct_feature_ids": 235,
+    "shared_relation_route_records_excluded": 3,
+    "review_discrepancies": 0,
+    "reviewer_written_files": 0,
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0
+  },
+  "verified_global_record_set": {
+    "records_sha256": "f09b3af490589118a2818092436bdc976863768eba0f6578db1dc3e0b58726e8",
+    "source_record_key_list_sha256": "bcfd68e4b34d9c936715846c161ea9d4a90f9090a9009adbcd2ed4e3e8e9c85a",
+    "ledger_row_sha256_list_sha256": "aa041749de94ce28f92631c1d95279f29ea4a6aadea7a0c2d3b5bdb4af5cfabd",
+    "feature_id_list_sha256": "7e009b9d6d598db3ad467507685489eede835c15ae83e3d017d0b9052bbcd5a1",
+    "feature_id_list_serialization": "sorted unique UTF-8 FEATURE-ID values joined with LF (0x0A), no terminal LF; matches producer canonical_list_sha256",
+    "serialization_reconciliation": {
+      "status": "RESOLVED_BEFORE_PUBLICATION",
+      "terminal_lf_variant_sha256": "1c051e7bd598543954043216ae2a75f00a516b34a43fc9a5f368739c347f28ca",
+      "set_membership_changed": false,
+      "normalized_hash_matches_producer": true
+    },
+    "records_match_producer": true,
+    "duplicate_mapping_ids": 0,
+    "duplicate_source_record_keys": 0,
+    "invalid_row_digests": 0
+  },
+  "partition_reviews": [
+    {
+      "partition_id": "A",
+      "reviewer_task_path": "/root/run087_mapping_recompute",
+      "reviewer_role": "FRESH_INDEPENDENT_READ_ONLY_RECONSTRUCTOR",
+      "verdict": "GO",
+      "discrepancy_count": 0,
+      "wrote_files": false,
+      "write_scope": [],
+      "counts": {
+        "records": 212,
+        "route_records": 56,
+        "page_records": 156,
+        "distinct_feature_ids": 94,
+        "route_distinct_feature_ids": 6,
+        "page_distinct_feature_ids": 91,
+        "route_page_feature_overlap": 3,
+        "distinct_feature_classes": {
+          "H": 85,
+          "D": 9
+        },
+        "record_feature_classes": {
+          "H": 199,
+          "D": 13
+        },
+        "excluded_shared_relation_records": 2
+      },
+      "hashes": {
+        "records_sha256": "9a291ae139113a253b14e00aee0c9bc77567bfb7ca26403c2f0b36c40e346b8e",
+        "source_record_key_list_sha256": "bf76286f9fec9fa127fdb82fc8c5b320c484b77599a803752442c826834918f9",
+        "ledger_row_sha256_list_sha256": "f0f7d1f7982312d0cda36fc04d3dece935d46925a1c5bb9f36f7e7055be1d473",
+        "feature_id_list_sha256": "2f46fd0150c06c88928fffd7aa82683a8155a90d5d01213084a862d4e8f2fd43",
+        "source_anchor_projection_sha256": "5a81c0fb36d966219998cc6ca22a38a14023df7fc906b7d8cd89e59c9ff6e093"
+      },
+      "excluded_shared_relation_ids": [
+        "RUN077-ROUTE-2393",
+        "RUN077-ROUTE-2394"
+      ],
+      "discrepancies": {
+        "input_hashes": [],
+        "selection": [],
+        "singleton": [],
+        "source_anchors": [],
+        "source_join": [],
+        "prior_review": [],
+        "inherited_evidence": [],
+        "credits": [],
+        "row_digests": [],
+        "ledger_rows": [],
+        "excluded_shared": [],
+        "generator_contract": []
+      }
+    },
+    {
+      "partition_id": "B",
+      "reviewer_task_path": "/root/run087_reporting_design",
+      "reviewer_role": "FRESH_INDEPENDENT_READ_ONLY_RECONSTRUCTOR",
+      "verdict": "GO",
+      "discrepancy_count": 0,
+      "wrote_files": false,
+      "write_scope": [],
+      "counts": {
+        "records": 127,
+        "route_records": 46,
+        "page_records": 81,
+        "distinct_feature_ids": 77,
+        "distinct_feature_classes": {
+          "H": 75,
+          "D": 2
+        },
+        "record_feature_classes": {
+          "H": 125,
+          "D": 2
+        },
+        "excluded_shared_relation_records": 0,
+        "excluded_explicit_unmapped_route_records": 1027,
+        "excluded_page_evidence_gap_records": 156
+      },
+      "hashes": {
+        "records_sha256": "63b6ae31368b6df453c3d3fd989537c6ee2b60f102c7954682d57903eb78e271",
+        "source_record_key_list_sha256": "065d4813e54ab27ea2fef30cdcc9ef3959a5a9d3a8b86fd7b227cca147be1a2e",
+        "ledger_row_sha256_list_sha256": "a75efcee6cfcc880354737e3de1a82f965cddbfb7fecc7b1e2e33ceee67456fb",
+        "feature_id_list_sha256": "a92f429d392fc63c951134d44a48344ab2f3d824452caba0e084065f5671b261",
+        "source_anchor_list_sha256": "5b899c49aaeb88703f8bfed019da25a7c3ca97138f55c766fd0a78a1f6a6e72e",
+        "manifest_record_sha256_list_sha256": "28f6c9e5b6d09b1c85e0ee3b06089a605edd30f02de49a48aca067c48217151b",
+        "classification_decision_sha256_list_sha256": "1a166f6c4e322f21698a945af1a2779f29cf5cddfb22224c4445824342ba524e",
+        "joined_source_evidence_sha256_list_sha256": "895355aca0b93bc841aade485e13c52a0f97b4ee8963eb8d04b6e8fc3b3fa27d"
+      },
+      "discrepancies": {
+        "record_reconstruction": [],
+        "per_row_digest": [],
+        "partition_record_set": [],
+        "source_anchor_or_hash": [],
+        "generator_assertion": [],
+        "credit_boundary": []
+      }
+    },
+    {
+      "partition_id": "C",
+      "reviewer_task_path": "/root/run086_gate_reaudit",
+      "reviewer_role": "FRESH_INDEPENDENT_READ_ONLY_RED_TEAM",
+      "verdict": "GO",
+      "discrepancy_count": 0,
+      "wrote_files": false,
+      "write_scope": [],
+      "counts": {
+        "records": 191,
+        "route_records": 110,
+        "route_OWNER": 109,
+        "route_ALIAS_OR_REDIRECT": 1,
+        "page_records": 81,
+        "distinct_feature_ids": 75,
+        "route_distinct_feature_ids": 14,
+        "page_distinct_feature_ids": 72,
+        "route_page_feature_overlap": 11,
+        "distinct_feature_classes": {
+          "H": 69,
+          "D": 6
+        },
+        "record_feature_classes": {
+          "H": 185,
+          "D": 6
+        },
+        "excluded_shared_relation_records": 1,
+        "excluded_explicit_unmapped_route_records": 961,
+        "excluded_page_evidence_gap_records": 156
+      },
+      "hashes": {
+        "records_sha256": "0c0e7aa1474cd381a52e5a8a0b397f4bba8f80aa01dc29eb94f58e4b5b998a68",
+        "source_record_key_list_sha256": "41fff3ca5f712179de1429fc31c20037cd8a01956993ee5786080137fe45a316",
+        "ledger_row_sha256_list_sha256": "475a86d6a777c97a277d840c8173232ec5c6697f9726a24d30906e95c173222c",
+        "record_set_envelope_sha256": "459db205581971f4a25db2db30a0802270ba3df4b684bf116d13b98dcaa5d223",
+        "feature_id_list_sha256": "5aed32d8fa4f1082c463664938fe4509896e233923659a9cf8d1a6c15829406e",
+        "source_record_id_list_sha256": "1cf048820850a1b8b0ca7bf15a48dc0ef610d3f56e8be704b864b26ad8e55599"
+      },
+      "discrepancies": {
+        "input_hash_mismatches": [],
+        "missing_ledger_records": [],
+        "extra_ledger_records": [],
+        "record_payload_mismatches": [],
+        "invalid_declared_row_digests": [],
+        "exact_relation_discrepancies": [],
+        "source_anchor_discrepancies": [],
+        "source_hash_or_blob_discrepancies": [],
+        "forbidden_prefix_import_controller_file_presence_inheritance": [],
+        "non_singleton_ownership": [],
+        "SHARED_RELATION_inclusion": [],
+        "prior_review_discrepancies": [],
+        "credit_boundary_discrepancies": []
+      }
+    }
+  ],
+  "aggregate_checks": {
+    "all_four_input_hashes_exact": true,
+    "all_generator_workspace_and_source_tree_pins_exact": true,
+    "three_disjoint_partition_reviews_cover_all_530_records": true,
+    "all_530_rows_reconstructed_before_ledger_comparison": true,
+    "all_530_row_digests_recomputed": true,
+    "all_source_anchors_and_source_hashes_exact": true,
+    "all_feature_relations_singleton": true,
+    "all_three_shared_relations_excluded": true,
+    "prefix_import_controller_file_presence_inheritance_rejected": true,
+    "matrix_byte_identical": true,
+    "review_discrepancies": 0,
+    "reviewer_writes": 0
+  },
+  "mutation_attestation": {
+    "review_execution_wrote_files": false,
+    "receipt_materialized_by_root_from_actual_reviewer_returns": true,
+    "application_source_changed": false,
+    "matrix_changed": false,
+    "runtime_or_external_system_changed": false,
+    "tests_executed": false,
+    "browser_used": false
+  },
+  "credit_boundary": {
+    "STATIC_SOURCE_FEATURE_OWNERSHIP": true,
+    "feature_mapping_complete": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Three fresh producer-independent read-only reviews reconstructed the complete 530-record ledger with zero discrepancies. GO authorizes only bounded static source FEATURE-ID ownership for those exact records. Gate 4, the canonical framework-expanded route/page denominator, the complete crosswalk, shared ownership, reachability, runtime, database, build, browser, tests, benchmarks, ease, Passes, findings, completion, and audit-complete status remain open or false."
+}

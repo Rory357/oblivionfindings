@@ -63,6 +63,12 @@ RUN-084B materializes 1,789 overlapping backend role rows across 1,755 unique pi
 
 RUN-084's current designated-application access preflight observed only the public home page and signed-out login page. The 1280×720 login observation had no page-level horizontal overflow and zero console warnings/errors. No credentials were read or entered, no form was submitted, no private record or screenshot was retained, and no non-production or deployed-build marker was established. Signed-in application-browser, representative role/Site, route/workflow, responsive-family, runtime, test, Pass, and completion credit remain zero.
 
+## RUN-086/R bounded static source feature ownership checkpoint
+
+RUN-086 materializes 530 exact record-level owner relations from the already cyclically reviewed static source decisions: 212 route records (211 `OWNER` and 1 `ALIAS_OR_REDIRECT`) plus 318 page-root records, spanning 235 canonical `FEATURE-ID`s. Three fresh read-only reviewers independently reconstruct partitions A, B, and C from the pinned matrix, manifest, classification, and prior review; RUN-086R returns three GO verdicts with zero discrepancies and zero reviewer writes.
+
+This awards only bounded `STATIC_SOURCE_FEATURE_OWNERSHIP` for those 530 records. It does not establish the framework-expanded canonical route/page denominator, a complete route/page-to-feature crosswalk, shared-relation ownership, route reachability, navigation, runtime, database, build, browser, executed tests, benchmarks, ease, Passes, findings, or completion. Gate 4 therefore remains incomplete, and the 340-row matrix remains byte-identical at `dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390`.
+
 ## Current raw source census
 
 These are deterministic path counts, not semantic feature or runtime denominators.
@@ -206,6 +212,10 @@ RUN-058-BROWSER later preserved a read-only, signed-in observation of six select
 - `evidence/source/root-run-084-full-inertia-page-graph-wave-09.json` and `raw-run-084r-independent-full-inertia-page-graph-review-wave-09.json`: full 1,058-file page-tree graph and independent GO review, limited to static structural and candidate-relation evidence.
 - `evidence/source/root-run-084b-backend-semantic-classification-wave-09.json` and `raw-run-084br-independent-backend-semantic-classification-review-wave-09.json`: 1,789-row backend role ledger and independent GO review, with every row retained as an evidence gap and zero whole-file semantic review.
 - `evidence/source/current-run-085-reporting-materialization-wave-09.json`: deterministic current reporting/hash receipt preserving matrix, benchmark, usability, visual, inventory, reports 07/08/10/11/12, and all downstream zero-credit boundaries.
+- `generators/build-reviewed-static-route-page-feature-ownership-wave-10.py`: deterministic RUN-086 producer for the bounded 530-record static source ownership ledger.
+- `evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json`: 212 route plus 318 page source-owner records across 235 canonical FEATURE-IDs, pending no credit inside the producer itself.
+- `evidence/source/raw-run-086r-independent-reviewed-static-route-page-feature-ownership-wave-10.json`: three-part fresh independent GO review with zero discrepancies, authorizing only bounded static source feature ownership.
+- `evidence/source/current-run-087-static-source-feature-ownership-reporting.json`: deterministic RUN-087 reporting receipt; matrix and every execution, benchmark, Pass, finding, and completion boundary remain unchanged.
 - `evidence/source/raw-run-073a-required-artifact-contract-wave-05.json`: historical RUN-073A review-time deliverable contract, including the then-current 11/18 snapshot and all 26 literal completion gates.
 - `evidence/source/raw-run-073b-cross-module-journeys-wave-05.json`: all eight pinned source reconstructions, 44 classified handoffs, exact Site/role/privacy boundaries, provisional candidates, blockers, and zero prompt-grade execution credit.
 - `evidence/source/raw-run-073d-independent-journey-review-wave-05.json`: fresh independent source-semantic review of all eight journeys and 155/155 selected anchors, retaining 0/8 prompt-grade completion.

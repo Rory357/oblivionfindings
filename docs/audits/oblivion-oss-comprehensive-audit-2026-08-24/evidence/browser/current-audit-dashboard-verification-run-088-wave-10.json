@@ -1,0 +1,145 @@
+{
+  "schema_version": "run-088-audit-dashboard-verification-wave-10-v1",
+  "run_id": "RUN-088-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "verified_on": "2026-08-25T16:53:56.5683579+12:00",
+  "surface": "IN_APP_BROWSER_LOCAL_AUDIT_DASHBOARD",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=run087-c7cdc89d#progress",
+  "document_title": "Oblivion Findings current-source audit",
+  "pins": {
+    "audit_checkpoint_commit_before_reporting_commit": "821314b6a8c3c279ff7937d4cd2ee1576b0a47d6",
+    "audit_checkpoint_tree_before_reporting_commit": "1564890364fd1c7ee54455075fa90ebe22801a7a",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "run_086_generator_sha256": "d6933ea5d4078cc8de459552d43a471d57974cb271977654fdb4d8866b387567",
+    "run_086_ledger_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+    "run_086r_independent_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+    "run_087_reporting_generator_sha256": "9dfbf1b24fb608abf3f0553c37cf2e66cdb0ec2d76b7e505fc89989766f83b1c",
+    "run_087_reporting_receipt_sha256": "ca3dc7a09b19a3f656f6eda4a653c27f4ad14479796d6eecd83677db44c01936",
+    "dashboard_generator_sha256": "91e6ce125b3ca447db942d97ba968f1371b4d7beb7f3e229a9b1b89f74a0aaf7",
+    "dashboard_html_sha256": "c7cdc89d738ccca1725f96472687e3dd8cdeaea54a2493e8fc04e2c383fd9697"
+  },
+  "viewports": [
+    {
+      "requested_width": 1440,
+      "requested_height": 900,
+      "page_client_width": 1425,
+      "page_scroll_width": 1425,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_wide_table_wraps": 0,
+      "navigation_client_width": 1425,
+      "navigation_scroll_width": 1425,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "requested_width": 1280,
+      "requested_height": 800,
+      "page_client_width": 1265,
+      "page_scroll_width": 1265,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_wide_table_wraps": 0,
+      "navigation_client_width": 1265,
+      "navigation_scroll_width": 1265,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "requested_width": 1024,
+      "requested_height": 768,
+      "page_client_width": 1009,
+      "page_scroll_width": 1009,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 1,
+      "unbounded_wide_table_wraps": 0,
+      "navigation_client_width": 1009,
+      "navigation_scroll_width": 1009,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "requested_width": 390,
+      "requested_height": 844,
+      "page_client_width": 375,
+      "page_scroll_width": 375,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 9,
+      "unbounded_wide_table_wraps": 0,
+      "navigation_client_width": 375,
+      "navigation_scroll_width": 962,
+      "navigation_overflow_x": "auto"
+    }
+  ],
+  "dom_and_link_checks": {
+    "href_occurrences": 292,
+    "unique_hrefs": 198,
+    "unique_local_file_hrefs": 188,
+    "existing_local_file_hrefs": 188,
+    "missing_local_file_hrefs": 0,
+    "unique_anchor_hrefs": 10,
+    "missing_anchor_targets": 0,
+    "unique_external_hrefs": 0,
+    "authored_unique_ids": 10,
+    "browser_dom_unique_ids_total": 11,
+    "in_app_browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_ids": 0,
+    "console_messages_at_warning_or_error_level": 0
+  },
+  "visible_boundary_checks": {
+    "run_087_checkpoint_visible": true,
+    "bounded_static_source_owner_record_count_530_visible": true,
+    "route_and_page_counts_212_and_318_visible": true,
+    "distinct_feature_id_count_235_visible": true,
+    "gate_4_and_complete_crosswalk_remain_open_visible": true,
+    "matrix_unchanged_and_mapping_zero_of_340_visible": true,
+    "downstream_runtime_browser_build_test_benchmark_ease_release_pass_and_completion_credit_zero_visible": true
+  },
+  "visual_review": {
+    "desktop_screenshot_inspected": true,
+    "mobile_screenshot_inspected": true,
+    "screenshots_retained": false,
+    "page_level_layout_defect_observed": false,
+    "unbounded_table_overflow_observed": false
+  },
+  "determinism": {
+    "dashboard_generator_runs": 2,
+    "first_dashboard_html_sha256": "c7cdc89d738ccca1725f96472687e3dd8cdeaea54a2493e8fc04e2c383fd9697",
+    "second_dashboard_html_sha256": "c7cdc89d738ccca1725f96472687e3dd8cdeaea54a2493e8fc04e2c383fd9697",
+    "byte_identical": true
+  },
+  "attestation": {
+    "audit_artifact_only": true,
+    "audit_dashboard_was_read_only_in_browser": true,
+    "application_routes_opened_for_this_verification": 0,
+    "application_state_changed": false,
+    "external_state_changed": false,
+    "credentials_read_or_entered": false,
+    "forms_submitted": false,
+    "database_or_runtime_command_executed": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact_verification": true,
+    "application_browser_credit": false,
+    "responsive_application_credit": false,
+    "rendered_application_visual_credit": false,
+    "workflow_credit": false,
+    "finding_credit": false,
+    "runtime_credit": false,
+    "build_credit": false,
+    "test_credit": false,
+    "benchmark_credit": false,
+    "feature_mapping_credit": false,
+    "ease_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "summary": "The exact generated RUN-087 audit dashboard passed read-only responsive geometry, bounded-table, navigation, local-link, anchor, content-boundary, console, and visual checks at four required viewports. This verifies only the audit artifact and awards no application browser, responsive application, rendered application visual, workflow, runtime, build, test, benchmark, feature mapping, finding, ease, release, Pass, completion, or audit-complete credit."
+}
