@@ -73,13 +73,21 @@ RUN-102 adds exactly 21 route owners and 21 controller-action bridges, preserves
 
 RUN-102R verifies the exact final bytes with zero discrepancies. These relations establish bounded static route/action ownership and explicit non-owner alias classification only. They do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
-## RUN-105–106 reviewed page render-owner overlay
+## Historical RUN-105–106 reviewed page render-owner overlay
 
 RUN-105 freezes 24 pending page roots across 17 candidate FEATURE-IDs for fresh outcome-neutral review. Twenty are explicit page owners, three are shared relations, and the Governance Action index remains an evidence gap because a material generated import is absent at the application pin. Containment, imports, presence, and names alone do not grant ownership.
 
-RUN-106 adds exactly 20 page owners, zero route owners, and zero controller-action bridges. The cumulative bounded ledger is 612 source owners (265 route + 347 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets are 59/242 with overlap 45, while the action-bridge count remains 53. Page accounting is 711 = 347 owners + 5 shared + 359 residual, with one evidence gap tagged inside the residual. RUN-090 queue accounting remains 507 total, 59 reviewed, 54 owned, two shared, three aliases, 448 pending, and 453 without ownership.
+RUN-106 adds exactly 20 page owners, zero route owners, and zero controller-action bridges. That cumulative bounded ledger was 612 source owners (265 route + 347 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets are 59/242 with overlap 45, while the action-bridge count remains 53. Page accounting is 711 = 347 owners + 5 shared + 359 residual, with one evidence gap tagged inside the residual. RUN-090 queue accounting remains 507 total, 59 reviewed, 54 owned, two shared, three aliases, 448 pending, and 453 without ownership.
 
 RUN-106R verifies exact final bytes and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit non-owner classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
+
+## RUN-109–110 reviewed page render-owner tail overlay
+
+RUN-109 freezes six pending singleton page roots for fresh outcome-neutral review. Two are explicit page owners and four are shared relations: Privacy dashboard, eMAR Medications, HR candidate detail, and the HR employee hub. Complete-page and canonical-matrix review, not containment or names, controls the outcome.
+
+RUN-110 adds exactly two page owners, zero route owners, and zero controller-action bridges. The cumulative bounded ledger is 614 source owners (265 route + 349 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets remain 59/242 with overlap 45, while the action-bridge count remains 53. Page accounting is 711 = 349 owners + 9 shared + 353 residual, with one earlier evidence gap tagged inside the residual. RUN-090 queue accounting is 507 total, 60 reviewed, 54 owned, three shared, three aliases, 447 pending, and 453 without ownership.
+
+RUN-110R verifies exact final bytes, canonical IDs, queue reconciliation, and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit reviewed-shared classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
 ## Candidate register
 
