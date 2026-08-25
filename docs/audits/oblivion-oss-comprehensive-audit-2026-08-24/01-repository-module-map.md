@@ -81,13 +81,21 @@ RUN-106 adds exactly 20 page owners, zero route owners, and zero controller-acti
 
 RUN-106R verifies exact final bytes and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit non-owner classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
-## RUN-109–110 reviewed page render-owner tail overlay
+## Historical RUN-109–110 reviewed page render-owner tail overlay
 
 RUN-109 freezes six pending singleton page roots for fresh outcome-neutral review. Two are explicit page owners and four are shared relations: Privacy dashboard, eMAR Medications, HR candidate detail, and the HR employee hub. Complete-page and canonical-matrix review, not containment or names, controls the outcome.
 
-RUN-110 adds exactly two page owners, zero route owners, and zero controller-action bridges. The cumulative bounded ledger is 614 source owners (265 route + 349 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets remain 59/242 with overlap 45, while the action-bridge count remains 53. Page accounting is 711 = 349 owners + 9 shared + 353 residual, with one earlier evidence gap tagged inside the residual. RUN-090 queue accounting is 507 total, 60 reviewed, 54 owned, three shared, three aliases, 447 pending, and 453 without ownership.
+RUN-110 adds exactly two page owners, zero route owners, and zero controller-action bridges. That cumulative bounded ledger was 614 source owners (265 route + 349 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets remain 59/242 with overlap 45, while the action-bridge count remains 53. Page accounting is 711 = 349 owners + 9 shared + 353 residual, with one earlier evidence gap tagged inside the residual. RUN-090 queue accounting is 507 total, 60 reviewed, 54 owned, three shared, three aliases, 447 pending, and 453 without ownership.
 
 RUN-110R verifies exact final bytes, canonical IDs, queue reconciliation, and all boundaries with zero discrepancies. These relations establish bounded static page ownership and explicit reviewed-shared classification only; they do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
+
+## RUN-113–114 reviewed outcome-neutral name-only route/action overlay
+
+RUN-113 freezes 24 pending direct-exact route actions for fresh outcome-neutral review: 16 Fleet incident actions and eight Respite handover-note actions. All are `NAME_ONLY` relations with zero pre-review credit. Fresh semantic review accepts 23 explicit route/action owners and preserves the Fleet incident `create` redirect as one reviewed alias; seven literal page callsites remain context only and add zero page ownership.
+
+RUN-114 adds exactly 23 route owners, 23 controller-action bridges, and zero page owners. The cumulative bounded ledger is 637 source owners (288 route + 349 page) across 256 FEATURE-IDs (234 H + 22 D). Route/page feature sets are 61/242 with overlap 47, while the action-bridge count is 76. Route accounting is 3,218 = 288 owners + 5 shared + 4 aliases + 2,921 residual. Page accounting remains 711 = 349 owners + 9 shared + 353 residual. RUN-090 queue accounting is 507 total, 84 reviewed, 77 owned, three shared, four aliases, 423 pending, and 430 without ownership.
+
+RUN-114R verifies exact final bytes, the committed two-blob delta, all 38 identities, queue reconciliation, and all semantic boundaries with zero discrepancies. These relations establish bounded static route ownership, controller-action bridges, and explicit alias classification only; they do not establish page or frontend ownership, framework reachability, Site or permission correctness, canonical direct-object concealment, privacy, lifecycle, concurrency, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
 ## Candidate register
 
