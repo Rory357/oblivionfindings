@@ -7,11 +7,11 @@ Governing prompt SHA-256: `4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa913
 
 Architecture rule: One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.
 
-## RUN-074–076 feature-side static linkage
+## RUN-074–076 historical feature-side static linkage
 
 Three producer partitions reconstructed 503 previously missing scoped cells across 288 canonical targets. Cyclic independent review reopened every decision before deterministic matrix integration. This is committed-source linkage only: it does not establish framework reachability, full route/page-universe mapping, runtime behavior, rendered browser behavior, executed tests, benchmark equivalence, ease, Pass, or audit completion.
 
-| Measure | Current result | Credit boundary |
+| Measure | RUN-076 result | Credit boundary |
 |---|---:|---|
 | Reviewed gap targets | 288 / 288 | independently reviewed static source only |
 | Matrix rows / fields changed | 282 / 575 | permitted linkage columns only |
@@ -21,6 +21,23 @@ Three producer partitions reconstructed 503 previously missing scoped cells acro
 | Benchmark mappings / final findings / completion | 0 / 0 / 0 | unchanged |
 
 Established final decisions include 119 route-path, 220 page-file, 8 backend-anchor, and 141 test-anchor cells. Retained sentinels remain visible.
+
+## RUN-077–080 route/page universe and reviewed classification
+
+The complete committed static input contains 3,217 primary route-facade callsites, one separately scoped route-like sentinel, 3,245 fluent-name callsites, and 711 page roots. Three producer partitions materialized a decision record for every row; three different-agent cyclic reviews returned GO with zero invalid decisions and zero writes.
+
+| Measure | Independently reviewed result | Credit boundary |
+|---|---:|---|
+| Route-like rows | 3,218 | 211 owner · 3 shared · 1 alias · 3,003 explicit unmapped |
+| Fluent-name decisions | 3,245 | static names only; framework reachability unproved |
+| Page-root decisions | 711 | 318 reviewed · 393 evidence gap |
+| Residual scoped cells | 15 | 2 established · 13 retained |
+| Route-name gap targets | 244 | 78 established · 166 retained |
+| RUN-080 matrix rows / fields changed | 79 / 80 | route names 78 · page files 2 only |
+| Remaining route-path / route-name / page-file gaps | 1 / 166 / 4 | explicit matrix sentinels |
+| Runtime / application browser / executed tests / completion | 0 / 0 / 0 / 0 | unchanged |
+
+All classification, review, and integration evidence is committed-source static evidence. It establishes no framework route execution, build resolution, final feature mapping, benchmark equivalence, ease, release, Pass, finding, or audit-completion credit.
 
 ## Exact accounting
 

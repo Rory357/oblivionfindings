@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-081-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_AND_LOCAL_LINK_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "observed_at": "2026-08-25T13:19:00.2541843+12:00",
+  "target": {
+    "url": "http://127.0.0.1:8771/audit-dashboard.html?v=run081-82174bba0aaf",
+    "artifact": "audit-dashboard.html",
+    "sha256": "82174bba0aaf4128afd80105841893c049afae978e3dba33a332010580ff0f4c",
+    "generator": "generators/build-current-audit-dashboard.py",
+    "generator_sha256": "108625a64191f27954a1ba786d74d6275dfaed5b744ee902eb5a5defebe101c2"
+  },
+  "lineage": {
+    "audit_checkpoint_commit": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
+    "audit_checkpoint_tree": "d1eb36fabc0f5150c81f2140e834347dca87dd25",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "route_page_static_linkage_integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
+    "route_page_reporting_materialization_sha256": "d075bc06da962d932351cb653f3a34dd88cbfc6272488fe06bc26ab61c80e55a"
+  },
+  "browser": {
+    "surface": "Codex in-app browser",
+    "page_title": "Oblivion Findings current-source audit",
+    "console_warnings": 0,
+    "console_errors": 0,
+    "visual_screenshots_inspected": 2,
+    "screenshots_retained": 0
+  },
+  "semantic_markers": {
+    "run_077_through_081_checkpoint_visible": true,
+    "route_universe_3217_plus_1_visible": true,
+    "route_like_3218_review_rows_visible": true,
+    "page_roots_711_visible": true,
+    "explicit_unmapped_3003_visible": true,
+    "page_evidence_gaps_393_visible": true,
+    "live_matrix_dadc888b5069_visible": true,
+    "remaining_1_route_path_166_route_names_4_page_files_1_combined_0_backend_8_tests_visible": true,
+    "zero_of_340_mapping_visible": true,
+    "no_completion_claim_visible": true,
+    "zero_downstream_credit_visible": true
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "page_client_width": 1425,
+      "page_scroll_width": 1425,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1425,
+      "navigation_scroll_width": 1425,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "page_client_width": 1265,
+      "page_scroll_width": 1265,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1265,
+      "navigation_scroll_width": 1265,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "page_client_width": 1009,
+      "page_scroll_width": 1009,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 0,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 1009,
+      "navigation_scroll_width": 1009,
+      "navigation_overflow_x": "auto"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "page_client_width": 375,
+      "page_scroll_width": 375,
+      "page_horizontal_overflow": false,
+      "table_wraps": 9,
+      "internally_wide_table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "navigation_client_width": 375,
+      "navigation_scroll_width": 962,
+      "navigation_overflow_x": "auto"
+    }
+  ],
+  "local_link_validation": {
+    "total_links": 247,
+    "unique_links": 176,
+    "unique_local_paths": 166,
+    "in_page_anchor_links": 10,
+    "external_links": 0,
+    "missing_links_after_evidence_creation": 0
+  },
+  "credit_boundary": {
+    "audit_artifact_browser_verification": true,
+    "application_browser": false,
+    "application_responsive": false,
+    "application_visual": false,
+    "workflow": false,
+    "finding": false,
+    "runtime": false,
+    "executed_test": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Read-only verification of the exact generated audit dashboard artifact in the Codex in-app browser. No application route, form, record, runtime, test, build, database, network, or external system was exercised or changed."
+}

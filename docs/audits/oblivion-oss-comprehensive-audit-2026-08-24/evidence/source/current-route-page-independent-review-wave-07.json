@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-079-ROUTE-PAGE-INDEPENDENT-REVIEW-NORMALIZATION",
+  "status": "THREE_PART_CYCLIC_INDEPENDENT_REVIEW_GO_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25T12:45:00+12:00",
+  "pins": {
+    "checkpoint_commit": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
+    "checkpoint_tree": "d1eb36fabc0f5150c81f2140e834347dca87dd25",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "manifest_path": "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json",
+    "manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "normalized_producer_path": "evidence/source/current-route-page-classification-wave-07.json",
+    "normalized_producer_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "producer_normalizer": "generators/normalize-route-page-classification-wave-07.py",
+    "producer_normalizer_sha256": "1aa28e6bcbcfe09a7dda2d539448b99e8435f9906aa40c8c43d9b559ea1e655a",
+    "generator": "generators/normalize-route-page-independent-review-wave-07.py",
+    "generator_sha256": "d3ea0145f1846823d34827758b7867ce2d09a4ce72fb87886d16c346387fd40a",
+    "raw_producers": [
+      {
+        "partition_id": "A",
+        "run_id": "RUN-078A-ROUTE-PAGE-CLASSIFICATION-PRODUCER",
+        "path": "evidence/source/raw-run-078a-route-page-classification-wave-07.json",
+        "sha256": "2a55b9a7848d41472d19aeb64dab5167c0d8f7f89244b0d6d9d9b353a2c963be",
+        "generator": "generators/build-run-078a-route-page-classification-wave-07.py",
+        "generator_sha256": "854cfe57444ac2e932431b1afa05baa9c10dac237bc7bb1f0f5932f1c552dc12",
+        "counts": {
+          "route_decisions": 1073,
+          "name_decisions": 1105,
+          "page_decisions": 237,
+          "residual_scoped_decisions": 4,
+          "route_name_gap_decisions": 82
+        }
+      },
+      {
+        "partition_id": "B",
+        "run_id": "RUN-078B-ROUTE-PAGE-CLASSIFICATION-WAVE-07",
+        "path": "evidence/source/raw-run-078b-route-page-classification-wave-07.json",
+        "sha256": "529e6dcbf5edbf1bb1a78c947b287931140cdfc68cef825610ebf525198a3bd7",
+        "generator": "generators/build-run-078b-route-page-classification-wave-07.py",
+        "generator_sha256": "d7b2f091ff313cba0a215ee654c37ee3c885205a1e008199e5413df17dcc9f1b",
+        "counts": {
+          "route_decisions": 1073,
+          "name_decisions": 1068,
+          "page_decisions": 237,
+          "residual_scoped_decisions": 4,
+          "route_name_gap_decisions": 81
+        }
+      },
+      {
+        "partition_id": "C",
+        "run_id": "RUN-078C-ROUTE-PAGE-CLASSIFICATION",
+        "path": "evidence/source/raw-run-078c-route-page-classification-wave-07.json",
+        "sha256": "18648cadca47d4dcea8db3b3ee1e044be93ab77903cce9734a4e15171ffd226e",
+        "generator": "generators/build-run-078c-route-page-classification-wave-07.py",
+        "generator_sha256": "76889b0502a3d309106cbe85cd64dd700f05ecee846f624cf907d6afbe6867aa",
+        "counts": {
+          "route_decisions": 1072,
+          "name_decisions": 1072,
+          "page_decisions": 237,
+          "residual_scoped_decisions": 4,
+          "route_name_gap_decisions": 81
+        }
+      }
+    ],
+    "raw_reviews": [
+      {
+        "review_id": "RUN-079A",
+        "path": "evidence/source/raw-run-079a-independent-route-page-review-wave-07.json",
+        "sha256": "52c6117b4858cf7a486c0b2764887778c3a8fe106b5789443a8bf562a59687f7",
+        "reviewer_partition_id": "A",
+        "reviewed_partition_id": "B"
+      },
+      {
+        "review_id": "RUN-079B",
+        "path": "evidence/source/raw-run-079b-independent-route-page-review-wave-07.json",
+        "sha256": "7a57397122ffa2784f51772288097e8af6f7cedb02153dd7fa6bdeaeb520e233",
+        "reviewer_partition_id": "B",
+        "reviewed_partition_id": "C"
+      },
+      {
+        "review_id": "RUN-079C",
+        "path": "evidence/source/raw-run-079c-independent-route-page-review-wave-07.json",
+        "sha256": "a82a04add97e56187d2db968e684649b6bcd8c41eef90924cb7d57a3ed970b94",
+        "reviewer_partition_id": "C",
+        "reviewed_partition_id": "A"
+      }
+    ]
+  },
+  "cyclic_review": {
+    "required_mapping": {
+      "A": "B",
+      "B": "C",
+      "C": "A"
+    },
+    "observed_mapping": {
+      "A": "B",
+      "B": "C",
+      "C": "A"
+    },
+    "self_review_count": 0
+  },
+  "counts": {
+    "review_artifacts": 3,
+    "go_reviews": 3,
+    "reviewer_partitions": 3,
+    "reviewed_partitions": 3,
+    "route_decisions_reviewed": 3218,
+    "name_decisions_reviewed": 3245,
+    "page_decisions_reviewed": 711,
+    "residual_scoped_decisions_reviewed": 12,
+    "residual_scoped_cells_reviewed": 15,
+    "route_name_gap_decisions_reviewed": 244,
+    "invalid_decisions": 0,
+    "review_artifacts_wrote_files": 0,
+    "route_classifications": {
+      "ALIAS_OR_REDIRECT": 1,
+      "EXPLICIT_UNMAPPED_SENTINEL": 3003,
+      "OWNER": 211,
+      "SHARED_RELATION": 3
+    },
+    "page_prompt_classifications": {
+      "Evidence gap": 393,
+      "Reviewed": 318
+    },
+    "residual_field_statuses": {
+      "ESTABLISHED": 2,
+      "RETAIN_NOT_ESTABLISHED": 13
+    },
+    "route_name_gap_statuses": {
+      "ESTABLISHED": 78,
+      "RETAIN_NOT_ESTABLISHED": 166
+    },
+    "benchmark_mapping_credit": 0,
+    "runtime_credit": 0,
+    "application_browser_credit": 0,
+    "executed_test_credit": 0,
+    "pass_credit": 0,
+    "completion_credit": 0
+  },
+  "reviews": [
+    {
+      "review_id": "RUN-079A",
+      "run_id": "RUN-079A-CORRECTED-PARTITION-B-INDEPENDENT-REVIEW-WAVE-07",
+      "status": "GO",
+      "reviewer_partition_id": "A",
+      "reviewed_partition_id": "B",
+      "path": "evidence/source/raw-run-079a-independent-route-page-review-wave-07.json",
+      "sha256": "52c6117b4858cf7a486c0b2764887778c3a8fe106b5789443a8bf562a59687f7",
+      "reviewed_producer_path": "evidence/source/raw-run-078b-route-page-classification-wave-07.json",
+      "reviewed_producer_sha256": "529e6dcbf5edbf1bb1a78c947b287931140cdfc68cef825610ebf525198a3bd7",
+      "reviewed_producer_generator": "generators/build-run-078b-route-page-classification-wave-07.py",
+      "reviewed_producer_generator_sha256": "d7b2f091ff313cba0a215ee654c37ee3c885205a1e008199e5413df17dcc9f1b",
+      "counts": {
+        "route_decisions": 1073,
+        "name_decisions": 1068,
+        "page_decisions": 237,
+        "residual_scoped_decisions": 4,
+        "route_name_gap_decisions": 81,
+        "route_classifications": {
+          "EXPLICIT_UNMAPPED_SENTINEL": 1027,
+          "OWNER": 46
+        },
+        "page_classifications": {
+          "Evidence gap": 156,
+          "Reviewed": 81
+        },
+        "residual_statuses": {
+          "ESTABLISHED": 2,
+          "RETAIN_NOT_ESTABLISHED": 2
+        },
+        "route_name_gap_statuses": {
+          "ESTABLISHED": 19,
+          "RETAIN_NOT_ESTABLISHED": 62
+        }
+      },
+      "invalid_decisions": 0,
+      "wrote_files": false,
+      "credit_awarded": false
+    },
+    {
+      "review_id": "RUN-079B",
+      "run_id": "RUN-079B-CORRECTED-C-INDEPENDENT-REVIEW",
+      "status": "GO",
+      "reviewer_partition_id": "B",
+      "reviewed_partition_id": "C",
+      "path": "evidence/source/raw-run-079b-independent-route-page-review-wave-07.json",
+      "sha256": "7a57397122ffa2784f51772288097e8af6f7cedb02153dd7fa6bdeaeb520e233",
+      "reviewed_producer_path": "evidence/source/raw-run-078c-route-page-classification-wave-07.json",
+      "reviewed_producer_sha256": "18648cadca47d4dcea8db3b3ee1e044be93ab77903cce9734a4e15171ffd226e",
+      "reviewed_producer_generator": "generators/build-run-078c-route-page-classification-wave-07.py",
+      "reviewed_producer_generator_sha256": "76889b0502a3d309106cbe85cd64dd700f05ecee846f624cf907d6afbe6867aa",
+      "counts": {
+        "route_decisions": 1072,
+        "name_decisions": 1072,
+        "page_decisions": 237,
+        "residual_scoped_decisions": 4,
+        "residual_scoped_cells": 4,
+        "route_name_gap_decisions": 81,
+        "route_classifications": {
+          "ALIAS_OR_REDIRECT": 1,
+          "EXPLICIT_UNMAPPED_SENTINEL": 961,
+          "OWNER": 109,
+          "SHARED_RELATION": 1
+        },
+        "page_classifications": {
+          "Evidence gap": 156,
+          "Reviewed": 81
+        },
+        "route_name_gap_statuses": {
+          "ESTABLISHED": 29,
+          "RETAIN_NOT_ESTABLISHED": 52
+        }
+      },
+      "invalid_decisions": 0,
+      "wrote_files": false,
+      "credit_awarded": false
+    },
+    {
+      "review_id": "RUN-079C",
+      "run_id": "RUN-079C-CYCLIC-INDEPENDENT-REVIEW-OF-CORRECTED-A",
+      "status": "GO",
+      "reviewer_partition_id": "C",
+      "reviewed_partition_id": "A",
+      "path": "evidence/source/raw-run-079c-independent-route-page-review-wave-07.json",
+      "sha256": "a82a04add97e56187d2db968e684649b6bcd8c41eef90924cb7d57a3ed970b94",
+      "reviewed_producer_path": "evidence/source/raw-run-078a-route-page-classification-wave-07.json",
+      "reviewed_producer_sha256": "2a55b9a7848d41472d19aeb64dab5167c0d8f7f89244b0d6d9d9b353a2c963be",
+      "reviewed_producer_generator": "generators/build-run-078a-route-page-classification-wave-07.py",
+      "reviewed_producer_generator_sha256": "854cfe57444ac2e932431b1afa05baa9c10dac237bc7bb1f0f5932f1c552dc12",
+      "counts": {
+        "route_decisions": 1073,
+        "name_decisions": 1105,
+        "page_decisions": 237,
+        "residual_scoped_decisions": 4,
+        "residual_scoped_cells": 7,
+        "route_name_gap_decisions": 82,
+        "route_classifications": {
+          "EXPLICIT_UNMAPPED_SENTINEL": 1015,
+          "OWNER": 56,
+          "SHARED_RELATION": 2
+        },
+        "page_classifications": {
+          "Evidence gap": 81,
+          "Reviewed": 156
+        },
+        "residual_field_statuses": {
+          "RETAIN_NOT_ESTABLISHED": 7
+        },
+        "route_name_gap_statuses": {
+          "ESTABLISHED": 30,
+          "RETAIN_NOT_ESTABLISHED": 52
+        }
+      },
+      "invalid_decisions": 0,
+      "wrote_files": false,
+      "credit_awarded": false
+    }
+  ],
+  "review_gate": {
+    "all_manifest_producer_and_review_hashes_exact": true,
+    "all_producer_pins_exact": true,
+    "cyclic_mapping_a_to_b_b_to_c_c_to_a_exact": true,
+    "all_three_review_statuses_go": true,
+    "all_review_wrote_files_false": true,
+    "all_review_write_scopes_empty": true,
+    "all_invalid_decision_arrays_empty": true,
+    "all_assigned_decisions_reviewed": true,
+    "exact_counts_and_pins_match": true,
+    "all_credit_boundaries_false": true,
+    "independent_cyclic_review_complete": true,
+    "static_matrix_field_integration_authorized": true,
+    "other_downstream_integration_authorized": false
+  },
+  "completion_boundary": {
+    "routes_classified": false,
+    "pages_prompt_classified": false,
+    "all_routes_expanded_and_mapped_to_feature_ids": false,
+    "all_page_roots_mapped_to_feature_ids": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "ease": false,
+    "pass_1_to_8": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "route_or_page_presence_as_feature_mapping": false,
+    "candidate_overlap_as_feature_mapping": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Root-only deterministic normalization of three fresh cyclic independent read-only reviews. Authorization is limited to static matrix field integration of accepted decisions; framework reachability, runtime, build, application browser, executed tests, benchmark mapping, ease, Pass, release, completion and audit-complete credit remain zero."
+}

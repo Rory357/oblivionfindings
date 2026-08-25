@@ -5,12 +5,16 @@
   "pins": {
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
-    "audit_checkpoint_parent": "0d5a05e30878d4c24cb7b83c27e63e8c09b498a3",
+    "audit_checkpoint_parent": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
-    "base_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
-    "current_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "current_matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
     "static_linkage_independent_review_sha256": "6ee2c0beb90ce8e9fec75190c1a2d87e44b7f7d7b0b7776d25df4832b73d20a0",
-    "static_linkage_integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf"
+    "static_linkage_integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf",
+    "route_page_manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "route_page_normalized_producer_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "route_page_independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+    "route_page_static_linkage_integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -32,7 +36,17 @@
     "static_linkage_reviewed_gap_targets": 288,
     "static_linkage_matrix_rows_changed": 282,
     "static_linkage_matrix_field_changes": 575,
-    "remaining_static_linkage_gap_targets": 12
+    "route_page_primary_route_facade_callsites": 3217,
+    "route_page_route_like_review_rows": 3218,
+    "route_page_fluent_name_callsites": 3245,
+    "route_page_page_roots": 711,
+    "route_page_explicit_unmapped_route_rows": 3003,
+    "route_page_page_evidence_gaps": 393,
+    "route_page_matrix_rows_changed": 79,
+    "route_page_matrix_field_changes": 80,
+    "remaining_route_name_gap_targets": 166,
+    "remaining_non_route_name_scoped_gap_targets": 10,
+    "remaining_any_linkage_gap_targets": 172
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -2257,16 +2271,17 @@
     }
   ],
   "current_static_linkage": {
-    "status": "INDEPENDENTLY_REVIEWED_COMMITTED_SOURCE_LINKAGE_ONLY",
+    "status": "RUN_074_TO_080_INDEPENDENTLY_REVIEWED_COMMITTED_SOURCE_LINKAGE_ONLY",
     "remaining_gap_counts": {
       "route_paths": 1,
-      "page_files": 6,
+      "route_names": 166,
+      "page_files": 4,
       "both_route_and_page": 1,
       "backend_anchors": 0,
       "test_anchors": 8
     },
     "framework_route_reachability": false,
-    "complete_route_page_universe_mapping": false,
+    "complete_route_page_to_feature_mapping": false,
     "runtime": false,
     "browser": false,
     "executed_tests": false,
@@ -2280,5 +2295,35 @@
     "source_matrix_sha256": "df6e1b1b357439ad1fd829bebf4e2d33d20d067d515eb945c352e2350a4194a4",
     "locator_refresh_completed": false,
     "measurement_credit": false
+  },
+  "current_route_page_classification": {
+    "status": "THREE_PART_CYCLIC_INDEPENDENT_REVIEW_GO_STATIC_ONLY",
+    "route_universe": {
+      "primary_route_facade_callsites": 3217,
+      "route_like_sentinels_outside_primary_denominator": 1,
+      "static_route_like_review_rows": 3218,
+      "fluent_name_callsites": 3245,
+      "classifications": {
+        "ALIAS_OR_REDIRECT": 1,
+        "EXPLICIT_UNMAPPED_SENTINEL": 3003,
+        "OWNER": 211,
+        "SHARED_RELATION": 3
+      }
+    },
+    "page_universe": {
+      "page_roots": 711,
+      "prompt_classifications": {
+        "Evidence gap": 393,
+        "Reviewed": 318
+      }
+    },
+    "cyclic_independent_reviews_go": 3,
+    "invalid_decisions": 0,
+    "review_artifacts_wrote_files": 0,
+    "final_feature_mappings": 0,
+    "runtime": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "completion": false
   }
 }

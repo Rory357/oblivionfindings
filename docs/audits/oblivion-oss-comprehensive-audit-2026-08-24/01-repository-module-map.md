@@ -23,7 +23,13 @@ Three formal read-only assignments returned 62 grouped user-observable candidate
 
 ## RUN-074–076 current linkage overlay
 
-The historical discovery register below remains source provenance. The live 340-target matrix now carries cyclically reviewed feature-side linkage changes on 282 rows / 575 cells. Retained gaps are 1 route paths, 6 page files, 0 backend anchors, and 8 static test anchors. Headless endpoints and support components remain distinct from route-owned pages. Full framework reachability, the 711-page-root universe mapping, runtime, browser, executed-test, benchmark, ease, Pass, and completion evidence remain open.
+The historical discovery register below remains source provenance. At RUN-076, the 340-target matrix carried cyclically reviewed feature-side linkage changes on 282 rows / 575 cells and retained 1 route path, 6 page files, 0 backend anchors, and 8 static test anchors. Those historical counts are superseded by the current RUN-080 overlay below. Headless endpoints and support components remain distinct from route-owned pages; full framework reachability, route/page-to-feature mapping, runtime, browser, executed-test, benchmark, ease, Pass, and completion evidence remain open.
+
+## RUN-077–080 exhaustive static route/page overlay
+
+RUN-077 materializes 3,217 primary route-facade callsites, one separate route-like sentinel, 3,245 fluent-name callsites, and 711 page roots from the committed application pin. RUN-078 records a decision for every row and RUN-079 independently reviews the A→B, B→C, C→A cycle: 211 route owners, 3 shared relations, 1 alias/redirect, 3,003 explicit unmapped sentinels, 318 reviewed pages, and 393 page evidence gaps.
+
+RUN-080 establishes 78 route-name and 2 page-file matrix fields. It retains 166 route-name, 1 route-path, 4 page-file, 0 backend-anchor, and 8 static test-anchor sentinels. These are reviewed static-source classifications and locators, not framework-expanded routes, runtime reachability, rendered pages, executed tests, or final route/page-to-`FEATURE-ID` mappings.
 
 ## Candidate register
 

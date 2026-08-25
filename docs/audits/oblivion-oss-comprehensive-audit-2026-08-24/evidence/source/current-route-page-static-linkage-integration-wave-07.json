@@ -1,0 +1,4247 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-080-ROUTE-PAGE-STATIC-LINKAGE-INTEGRATION",
+  "status": "INDEPENDENTLY_REVIEWED_ROUTE_PAGE_STATIC_LINKAGE_INTEGRATED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25T13:00:00+12:00",
+  "pins": {
+    "checkpoint_commit": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
+    "checkpoint_tree": "d1eb36fabc0f5150c81f2140e834347dca87dd25",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "normalized_producer_path": "evidence/source/current-route-page-classification-wave-07.json",
+    "normalized_producer_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "independent_review_path": "evidence/source/current-route-page-independent-review-wave-07.json",
+    "independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+    "generator": "generators/integrate-route-page-classification-wave-07.py",
+    "generator_sha256": "b36006e65abbdfbde0901cde5822fab0556ec0659b014941c9cb8f049edcd5ae"
+  },
+  "counts": {
+    "canonical_targets": 340,
+    "canonical_feature_classes": {
+      "H": 300,
+      "D": 40,
+      "M": 0
+    },
+    "reviewed_route_name_gap_targets": 244,
+    "reviewed_residual_targets": 12,
+    "reviewed_residual_cells": 15,
+    "matrix_rows_changed": 79,
+    "matrix_field_changes": 80,
+    "field_changes": {
+      "page_files": 2,
+      "route_names": 78
+    },
+    "field_final_statuses": {
+      "page_files:ESTABLISHED": 2,
+      "page_files:RETAIN_NOT_ESTABLISHED": 4,
+      "route_names:ESTABLISHED": 78,
+      "route_names:RETAIN_NOT_ESTABLISHED": 166,
+      "route_paths:RETAIN_NOT_ESTABLISHED": 1,
+      "test_anchors:RETAIN_NOT_ESTABLISHED": 8
+    },
+    "remaining_missing_route_paths": 1,
+    "remaining_missing_route_names": 166,
+    "remaining_missing_page_files": 4,
+    "remaining_missing_both_route_and_page": 1,
+    "remaining_missing_backend_anchors": 0,
+    "remaining_missing_test_anchors": 8,
+    "targets_with_any_remaining_scoped_gap": 10,
+    "benchmark_mapping_credit": 0,
+    "runtime_credit": 0,
+    "browser_credit": 0,
+    "executed_test_credit": 0,
+    "pass_credit": 0,
+    "completion_credit": 0
+  },
+  "matrix": {
+    "path": "03-feature-to-benchmark-matrix.csv",
+    "base_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "updated_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "base_feature_id_order_sha256": "6c436ab1ff09e26891cc68508f929e6e282831404f2899766b77a79b59ade124",
+    "updated_feature_id_order_sha256": "6c436ab1ff09e26891cc68508f929e6e282831404f2899766b77a79b59ade124",
+    "base_immutable_projection_sha256": "cbf86c337280142c7264a10214baaaedb6e13266c57dde159c93fd70315f238f",
+    "updated_immutable_projection_sha256": "cbf86c337280142c7264a10214baaaedb6e13266c57dde159c93fd70315f238f",
+    "immutable_columns": [
+      "feature_id",
+      "module",
+      "submodule",
+      "owning_actor",
+      "secondary_actors",
+      "user_job",
+      "criticality",
+      "navigation_entry",
+      "current_states",
+      "current_workflow_summary",
+      "benchmark_candidates",
+      "selected_open_source_benchmark",
+      "benchmark_url_and_sha",
+      "verified_behaviour",
+      "neutral_requirements_extracted",
+      "no_match_evidence",
+      "current_ease_score",
+      "target_ease_score",
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8",
+      "finding_ids",
+      "confidence",
+      "feature_class",
+      "feature_identity_status",
+      "benchmark_mapping_credit",
+      "completion_status",
+      "evidence_limit"
+    ],
+    "base_benchmark_and_credit_projection_sha256": "49f1d00007550a582f5cbdb93726d74fc08d11eb8c98f659f88cbeff7572e945",
+    "updated_benchmark_and_credit_projection_sha256": "49f1d00007550a582f5cbdb93726d74fc08d11eb8c98f659f88cbeff7572e945",
+    "benchmark_and_credit_columns": [
+      "benchmark_candidates",
+      "selected_open_source_benchmark",
+      "benchmark_url_and_sha",
+      "verified_behaviour",
+      "neutral_requirements_extracted",
+      "no_match_evidence",
+      "current_ease_score",
+      "target_ease_score",
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8",
+      "finding_ids",
+      "confidence",
+      "feature_class",
+      "feature_identity_status",
+      "benchmark_mapping_credit",
+      "completion_status",
+      "evidence_limit"
+    ],
+    "row_order_preserved": true,
+    "feature_id_denominator_preserved": true,
+    "only_permitted_cells_changed": true
+  },
+  "remaining_gaps": {
+    "route_paths": [
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT"
+    ],
+    "route_names": [
+      "CAP-CATER-SITE-INVENTORY-LIFECYCLE",
+      "CAP-CATER-SITE-SHOPPING-LIST",
+      "CAP-CLI-CLIENT-ASSESSMENT",
+      "CAP-CLI-CLIENT-ASSIGNMENT",
+      "CAP-CLI-CLIENT-CONSENT-LIFECYCLE",
+      "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+      "CAP-CLI-CLIENT-NOTES",
+      "CAP-CLI-CLIENT-RISK-REGISTER",
+      "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "CAP-CLIN-ASSESSMENT-RECORD",
+      "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+      "CAP-CLIN-CLIENT-SUMMARY-LENS",
+      "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "CAP-CLIN-HEALTH-MONITORING-LENS",
+      "CAP-CLIN-MODULE-DASHBOARD",
+      "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "CAP-CLIN-PROTOCOL-LIFECYCLE",
+      "CAP-CLIN-TRENDS-LENS",
+      "CAP-COMPLAINT-RESPITE-STAY",
+      "CAP-COMPLAINT-SITE-FEEDBACK",
+      "CAP-CR-ALERT-TASK-LIFECYCLE",
+      "CAP-CR-ALERT-WATCH",
+      "CAP-CR-BROADCAST",
+      "CAP-CR-ESCALATION-QUEUE-LIFECYCLE",
+      "CAP-CR-EVIDENCE-PACK-LIFECYCLE",
+      "CAP-CR-LIVE-DEVICE-MAP",
+      "CAP-CR-MESSAGING-DISCUSSION",
+      "CAP-CR-PLAYBOOK-LIFECYCLE",
+      "CAP-CR-RECOVERY-CONFIGURATION",
+      "CAP-CR-REPORTING-EXPORT",
+      "CAP-CR-SIGNAL-QUEUE-CONFIGURATION",
+      "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER",
+      "CAP-CR-TIME-RECORDING",
+      "CAP-DAY-TASK-CSV-EXPORT",
+      "CAP-DAY-TASK-REPORT",
+      "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "CAP-FIN-ACCOUNTING-PERIOD-LIFECYCLE",
+      "CAP-FIN-COST-CENTRE-ADMIN",
+      "CAP-FIN-CURRENCY-ADMIN",
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "CAP-FIN-FUNDING-STREAM-ADMIN",
+      "CAP-FIN-GST-RETURN-LIFECYCLE",
+      "CAP-FIN-IRD-FILING-LIFECYCLE",
+      "CAP-FIN-MANUAL-JOURNAL-LIFECYCLE",
+      "CAP-FIN-PAYMENT-RUN-EXPORT",
+      "CAP-FIN-PAYMENT-RUN-LIFECYCLE",
+      "CAP-FIN-QUOTE-LIFECYCLE",
+      "CAP-FIN-RECURRING-JOURNAL-EXECUTION",
+      "CAP-FIN-XERO-ACCOUNTING-SYNC",
+      "CAP-FLEET-PANIC-RESPONSE",
+      "CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE",
+      "CAP-HR-CANDIDATE-ASSESSMENT",
+      "CAP-HR-CASEWORK-LIFECYCLE",
+      "CAP-HR-COMPLIANCE-RECORDS",
+      "CAP-HR-DOCUMENT-LIBRARY",
+      "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "CAP-HR-LEAVE-LIFECYCLE",
+      "CAP-HR-OFFBOARDING-LIFECYCLE",
+      "CAP-HR-ONBOARDING-LIFECYCLE",
+      "CAP-HR-PERFORMANCE-REVIEW",
+      "CAP-HR-POLICY-LIFECYCLE",
+      "CAP-HR-RECRUITMENT-OFFER-HIRE-LIFECYCLE",
+      "CAP-HR-RECRUITMENT-PIPELINE-EXPORT",
+      "CAP-HR-RECRUITMENT-REQUISITION-LIFECYCLE",
+      "CAP-HR-REPORT-SUBSCRIPTION",
+      "CAP-HR-SAVED-REPORT-EXPORT",
+      "CAP-HR-SAVED-REPORT-LIFECYCLE",
+      "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+      "CAP-HR-VETTING-LIFECYCLE",
+      "CAP-HR-WEBHOOK-CONFIGURATION",
+      "CAP-HR-WEBHOOK-DELIVERY",
+      "CAP-HR-WORKFORCE-REPORT-RUN",
+      "CAP-HS-EVENT-REGISTER",
+      "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+      "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+      "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+      "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+      "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE",
+      "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "CAP-INT-API-KEY-ADMIN",
+      "CAP-INT-MAILBOX-CONNECTION",
+      "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+      "CAP-INT-SITE-RESOURCE-CALENDAR-SYNC",
+      "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "CAP-IT-CHANGE-LIFECYCLE",
+      "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+      "CAP-IT-PROBLEM-LIFECYCLE",
+      "CAP-IT-PROVISIONING-LIFECYCLE",
+      "CAP-IT-REPORTING-EXPORT",
+      "CAP-IT-SELF-SERVICE-TICKET",
+      "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+      "CAP-MED-BREAK-GLASS-ACCESS",
+      "CAP-MED-CD-REGISTER-BALANCE",
+      "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "CAP-MED-DESTRUCTION-LIFECYCLE",
+      "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+      "CAP-MED-MEDICATION-REVIEW",
+      "CAP-MED-PHARMACY-ACTIONS",
+      "CAP-MED-ROUND-LIFECYCLE",
+      "CAP-MED-SELF-ADMINISTRATION",
+      "CAP-MED-STAFF-COMPETENCY",
+      "CAP-MED-WORKER-TODAY-WORKLIST",
+      "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+      "CAP-OPS-ATTENDANCE-SESSION-CORRECTION",
+      "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "CAP-OPS-CLIENT-ONBOARDING",
+      "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "CAP-OPS-DASHBOARD-ACTIVITY",
+      "CAP-OPS-FUNDING-CLAIMS",
+      "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "CAP-OPS-ROSTER-AUTO-SCHEDULE-SUGGESTIONS",
+      "CAP-OPS-ROSTER-PERIOD-PUBLICATION",
+      "CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE",
+      "CAP-OPS-SHIFT-COVER-LIFECYCLE",
+      "CAP-OPS-SHIFT-HANDOVER",
+      "CAP-OPS-SHIFT-LIFECYCLE",
+      "CAP-OPS-SHIFT-STAFF-ASSIGNMENT",
+      "CAP-OPS-STAFF-AVAILABILITY",
+      "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+      "CAP-PLAT-ADMIN-DASHBOARD",
+      "CAP-PORT-FAMILY-CALENDAR",
+      "CAP-PORT-FAMILY-DASHBOARD",
+      "CAP-PORT-FAMILY-DOCUMENTS",
+      "CAP-PORT-FAMILY-HEALTH-LENS",
+      "CAP-PORT-FAMILY-LOCATION-LENS",
+      "CAP-PORT-FAMILY-PHOTOS",
+      "CAP-PORT-FAMILY-SCHEDULE",
+      "CAP-PORT-FAMILY-TIMELINE",
+      "CAP-PRIV-BREACH-LIFECYCLE",
+      "CAP-PRIV-DASHBOARD-WORKLIST",
+      "CAP-PRIV-DSR-DATA-EXPORT",
+      "CAP-PRIV-DSR-LIFECYCLE",
+      "CAP-PRIV-LEGAL-HOLD",
+      "CAP-PRIV-PIA-LIFECYCLE",
+      "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+      "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE",
+      "CAP-PUB-CONTACT-SUBMISSION",
+      "CAP-PUB-MARKETING-PAGES",
+      "CAP-REP-REPORT-CATALOG-HUB",
+      "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "CAP-RESP-STAY-LIFECYCLE",
+      "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE",
+      "CAP-ROAD-INITIATIVE-LIFECYCLE",
+      "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE",
+      "CAP-ROAD-SUGGESTION-LIFECYCLE",
+      "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+      "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+      "CAP-SAFE-EVIDENCE-DOWNLOAD",
+      "CAP-SAFE-EXTERNAL-REPORT",
+      "CAP-SAFE-INVESTIGATION",
+      "CAP-SAFE-RISK-ASSESSMENT",
+      "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "CAP-SAFE-TERMINAL-PROJECTION",
+      "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+      "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+      "CAP-SEC-GOVERNED-COMMAND",
+      "CAP-SEC-MONITORING-COVERAGE-POLICY",
+      "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+      "CAP-SET-NOTIFICATION-CONFIG",
+      "CAP-SET-ROLE-PERMISSION-ADMIN",
+      "CAP-SET-TERMINOLOGY-CONFIG",
+      "CAP-SET-USER-ACCESS-ADMIN"
+    ],
+    "page_files": [
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "CAP-RESP-EVIDENCE-PACK-EXPORT"
+    ],
+    "both_route_and_page": [
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT"
+    ],
+    "backend_anchors": [],
+    "test_anchors": [
+      "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "CAP-MED-PHARMACY-ACTIONS",
+      "CAP-REP-COMBINED-REPORTS",
+      "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "CAP-SITE-RESOURCE-REGISTER"
+    ],
+    "any_residual_field": [
+      "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "CAP-MED-PHARMACY-ACTIONS",
+      "CAP-REP-COMBINED-REPORTS",
+      "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "CAP-SITE-RESOURCE-REGISTER"
+    ]
+  },
+  "changed_feature_ids": [
+    "CAP-CATER-DIETARY-TAG-LIBRARY",
+    "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+    "CAP-CATER-PRODUCT-CATALOG",
+    "CAP-CATER-RECIPE-LIBRARY",
+    "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+    "CAP-DAY-ALL-TASKS-WORKBENCH",
+    "CAP-DAY-MY-CALENDAR",
+    "CAP-DAY-MY-DAY-WORKSPACE",
+    "CAP-DAY-MY-ROSTER",
+    "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+    "CAP-FIN-BANK-STATEMENT-RECONCILIATION",
+    "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+    "CAP-FIN-CASH-POSITION",
+    "CAP-FIN-CHART-OF-ACCOUNTS",
+    "CAP-FIN-CLIENT-FINANCIAL-SUMMARY",
+    "CAP-FIN-EXECUTIVE-INSIGHTS",
+    "CAP-FIN-FX-REVALUATION",
+    "CAP-FIN-MODULE-OVERVIEW",
+    "CAP-FIN-OBLIGATION-CALENDAR",
+    "CAP-FIN-SITE-FINANCIAL-DASHBOARD",
+    "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+    "CAP-FLEET-ASSET-REGISTER",
+    "CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "CAP-FLEET-GEOFENCE-LIFECYCLE",
+    "CAP-FLEET-HANDOVER-LIFECYCLE",
+    "CAP-FLEET-INCIDENT-RECORD",
+    "CAP-FLEET-KEY-CUSTODY",
+    "CAP-FLEET-MAINTENANCE-SCHEDULE",
+    "CAP-FLEET-MILEAGE-RECORD",
+    "CAP-FLEET-OUTING-LIFECYCLE",
+    "CAP-FLEET-RESIDENT-TRACKING",
+    "CAP-FLEET-VEHICLE-INSPECTION",
+    "CAP-FLEET-VEHICLE-REGISTER",
+    "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+    "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+    "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+    "CAP-HS-WORKER-PARTICIPATION",
+    "CAP-HS-WORKPLACE-INJURY-RTW",
+    "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+    "CAP-INT-SITE-PROVIDER-CONNECTION",
+    "CAP-INT-SITE-PROVIDER-SYNC",
+    "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+    "CAP-IT-KNOWLEDGE-BASE",
+    "CAP-MED-ADMINISTRATION-CORRECTION",
+    "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+    "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+    "CAP-MED-SHIFT-HANDOVER",
+    "CAP-MED-STOCK-MOVEMENT",
+    "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+    "CAP-NOTIF-PERSONAL-INBOX-ACK",
+    "CAP-PORT-CLIENT-WORKSPACE",
+    "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+    "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+    "CAP-PRIV-RETENTION-EXECUTION-EVIDENCE",
+    "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+    "CAP-REP-COMBINED-REPORTS",
+    "CAP-RESP-BOOKING-LIFECYCLE",
+    "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+    "CAP-RESP-COMMUNICATION-LOG",
+    "CAP-RESP-DAILY-CARE-NOTES",
+    "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+    "CAP-RESP-HANDOVER-NOTES",
+    "CAP-RESP-PROCEDURE-LIFECYCLE",
+    "CAP-RESP-REFERRAL-LIFECYCLE",
+    "CAP-RESP-RISK-PLAN-LIFECYCLE",
+    "CAP-RESP-TASK-LIFECYCLE",
+    "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+    "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+    "CAP-SEC-GROUP-TOPOLOGY",
+    "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+    "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+    "CAP-SEC-MONITORING-RETENTION-POLICY",
+    "CAP-SEC-REPORTING-EXPORT",
+    "CAP-SET-DATA-GOVERNANCE",
+    "CAP-SET-PERSONAL-PASSWORD",
+    "CAP-SET-PERSONAL-PREFERENCES",
+    "CAP-SET-PERSONAL-PROFILE",
+    "CAP-SET-PERSONAL-TWO-FACTOR",
+    "CAP-SET-SECURITY-POLICY"
+  ],
+  "route_name_records": [
+    {
+      "matrix_ordinal": 1,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-DIETARY-TAG-LIBRARY",
+      "status": "ESTABLISHED",
+      "value": "tags.destroy; tags.index; tags.store; tags.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/catering.php:63",
+        "routes/catering.php:66",
+        "routes/catering.php:69",
+        "routes/catering.php:72"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 2,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-MEAL-PLAN-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "library-counts; meal-planner",
+      "changed": true,
+      "source_anchors": [
+        "routes/catering.php:24",
+        "routes/catering.php:27"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 3,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-PRODUCT-CATALOG",
+      "status": "ESTABLISHED",
+      "value": "products.destroy; products.index; products.store; products.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/catering.php:50",
+        "routes/catering.php:53",
+        "routes/catering.php:56",
+        "routes/catering.php:59"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 4,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-RECIPE-LIBRARY",
+      "status": "ESTABLISHED",
+      "value": "recipes.create; recipes.destroy; recipes.edit; recipes.index; recipes.show; recipes.store; recipes.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/catering.php:30",
+        "routes/catering.php:33",
+        "routes/catering.php:34",
+        "routes/catering.php:37",
+        "routes/catering.php:40",
+        "routes/catering.php:43",
+        "routes/catering.php:46"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 5,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-SITE-INVENTORY-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/sites.php:363-383",
+        "app/Http/Controllers/Sites/SiteMealInventoryController.php:13-168",
+        "resources/js/pages/sites/meal-planner/index.tsx:736-751"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 6,
+      "partition_id": "A",
+      "feature_id": "CAP-CATER-SITE-SHOPPING-LIST",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/sites.php:295-421",
+        "routes/sites.php:385-410",
+        "app/Http/Controllers/Sites/SiteMealShoppingListController.php:19-262",
+        "resources/js/pages/sites/meal-planner/index.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 7,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-ASSESSMENT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:160-165",
+        "app/Http/Controllers/ClientAssessmentController.php",
+        "app/Http/Controllers/ClientAssessmentController.php:10",
+        "resources/js/pages/operations/clients/show.tsx:4496-4517"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 8,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-ASSIGNMENT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:172-177",
+        "routes/clients.php:173-177",
+        "app/Http/Controllers/ClientAssignmentController.php:10",
+        "resources/js/pages/operations/clients/assignments.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 9,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-CONSENT-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/operations.php:180-208",
+        "routes/operations.php:355-364",
+        "app/Services/ConsentDecisionEvidenceService.php",
+        "app/Services/ConsentDecisionEvidenceService.php:18-220",
+        "app/Services/ConsentRequestService.php",
+        "app/Services/ConsentRequestService.php:30-1158",
+        "resources/js/pages/operations/clients/consent-requests/Show.tsx",
+        "resources/js/pages/operations/clients/consents/Index.tsx",
+        "resources/js/pages/operations/clients/tabs/_groups.ts"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 10,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-DOCUMENT-STAFF-LIBRARY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:28-39",
+        "routes/clients.php:30-259",
+        "routes/operations.php:147-153",
+        "app/Http/Controllers/ClientController.php:1",
+        "app/Http/Controllers/ClientDocumentController.php:23-278",
+        "app/Http/Controllers/ClientDocumentController.php:23-78",
+        "app/Http/Controllers/ClientDocumentController.php:84-278",
+        "app/Policies/ClientPolicy.php:20-42",
+        "app/Services/Clients/ClientProfileSectionAccess.php:34-52",
+        "app/Services/Clients/ClientProfileSectionAccess.php:88-93",
+        "app/Services/ConsentDecisionEvidenceService.php:1",
+        "app/Services/ConsentRequestService.php:1",
+        "resources/js/pages/operations/clients/documents.tsx:335-1333"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 11,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-NOTES",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:180-186",
+        "routes/clients.php:181-186",
+        "app/Http/Controllers/ClientNoteController.php:11",
+        "resources/js/pages/operations/clients/tabs/communication-notes.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 12,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-RISK-REGISTER",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:242-259",
+        "app/Http/Controllers/ClientRiskController.php:10",
+        "resources/js/pages/operations/clients/tabs/risk-management.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 13,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/clients.php:156-157",
+        "app/Http/Controllers/ClientSupportPlanController.php:10",
+        "resources/js/pages/operations/clients/tabs/care-support-plan.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 14,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-ASSESSMENT-RECORD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:63-68",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:377-471",
+        "resources/js/pages/health-clinical/Assessments.tsx",
+        "resources/js/pages/health-clinical/components/record-assessment-dialog.tsx:40-398"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 15,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-BEHAVIOUR-REGISTER",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:108-113",
+        "routes/health-clinical.php:51-53",
+        "app/Http/Controllers/Clinical/BehaviourAbcController.php:22",
+        "resources/js/pages/health-clinical/Behaviour.tsx",
+        "resources/js/pages/health-clinical/components/record-abc-dialog.tsx:27-266"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 16,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-CARE-PLAN-REVIEW-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:54-56",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:221-241",
+        "resources/js/pages/health-clinical/CarePlans.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 17,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-CLIENT-SUMMARY-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:95-97",
+        "app/Http/Controllers/HealthClinical/HealthClinicalController.php:25",
+        "resources/js/pages/health-clinical/ClientSummary.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 18,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-EVENT-REGISTER-RECORD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:23-114",
+        "routes/health-clinical.php:36-41",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "resources/js/pages/health-clinical/components/record-event-dialog.tsx:27-248"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 19,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-EVENT-REVIEW-ESCALATION-CLOSURE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "resources/js/pages/health-clinical/Events.tsx:152-180"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 20,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-HEALTH-MONITORING-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:57-59",
+        "app/Domain/Clinical/Services/ClinicalDashboardService.php:584",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:246",
+        "resources/js/pages/health-clinical/HealthMonitoring.tsx:135-160"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 21,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-MODULE-DASHBOARD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:23-114",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "resources/js/pages/health-clinical/index.tsx:198-220"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 22,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-OBSERVATION-REGISTER-RECORD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:23-114",
+        "routes/health-clinical.php:30-35",
+        "app/Domain/Clinical/Services/ClinicalEventService.php:1",
+        "app/Domain/Clinical/Services/ClinicalObservationService.php:1",
+        "app/Http/Controllers/Clinical/HealthClinicalDashboardController.php:1",
+        "resources/js/pages/health-clinical/components/record-observation-dialog.tsx:27-336"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 23,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-PROTOCOL-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:69-86",
+        "app/Domain/Clinical/Services/ClinicalProtocolService.php:41",
+        "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php:20-247",
+        "resources/js/pages/health-clinical/Protocols.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 24,
+      "partition_id": "A",
+      "feature_id": "CAP-CLIN-TRENDS-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/health-clinical.php:60-62",
+        "routes/health-clinical.php:92-94",
+        "app/Http/Controllers/Clinical/HealthClinicalClientTrendsController.php:12",
+        "resources/js/pages/health-clinical/Trends.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 25,
+      "partition_id": "A",
+      "feature_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+      "status": "ESTABLISHED",
+      "value": "compliance.index",
+      "changed": true,
+      "source_anchors": [
+        "routes/compliance.php:18"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 26,
+      "partition_id": "A",
+      "feature_id": "CAP-COMPLAINT-RESPITE-STAY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/respite.php:80-93",
+        "routes/respite.php:89",
+        "app/Http/Controllers/Respite/RespiteStayController.php:544-574",
+        "resources/js/pages/respite/stays/show.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 27,
+      "partition_id": "A",
+      "feature_id": "CAP-COMPLAINT-SITE-FEEDBACK",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/sites.php",
+        "app/Http/Controllers/Sites/SiteComplianceController.php:415-548",
+        "resources/js/pages/sites/feedback/Index.tsx:185-185"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 28,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-ALERT-TASK-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:143-163",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:18-418",
+        "resources/js/pages/control-room/show.tsx:17-64"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 29,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-ALERT-WATCH",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php",
+        "routes/control-room.php:433-444",
+        "app/Http/Controllers/ControlRoom/ControlRoomWatcherController.php:15",
+        "resources/js/pages/control-room/show.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 31,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-BROADCAST",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:279-286",
+        "app/Http/Controllers/ControlRoom/ControlRoomBroadcastController.php:16",
+        "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:24-304",
+        "resources/js/pages/control-room/broadcast.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 32,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-ESCALATION-QUEUE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:177-181",
+        "routes/control-room.php:241-258",
+        "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php:22",
+        "resources/js/pages/control-room/escalations.tsx:76-110"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 33,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-EVIDENCE-PACK-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:304-324",
+        "app/Http/Controllers/ControlRoom/ControlRoomEvidenceController.php:16-381",
+        "resources/js/pages/control-room/show.tsx:17-64"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 34,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-LIVE-DEVICE-MAP",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:214",
+        "routes/control-room.php:379-386",
+        "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:16-288",
+        "app/Http/Controllers/ControlRoom/ControlRoomMapController.php:21-111",
+        "resources/js/pages/control-room/map.tsx:193-220"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 35,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-MESSAGING-DISCUSSION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:263-277",
+        "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:17",
+        "app/Http/Controllers/ControlRoom/ControlRoomMessagingController.php:24-304",
+        "resources/js/pages/control-room/messaging.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 36,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-PLAYBOOK-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:329-408",
+        "routes/control-room.php:388-410",
+        "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php:18-552",
+        "resources/js/pages/control-room/playbooks/index.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 37,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-RECOVERY-CONFIGURATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:344-360",
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php:20",
+        "resources/js/pages/control-room/settings.tsx:1333-1360"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 38,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-REPORTING-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:62-75",
+        "app/Http/Controllers/ControlRoom/ControlRoomReportController.php:14-235",
+        "resources/js/pages/control-room/reports.tsx:63-85"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 40,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-SIGNAL-QUEUE-CONFIGURATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:329-343",
+        "routes/control-room.php:329-408",
+        "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php:20",
+        "resources/js/pages/control-room/settings.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 41,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-TASK-TO-HS-CORRECTIVE-ACTION-TRANSFER",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php:155-157",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:261-285",
+        "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php:936-1005",
+        "resources/js/pages/control-room/show.tsx:17-64"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 42,
+      "partition_id": "A",
+      "feature_id": "CAP-CR-TIME-RECORDING",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/control-room.php",
+        "routes/control-room.php:289-300",
+        "app/Http/Controllers/ControlRoom/ControlRoomTimeEntryController.php:17",
+        "resources/js/pages/control-room/show.tsx"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 43,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "status": "ESTABLISHED",
+      "value": "tasks.assign; tasks.default-view; tasks.detail; tasks.lookup; tasks.split; tasks.users; tasks.watch",
+      "changed": true,
+      "source_anchors": [
+        "routes/tasks.php:17",
+        "routes/tasks.php:18",
+        "routes/tasks.php:20",
+        "routes/tasks.php:21",
+        "routes/tasks.php:24",
+        "routes/tasks.php:27",
+        "routes/tasks.php:30"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 44,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-MY-CALENDAR",
+      "status": "ESTABLISHED",
+      "value": "my-calendar; my-calendar.events",
+      "changed": true,
+      "source_anchors": [
+        "routes/web.php:320",
+        "routes/web.php:321"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 45,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-MY-DAY-WORKSPACE",
+      "status": "ESTABLISHED",
+      "value": "my-day",
+      "changed": true,
+      "source_anchors": [
+        "routes/web.php:153"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 46,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-MY-ROSTER",
+      "status": "ESTABLISHED",
+      "value": "my-roster",
+      "changed": true,
+      "source_anchors": [
+        "routes/web.php:157"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 47,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-TASK-CSV-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/tasks.php:16-16",
+        "app/Http/Controllers/AllTasksController.php:488-517",
+        "app/Http/Controllers/AllTasksController.php:99-100",
+        "resources/js/pages/tasks/index.tsx:393-558"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 48,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-TASK-REPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/tasks.php:19-19",
+        "app/Http/Controllers/ControlRoom/ControlRoomTaskController.php:1",
+        "app/Http/Controllers/MyDayActionsController.php:1",
+        "app/Http/Controllers/MyDayMedicationsController.php:1",
+        "resources/js/pages/tasks/reports.tsx:218-243"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 49,
+      "partition_id": "A",
+      "feature_id": "CAP-DAY-TODAY-OPERATIONS-OVERVIEW",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/web.php:129",
+        "app/Http/Controllers/TodayDashboardController.php:13-124",
+        "resources/js/pages/dashboard/today.tsx:56-64"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 50,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+      "status": "ESTABLISHED",
+      "value": "integrations.destroy; integrations.index; integrations.mapping; integrations.mapping.update; integrations.store; integrations.test; integrations.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:604",
+        "routes/finance.php:605",
+        "routes/finance.php:606",
+        "routes/finance.php:608",
+        "routes/finance.php:609",
+        "routes/finance.php:610",
+        "routes/finance.php:611"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 51,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-ACCOUNTING-PERIOD-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:181",
+        "app/Domain/Finance/Http/Controllers/FiscalPeriodController.php:11",
+        "resources/js/pages/finance/fiscal-periods/Index.tsx:248-275"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 54,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-BANK-STATEMENT-RECONCILIATION",
+      "status": "ESTABLISHED",
+      "value": "bank-reconciliation.index",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:496"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 56,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "invoices.index",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:676"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 59,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-CASH-POSITION",
+      "status": "ESTABLISHED",
+      "value": "cash-position",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:81"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 60,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-CHART-OF-ACCOUNTS",
+      "status": "ESTABLISHED",
+      "value": "accounts.create; accounts.destroy; accounts.edit; accounts.index; accounts.show; accounts.store; accounts.update; cost-centres.destroy; cost-centres.store; cost-centres.update; fiscal-periods.close; fiscal-periods.store; fiscal-periods.update; funding-streams.destroy; funding-streams.store; funding-streams.update; journals.create; journals.post; journals.reverse; journals.show; journals.store; ledger.index",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:134",
+        "routes/finance.php:138",
+        "routes/finance.php:141",
+        "routes/finance.php:144",
+        "routes/finance.php:147",
+        "routes/finance.php:150",
+        "routes/finance.php:153",
+        "routes/finance.php:156",
+        "routes/finance.php:164",
+        "routes/finance.php:167",
+        "routes/finance.php:170",
+        "routes/finance.php:173",
+        "routes/finance.php:176",
+        "routes/finance.php:182",
+        "routes/finance.php:183",
+        "routes/finance.php:184",
+        "routes/finance.php:190",
+        "routes/finance.php:191",
+        "routes/finance.php:192",
+        "routes/finance.php:198",
+        "routes/finance.php:199",
+        "routes/finance.php:200"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 61,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-CLIENT-FINANCIAL-SUMMARY",
+      "status": "ESTABLISHED",
+      "value": "clients.financials",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:106"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 64,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-COST-CENTRE-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:189",
+        "app/Domain/Finance/Http/Controllers/CostCentreController.php:10",
+        "resources/js/pages/finance/cost-centres/Index.tsx:266-294"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 66,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-CURRENCY-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:205",
+        "app/Domain/Finance/Http/Controllers/CurrencyController.php:10",
+        "resources/js/pages/finance/currencies/Index.tsx:425-452"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 70,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-EXECUTIVE-INSIGHTS",
+      "status": "ESTABLISHED",
+      "value": "executive-dashboard",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:76"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 71,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 73,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-FUNDING-STREAM-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:197",
+        "app/Domain/Finance/Http/Controllers/FundingStreamController.php:11",
+        "resources/js/pages/finance/funding-streams/Index.tsx:61-88"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 74,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-FX-REVALUATION",
+      "status": "ESTABLISHED",
+      "value": "fx-revaluations.create; fx-revaluations.index; fx-revaluations.post; fx-revaluations.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:596",
+        "routes/finance.php:597",
+        "routes/finance.php:598",
+        "routes/finance.php:599"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 75,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-GST-RETURN-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:530-547",
+        "app/Domain/Finance/Http/Controllers/GstReturnController.php:14",
+        "app/Domain/Finance/Services/GstReturnService.php:21",
+        "resources/js/pages/finance/gst-returns/Index.tsx:89-117",
+        "resources/js/pages/finance/gst-returns/Show.tsx:191-219"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 76,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-IRD-FILING-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:530-547",
+        "app/Domain/Finance/Http/Controllers/IrdFilingController.php:15",
+        "app/Domain/Finance/Services/IrdFilingService.php:12",
+        "resources/js/pages/finance/IrdFilings/Index.tsx:116-144",
+        "resources/js/pages/finance/IrdFilings/Show.tsx:89-117"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 77,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-MANUAL-JOURNAL-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:160",
+        "app/Domain/Finance/Services/JournalPostingService.php:21",
+        "app/Domain/Finance/Services/JournalPostingService.php:21-272",
+        "resources/js/pages/finance/journals/Index.tsx:176-204",
+        "resources/js/pages/finance/journals/Show.tsx:123-151"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 78,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-MODULE-OVERVIEW",
+      "status": "ESTABLISHED",
+      "value": "dashboard",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:70"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 79,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-OBLIGATION-CALENDAR",
+      "status": "ESTABLISHED",
+      "value": "calendar.events; calendar.index",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:87",
+        "routes/finance.php:90"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 80,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-PAYMENT-RUN-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:304-336",
+        "app/Domain/Finance/Http/Controllers/PaymentRunController.php:64",
+        "app/Domain/Finance/Services/ExternalSettlementService.php:290",
+        "resources/js/pages/finance/payment-runs/Show.tsx:70-105"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 82,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-PAYMENT-RUN-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:304-336",
+        "app/Domain/Finance/Http/Controllers/PaymentRunController.php:13",
+        "app/Domain/Finance/Services/PaymentRunService.php:15",
+        "resources/js/pages/finance/payment-runs/Index.tsx:62-90",
+        "resources/js/pages/finance/payment-runs/Show.tsx:70-105"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 85,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-QUOTE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:347-415",
+        "routes/finance.php:389",
+        "app/Domain/Finance/Services/QuoteLifecycleService.php:16",
+        "resources/js/pages/finance/quotes/Index.tsx:97-125",
+        "resources/js/pages/finance/quotes/Show.tsx:59-87"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 87,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-RECURRING-JOURNAL-EXECUTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/console.php:570-575",
+        "app/Domain/Finance/Services/RecurringJournalService.php:18",
+        "resources/js/pages/finance/journals/Index.tsx:176-204",
+        "resources/js/pages/finance/journals/Index.tsx:277-415"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 88,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-SITE-FINANCIAL-DASHBOARD",
+      "status": "ESTABLISHED",
+      "value": "sites.financial-dashboard",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:100"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 89,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+      "status": "ESTABLISHED",
+      "value": "sites.overview",
+      "changed": true,
+      "source_anchors": [
+        "routes/finance.php:95"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 91,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-XERO-ACCOUNTING-SYNC",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/finance.php:607",
+        "app/Domain/Finance/Jobs/SyncAccountingIntegrationJob.php:14-110",
+        "app/Domain/Finance/Models/FinGlSyncLog.php:1",
+        "app/Domain/Finance/Services/AccountingSyncProviders/XeroSyncProvider.php:18-679",
+        "resources/js/pages/finance/Integrations/Index.tsx:514-542",
+        "resources/js/pages/finance/Integrations/Mapping.tsx:63-91"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 92,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-ASSET-REGISTER",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.assets.create; fleet-assets.assets.edit; fleet-assets.assets.index; fleet-assets.assets.show; fleet-assets.assets.store; fleet-assets.assets.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:71",
+        "routes/fleet-assets.php:72",
+        "routes/fleet-assets.php:75",
+        "routes/fleet-assets.php:76",
+        "routes/fleet-assets.php:79",
+        "routes/fleet-assets.php:80"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 93,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.daily-check.index; fleet-assets.daily-check.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:45",
+        "routes/fleet-assets.php:46"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 94,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-GEOFENCE-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.geofences.create; fleet-assets.geofences.destroy; fleet-assets.geofences.edit; fleet-assets.geofences.index; fleet-assets.geofences.store; fleet-assets.geofences.toggle; fleet-assets.geofences.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:147",
+        "routes/fleet-assets.php:152",
+        "routes/fleet-assets.php:153",
+        "routes/fleet-assets.php:154",
+        "routes/fleet-assets.php:155",
+        "routes/fleet-assets.php:156",
+        "routes/fleet-assets.php:157"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 95,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.handovers.accept; fleet-assets.handovers.create; fleet-assets.handovers.dispute; fleet-assets.handovers.index; fleet-assets.handovers.show; fleet-assets.handovers.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:254",
+        "routes/fleet-assets.php:255",
+        "routes/fleet-assets.php:260",
+        "routes/fleet-assets.php:264",
+        "routes/fleet-assets.php:269",
+        "routes/fleet-assets.php:272"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 96,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-INCIDENT-RECORD",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.incidents.attachments.destroy; fleet-assets.incidents.attachments.download; fleet-assets.incidents.attachments.store; fleet-assets.incidents.back-in-service; fleet-assets.incidents.claim; fleet-assets.incidents.create; fleet-assets.incidents.followups.add; fleet-assets.incidents.followups.complete; fleet-assets.incidents.index; fleet-assets.incidents.off-road; fleet-assets.incidents.options.search; fleet-assets.incidents.police-report; fleet-assets.incidents.show; fleet-assets.incidents.status; fleet-assets.incidents.store; fleet-assets.incidents.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:276",
+        "routes/fleet-assets.php:277",
+        "routes/fleet-assets.php:278",
+        "routes/fleet-assets.php:279",
+        "routes/fleet-assets.php:280",
+        "routes/fleet-assets.php:282",
+        "routes/fleet-assets.php:287",
+        "routes/fleet-assets.php:288",
+        "routes/fleet-assets.php:289",
+        "routes/fleet-assets.php:291",
+        "routes/fleet-assets.php:292",
+        "routes/fleet-assets.php:294",
+        "routes/fleet-assets.php:295",
+        "routes/fleet-assets.php:296",
+        "routes/fleet-assets.php:297",
+        "routes/fleet-assets.php:298"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 97,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-KEY-CUSTODY",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.keys.checkout; fleet-assets.keys.index; fleet-assets.keys.return; fleet-assets.keys.transfer",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:197",
+        "routes/fleet-assets.php:202",
+        "routes/fleet-assets.php:203",
+        "routes/fleet-assets.php:204"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 98,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-MAINTENANCE-SCHEDULE",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.schedules.mark-complete; fleet-assets.schedules.store; fleet-assets.schedules.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:188",
+        "routes/fleet-assets.php:189",
+        "routes/fleet-assets.php:190"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 99,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-MILEAGE-RECORD",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.mileage.approve; fleet-assets.mileage.create; fleet-assets.mileage.export; fleet-assets.mileage.index; fleet-assets.mileage.mark-paid; fleet-assets.mileage.reject; fleet-assets.mileage.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:320",
+        "routes/fleet-assets.php:321",
+        "routes/fleet-assets.php:322",
+        "routes/fleet-assets.php:323",
+        "routes/fleet-assets.php:328",
+        "routes/fleet-assets.php:329",
+        "routes/fleet-assets.php:330"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 100,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-OUTING-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.outings.cancel; fleet-assets.outings.complete; fleet-assets.outings.create; fleet-assets.outings.index; fleet-assets.outings.resident-return; fleet-assets.outings.return-all; fleet-assets.outings.show; fleet-assets.outings.start; fleet-assets.outings.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/fleet-assets.php:303",
+        "routes/fleet-assets.php:304",
+        "routes/fleet-assets.php:305",
+        "routes/fleet-assets.php:310",
+        "routes/fleet-assets.php:311",
+        "routes/fleet-assets.php:312",
+        "routes/fleet-assets.php:313",
+        "routes/fleet-assets.php:314",
+        "routes/fleet-assets.php:315"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 101,
+      "partition_id": "A",
+      "feature_id": "CAP-FLEET-PANIC-RESPONSE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "routes/fleet-assets.php:224",
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:775-829",
+        "resources/js/pages/fleet-assets/resident-tracking/index.tsx:970-998"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 103,
+      "partition_id": "B",
+      "feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.resident-tracking.assign; fleet-assets.resident-tracking.assign.store; fleet-assets.resident-tracking.export; fleet-assets.resident-tracking.history; fleet-assets.resident-tracking.index; fleet-assets.resident-tracking.locate-now; fleet-assets.resident-tracking.privacy-status; fleet-assets.resident-tracking.unassign",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:104",
+        "routes/fleet-assets.php:212:87:name:82",
+        "routes/fleet-assets.php:212:9:get",
+        "routes/fleet-assets.php:213:99:name:83",
+        "routes/fleet-assets.php:213:9:get",
+        "routes/fleet-assets.php:214:129:name:84",
+        "routes/fleet-assets.php:214:9:get",
+        "routes/fleet-assets.php:215:150:name:85",
+        "routes/fleet-assets.php:215:9:get",
+        "routes/fleet-assets.php:216:193:name:86",
+        "routes/fleet-assets.php:216:9:post",
+        "routes/fleet-assets.php:217:135:name:87",
+        "routes/fleet-assets.php:217:9:post",
+        "routes/fleet-assets.php:222:96:name:88",
+        "routes/fleet-assets.php:222:9:post",
+        "routes/fleet-assets.php:223:132:name:89",
+        "routes/fleet-assets.php:223:9:post"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 106,
+      "partition_id": "B",
+      "feature_id": "CAP-FLEET-VEHICLE-INSPECTION",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.inspections.store",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:107",
+        "routes/fleet-assets.php:192:76:name:77",
+        "routes/fleet-assets.php:192:9:post"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 107,
+      "partition_id": "B",
+      "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.fuel.index; fleet-assets.fuel.store; fleet-assets.trips.index; fleet-assets.trips.playback; fleet-assets.trips.playback.data; fleet-assets.trips.toggle-personal; fleet-assets.vehicles.alerts-config; fleet-assets.vehicles.alerts-config.save; fleet-assets.vehicles.bulk-action; fleet-assets.vehicles.index; fleet-assets.vehicles.show; fleet-assets.vehicles.update",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:108",
+        "routes/fleet-assets.php:51:69:name:7",
+        "routes/fleet-assets.php:51:9:get",
+        "routes/fleet-assets.php:52:98:name:8",
+        "routes/fleet-assets.php:52:9:get",
+        "routes/fleet-assets.php:53:120:name:9",
+        "routes/fleet-assets.php:53:9:get",
+        "routes/fleet-assets.php:54:66:name:10",
+        "routes/fleet-assets.php:54:9:get",
+        "routes/fleet-assets.php:55:104:name:11",
+        "routes/fleet-assets.php:55:9:get",
+        "routes/fleet-assets.php:56:113:name:12",
+        "routes/fleet-assets.php:56:9:get",
+        "routes/fleet-assets.php:57:64:name:13",
+        "routes/fleet-assets.php:57:9:get",
+        "routes/fleet-assets.php:62:100:name:14",
+        "routes/fleet-assets.php:62:9:put",
+        "routes/fleet-assets.php:63:87:name:15",
+        "routes/fleet-assets.php:63:9:post",
+        "routes/fleet-assets.php:64:125:name:16",
+        "routes/fleet-assets.php:64:9:post",
+        "routes/fleet-assets.php:65:118:name:17",
+        "routes/fleet-assets.php:65:9:post",
+        "routes/fleet-assets.php:66:70:name:18",
+        "routes/fleet-assets.php:66:9:post"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 108,
+      "partition_id": "B",
+      "feature_id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "fleet-assets.checklists.index; fleet-assets.checklists.run-page; fleet-assets.work-orders.bulk-action; fleet-assets.work-orders.create; fleet-assets.work-orders.index; fleet-assets.work-orders.options.search; fleet-assets.work-orders.show; fleet-assets.work-orders.store; fleet-assets.work-orders.update",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:109",
+        "routes/fleet-assets.php:163:86:name:59",
+        "routes/fleet-assets.php:163:9:get",
+        "routes/fleet-assets.php:164:94:name:60",
+        "routes/fleet-assets.php:164:9:get",
+        "routes/fleet-assets.php:165:123:name:61",
+        "routes/fleet-assets.php:165:9:get",
+        "routes/fleet-assets.php:167:85:name:62",
+        "routes/fleet-assets.php:167:9:get",
+        "routes/fleet-assets.php:168:91:name:63",
+        "routes/fleet-assets.php:168:9:get",
+        "routes/fleet-assets.php:180:109:name:68",
+        "routes/fleet-assets.php:180:9:get",
+        "routes/fleet-assets.php:181:87:name:69",
+        "routes/fleet-assets.php:181:9:post",
+        "routes/fleet-assets.php:182:125:name:70",
+        "routes/fleet-assets.php:182:9:put",
+        "routes/fleet-assets.php:183:104:name:71",
+        "routes/fleet-assets.php:183:9:post"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 133,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:134",
+        "routes/hr.php:151-166"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 134,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-CANDIDATE-ASSESSMENT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:135",
+        "routes/hr.php:167-179"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 135,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-CASEWORK-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:136",
+        "routes/hr.php:539-567"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 137,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-COMPLIANCE-RECORDS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:138",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 138,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-DOCUMENT-LIBRARY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:139",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 140,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-EMPLOYEE-PROFILE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:141",
+        "routes/hr.php:1-1420",
+        "routes/hr.php:259-287"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 141,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-LEAVE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:142",
+        "routes/hr.php:1-1420",
+        "routes/operations.php:1-1336",
+        "routes/shifts.php:1-127"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 142,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-OFFBOARDING-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:143",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 143,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-ONBOARDING-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:144",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 145,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-PERFORMANCE-REVIEW",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:146",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 147,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-POLICY-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:148",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 148,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-RECRUITMENT-OFFER-HIRE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:149",
+        "routes/hr.php:206-228"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 149,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-RECRUITMENT-PIPELINE-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:150",
+        "routes/hr.php:141-144"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 150,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-RECRUITMENT-REQUISITION-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:151",
+        "routes/hr.php:230-248"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 151,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-REPORT-SUBSCRIPTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:152",
+        "routes/hr.php:747-752"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 152,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-SAVED-REPORT-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:153",
+        "routes/hr.php:1373-1374"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 153,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-SAVED-REPORT-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:154",
+        "routes/hr.php:1365-1375"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 154,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:155",
+        "routes/console.php:661-665"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 157,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-VETTING-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:158",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 158,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-WEBHOOK-CONFIGURATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:159",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 159,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-WEBHOOK-DELIVERY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:160",
+        "routes/hr.php:1-1420"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 161,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-WORKFORCE-REPORT-RUN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:162",
+        "routes/hr.php:739-745"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 166,
+      "partition_id": "B",
+      "feature_id": "CAP-HS-EVENT-REGISTER",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:167",
+        "routes/health-safety.php:44-48"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 168,
+      "partition_id": "B",
+      "feature_id": "CAP-HS-GOVERNANCE-REPORTS-EXPORT",
+      "status": "ESTABLISHED",
+      "value": "board-summary; corrective-action-traceability; investigation-outcomes; risk-assessment-register; worksafe-register",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:169",
+        "routes/health-safety.php:122:92:name:50",
+        "routes/health-safety.php:122:9:get",
+        "routes/health-safety.php:123:100:name:51",
+        "routes/health-safety.php:123:9:get",
+        "routes/health-safety.php:124:110:name:52",
+        "routes/health-safety.php:124:9:get",
+        "routes/health-safety.php:125:125:name:53",
+        "routes/health-safety.php:125:9:get",
+        "routes/health-safety.php:126:113:name:54",
+        "routes/health-safety.php:126:9:get"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 170,
+      "partition_id": "B",
+      "feature_id": "CAP-HS-INCIDENT-HANDOVER-ACCEPTANCE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:171",
+        "routes/health-safety.php:66"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 177,
+      "partition_id": "B",
+      "feature_id": "CAP-HS-WORKER-PARTICIPATION",
+      "status": "ESTABLISHED",
+      "value": "committees.meetings.store; committees.store; consultations.documents.download; consultations.documents.upload; consultations.status; consultations.store; consultations.update; export; index; meetings.attendees; meetings.cancel; meetings.complete; meetings.minutes.download; meetings.minutes.upload; meetings.update; representatives.store; representatives.update",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:178",
+        "routes/health-safety.php:238:13:get",
+        "routes/health-safety.php:238:77:name:103",
+        "routes/health-safety.php:239:13:get",
+        "routes/health-safety.php:239:84:name:104",
+        "routes/health-safety.php:243:13:get",
+        "routes/health-safety.php:243:145:name:105",
+        "routes/health-safety.php:244:129:name:106",
+        "routes/health-safety.php:244:13:get",
+        "routes/health-safety.php:249:107:name:107",
+        "routes/health-safety.php:249:13:post",
+        "routes/health-safety.php:250:124:name:108",
+        "routes/health-safety.php:250:13:put",
+        "routes/health-safety.php:253:13:post",
+        "routes/health-safety.php:253:97:name:109",
+        "routes/health-safety.php:256:116:name:110",
+        "routes/health-safety.php:256:13:post",
+        "routes/health-safety.php:257:103:name:111",
+        "routes/health-safety.php:257:13:put",
+        "routes/health-safety.php:260:103:name:112",
+        "routes/health-safety.php:260:13:post",
+        "routes/health-safety.php:261:118:name:113",
+        "routes/health-safety.php:261:13:put",
+        "routes/health-safety.php:264:131:name:114",
+        "routes/health-safety.php:264:13:put",
+        "routes/health-safety.php:265:137:name:115",
+        "routes/health-safety.php:265:13:post",
+        "routes/health-safety.php:268:120:name:116",
+        "routes/health-safety.php:268:13:post",
+        "routes/health-safety.php:269:114:name:117",
+        "routes/health-safety.php:269:13:put",
+        "routes/health-safety.php:270:110:name:118",
+        "routes/health-safety.php:270:13:put",
+        "routes/health-safety.php:271:119:name:119",
+        "routes/health-safety.php:271:13:post"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 178,
+      "partition_id": "B",
+      "feature_id": "CAP-HS-WORKPLACE-INJURY-RTW",
+      "status": "ESTABLISHED",
+      "value": "attachments.destroy; attachments.download; attachments.store; capacity-assessments.store; create; export; index; modified-duties.store; rtw-plans.store; rtw-plans.update; show; status; store; update",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:179",
+        "routes/health-safety.php:362:13:get",
+        "routes/health-safety.php:362:70:name:149",
+        "routes/health-safety.php:363:13:get",
+        "routes/health-safety.php:363:77:name:150",
+        "routes/health-safety.php:367:13:get",
+        "routes/health-safety.php:367:77:name:151",
+        "routes/health-safety.php:368:13:post",
+        "routes/health-safety.php:368:71:name:152",
+        "routes/health-safety.php:371:13:put",
+        "routes/health-safety.php:371:79:name:153",
+        "routes/health-safety.php:374:13:post",
+        "routes/health-safety.php:374:97:name:154",
+        "routes/health-safety.php:377:13:post",
+        "routes/health-safety.php:377:96:name:155",
+        "routes/health-safety.php:378:13:put",
+        "routes/health-safety.php:378:97:name:156",
+        "routes/health-safety.php:381:118:name:157",
+        "routes/health-safety.php:381:13:post",
+        "routes/health-safety.php:384:118:name:158",
+        "routes/health-safety.php:384:13:post",
+        "routes/health-safety.php:387:102:name:159",
+        "routes/health-safety.php:387:13:post",
+        "routes/health-safety.php:388:118:name:160",
+        "routes/health-safety.php:388:13:delete",
+        "routes/health-safety.php:392:9:get",
+        "routes/health-safety.php:394:13:name:161",
+        "routes/health-safety.php:397:9:get",
+        "routes/health-safety.php:399:13:name:162"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 180,
+      "partition_id": "B",
+      "feature_id": "CAP-INC-INCIDENT-AUTHOR-TEMPLATE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:181",
+        "routes/incidents.php:16-139",
+        "routes/incidents.php:18-48"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 181,
+      "partition_id": "B",
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-DOWNLOAD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:182",
+        "routes/incidents.php:16-139",
+        "routes/incidents.php:59-65"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 182,
+      "partition_id": "B",
+      "feature_id": "CAP-INC-INCIDENT-EVIDENCE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:183",
+        "routes/incidents.php:59-86"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 183,
+      "partition_id": "B",
+      "feature_id": "CAP-INC-INCIDENT-FOLLOWUP-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:184",
+        "routes/incidents.php:106-118"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 185,
+      "partition_id": "B",
+      "feature_id": "CAP-INC-INCIDENT-REVIEW-CLOSURE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:186",
+        "routes/incidents.php:16-139",
+        "routes/incidents.php:88-104"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 186,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-API-KEY-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:187",
+        "routes/settings.php:201-219",
+        "routes/settings.php:205"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 187,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+      "status": "ESTABLISHED",
+      "value": "webhooks.receive",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:188",
+        "routes/integrations.php:27:1:post",
+        "routes/integrations.php:29:5:name:3"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 188,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-MAILBOX-CONNECTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:189",
+        "routes/settings.php:201-219"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 189,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-OUTBOUND-WEBHOOK-CONNECTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:190",
+        "routes/settings.php:201-219",
+        "routes/settings.php:211"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 190,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+      "status": "ESTABLISHED",
+      "value": "security-devices.integrations; security-devices.integrations.milesight; security-devices.integrations.milesight.key; security-devices.integrations.milesight.remove; security-devices.integrations.milesight.rotate; security-devices.integrations.milesight.test; security-devices.integrations.milesight.webhook.remove; security-devices.integrations.milesight.webhook.save; security-devices.integrations.unifi; security-devices.integrations.unifi.disable; security-devices.integrations.unifi.key; security-devices.integrations.unifi.rotate; security-devices.integrations.unifi.test",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:191",
+        "routes/security-devices.php:385:5:get",
+        "routes/security-devices.php:387:9:name:76",
+        "routes/security-devices.php:511:13:get",
+        "routes/security-devices.php:512:17:name:108",
+        "routes/security-devices.php:513:13:post",
+        "routes/security-devices.php:514:17:name:109",
+        "routes/security-devices.php:515:13:post",
+        "routes/security-devices.php:516:17:name:110",
+        "routes/security-devices.php:517:13:post",
+        "routes/security-devices.php:518:17:name:111",
+        "routes/security-devices.php:519:13:post",
+        "routes/security-devices.php:520:17:name:112",
+        "routes/security-devices.php:601:13:get",
+        "routes/security-devices.php:602:17:name:141",
+        "routes/security-devices.php:603:13:post",
+        "routes/security-devices.php:604:17:name:142",
+        "routes/security-devices.php:605:13:post",
+        "routes/security-devices.php:606:17:name:143",
+        "routes/security-devices.php:607:13:post",
+        "routes/security-devices.php:608:17:name:144",
+        "routes/security-devices.php:609:13:post",
+        "routes/security-devices.php:610:17:name:145",
+        "routes/security-devices.php:611:13:delete",
+        "routes/security-devices.php:612:17:name:146",
+        "routes/security-devices.php:613:13:delete",
+        "routes/security-devices.php:614:17:name:147"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 191,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-SITE-PROVIDER-SYNC",
+      "status": "ESTABLISHED",
+      "value": "security-devices.integrations.milesight.applications.map; security-devices.integrations.milesight.applications.remove; security-devices.integrations.milesight.devices.sync; security-devices.integrations.unifi.map-site; security-devices.integrations.unifi.remove-mapping; security-devices.integrations.unifi.sync-devices; security-devices.integrations.unifi.sync-sites",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:192",
+        "routes/security-devices.php:521:13:post",
+        "routes/security-devices.php:522:17:name:113",
+        "routes/security-devices.php:523:13:post",
+        "routes/security-devices.php:524:17:name:114",
+        "routes/security-devices.php:525:13:delete",
+        "routes/security-devices.php:526:17:name:115",
+        "routes/security-devices.php:527:13:post",
+        "routes/security-devices.php:528:17:name:116",
+        "routes/security-devices.php:617:13:post",
+        "routes/security-devices.php:618:17:name:149",
+        "routes/security-devices.php:619:13:delete",
+        "routes/security-devices.php:620:17:name:150",
+        "routes/security-devices.php:621:13:post",
+        "routes/security-devices.php:622:17:name:151"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 192,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+      "status": "ESTABLISHED",
+      "value": "settings.calendar-sync; settings.calendar-sync.callback; settings.calendar-sync.connect; settings.calendar-sync.disconnect; settings.calendar-sync.mapping; settings.calendar-sync.resources; settings.calendar-sync.settings",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:193",
+        "routes/settings.php:312:9:get",
+        "routes/settings.php:313:13:name:85",
+        "routes/settings.php:314:9:put",
+        "routes/settings.php:315:13:name:86",
+        "routes/settings.php:316:9:put",
+        "routes/settings.php:317:13:name:87",
+        "routes/settings.php:318:9:get",
+        "routes/settings.php:319:13:name:88",
+        "routes/settings.php:327:9:get",
+        "routes/settings.php:328:13:name:91",
+        "routes/settings.php:329:9:get",
+        "routes/settings.php:330:13:name:92",
+        "routes/settings.php:331:9:delete",
+        "routes/settings.php:332:13:name:93"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 193,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-SYNC",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:194",
+        "routes/settings.php:320-322"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 194,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-AGENT-TICKET-WORKFLOW",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:195",
+        "routes/web.php:183-268"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 195,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-CHANGE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:196",
+        "routes/web.php:173-237"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 196,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-KNOWLEDGE-BASE",
+      "status": "ESTABLISHED",
+      "value": "it.kb.destroy; it.kb.publish; it.kb.restore; it.kb.retire; it.kb.store; it.kb.submit-review; it.kb.update; it.sla.update",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:197",
+        "routes/web.php:270:95:name:99",
+        "routes/web.php:270:9:put",
+        "routes/web.php:272:64:name:100",
+        "routes/web.php:272:9:post",
+        "routes/web.php:273:76:name:101",
+        "routes/web.php:273:9:patch",
+        "routes/web.php:274:95:name:102",
+        "routes/web.php:274:9:post",
+        "routes/web.php:275:84:name:103",
+        "routes/web.php:275:9:post",
+        "routes/web.php:276:82:name:104",
+        "routes/web.php:276:9:post",
+        "routes/web.php:277:84:name:105",
+        "routes/web.php:277:9:post",
+        "routes/web.php:278:78:name:106",
+        "routes/web.php:278:9:delete"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 197,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-MAJOR-INCIDENT-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:198",
+        "routes/web.php:175-241"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 198,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-PROBLEM-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:199",
+        "routes/web.php:179-244"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 199,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-PROVISIONING-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:200",
+        "routes/web.php:164-252"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 200,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-REPORTING-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:201",
+        "routes/web.php:204-210"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 201,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-SELF-SERVICE-TICKET",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:202",
+        "routes/web.php:159-194"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 202,
+      "partition_id": "B",
+      "feature_id": "CAP-IT-SERVICE-MANAGEMENT-SETUP",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:203",
+        "routes/web.php:218-233"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 203,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-ADMINISTRATION-CORRECTION",
+      "status": "ESTABLISHED",
+      "value": "api.medications.administrations.correct",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:204",
+        "routes/api_medications.php:63:5:post",
+        "routes/api_medications.php:65:9:name:13"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 204,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-BREAK-GLASS-ACCESS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:205",
+        "routes/clients.php:204-209",
+        "routes/emar.php:295-315"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 205,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-CD-REGISTER-BALANCE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:206",
+        "routes/emar.php:30-395"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 206,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-CLIENT-MEDICAL-PROFILE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:207",
+        "routes/clients.php:122-124",
+        "routes/clients.php:41-44",
+        "routes/operations.php:166-169",
+        "routes/operations.php:251-254",
+        "routes/operations.php:308-310"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 207,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-DESTRUCTION-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:208",
+        "routes/emar.php:139-141",
+        "routes/emar.php:217-218"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 208,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-EMAR-WORKSPACE-ORDER-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "api.medications.alerts.acknowledge; api.medications.alerts.client; api.medications.alerts.index; api.medications.alerts.resolve; api.medications.allergies.create; api.medications.allergies.index; api.medications.dashboard.widgets; api.medications.versions.index",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:209",
+        "routes/api_medications.php:108:5:get",
+        "routes/api_medications.php:110:9:name:23",
+        "routes/api_medications.php:112:5:post",
+        "routes/api_medications.php:114:9:name:24",
+        "routes/api_medications.php:117:5:get",
+        "routes/api_medications.php:119:9:name:25",
+        "routes/api_medications.php:14:5:get",
+        "routes/api_medications.php:16:9:name:1",
+        "routes/api_medications.php:77:5:get",
+        "routes/api_medications.php:79:9:name:16",
+        "routes/api_medications.php:81:5:get",
+        "routes/api_medications.php:83:9:name:17",
+        "routes/api_medications.php:85:5:post",
+        "routes/api_medications.php:87:9:name:18",
+        "routes/api_medications.php:89:5:post",
+        "routes/api_medications.php:91:9:name:19"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 209,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-MEDICATION-ERROR-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:210",
+        "routes/emar.php:365-386"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 210,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-MEDICATION-ORDER-VERIFICATION",
+      "status": "ESTABLISHED",
+      "value": "api.medications.interactions.index; api.medications.interactions.store",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:211",
+        "routes/api_medications.php:135:5:get",
+        "routes/api_medications.php:137:9:name:29",
+        "routes/api_medications.php:139:5:post",
+        "routes/api_medications.php:141:9:name:30"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 211,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-MEDICATION-REVIEW",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:212",
+        "routes/emar.php:109-111",
+        "routes/emar.php:167-169",
+        "routes/emar.php:167-171"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 212,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-PHARMACY-ACTIONS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:213",
+        "routes/emar.php:221-223"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 214,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-ROUND-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:215",
+        "routes/emar.php:118-130",
+        "routes/emar.php:191-197"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 215,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-SELF-ADMINISTRATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:216",
+        "routes/emar.php:134-136",
+        "routes/emar.php:200-202"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 216,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-SHIFT-HANDOVER",
+      "status": "ESTABLISHED",
+      "value": "api.medications.shift.summary",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:217",
+        "routes/api_medications.php:103:5:get",
+        "routes/api_medications.php:105:9:name:22"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 217,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-STAFF-COMPETENCY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:218",
+        "routes/emar.php:104-106",
+        "routes/emar.php:186-188"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 218,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-STOCK-MOVEMENT",
+      "status": "ESTABLISHED",
+      "value": "api.medications.scheduled_counts.complete; api.medications.scheduled_counts.index; api.medications.scheduled_counts.store",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:219",
+        "routes/api_medications.php:122:5:get",
+        "routes/api_medications.php:124:9:name:26",
+        "routes/api_medications.php:126:5:post",
+        "routes/api_medications.php:128:9:name:27",
+        "routes/api_medications.php:130:5:post",
+        "routes/api_medications.php:132:9:name:28"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 219,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-WORKER-DOSE-PRN-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "api.medications.administrations.record; api.medications.mar.show; api.medications.prn.history",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:220",
+        "routes/api_medications.php:19:5:get",
+        "routes/api_medications.php:21:9:name:2",
+        "routes/api_medications.php:35:5:post",
+        "routes/api_medications.php:37:9:name:6",
+        "routes/api_medications.php:72:5:get",
+        "routes/api_medications.php:74:9:name:15"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 220,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-WORKER-TODAY-WORKLIST",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:221",
+        "routes/emar.php:30-395"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 221,
+      "partition_id": "B",
+      "feature_id": "CAP-NOTIF-PERSONAL-INBOX-ACK",
+      "status": "ESTABLISHED",
+      "value": "inbox.announcements.read; inbox.announcements.readAll; inbox.notifications.ack; inbox.notifications.read; inbox.notifications.readAll; notifications.index",
+      "changed": true,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:222",
+        "routes/portal.php:182:5:post",
+        "routes/portal.php:183:9:name:52",
+        "routes/portal.php:184:5:post",
+        "routes/portal.php:185:9:name:53",
+        "routes/portal.php:186:5:post",
+        "routes/portal.php:187:9:name:54",
+        "routes/portal.php:189:5:post",
+        "routes/portal.php:190:9:name:55",
+        "routes/portal.php:191:5:post",
+        "routes/portal.php:192:9:name:56",
+        "routes/portal.php:195:5:get",
+        "routes/portal.php:231:7:name:57"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 222,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-ATTENDANCE-CLOCK-SESSION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:223",
+        "routes/operations.php:1-1336",
+        "routes/shifts.php:1-127",
+        "routes/shifts.php:96-104"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 223,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-ATTENDANCE-SESSION-CORRECTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:224",
+        "routes/shifts.php:105-114"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 224,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-CARE-PLAN-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:225",
+        "routes/operations.php:638-686"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 225,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-CLIENT-ONBOARDING",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:226",
+        "routes/operations.php:1-1336"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 226,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-CLIENT-RECORD-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:227",
+        "routes/clients.php:30-259"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 227,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-DASHBOARD-ACTIVITY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:228",
+        "routes/operations.php:1-1336"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 228,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-FUNDING-CLAIMS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:229",
+        "routes/operations.php:1-1336"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 229,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:230",
+        "routes/operations.php:1318-1322"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 231,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-ROSTER-AUTO-SCHEDULE-SUGGESTIONS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:232",
+        "routes/operations.php:983-994"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 232,
+      "partition_id": "B",
+      "feature_id": "CAP-OPS-ROSTER-PERIOD-PUBLICATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:233",
+        "routes/operations.php:968-981"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 233,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 234,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-ROSTER-TEMPLATE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 236,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-SHIFT-COVER-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 237,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-SHIFT-HANDOVER",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 238,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-SHIFT-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 240,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-SHIFT-STAFF-ASSIGNMENT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 241,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-STAFF-AVAILABILITY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 242,
+      "partition_id": "C",
+      "feature_id": "CAP-OPS-TIMESHEET-AUTHOR-SUBMIT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 244,
+      "partition_id": "C",
+      "feature_id": "CAP-PLAT-ADMIN-DASHBOARD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 245,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-CLIENT-WORKSPACE",
+      "status": "ESTABLISHED",
+      "value": "portal.auth.google; portal.auth.microsoft; portal.clients.care-plans.attestations.store; portal.clients.consent-requests.approve; portal.clients.consent-requests.decline; portal.clients.consent-requests.show; portal.clients.documents.download; portal.clients.incidents.attachments.download; portal.clients.rag.ask; portal.clients.show; portal.index; portal.login; portal.notifications; portal.notifications.read; portal.notifications.readAll; portal.preferences; portal.preferences.update; portal.summaries.generate",
+      "changed": true,
+      "source_anchors": [
+        "routes/portal.php:49",
+        "routes/portal.php:50",
+        "routes/portal.php:52",
+        "routes/portal.php:57",
+        "routes/portal.php:59",
+        "routes/portal.php:61",
+        "routes/portal.php:64",
+        "routes/portal.php:66",
+        "routes/portal.php:78",
+        "routes/portal.php:80",
+        "routes/portal.php:82",
+        "routes/portal.php:85",
+        "routes/portal.php:167",
+        "routes/portal.php:169",
+        "routes/portal.php:171",
+        "routes/portal.php:173",
+        "routes/portal.php:175",
+        "routes/portal.php:179"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 246,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-CALENDAR",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 247,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-DASHBOARD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 248,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-DOCUMENTS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 249,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-HEALTH-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 250,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-LOCATION-LENS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 253,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-PHOTOS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 254,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-SCHEDULE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 255,
+      "partition_id": "C",
+      "feature_id": "CAP-PORT-FAMILY-TIMELINE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 256,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-BREACH-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 257,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-COMPLIANCE-REPORT-EXPORT",
+      "status": "ESTABLISHED",
+      "value": "privacy.breaches.create; privacy.breaches.index; privacy.breaches.notify-opc; privacy.breaches.notify-subjects; privacy.breaches.resolve; privacy.breaches.show; privacy.breaches.store; privacy.breaches.update; privacy.reports.compliance; privacy.reports.export; privacy.reports.index; privacy.retention.approve; privacy.retention.create; privacy.retention.edit; privacy.retention.index; privacy.retention.preview; privacy.retention.review; privacy.retention.store; privacy.retention.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/privacy.php:62",
+        "routes/privacy.php:64",
+        "routes/privacy.php:66",
+        "routes/privacy.php:68",
+        "routes/privacy.php:70",
+        "routes/privacy.php:72",
+        "routes/privacy.php:74",
+        "routes/privacy.php:76",
+        "routes/privacy.php:107",
+        "routes/privacy.php:109",
+        "routes/privacy.php:111",
+        "routes/privacy.php:113",
+        "routes/privacy.php:115",
+        "routes/privacy.php:117",
+        "routes/privacy.php:119",
+        "routes/privacy.php:121",
+        "routes/privacy.php:150",
+        "routes/privacy.php:152",
+        "routes/privacy.php:154"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 258,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-DASHBOARD-WORKLIST",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 259,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-DSR-DATA-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 260,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-DSR-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 261,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-EVIDENCE-ATTACHMENTS",
+      "status": "ESTABLISHED",
+      "value": "privacy.attachments.destroy; privacy.attachments.download; privacy.attachments.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/privacy.php:25",
+        "routes/privacy.php:27",
+        "routes/privacy.php:29"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 262,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-LEGAL-HOLD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 263,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-PIA-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 264,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-RETENTION-EXECUTION-EVIDENCE",
+      "status": "ESTABLISHED",
+      "value": "privacy.deletion-logs.index; privacy.deletion.execute",
+      "changed": true,
+      "source_anchors": [
+        "routes/privacy.php:82",
+        "routes/privacy.php:84"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 265,
+      "partition_id": "C",
+      "feature_id": "CAP-PRIV-RETENTION-POLICY-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 266,
+      "partition_id": "C",
+      "feature_id": "CAP-PUB-CAREERS-APPLICATION-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 267,
+      "partition_id": "C",
+      "feature_id": "CAP-PUB-CONTACT-SUBMISSION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 268,
+      "partition_id": "C",
+      "feature_id": "CAP-PUB-MARKETING-PAGES",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 269,
+      "partition_id": "C",
+      "feature_id": "CAP-QUAL-INTERNAL-QUALITY-CHECKLIST",
+      "status": "ESTABLISHED",
+      "value": "quality.checklist",
+      "changed": true,
+      "source_anchors": [
+        "routes/web.php:130"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 270,
+      "partition_id": "C",
+      "feature_id": "CAP-REP-COMBINED-REPORTS",
+      "status": "ESTABLISHED",
+      "value": "reports.combined.show",
+      "changed": true,
+      "source_anchors": [
+        "routes/reports.php:34"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 271,
+      "partition_id": "C",
+      "feature_id": "CAP-REP-REPORT-CATALOG-HUB",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 272,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-BOOKING-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.bookings.confirm; respite.bookings.create; respite.bookings.show; respite.bookings.store; respite.bookings.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:68",
+        "routes/respite.php:69",
+        "routes/respite.php:70",
+        "routes/respite.php:74",
+        "routes/respite.php:77"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 273,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.requests.approve; respite.requests.create; respite.requests.promote; respite.requests.show; respite.requests.store; respite.requests.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:48",
+        "routes/respite.php:49",
+        "routes/respite.php:54",
+        "routes/respite.php:57",
+        "routes/respite.php:60",
+        "routes/respite.php:63"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 275,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-COMMUNICATION-LOG",
+      "status": "ESTABLISHED",
+      "value": "respite.communication-logs.add-evidence; respite.communication-logs.create; respite.communication-logs.index; respite.communication-logs.show; respite.communication-logs.store; respite.communication-logs.update; respite.stays.communication-logs",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:167",
+        "routes/respite.php:168",
+        "routes/respite.php:169",
+        "routes/respite.php:170",
+        "routes/respite.php:173",
+        "routes/respite.php:174",
+        "routes/respite.php:175"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 276,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-DAILY-CARE-NOTES",
+      "status": "ESTABLISHED",
+      "value": "respite.daily-notes.create; respite.daily-notes.index; respite.daily-notes.show; respite.daily-notes.store; respite.daily-notes.update; respite.daily-notes.with-concerns; respite.daily-notes.with-incidents; respite.stays.daily-notes",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:198",
+        "routes/respite.php:199",
+        "routes/respite.php:200",
+        "routes/respite.php:201",
+        "routes/respite.php:202",
+        "routes/respite.php:203",
+        "routes/respite.php:206",
+        "routes/respite.php:207"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 277,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 278,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.evidence-packs.add-item; respite.evidence-packs.create; respite.evidence-packs.index; respite.evidence-packs.remove-item; respite.evidence-packs.seal; respite.evidence-packs.show; respite.evidence-packs.store; respite.evidence-packs.update; respite.stays.evidence-pack",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:180",
+        "routes/respite.php:181",
+        "routes/respite.php:182",
+        "routes/respite.php:184",
+        "routes/respite.php:187",
+        "routes/respite.php:188",
+        "routes/respite.php:189",
+        "routes/respite.php:190",
+        "routes/respite.php:193"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 279,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-HANDOVER-NOTES",
+      "status": "ESTABLISHED",
+      "value": "respite.handover-notes.acknowledge; respite.handover-notes.create; respite.handover-notes.index; respite.handover-notes.show; respite.handover-notes.store; respite.handover-notes.unacknowledged; respite.handover-notes.update; respite.stays.handover-notes",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:153",
+        "routes/respite.php:154",
+        "routes/respite.php:155",
+        "routes/respite.php:156",
+        "routes/respite.php:157",
+        "routes/respite.php:160",
+        "routes/respite.php:161",
+        "routes/respite.php:162"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 280,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-PROCEDURE-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.procedure-runs.cancel; respite.procedure-runs.complete; respite.procedure-runs.create; respite.procedure-runs.escalate; respite.procedure-runs.fail; respite.procedure-runs.index; respite.procedure-runs.my-active; respite.procedure-runs.overdue; respite.procedure-runs.show; respite.procedure-runs.start; respite.procedure-runs.store; respite.procedures.create; respite.procedures.index; respite.procedures.show; respite.procedures.store; respite.procedures.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:108",
+        "routes/respite.php:109",
+        "routes/respite.php:110",
+        "routes/respite.php:111",
+        "routes/respite.php:112",
+        "routes/respite.php:117",
+        "routes/respite.php:118",
+        "routes/respite.php:119",
+        "routes/respite.php:120",
+        "routes/respite.php:121",
+        "routes/respite.php:122",
+        "routes/respite.php:123",
+        "routes/respite.php:124",
+        "routes/respite.php:125",
+        "routes/respite.php:126",
+        "routes/respite.php:127"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 281,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-REFERRAL-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.referrals.create; respite.referrals.show; respite.referrals.store; respite.referrals.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:36",
+        "routes/respite.php:37",
+        "routes/respite.php:41",
+        "routes/respite.php:44"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 282,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-RISK-PLAN-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.clients.risk-plan-activations; respite.risk-plan-activations.acknowledge; respite.risk-plan-activations.activate; respite.risk-plan-activations.create; respite.risk-plan-activations.deactivate; respite.risk-plan-activations.index; respite.risk-plan-activations.needing-acknowledgment; respite.risk-plan-activations.review; respite.risk-plan-activations.show; respite.risk-plan-activations.store; respite.risk-plan-activations.suspend; respite.risk-plan-activations.update; respite.stays.risk-plan-activations",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:212",
+        "routes/respite.php:213",
+        "routes/respite.php:214",
+        "routes/respite.php:215",
+        "routes/respite.php:216",
+        "routes/respite.php:217",
+        "routes/respite.php:220",
+        "routes/respite.php:221",
+        "routes/respite.php:222",
+        "routes/respite.php:223",
+        "routes/respite.php:224",
+        "routes/respite.php:225",
+        "routes/respite.php:226"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 283,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-STAY-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 284,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-TASK-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "respite.tasks.add-evidence; respite.tasks.approve; respite.tasks.assign; respite.tasks.awaiting-approval; respite.tasks.complete; respite.tasks.index; respite.tasks.my-tasks; respite.tasks.overdue; respite.tasks.reject; respite.tasks.show; respite.tasks.start; respite.tasks.submit-for-approval; respite.tasks.update-checklist",
+      "changed": true,
+      "source_anchors": [
+        "routes/respite.php:132",
+        "routes/respite.php:133",
+        "routes/respite.php:134",
+        "routes/respite.php:135",
+        "routes/respite.php:136",
+        "routes/respite.php:139",
+        "routes/respite.php:140",
+        "routes/respite.php:141",
+        "routes/respite.php:142",
+        "routes/respite.php:143",
+        "routes/respite.php:144",
+        "routes/respite.php:147",
+        "routes/respite.php:148"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 285,
+      "partition_id": "C",
+      "feature_id": "CAP-ROAD-DECISION-APPROVAL-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 286,
+      "partition_id": "C",
+      "feature_id": "CAP-ROAD-INITIATIVE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 287,
+      "partition_id": "C",
+      "feature_id": "CAP-ROAD-QUARTERLY-PLAN-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 288,
+      "partition_id": "C",
+      "feature_id": "CAP-ROAD-SUGGESTION-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 289,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-ACTION-PLAN-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 290,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-CONCERN-INTAKE-TRIAGE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 292,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-EVIDENCE-ATTACHMENTS",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 293,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-EVIDENCE-DOWNLOAD",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 294,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-EXTERNAL-REPORT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 295,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-INVESTIGATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 296,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-RISK-ASSESSMENT",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 297,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-SENSITIVITY-DECLASSIFICATION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 298,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-TERMINAL-PROJECTION",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 299,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-ACCESS-CREDENTIAL-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "security-devices.access-control.credentials.revoke; security-devices.access-control.credentials.store",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:255",
+        "routes/security-devices.php:259"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 300,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-ACCESS-SCHEDULE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 301,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-DEVICE-REGISTRY-CUSTODY",
+      "status": "ESTABLISHED",
+      "value": "security-devices.devices.asset-links.destroy; security-devices.devices.asset-links.store; security-devices.devices.assign; security-devices.devices.create; security-devices.devices.destroy; security-devices.devices.edit; security-devices.devices.index; security-devices.devices.patch-fields; security-devices.devices.relationships.destroy; security-devices.devices.relationships.store; security-devices.devices.release; security-devices.devices.show; security-devices.devices.store; security-devices.devices.store.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:58",
+        "routes/security-devices.php:62",
+        "routes/security-devices.php:66",
+        "routes/security-devices.php:70",
+        "routes/security-devices.php:74",
+        "routes/security-devices.php:78",
+        "routes/security-devices.php:82",
+        "routes/security-devices.php:88",
+        "routes/security-devices.php:148",
+        "routes/security-devices.php:152",
+        "routes/security-devices.php:159",
+        "routes/security-devices.php:163",
+        "routes/security-devices.php:170",
+        "routes/security-devices.php:174"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 302,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-DISCOVERY-SCOPE-LIFECYCLE",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 303,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-GOVERNED-COMMAND",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 304,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-GROUP-TOPOLOGY",
+      "status": "ESTABLISHED",
+      "value": "security-devices.device-groups; security-devices.device-groups.add-member; security-devices.device-groups.auto-rules.preview; security-devices.device-groups.auto-rules.preview-draft; security-devices.device-groups.auto-rules.sync; security-devices.device-groups.create; security-devices.device-groups.destroy; security-devices.device-groups.edit; security-devices.device-groups.remove-member; security-devices.device-groups.show; security-devices.device-groups.store; security-devices.device-groups.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:279",
+        "routes/security-devices.php:283",
+        "routes/security-devices.php:287",
+        "routes/security-devices.php:291",
+        "routes/security-devices.php:295",
+        "routes/security-devices.php:299",
+        "routes/security-devices.php:303",
+        "routes/security-devices.php:307",
+        "routes/security-devices.php:311",
+        "routes/security-devices.php:315",
+        "routes/security-devices.php:322",
+        "routes/security-devices.php:326"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 305,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-MONITOR-DEFINITION-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "security-devices.monitoring; security-devices.monitoring.native-monitors.deactivate; security-devices.monitoring.native-monitors.store; security-devices.monitoring.native-monitors.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:334",
+        "routes/security-devices.php:343",
+        "routes/security-devices.php:346",
+        "routes/security-devices.php:349"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 306,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-MONITORING-COLLECTOR-LIFECYCLE",
+      "status": "ESTABLISHED",
+      "value": "security-devices.collectors.enrolments.issue; security-devices.collectors.enrolments.reissue; security-devices.collectors.revoke",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:419",
+        "routes/security-devices.php:422",
+        "routes/security-devices.php:425"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 307,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-MONITORING-COVERAGE-POLICY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 308,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-MONITORING-MAINTENANCE-POLICY",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 309,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-MONITORING-RETENTION-POLICY",
+      "status": "ESTABLISHED",
+      "value": "security-devices.settings.monitoring.retention.deactivate; security-devices.settings.monitoring.retention.preview; security-devices.settings.monitoring.retention.reactivate; security-devices.settings.monitoring.retention.store; security-devices.settings.monitoring.retention.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:477",
+        "routes/security-devices.php:479",
+        "routes/security-devices.php:482",
+        "routes/security-devices.php:485",
+        "routes/security-devices.php:488"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 310,
+      "partition_id": "C",
+      "feature_id": "CAP-SEC-REPORTING-EXPORT",
+      "status": "ESTABLISHED",
+      "value": "security-devices.reports; security-devices.reports.devices; security-devices.reports.events; security-devices.reports.maintenance",
+      "changed": true,
+      "source_anchors": [
+        "routes/security-devices.php:630",
+        "routes/security-devices.php:632",
+        "routes/security-devices.php:634",
+        "routes/security-devices.php:636"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 312,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-DATA-GOVERNANCE",
+      "status": "ESTABLISHED",
+      "value": "settings.data; settings.data.compliance.update; settings.data.privacy.update; settings.data.processors.destroy; settings.data.processors.store; settings.data.processors.update",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:224",
+        "routes/settings.php:230",
+        "routes/settings.php:233",
+        "routes/settings.php:242",
+        "routes/settings.php:245",
+        "routes/settings.php:248"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 315,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-NOTIFICATION-CONFIG",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 316,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-PERSONAL-PASSWORD",
+      "status": "ESTABLISHED",
+      "value": "user-password.edit",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:46"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 317,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-PERSONAL-PREFERENCES",
+      "status": "ESTABLISHED",
+      "value": "appearance.edit",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:53"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 318,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-PERSONAL-PROFILE",
+      "status": "ESTABLISHED",
+      "value": "profile.edit",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:39"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 319,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-PERSONAL-TWO-FACTOR",
+      "status": "ESTABLISHED",
+      "value": "two-factor.show",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:60"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 320,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-ROLE-PERMISSION-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 321,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-SECURITY-POLICY",
+      "status": "ESTABLISHED",
+      "value": "settings.security",
+      "changed": true,
+      "source_anchors": [
+        "routes/settings.php:196"
+      ],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 324,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-TERMINOLOGY-CONFIG",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    },
+    {
+      "matrix_ordinal": 325,
+      "partition_id": "C",
+      "feature_id": "CAP-SET-USER-ACCESS-ADMIN",
+      "status": "RETAIN_NOT_ESTABLISHED",
+      "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+      "changed": false,
+      "source_anchors": [],
+      "name_semantics": "DECLARED_LITERAL_ONLY_NO_GROUP_PREFIX_PROPAGATION_OR_EFFECTIVE_RUNTIME_NAME_CLAIM"
+    }
+  ],
+  "residual_records": [
+    {
+      "matrix_ordinal": 13,
+      "partition_id": "A",
+      "feature_id": "CAP-CLI-CLIENT-SUPPORT-PLAN",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": [
+        "routes/clients.php:156-157",
+        "resources/js/pages/operations/clients/tabs/care-support-plan.tsx",
+        "app/Http/Controllers/ClientSupportPlanController.php:10"
+      ]
+    },
+    {
+      "matrix_ordinal": 71,
+      "partition_id": "A",
+      "feature_id": "CAP-FIN-FINANCIAL-STATEMENTS-EXPORT",
+      "integrated_fields": {
+        "route_paths": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        },
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        },
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    },
+    {
+      "matrix_ordinal": 109,
+      "partition_id": "A",
+      "feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "integrated_fields": {
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    },
+    {
+      "matrix_ordinal": 110,
+      "partition_id": "A",
+      "feature_id": "CAP-GOV-AUDIT-EVIDENCE-PACK",
+      "integrated_fields": {
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        },
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": [
+        "routes/governance.php:47-48",
+        "app/Domain/Governance/Http/Controllers/ReportController.php:161-193",
+        "app/Domain/Governance/Services/AuditEvidencePackService.php:11"
+      ]
+    },
+    {
+      "matrix_ordinal": 154,
+      "partition_id": "B",
+      "feature_id": "CAP-HR-SCHEDULED-REPORT-EXECUTION",
+      "integrated_fields": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "resources/js/pages/hr/reports/index.tsx",
+          "changed": true
+        }
+      },
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:155",
+        "app/Http/Controllers/Hr/HrReportController.php:76-84",
+        "resources/js/pages/hr/reports/index.tsx:417-567"
+      ]
+    },
+    {
+      "matrix_ordinal": 187,
+      "partition_id": "B",
+      "feature_id": "CAP-INT-INBOUND-PROVIDER-WEBHOOK",
+      "integrated_fields": {
+        "page_files": {
+          "status": "ESTABLISHED",
+          "value": "NOT_APPLICABLE",
+          "changed": true
+        }
+      },
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:188",
+        "app/Http/Controllers/Api/WebhookReceiverController.php:35-222",
+        "routes/integrations.php:27-30"
+      ]
+    },
+    {
+      "matrix_ordinal": 212,
+      "partition_id": "B",
+      "feature_id": "CAP-MED-PHARMACY-ACTIONS",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:213",
+        "routes/emar.php:220-223",
+        "tests/Feature/Emar/AuditTrailTest.php:224-239",
+        "tests/Feature/Emar/StockManagementTest.php:45-133"
+      ]
+    },
+    {
+      "matrix_ordinal": 270,
+      "partition_id": "B",
+      "feature_id": "CAP-REP-COMBINED-REPORTS",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": [
+        "03-feature-to-benchmark-matrix.csv:271",
+        "app/Http/Controllers/CombinedReportController.php:19-49",
+        "routes/reports.php:32-37"
+      ]
+    },
+    {
+      "matrix_ordinal": 274,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-BOOKING-REQUEST-REPORTING-EXPORT",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    },
+    {
+      "matrix_ordinal": 277,
+      "partition_id": "C",
+      "feature_id": "CAP-RESP-EVIDENCE-PACK-EXPORT",
+      "integrated_fields": {
+        "page_files": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    },
+    {
+      "matrix_ordinal": 291,
+      "partition_id": "C",
+      "feature_id": "CAP-SAFE-CONCERN-REPORTING-EXPORT",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    },
+    {
+      "matrix_ordinal": 337,
+      "partition_id": "C",
+      "feature_id": "CAP-SITE-RESOURCE-REGISTER",
+      "integrated_fields": {
+        "test_anchors": {
+          "status": "RETAIN_NOT_ESTABLISHED",
+          "value": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "changed": false
+        }
+      },
+      "source_anchors": []
+    }
+  ],
+  "review_gate": {
+    "normalized_producer_exact_hash_valid": true,
+    "three_part_cyclic_independent_review_go": true,
+    "integration_authorized": true,
+    "only_reviewed_established_cells_integrated": true
+  },
+  "completion_boundary": {
+    "reviewed_static_matrix_cells_integrated": true,
+    "route_callsites_classified": false,
+    "page_prompts_classified": false,
+    "all_routes_expanded_and_mapped_to_feature_ids": false,
+    "all_page_roots_mapped_to_feature_ids": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "ease": false,
+    "pass_1_to_8": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "route_or_page_presence_as_feature_mapping": false,
+    "candidate_overlap_as_feature_mapping": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "audit_completion_credit": false,
+  "transaction": {
+    "publication": "two-file temp-write, fsync, replace, verify, and rollback-on-failure",
+    "idempotent_second_run": true,
+    "fixed_generated_on": "2026-08-25T13:00:00+12:00"
+  },
+  "attestation": "Root-only deterministic RUN-080 integration from the exact RUN-077 checkpoint matrix, exact RUN-078 normalized producer, and RUN-079 three-part cyclic GO. Exactly 78 declared-literal route_names and two page_files cells change. All other route/page classifications remain separate evidence; no group-prefix expansion, feature mapping, runtime, browser, executed-test, benchmark, ease, release, Pass, completion, or audit-complete credit is awarded."
+}

@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-081-ROUTE-PAGE-REPORTING-MATERIALIZATION",
+  "status": "CURRENT_ROUTE_PAGE_REPORTING_REFRESHED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "checkpoint_commit": "87826adc6fb8c9f0b1ca5ea99dcdc06e32bbd6d0",
+    "checkpoint_tree": "d1eb36fabc0f5150c81f2140e834347dca87dd25",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "normalized_producer_sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+    "integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
+    "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
+    "updated_matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
+  "counts": {
+    "canonical_features": 340,
+    "H_features": 300,
+    "D_features": 40,
+    "primary_route_facade_callsites": 3217,
+    "route_like_sentinels_outside_primary_denominator": 1,
+    "route_like_review_rows": 3218,
+    "fluent_name_callsites": 3245,
+    "page_roots": 711,
+    "route_classifications": {
+      "ALIAS_OR_REDIRECT": 1,
+      "EXPLICIT_UNMAPPED_SENTINEL": 3003,
+      "OWNER": 211,
+      "SHARED_RELATION": 3
+    },
+    "page_prompt_classifications": {
+      "Evidence gap": 393,
+      "Reviewed": 318
+    },
+    "cyclic_independent_go_reviews": 3,
+    "invalid_decisions": 0,
+    "matrix_rows_changed": 79,
+    "matrix_field_changes": 80,
+    "field_changes": {
+      "page_files": 2,
+      "route_names": 78
+    },
+    "remaining_missing_route_paths": 1,
+    "remaining_missing_route_names": 166,
+    "remaining_missing_page_files": 4,
+    "remaining_missing_both_route_and_page": 1,
+    "remaining_missing_backend_anchors": 0,
+    "remaining_missing_test_anchors": 8,
+    "remaining_targets_with_any_non_route_name_scoped_gap": 10,
+    "remaining_targets_with_any_linkage_gap_including_route_names": 172,
+    "final_feature_mappings": 0,
+    "runtime_credit": 0,
+    "application_browser_credit": 0,
+    "executed_test_credit": 0,
+    "completion_credit": 0
+  },
+  "inputs": {
+    "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+    "evidence/source/current-route-page-classification-wave-07.json": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+    "evidence/source/current-route-page-independent-review-wave-07.json": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+    "evidence/source/current-route-page-static-linkage-integration-wave-07.json": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
+    "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "artifact_register": {
+    "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": {
+      "sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/current-route-page-classification-wave-07.json": {
+      "sha256": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/current-route-page-independent-review-wave-07.json": {
+      "sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/current-route-page-static-linkage-integration-wave-07.json": {
+      "sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
+      "role": "current_wave_evidence"
+    },
+    "03-feature-to-benchmark-matrix.csv": {
+      "sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "role": "current_matrix"
+    },
+    "evidence/source/raw-run-078a-route-page-classification-wave-07.json": {
+      "sha256": "2a55b9a7848d41472d19aeb64dab5167c0d8f7f89244b0d6d9d9b353a2c963be",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/raw-run-078b-route-page-classification-wave-07.json": {
+      "sha256": "529e6dcbf5edbf1bb1a78c947b287931140cdfc68cef825610ebf525198a3bd7",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/raw-run-078c-route-page-classification-wave-07.json": {
+      "sha256": "18648cadca47d4dcea8db3b3ee1e044be93ab77903cce9734a4e15171ffd226e",
+      "role": "current_wave_evidence"
+    },
+    "generators/build-run-078a-route-page-classification-wave-07.py": {
+      "sha256": "854cfe57444ac2e932431b1afa05baa9c10dac237bc7bb1f0f5932f1c552dc12",
+      "role": "generator"
+    },
+    "generators/build-run-078b-route-page-classification-wave-07.py": {
+      "sha256": "d7b2f091ff313cba0a215ee654c37ee3c885205a1e008199e5413df17dcc9f1b",
+      "role": "generator"
+    },
+    "generators/build-run-078c-route-page-classification-wave-07.py": {
+      "sha256": "76889b0502a3d309106cbe85cd64dd700f05ecee846f624cf907d6afbe6867aa",
+      "role": "generator"
+    },
+    "evidence/source/raw-run-079a-independent-route-page-review-wave-07.json": {
+      "sha256": "52c6117b4858cf7a486c0b2764887778c3a8fe106b5789443a8bf562a59687f7",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/raw-run-079b-independent-route-page-review-wave-07.json": {
+      "sha256": "7a57397122ffa2784f51772288097e8af6f7cedb02153dd7fa6bdeaeb520e233",
+      "role": "current_wave_evidence"
+    },
+    "evidence/source/raw-run-079c-independent-route-page-review-wave-07.json": {
+      "sha256": "a82a04add97e56187d2db968e684649b6bcd8c41eef90924cb7d57a3ed970b94",
+      "role": "current_wave_evidence"
+    },
+    "generators/build-route-page-universe-manifest-wave-07.py": {
+      "sha256": "fdecb0db07304c37841f95c1ebc3130c5a3a02e108e242d246644180a155ff44",
+      "role": "generator"
+    },
+    "generators/normalize-route-page-classification-wave-07.py": {
+      "sha256": "1aa28e6bcbcfe09a7dda2d539448b99e8435f9906aa40c8c43d9b559ea1e655a",
+      "role": "generator"
+    },
+    "generators/normalize-route-page-independent-review-wave-07.py": {
+      "sha256": "d3ea0145f1846823d34827758b7867ce2d09a4ce72fb87886d16c346387fd40a",
+      "role": "generator"
+    },
+    "generators/integrate-route-page-classification-wave-07.py": {
+      "sha256": "b36006e65abbdfbde0901cde5822fab0556ec0659b014941c9cb8f049edcd5ae",
+      "role": "generator"
+    },
+    "evidence/source/current-static-linkage-reporting-materialization-wave-06.json": {
+      "sha256": "04d5fd61048c2c877f6bdba3785fa46365ba85464649eb1b83779cc0daf39906",
+      "role": "historical_reporting_receipt"
+    }
+  },
+  "generator": {
+    "generators/materialize-route-page-reporting-wave-07.py": "0b07eee85bdd2b2e743ebb4fbe6237e40129ecbdd530c5ad5b263f8f000d019d"
+  },
+  "history": {
+    "evidence/source/current-static-linkage-reporting-materialization-wave-06.json": {
+      "sha256": "04d5fd61048c2c877f6bdba3785fa46365ba85464649eb1b83779cc0daf39906",
+      "rewritten": false
+    },
+    "checkpoint_base_reports": {
+      "00-executive-summary.md": {
+        "sha256": "231e339c0a830c08ff8b65a290faab710242b224a321289a709b0e228681247a",
+        "byte_preserved": false,
+        "superseded_by_run_081": true
+      },
+      "01-repository-module-map.md": {
+        "sha256": "82a16b1b4eadd205716299e301ed15e3f3233489399fa992c864c12924c53c61",
+        "byte_preserved": false,
+        "superseded_by_run_081": true
+      },
+      "07-module-findings.md": {
+        "sha256": "3ebe59ac1891a5bbec78b3b5a32c67993e750ab1d2a6821ab3aebb3899406826",
+        "byte_preserved": false,
+        "superseded_by_run_081": true
+      },
+      "08-cross-module-journeys.md": {
+        "sha256": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+        "byte_preserved": true,
+        "superseded_by_run_081": false
+      },
+      "09-ui-ux-accessibility-visual-consistency.md": {
+        "sha256": "b91ce38abc9b5babb9e590641bd7b9bdd7efe6338f4b697060de1f9714b59983",
+        "byte_preserved": true,
+        "superseded_by_run_081": false
+      },
+      "10-architecture-data-integration-security.md": {
+        "sha256": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+        "byte_preserved": true,
+        "superseded_by_run_081": false
+      },
+      "11-prioritised-roadmap.md": {
+        "sha256": "e5c2f41bf98d3415de97d18d853f1d7c351b337ba544fbf8c81330ec63dcf02d",
+        "byte_preserved": true,
+        "superseded_by_run_081": false
+      },
+      "12-native-build-and-do-not-copy-register.md": {
+        "sha256": "44ae85422a6863d4804fec7d495107b9bdc937257f023767fb306ccd755e137a",
+        "byte_preserved": true,
+        "superseded_by_run_081": false
+      },
+      "13-unresolved-questions-and-evidence-gaps.md": {
+        "sha256": "c39e2ddf9ba75f2d8cc8b573af2316df15f5908351798e320d7a267fc61708e2",
+        "byte_preserved": false,
+        "superseded_by_run_081": true
+      },
+      "findings.json": {
+        "sha256": "abc4e92c4399a1e818ec82eb17eaa42aeb6c125355177f7cc24ea755b98972a4",
+        "byte_preserved": false,
+        "superseded_by_run_081": true
+      }
+    }
+  },
+  "outputs": {
+    "00-executive-summary.md": "d459661909ac9c987ff09798c6aa596036a604d94de3e466ed0856fd13435913",
+    "01-repository-module-map.md": "1a382ab39a76ffed9518a5eec1ef23dc1409dec9dbd0c798aa37c5bc7e75f9ab",
+    "07-module-findings.md": "b374758ca49463469426764f54d11e2b1a24df64c0ef101c6979026cc3c82a9a",
+    "08-cross-module-journeys.md": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+    "09-ui-ux-accessibility-visual-consistency.md": "b91ce38abc9b5babb9e590641bd7b9bdd7efe6338f4b697060de1f9714b59983",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+    "11-prioritised-roadmap.md": "e5c2f41bf98d3415de97d18d853f1d7c351b337ba544fbf8c81330ec63dcf02d",
+    "12-native-build-and-do-not-copy-register.md": "44ae85422a6863d4804fec7d495107b9bdc937257f023767fb306ccd755e137a",
+    "13-unresolved-questions-and-evidence-gaps.md": "b3948545270710304d6e6c72a992e153ca968aba39f4f4754e580d564b1a27f0",
+    "findings.json": "80f9e9439dc909d6f17d4b9904daf8afa63e4aa56707b82a7b7cb9424f5fe455"
+  },
+  "matrix_validation": {
+    "rows": 340,
+    "unique_feature_ids": 340,
+    "classes": {
+      "H": 300,
+      "D": 40
+    },
+    "changed_columns": [
+      "page_files",
+      "route_names"
+    ],
+    "immutable_projection_equal": true,
+    "benchmark_and_credit_projection_equal": true,
+    "gap_lists_recomputed_from_live_csv": true
+  },
+  "evidence_boundary": {
+    "exhaustive_committed_static_route_name_page_universe_materialized": true,
+    "three_part_cyclic_independent_static_review_go": true,
+    "reviewed_route_name_and_page_file_fields_integrated": true,
+    "complete_route_page_to_feature_mapping": false,
+    "framework_route_reachability": false,
+    "build_resolution": false,
+    "run_072_locator_refresh": false
+  },
+  "credit_boundary": {
+    "artifact_presence": false,
+    "route_or_page_presence_as_feature_mapping": false,
+    "final_finding": false,
+    "application_browser": false,
+    "runtime": false,
+    "build": false,
+    "executed_tests": false,
+    "ease": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "release": false,
+    "pass": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Deterministic RUN-081 reporting refresh from exact RUN-077 through RUN-080 static evidence. Reports are reconstructed from checkpoint 87826adc6fb8 and atomically published. No application source, runtime, browser, build, tests, database, network, benchmark mapping, ease, Pass, finding, or completion credit is created."
+}
