@@ -57,13 +57,21 @@ Complete semantic review accepts nine chains and excludes two shared chains. RUN
 
 The two excluded chains remain explicit `SHARED_RELATION` records: the Milesight connection/settings page also implements provider-sync behaviour, and the resource-calendar connection/settings page also implements calendar-sync behaviour. The queue remains 495 rows unreviewed and 497 rows without ownership. These closed-chain bridges do not imply framework reachability, navigation, runtime, build, Site/permission/privacy correctness, tests, mapping completeness, benchmark equivalence, findings, Passes, or completion.
 
-## RUN-097–098 reviewed route/controller-only overlay
+## Historical RUN-097–098 reviewed route/controller-only overlay
 
 RUN-097 freezes 23 pending route surfaces across 22 FEATURE-IDs for exact controller-action review. Three fresh reviewers independently accept all 23 as `OWNER_ROUTE_ACTION`. The accepted relations add no page roots: nine observed literal render callsites were already owned and are context only.
 
-RUN-098 therefore adds exactly 23 route owners and 23 controller-action bridges to the RUN-092 checkpoint. The cumulative bounded ledger is 571 source owners (244 route + 327 page) across 246 FEATURE-IDs (226 H + 20 D). The route/page feature sets are 56/234 with overlap 44, and the action-bridge count is 32. Queue accounting is 507 total, 35 reviewed, 33 owned, two shared, 472 pending, and 474 without ownership.
+RUN-098 therefore adds exactly 23 route owners and 23 controller-action bridges to the RUN-092 checkpoint. That historical cumulative bounded ledger is 571 source owners (244 route + 327 page) across 246 FEATURE-IDs (226 H + 20 D). The route/page feature sets are 56/234 with overlap 44, and the action-bridge count is 32. Queue accounting is 507 total, 35 reviewed, 33 owned, two shared, 472 pending, and 474 without ownership.
 
 These relations establish bounded static route/action ownership only. They do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
+
+## RUN-101–102 reviewed outcome-neutral route/action overlay
+
+RUN-101 freezes 24 pending route actions across six FEATURE-IDs for fresh outcome-neutral review. The three recipe index/create/show actions are redirects and remain non-owners; the remaining 21 actions are explicit owners. No outcome inherits page ownership from frontend callers, rendered roots, or page-graph context.
+
+RUN-102 adds exactly 21 route owners and 21 controller-action bridges, preserves three alias records, and adds zero page roots. The cumulative bounded ledger is 592 source owners (265 route + 327 page) across 249 FEATURE-IDs (229 H + 20 D). The route/page feature sets are 59/234 with overlap 44, and the action-bridge count is 53. Queue accounting is 507 total, 59 reviewed, 54 owned, two shared, three aliases, 448 pending, and 453 without ownership.
+
+RUN-102R verifies the exact final bytes with zero discrepancies. These relations establish bounded static route/action ownership and explicit non-owner alias classification only. They do not establish framework reachability, Site or permission correctness, canonical direct-object concealment, privacy or lifecycle behaviour, runtime, build, browser, tests, benchmarks, findings, Passes, or completion.
 
 ## Candidate register
 
