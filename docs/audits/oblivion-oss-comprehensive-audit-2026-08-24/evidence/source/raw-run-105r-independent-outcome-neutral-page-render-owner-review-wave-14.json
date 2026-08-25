@@ -1,0 +1,819 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "RUN-105R-INDEPENDENT-OUTCOME-NEUTRAL-PAGE-RENDER-OWNER-REVIEW-WAVE-14",
+  "status": "FRESH_REVIEW_GO_TWENTY_OWNER_PAGES_THREE_SHARED_ONE_EVIDENCE_GAP_ZERO_CURRENT_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "publication_checkpoint_commit": "a5919b5fe738606314f3757363a6741868a6fb1a",
+    "publication_checkpoint_tree": "f325346946835b43f6c783a2ecca335e1087df99",
+    "cohort_checkpoint_commit": "ed561394411fff4caaffd8b24290bf06bae9bd22",
+    "cohort_checkpoint_tree": "b57fc91fb81e2a12e8e830104603a5fdf9b1546b",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "cohort": "evidence/source/root-run-105-outcome-neutral-page-render-owner-cohort-wave-14.json",
+    "cohort_sha256": "4d6868c06a4c94c708e0934682e0c9724b71fc104c3751d02d0acfd3a95370bc",
+    "cohort_generator": "generators/build-outcome-neutral-page-render-owner-cohort-wave-14.py",
+    "cohort_generator_sha256": "564c37de4525a4587c99d455fa08c6a4a4557441551c6ac5628bd8ae7ca1d31a",
+    "materializer": "generators/materialize-independent-outcome-neutral-page-render-owner-review-wave-14.py",
+    "materializer_sha256": "b1acf84553f91fd6ce71d200126f34ee2c31a622c488d85d490ffd0a536da360",
+    "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "inputs": {
+      "generators/build-outcome-neutral-route-action-cohort-wave-13.py": "f3ada90da486ba700d21596fb765ab10f661c343944899551006d5db5b9e7a0f",
+      "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+      "evidence/source/current-route-page-classification-wave-07.json": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+      "evidence/source/root-run-082-exact-owner-containment-candidate-manifest-wave-08.json": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
+      "evidence/source/raw-run-082r-independent-exact-owner-containment-review-wave-08.json": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396",
+      "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+      "evidence/source/raw-run-084r-independent-full-inertia-page-graph-review-wave-09.json": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+      "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+      "evidence/source/raw-run-086r-independent-reviewed-static-route-page-feature-ownership-wave-10.json": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "evidence/source/root-run-091-closed-route-action-page-chain-cohort-wave-11.json": "7b1fea57104e9f4bfea7ee450ef535ac57e7fa69bc978212b4eafb0fe1ed0cae",
+      "evidence/source/raw-run-091r-independent-closed-route-action-page-chain-review-wave-11.json": "fb88ca666bc9f91298ab33fefa1dadbb39a4a612215fca814932f59bfc2f199b",
+      "evidence/source/current-run-092-reviewed-static-source-ownership-overlay-wave-11.json": "5390e55d9e47d1845afa8b3848bdab7687747cbb62c946dd4d66d3c435e8de0b",
+      "evidence/source/raw-run-092r-independent-reviewed-static-source-ownership-overlay-wave-11.json": "1111d30aa24935116c37f27bead824ca1bcca7444157e456d959e821af00669a",
+      "evidence/source/current-run-098-reviewed-route-controller-only-ownership-overlay-wave-12.json": "7f76c9cfeae906a64c92013fbf9a12cf180d39a315bfa13e778b6332365cdd2a",
+      "evidence/source/current-run-102-reviewed-outcome-neutral-route-action-ownership-overlay-wave-13.json": "cf68900351832c790ec53b4996daaf640c604c498f902c85dec681113bf492dd",
+      "evidence/source/raw-run-102r-independent-reviewed-outcome-neutral-route-action-ownership-overlay-wave-13.json": "f88c3ce6ae7b82ca316c656787547bdd9e6a4cd40469b16d44a6e84f99d14902",
+      "evidence/source/current-run-103-reviewed-outcome-neutral-route-action-reporting-wave-13.json": "e8e0d5755dc1a3ed88f1c34a5e3d65b881f2d5a551cc40d6aa3bb605652d9bc5",
+      "evidence/browser/current-audit-dashboard-verification-run-104-wave-13.json": "3caf6c0970c4ea5c276b51b558d5d736c45576c503049625968e35325148009e"
+    }
+  },
+  "architecture_rule": "Oblivion Findings is one operating organisation with multiple Sites. Page ownership is separate from Site access, roles and permissions, canonical ownership, direct-object concealment, privacy, and lifecycle correctness.",
+  "review_method": {
+    "fresh_partition_review": true,
+    "complete_page_source_reviewed": true,
+    "exact_render_method_reviewed": true,
+    "material_imports_reviewed": true,
+    "canonical_matrix_user_job_reviewed": true,
+    "render_containment_alone_accepted_as_ownership": false,
+    "reviewer_writes": 0
+  },
+  "partition_reviews": [
+    {
+      "partition_id": "A",
+      "reviewer_task_paths": [
+        "/root/run104_receipt_verify/run105_page_review_a/semantic_01_04",
+        "/root/run104_receipt_verify/run105_page_review_a/identity_05_08"
+      ],
+      "synthesis_task_path": "/root/run104_receipt_verify/run105_page_review_a",
+      "verdict": "GO_REVIEW_COMPLETE_SIX_OWNER_ONE_SHARED_ONE_EVIDENCE_GAP",
+      "candidate_count": 8,
+      "owner_pages": 6,
+      "shared_relations": 1,
+      "alias_or_redirect": 0,
+      "dead_or_noncanonical": 0,
+      "evidence_gaps": 1,
+      "page_feature_key_list_sha256": "5f4b07d00fb5e3dfda8ac2d8efe608a11236d8a9913dbc01277f3de16533ae3e",
+      "mechanical_discrepancies": 0,
+      "reviewer_wrote_files": false,
+      "partition_review_sha256": "c99a850d568b0b13a5d285c2aeb3bcd97b66d73344bca5ad17bfeffbec145359"
+    },
+    {
+      "partition_id": "B",
+      "reviewer_task_paths": [
+        "/root/run102r_reporting_contract/run105_page_review_b"
+      ],
+      "synthesis_task_path": null,
+      "verdict": "GO_REVIEW_COMPLETE_SIX_OWNER_TWO_SHARED",
+      "candidate_count": 8,
+      "owner_pages": 6,
+      "shared_relations": 2,
+      "alias_or_redirect": 0,
+      "dead_or_noncanonical": 0,
+      "evidence_gaps": 0,
+      "page_feature_key_list_sha256": "7fad35c233d62a6eef09afbfbabffdf132b95702325484fced3be8fec9e0d7da",
+      "mechanical_discrepancies": 0,
+      "reviewer_wrote_files": false,
+      "partition_review_sha256": "dbdc88948640793ae94c46d94ac72b44a5adfecf6c9f8cb95d8ca4ed2f421c6c"
+    },
+    {
+      "partition_id": "C",
+      "reviewer_task_paths": [
+        "/root/wave13_checkpoint_hygiene/run105_page_review_c"
+      ],
+      "synthesis_task_path": null,
+      "verdict": "GO_REVIEW_COMPLETE_EIGHT_OWNER",
+      "candidate_count": 8,
+      "owner_pages": 8,
+      "shared_relations": 0,
+      "alias_or_redirect": 0,
+      "dead_or_noncanonical": 0,
+      "evidence_gaps": 0,
+      "page_feature_key_list_sha256": "e5596303a59a66418f569a266b6516f6d49a2450315d8d56f6f42d3392dbb03f",
+      "mechanical_discrepancies": 0,
+      "reviewer_wrote_files": false,
+      "partition_review_sha256": "085bf59f6a4a0f7d280d2efcc3d343cd5de3f5faba42f489e7fa15a456c24b19"
+    }
+  ],
+  "page_decisions": [
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-01",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-21C3EF7D79CDB1C9|CAP-PRIV-LEGAL-HOLD",
+      "page_record_id": "PAGE-ROOT-21C3EF7D79CDB1C9",
+      "page_file": "resources/js/pages/privacy/legal-holds/edit.tsx",
+      "candidate_feature_id": "CAP-PRIV-LEGAL-HOLD",
+      "render_source_anchor": "app/Http/Controllers/LegalHoldController.php:110",
+      "candidate_record_sha256": "a9977871bcb20259c454a5bb0dfec679c90fb67de6e607bd70c67d342074ffe9",
+      "joined_candidate_evidence_sha256": "9bd92337b4731eca23e55c1b68a06722207dd1800c5fc054bc909697a50073e0",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/privacy/legal-holds/edit.tsx:1-286",
+        "app/Http/Controllers/LegalHoldController.php:106-152"
+      ],
+      "rationale": "The complete page only reviews, updates, and releases one legal hold, and the exact edit action renders that same lifecycle surface.",
+      "review_discrepancies": [],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "5e21ae5030e73a3edf69142763d5c22c17aea4c73d67ab1810714ef78fe5873b"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-02",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-2443D36D2026F002|CAP-HS-EVENT-REGISTER",
+      "page_record_id": "PAGE-ROOT-2443D36D2026F002",
+      "page_file": "resources/js/pages/health-safety/events/show.tsx",
+      "candidate_feature_id": "CAP-HS-EVENT-REGISTER",
+      "render_source_anchor": "app/Http/Controllers/HealthSafety/HsEventController.php:313",
+      "candidate_record_sha256": "4c32d67050e45873daaa0d806f59aa4817152c6c2ee2f50aef2a60d95eee27f6",
+      "joined_candidate_evidence_sha256": "d7e152ee636257378045c3a5f494a8f73980ab3873560e87dc4c8f8ebad75931",
+      "outcome": "SHARED_RELATION",
+      "source_loci": [
+        "resources/js/pages/health-safety/events/show.tsx:1-76",
+        "resources/js/components/health-safety/event-detail-dialog.tsx:717-3903",
+        "app/Http/Controllers/HealthSafety/HsEventController.php:309-316",
+        "app/Http/Controllers/HealthSafety/HsEventController.php:605-1055",
+        "03-feature-to-benchmark-matrix.csv:166-180"
+      ],
+      "rationale": "The thin event-detail shell imports a shared EventDetailDialog and the canonical matrix assigns this exact page to event closure, handover, investigation, WorkSafe, and register-related jobs.",
+      "review_discrepancies": [
+        "Complete-page and matrix review rejects the packet's singleton projection as a multi-feature shared relation."
+      ],
+      "page_ownership_authorized": false,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "72573c51319ee74b42b4f7565f7a0065a61f9fd441433b39bd453496cb5ce68e"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-03",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-32E8771CE7FA7DA1|CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "page_record_id": "PAGE-ROOT-32E8771CE7FA7DA1",
+      "page_file": "resources/js/pages/operations/calendar-sync/Create.tsx",
+      "candidate_feature_id": "CAP-OPS-PERSONAL-CALENDAR-CONNECTION",
+      "render_source_anchor": "app/Http/Controllers/Operations/CalendarSyncController.php:32",
+      "candidate_record_sha256": "17e23738ecb86044e5509690e0147e943824e3691653451b95ca99673b925485",
+      "joined_candidate_evidence_sha256": "fc5d637c4da3b75322619e90ff5bee877873a89587fe98beb22452d69fb73fee",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/operations/calendar-sync/Create.tsx:1-166",
+        "app/Http/Controllers/Operations/CalendarSyncController.php:27-57",
+        "03-feature-to-benchmark-matrix.csv:230"
+      ],
+      "rationale": "The page and controller exclusively create the authenticated user's personal calendar connection metadata, distinct from approved-Site resource integration.",
+      "review_discrepancies": [],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "4c5975479f8eb6432af34f732aa7e27eb5c4a557dec65a5346ad7b76e101bf52"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-04",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-3B51528F1FA22152|CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "page_record_id": "PAGE-ROOT-3B51528F1FA22152",
+      "page_file": "resources/js/pages/Governance/Actions/Index.tsx",
+      "candidate_feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "render_source_anchor": "app/Domain/Governance/Http/Controllers/ActionItemController.php:40",
+      "candidate_record_sha256": "2290df50e07b641e8b9c8a21457b764fe4e8c32459ba763d7e9c9e29cde34d11",
+      "joined_candidate_evidence_sha256": "f9d2af25a0ce5cfa34efed64792743efc411f7c2d744f75a534d27ac1269229d",
+      "outcome": "EVIDENCE_GAP",
+      "source_loci": [
+        "resources/js/pages/Governance/Actions/Index.tsx:1-177",
+        "resources/js/pages/Governance/Actions/Index.tsx:8",
+        "app/Domain/Governance/Http/Controllers/ActionItemController.php:13-54",
+        "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json:337-346",
+        ".gitignore:10",
+        "03-feature-to-benchmark-matrix.csv:110"
+      ],
+      "rationale": "The ActionItem list is semantically plausible, but its material generated showAction import is absent at the pinned application commit and build resolution was not executed, so sole page ownership cannot close.",
+      "review_discrepancies": [
+        "RUN-105's condensed page graph omits the pinned unresolved generated import; the record remains tagged within the residual."
+      ],
+      "page_ownership_authorized": false,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "5979fbd6641e9e4c2021985eff10ed66aeecc6420d8f9f0436838bf2672bb242"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-05",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-40F026866702E352|CAP-SITE-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-40F026866702E352",
+      "page_file": "resources/js/pages/sites/reports/overdue-actions.tsx",
+      "candidate_feature_id": "CAP-SITE-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/Sites/SiteReportingController.php:298",
+      "candidate_record_sha256": "0520e776e5368956af81d7ccc98a08f10ec299ce036d8af5d44e3dd89a1dbac6",
+      "joined_candidate_evidence_sha256": "7d79915a9ddd4560f5a55a42f60cd42f74baf5fea0d73c324606e6127c6ad78c",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/sites/reports/overdue-actions.tsx:54-282",
+        "app/Http/Controllers/Sites/SiteReportingController.php:277-304",
+        "routes/sites.php:595-597"
+      ],
+      "rationale": "The dedicated page reviews and filters overdue Site corrective-action reporting and has one exact SiteReportingController render owner.",
+      "review_discrepancies": [
+        "The page covers review rather than export, and assigned-to filtering supplied by the controller is not exposed by the page."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "f59841cafd191800c64737ca6e03dfafaaea7f38d3aa91e0f2039b0789ffe223"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-06",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-448D5C3469D3E49B|CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-448D5C3469D3E49B",
+      "page_file": "resources/js/pages/hr/candidates/create.tsx",
+      "candidate_feature_id": "CAP-HR-CANDIDATE-APPLICATION-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/Hr/CandidateController.php:74",
+      "candidate_record_sha256": "4e1625346f56799d698278a007c062babf58b234361b90fb2b35690cb43b1cf4",
+      "joined_candidate_evidence_sha256": "8bb7140ccf644b5048bfe2bad4950ee30b5ae8f9dfed84a662b1958270506b55",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/hr/candidates/create.tsx:42-412",
+        "app/Http/Controllers/Hr/CandidateController.php:56-172",
+        "app/Domain/Hr/Services/RecruitmentService.php:48-152"
+      ],
+      "rationale": "The complete page gathers candidate and application data and the controller creates both records for the candidate-application lifecycle.",
+      "review_discrepancies": [
+        "The supplied sources prop and target-Site requirement diverge from parts of the page UI, without creating competing ownership."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "e6d2990028515dbdaab7f0062b84afa7bd639acbc7efb1b193fc345305116278"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-07",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-517A8116437FD87B|CAP-FLEET-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-517A8116437FD87B",
+      "page_file": "resources/js/pages/fleet-assets/reports/reimbursement.tsx",
+      "candidate_feature_id": "CAP-FLEET-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/FleetAssets/ReportController.php:458",
+      "candidate_record_sha256": "ac61d5bf3d45f1aa09ccdf7f6681729227aba9e4ff22d65d673941e79ee0229c",
+      "joined_candidate_evidence_sha256": "fbae0729356eef09bca2e600f939af1ba8ff2ff705830a883568c5e847433b3a",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/fleet-assets/reports/reimbursement.tsx:35-346",
+        "app/Http/Controllers/FleetAssets/ReportController.php:456-507",
+        "routes/fleet-assets.php:333-342"
+      ],
+      "rationale": "The page generates and exports the dated mileage-reimbursement report and depends on the matching Fleet report data action.",
+      "review_discrepancies": [
+        "The packet render slice omits the material reimbursementData endpoint; no Site, CSV-quality, or runtime credit follows."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "f526a0f02074ba3ed5c29a2114e6317b4b15d713a19cf0f97f1bca62ec26750e"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-08",
+      "partition_id": "A",
+      "page_feature_key": "PAGE-ROOT-56077462B594F86E|CAP-CLIN-PROTOCOL-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-56077462B594F86E",
+      "page_file": "resources/js/pages/health-clinical/protocols/Create.tsx",
+      "candidate_feature_id": "CAP-CLIN-PROTOCOL-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php:67",
+      "candidate_record_sha256": "32d471559f59ddb9318108c100ec2d42ae3393d4e91ee12dab10b9b2bdcf3c06",
+      "joined_candidate_evidence_sha256": "d087d079b40d52f7767202ce0f4f8a90e5e639594c0722681092d4534e675893",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/health-clinical/protocols/Create.tsx:26-49",
+        "resources/js/components/clinical/protocol-form.tsx:63-399",
+        "app/Http/Controllers/Clinical/HealthClinicalProtocolController.php:63-89",
+        "app/Domain/Clinical/Services/ClinicalProtocolService.php:41-95"
+      ],
+      "rationale": "The dedicated create-protocol page and its material ProtocolForm implement the create portion of the clinical protocol lifecycle.",
+      "review_discrepancies": [
+        "The packet graph omits the material ProtocolForm import, resolved by complete-source review."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "c012772ba8282a2bc33f50a950e3caeba705ea15e0d4914ac214bc297354a0e5"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-09",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-5842BD76979046C7|CAP-CR-LIVE-DEVICE-MAP",
+      "page_record_id": "PAGE-ROOT-5842BD76979046C7",
+      "page_file": "resources/js/pages/control-room/devices/index.tsx",
+      "candidate_feature_id": "CAP-CR-LIVE-DEVICE-MAP",
+      "render_source_anchor": "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:128",
+      "candidate_record_sha256": "be5c1bf1d552d1592b266be8af6a11b3247a0eb83fe9df09b9628470fde56427",
+      "joined_candidate_evidence_sha256": "c5ab8eab943eb1733222460215985c02e3d28d305a8bd2f61f14bd9c50610206",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/control-room/devices/index.tsx:35-388",
+        "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:28-128",
+        "03-feature-to-benchmark-matrix.csv:35"
+      ],
+      "rationale": "The page is the authorised Control Room device-signal projection and explicitly separates canonical inventory ownership from this live-map journey.",
+      "review_discrepancies": [
+        "The matrix names the map page as representative, while its user job and backend anchors include this device projection."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "592a5b4dc75aef9720b5a8f2b8348be2979eeb72c4fc1529cccfbdebf2a3a348"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-10",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-699E529882BBD0C9|CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "page_record_id": "PAGE-ROOT-699E529882BBD0C9",
+      "page_file": "resources/js/pages/operations/rostering/conflicts.tsx",
+      "candidate_feature_id": "CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "render_source_anchor": "app/Http/Controllers/RosteringController.php:1051",
+      "candidate_record_sha256": "9860ce24d308c2be513b3d8b0f95fea68598fa1bbec6be1da0f8c99133583878",
+      "joined_candidate_evidence_sha256": "57f162370a63353279857109162035ab2f4b68e0e8c5e3a1f851e9d0082c893b",
+      "outcome": "SHARED_RELATION",
+      "source_loci": [
+        "resources/js/pages/operations/rostering/conflicts.tsx:104-511",
+        "resources/js/components/rostering/conflict-queue/build-queue.ts:82-300",
+        "app/Http/Controllers/RosteringController.php:881-1051",
+        "03-feature-to-benchmark-matrix.csv:234-241"
+      ],
+      "rationale": "The conflict workspace directly implements roster planning, shift cover, shift lifecycle, and staff-assignment actions, so it cannot be a one-feature page owner.",
+      "review_discrepancies": [
+        "Complete-page review rejects the packet's singleton projection as a multi-feature shared relation."
+      ],
+      "page_ownership_authorized": false,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "d21ad3cf82377fece53868d0ce33bf16c73d2459eb300843292c80b721c57b79"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-11",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-74F2D6A89C37B330|CAP-SITE-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-74F2D6A89C37B330",
+      "page_file": "resources/js/pages/sites/reports/checklist-trends.tsx",
+      "candidate_feature_id": "CAP-SITE-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/Sites/SiteReportingController.php:329",
+      "candidate_record_sha256": "ea811bb2065a39ca9a2a085b08a2a4a732a3e2c8864b61fdc152c3c2821e1635",
+      "joined_candidate_evidence_sha256": "ab56db6c4636b71aafab1b2072967f07575132b4aaa722b44228d63bfc3f78f4",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/sites/reports/checklist-trends.tsx:30-171",
+        "app/Http/Controllers/Sites/SiteReportingController.php:305-337",
+        "03-feature-to-benchmark-matrix.csv:337"
+      ],
+      "rationale": "The dedicated checklist-failure report and its controller aggregation own the checklist-report portion of Site reporting.",
+      "review_discrepancies": [
+        "The matrix lists only the generic report module as its representative page."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "2c8c2ef2c20511be12dee1bcea934ad0004ee33a02df644e5571f119833d680d"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-12",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-7BBA7AF7815B6DD5|CAP-RESP-STAY-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-7BBA7AF7815B6DD5",
+      "page_file": "resources/js/pages/respite/stays/index.tsx",
+      "candidate_feature_id": "CAP-RESP-STAY-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/Respite/RespiteStayController.php:47",
+      "candidate_record_sha256": "c373c368b4cb2a8a73b7603f5cbf2f8b9159e4698aa7b666d7df1d51c7541ba3",
+      "joined_candidate_evidence_sha256": "704baeb74ae6b590564142fd8ba173aa1ea5ce0a921619a3fb861b1fb28e9cdc",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/respite/stays/index.tsx:14-108",
+        "app/Http/Controllers/Respite/RespiteStayController.php:39-47",
+        "03-feature-to-benchmark-matrix.csv:284"
+      ],
+      "rationale": "The page is the stay-lifecycle register for active and completed respite stays and opens the canonical stay record.",
+      "review_discrepancies": [
+        "The matrix representative page is the stay detail page; this is its matching lifecycle register."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "8ba1be506f54b3c0b418b99f3cab99f2a6252fc52850750fbd58b90be9d16d22"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-13",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-8FDA148A7D77DF0F|CAP-CR-PLAYBOOK-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-8FDA148A7D77DF0F",
+      "page_file": "resources/js/pages/control-room/playbooks/show.tsx",
+      "candidate_feature_id": "CAP-CR-PLAYBOOK-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php:121",
+      "candidate_record_sha256": "576fb175860ec8fb827d78109334a1fa6a9b00fbaa962047f186c25071af2433",
+      "joined_candidate_evidence_sha256": "b5d1d62abb0f1433a88f6433cd3ec7eafac196fed29e8ac1de0e105229106808",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/control-room/playbooks/show.tsx:187-531",
+        "resources/js/components/control-room/playbook-wizard.tsx:113-217",
+        "app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php:79-121",
+        "03-feature-to-benchmark-matrix.csv:37"
+      ],
+      "rationale": "The playbook detail/editor page reviews lifecycle state, evidence configuration, steps, and run history, with its wizard persisting create and update semantics.",
+      "review_discrepancies": [
+        "The matrix representative page is the playbook index rather than this lifecycle detail/editor."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "ee3664d3662124d7c97a31b65472da51db30a66da0e25c2a3571021486add3e2"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-14",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-93D4B3A11F292435|CAP-MED-PHARMACY-ACTIONS",
+      "page_record_id": "PAGE-ROOT-93D4B3A11F292435",
+      "page_file": "resources/js/pages/emar/Prescriptions.tsx",
+      "candidate_feature_id": "CAP-MED-PHARMACY-ACTIONS",
+      "render_source_anchor": "app/Http/Controllers/Emar/EmarController.php:2279",
+      "candidate_record_sha256": "7408aa5c24af24307f3eb085c77a2738ef2045e50c4f3bb34030599c617fb77f",
+      "joined_candidate_evidence_sha256": "f5b8d5c0c7038690be467b6aeaf9493bb3bd49451ed6a2b6af030c879ea96291",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/emar/Prescriptions.tsx:204-996",
+        "resources/js/pages/emar/_prescription-dialogs.tsx:69-757",
+        "app/Http/Controllers/Emar/EmarController.php:2199-2279",
+        "03-feature-to-benchmark-matrix.csv:213"
+      ],
+      "rationale": "The prescriptions workbench and material dialogs implement prescriber, countersign, dispense, link, confirm, and cancel pharmacy-order actions.",
+      "review_discrepancies": [
+        "The matrix representative page is Medications.tsx rather than this direct order-action workbench."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "7c70507f406a35c55c112927776f6d68cdb2039dfa37dd7460ca1b30b798ab23"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-15",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-9BA6737345457A9E|CAP-IT-SELF-SERVICE-TICKET",
+      "page_record_id": "PAGE-ROOT-9BA6737345457A9E",
+      "page_file": "resources/js/pages/it/tickets/show.tsx",
+      "candidate_feature_id": "CAP-IT-SELF-SERVICE-TICKET",
+      "render_source_anchor": "app/Http/Controllers/It/ItTicketController.php:87",
+      "candidate_record_sha256": "b8450cd7f95a5adf833cf79c12e7740add2391f78f65a70bdeb0cbc45a8a6a4f",
+      "joined_candidate_evidence_sha256": "1dbf290ae6fa50b6b3a09e0ccd5042449d22ac6595ebb77c473dab2037b27432",
+      "outcome": "SHARED_RELATION",
+      "source_loci": [
+        "resources/js/pages/it/tickets/show.tsx:207-1173",
+        "app/Http/Controllers/It/ItTicketController.php:51-88",
+        "03-feature-to-benchmark-matrix.csv:195-202"
+      ],
+      "rationale": "The same ticket page intentionally implements requester self-service and internal agent triage, assignment, resolution, merge, close, watch, reopen, and rating workflows.",
+      "review_discrepancies": [
+        "The canonical matrix explicitly assigns this page to both self-service and agent-ticket features."
+      ],
+      "page_ownership_authorized": false,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "a41519c9ee799ec1c9bc3bcf5abe880d943adff5fd05b6c5335329794b4df824"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-16",
+      "partition_id": "B",
+      "page_feature_key": "PAGE-ROOT-9CEBFFD54BFEA04F|CAP-DAY-ALL-TASKS-WORKBENCH",
+      "page_record_id": "PAGE-ROOT-9CEBFFD54BFEA04F",
+      "page_file": "resources/js/pages/tasks/index.tsx",
+      "candidate_feature_id": "CAP-DAY-ALL-TASKS-WORKBENCH",
+      "render_source_anchor": "app/Http/Controllers/AllTasksController.php:110",
+      "candidate_record_sha256": "2ce38376200e2395e0d2307be682ee8b224b34e8d3077ab042706c7b8ad62011",
+      "joined_candidate_evidence_sha256": "da7b48357466e913a4b74e70020118ce4c8378de69d4a4d78c8ff83ffcabea09",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/tasks/index.tsx:266-778",
+        "app/Http/Controllers/AllTasksController.php:39-110",
+        "03-feature-to-benchmark-matrix.csv:44"
+      ],
+      "rationale": "The complete cross-provider All Tasks workbench owns search, filtering, export, saved views, assignment, preview, statistics, and canonical deep links.",
+      "review_discrepancies": [],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "2cb00bddf2fad2e525f831320862e4c546d48550ffa6574d783f9c9619560c61"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-17",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-A659E03D0638D8E1|CAP-HR-CASEWORK-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-A659E03D0638D8E1",
+      "page_file": "resources/js/pages/hr/cases/show.tsx",
+      "candidate_feature_id": "CAP-HR-CASEWORK-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/Hr/HrCaseController.php:323",
+      "candidate_record_sha256": "b9c32d6c8554f714fa880faace66da9cebdd2b1fea63f1ae68b691c7d20f66db",
+      "joined_candidate_evidence_sha256": "3bd6bb223827c2d2753e25ae64ee57467b6b1aa9fef16f776b1a302bbe0fd076",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/hr/cases/show.tsx:235-962",
+        "app/Http/Controllers/Hr/HrCaseController.php:247-358",
+        "app/Http/Controllers/Hr/HrCaseController.php:607-903"
+      ],
+      "rationale": "The confidential HR case detail page is the substantive facts, people, timeline, incident, disciplinary, stage, and closure workspace.",
+      "review_discrepancies": [
+        "The matrix names only the case index page despite exact backend and user-job convergence."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "4a23a18c9a0988470bb9074fdda7e174cc4442c0009d1e0207d4bd6ac2e2b041"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-18",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-AD147EDAEA766491|CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "page_record_id": "PAGE-ROOT-AD147EDAEA766491",
+      "page_file": "resources/js/pages/Governance/Actions/Show.tsx",
+      "candidate_feature_id": "CAP-GOV-ACTION-ITEM-WORKFLOW",
+      "render_source_anchor": "app/Domain/Governance/Http/Controllers/ActionItemController.php:50",
+      "candidate_record_sha256": "15ad0e7fcb5a18f16794aa7ffc3e6c6010fe898cbb8ff9d819a9db292fb8d2cb",
+      "joined_candidate_evidence_sha256": "2ea0de6360b2665d1481f3618e9c2f50cdfa66e2eec296f8809dac7c77a54c22",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/Governance/Actions/Show.tsx:54-286",
+        "app/Domain/Governance/Http/Controllers/ActionItemController.php:46-54"
+      ],
+      "rationale": "The governance action detail page directly presents and completes one action item under the canonical action-item workflow.",
+      "review_discrepancies": [
+        "The matrix page_files field is not established; this complete review supplies the exact page identity."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "d85fc024dc79e140f00e92d8065b8452e8ac18413636d0353df42339d3a24be8"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-19",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-AD9237EC426D710E|CAP-CR-LIVE-DEVICE-MAP",
+      "page_record_id": "PAGE-ROOT-AD9237EC426D710E",
+      "page_file": "resources/js/pages/control-room/devices/show.tsx",
+      "candidate_feature_id": "CAP-CR-LIVE-DEVICE-MAP",
+      "render_source_anchor": "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:288",
+      "candidate_record_sha256": "376c04b4e98a49fcf91126e25f66980d0af6a7392c6eeb8f3b297a98c4e6ef02",
+      "joined_candidate_evidence_sha256": "6138ecac5ebd1638e7e2e3c46fff2ee5a7439351642a1cbc8023adf454333f25",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/control-room/devices/show.tsx:242-610",
+        "app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php:155-311"
+      ],
+      "rationale": "The page owns the Control Room signal-source/device projection while explicitly preserving canonical device inventory in Security and Devices.",
+      "review_discrepancies": [
+        "The matrix omits this detail page and truncates the containing backend action at its render line."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "9b5f8eb0fc2849fc967422f33d7f11b92e09680703bb3587a4cb39aff6c0a853"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-20",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-B18CC9A5626ADBEA|CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "page_record_id": "PAGE-ROOT-B18CC9A5626ADBEA",
+      "page_file": "resources/js/pages/operations/rostering/index.tsx",
+      "candidate_feature_id": "CAP-OPS-ROSTER-PLANNING-WORKSPACE",
+      "render_source_anchor": "app/Http/Controllers/RosteringController.php:552",
+      "candidate_record_sha256": "12a50f080eca10e8b79c2ffa02824c1fb7608b69e1d0102d60583d755f9bc53b",
+      "joined_candidate_evidence_sha256": "9b0afb25bedb101656a64cdd34931148f896c9ed68e658e3cf2c9dee1425c59a",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/operations/rostering/index.tsx:1-3233",
+        "app/Http/Controllers/RosteringController.php:50-880",
+        "app/Http/Controllers/RosteringController.php:1276-1534"
+      ],
+      "rationale": "The complete roster-planning workspace owns Site, staff, client, week, grid, conflict, coverage, leave, capacity, template, series, publish, and scheduling operations.",
+      "review_discrepancies": [],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "16ebc63559f202e94ecdab9377d9042ad87b10ba99a0b390b29e2a1d85de8a11"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-21",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-B4FAC1F51E79BB57|CAP-FLEET-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-B4FAC1F51E79BB57",
+      "page_file": "resources/js/pages/fleet-assets/reports/by-house.tsx",
+      "candidate_feature_id": "CAP-FLEET-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/FleetAssets/ReportController.php:756",
+      "candidate_record_sha256": "2a4d4786324c39c4786a528c0f0a0a09ca5217791a69be6ef6821345f042fce8",
+      "joined_candidate_evidence_sha256": "3652c3dae3846f8bad419a37a98cc11a2666dc79637a4404d20bec7c2f367535",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/fleet-assets/reports/by-house.tsx:58-428",
+        "app/Http/Controllers/FleetAssets/ReportController.php:648-764"
+      ],
+      "rationale": "The dedicated Fleet by-house page substantively reports vehicle usage, trips, distance, fuel, transport, and cross-house comparisons.",
+      "review_discrepancies": [
+        "The matrix names only the generic report page; this variant has no export control, so no export-behaviour credit follows."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "698c1a76c415408dd7a4d6a4e3d3d63fe464ac1a13bb99136723dde559067373"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-22",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-C2EFAF82BB3F8076|CAP-PRIV-PIA-LIFECYCLE",
+      "page_record_id": "PAGE-ROOT-C2EFAF82BB3F8076",
+      "page_file": "resources/js/pages/privacy/dpia/edit.tsx",
+      "candidate_feature_id": "CAP-PRIV-PIA-LIFECYCLE",
+      "render_source_anchor": "app/Http/Controllers/DPIAController.php:123",
+      "candidate_record_sha256": "04214600bec7f36def2f71f4138da60504df22014fd9011627ceed6c37556115",
+      "joined_candidate_evidence_sha256": "0473f1ad5062b39b999daef121988d2cdf551acb9c69be5f717d0c0c90a0ae94",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/privacy/dpia/edit.tsx:51-395",
+        "app/Http/Controllers/DPIAController.php:119-127",
+        "app/Http/Controllers/DPIAController.php:191-194"
+      ],
+      "rationale": "The DPIA edit page owns the assessment and editing portion of the privacy-impact lifecycle, including purpose, legal basis, subjects, risks, mitigations, levels, and review date.",
+      "review_discrepancies": [
+        "The matrix names only the DPIA show page; an unused staff prop does not create competing ownership."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "d36a78d2b5c342241ed024e8ed0b62e3f428528a14605be4ea50b765c5bc0f20"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-23",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-C4025769E6136348|CAP-SITE-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-C4025769E6136348",
+      "page_file": "resources/js/pages/sites/reports/site-detail.tsx",
+      "candidate_feature_id": "CAP-SITE-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/Sites/SiteReportingController.php:250",
+      "candidate_record_sha256": "7736b08c0bd43b9843420c0338c32b2a4c4cb61f4b63fab8c362d6dae06e60ee",
+      "joined_candidate_evidence_sha256": "de47f2aacbb166298af9b2381fe53fdc25fa3f9bdbc7e3a2e76df4836fc71bfd",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/sites/reports/site-detail.tsx:58-293",
+        "app/Http/Controllers/Sites/SiteReportingController.php:187-275"
+      ],
+      "rationale": "The dedicated Site-detail report aggregates hazard, checklist, inspection, credential, and audit-log reporting under the Site reporting job.",
+      "review_discrepancies": [
+        "The matrix names only the generic report page; no export control exists on this variant."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "af4fbe5314874b570014ab42ed7238e9cb79a1803ef242f294d7e788909e814f"
+    },
+    {
+      "candidate_id": "RUN105-PAGE-RENDER-24",
+      "partition_id": "C",
+      "page_feature_key": "PAGE-ROOT-C639F94B19EF074C|CAP-SITE-REPORTING-EXPORT",
+      "page_record_id": "PAGE-ROOT-C639F94B19EF074C",
+      "page_file": "resources/js/pages/sites/reports/asset-condition.tsx",
+      "candidate_feature_id": "CAP-SITE-REPORTING-EXPORT",
+      "render_source_anchor": "app/Http/Controllers/Sites/SiteReportingController.php:371",
+      "candidate_record_sha256": "2320cb824943af3a901a670b539f7691dad2ad1dd43a6f088786460bd5d1ef49",
+      "joined_candidate_evidence_sha256": "d473745ee94aae12b91fa3b30cab9288f91d6e4986309cc9625396b6bd2c0392",
+      "outcome": "OWNER_PAGE",
+      "source_loci": [
+        "resources/js/pages/sites/reports/asset-condition.tsx:64-297",
+        "app/Http/Controllers/Sites/SiteReportingController.php:338-381"
+      ],
+      "rationale": "The dedicated Site asset-condition report owns Site filtering, condition groups, warranty summaries, and asset detail reporting.",
+      "review_discrepancies": [
+        "The matrix names only the generic report page; no export control exists on this variant."
+      ],
+      "page_ownership_authorized": true,
+      "route_ownership_authorized": false,
+      "controller_action_bridge_authorized": false,
+      "downstream_credit_authorized": false,
+      "decision_record_sha256": "df1dc803b471d9def72daad4781b3bb3e7c533bbafad6694060e04dc83385338"
+    }
+  ],
+  "outcome_conservation": {
+    "reviewed_candidates": 24,
+    "owner_pages": 20,
+    "shared_relations": 3,
+    "alias_or_redirect": 0,
+    "dead_or_noncanonical": 0,
+    "evidence_gaps": 1,
+    "equation": "24 = 20 OWNER_PAGE + 3 SHARED_RELATION + 0 ALIAS_OR_REDIRECT + 0 DEAD_OR_NONCANONICAL + 1 EVIDENCE_GAP",
+    "all_candidates_conserved": true
+  },
+  "decision": {
+    "verdict": "GO_20_EXPLICIT_OWNER_PAGE_3_SHARED_RELATION_1_EVIDENCE_GAP",
+    "mechanical_discrepancies": 0,
+    "owner_pages": 20,
+    "shared_relations": 3,
+    "alias_or_redirect": 0,
+    "dead_or_noncanonical": 0,
+    "evidence_gaps": 1,
+    "static_page_owner_records_authorized": 20,
+    "static_route_owner_records_authorized": 0,
+    "static_controller_action_bridges_authorized": 0,
+    "owner_only_overlay_authorized": true,
+    "non_owner_records_must_be_preserved": 4,
+    "matrix_mutation_authorized": false,
+    "gate_4_complete": false
+  },
+  "identity": {
+    "page_record_id_list_sha256": "a2417deef667069b3ac51252f508a973b54ed14470a5dea69259016ebe9aae20",
+    "page_path_list_sha256": "9c453b6cc7303ef76523f32f2ec3f18828f5e0a9e0198109b129a969d09f5192",
+    "feature_id_list_sha256": "87364e111d2b2d4d117c1202b6e8a667aefe7287511b8119ef2428992efb3f0c",
+    "new_feature_id_list_sha256": "e00b769ff8f50fc42f093fc0c373720b1c98aca6738118d5d668e08401aa82a2",
+    "render_anchor_list_sha256": "eb6bba04cc4d01c13f072007f1ad83a9ddd2a8aa03518252d0e02a2b28638ad4",
+    "page_feature_key_list_sha256": "d466f13daa2c1419f9d10ac9e25951ca9bff92c1b09fe4e1b22ca7efd161856c",
+    "candidate_record_sha256_list_sha256": "975397e85756417e66be3a451366961e32c4d7cc24792f8863a14c6db42c116b",
+    "records_sha256": "5dd86da895cefa7478299f0a37fe2e372f2121b685cb684095abf132223a0839",
+    "owner_candidate_id_list_sha256": "018c0b6fb615f9fc5bad443471e0dbeb1da3b24c9d98b37727f2f96ead10c00c",
+    "owner_page_record_id_list_sha256": "11ca27250dff6b2ef40e3f7c38ad83e5ca27dc0e7425f960d7d003790c211fc3",
+    "owner_page_feature_key_list_sha256": "e859c610f927e7cd2b6d2c2df80b5df966e054deff6f33603d19235342e35fda",
+    "owner_candidate_record_sha256_list_sha256": "71580cac00d1dedaf9aa5495bdf020cfde1b13b81d9caadd0115bbea889e351b",
+    "shared_candidate_id_list_sha256": "0aa4fde52375eb95117d17fd8c816d4f2551eb3977d4f7011c0417ff1ce60ece",
+    "evidence_gap_candidate_id_list_sha256": "9cd514876fb2eb15560617823066171f47b706f44d5e467ebc2425694794c0e3",
+    "decision_records_sha256": "26bf4f979d168891e34ad1446aecf14f8da40a84973afb12741d860b806e1026",
+    "decision_record_sha256_list_sha256": "dcebe82e3a9358bdee266c72527c3850ee54804275272a7a23d5e3fb6c4ff5a2",
+    "partition_reviews_sha256": "b3acafd97cb70a35911620acd01510503ab0cb7f71c4664550e55a4faf65648c"
+  },
+  "projected_integration_only": {
+    "projection_is_current_credit": false,
+    "bounded_source_records": "3929 = 612 owner + 3317 non-owner residual",
+    "owner_surfaces": "612 = 265 route + 347 page",
+    "page_universe": "711 = 347 owner + 5 shared + 0 alias + 0 dead + 359 residual",
+    "evidence_gap_tagged_within_page_residual": 1,
+    "static_controller_action_bridges": 53,
+    "bounded_static_source_ownership_percent": "15.576483"
+  },
+  "credit_boundary": {
+    "PAGE_REVIEW_DECISIONS_FOR_LATER_OWNER_ONLY_OVERLAY": true,
+    "page_ownership": false,
+    "route_ownership": false,
+    "static_controller_action_bridge": false,
+    "framework_route_reachability": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "direct_object_concealment": false,
+    "privacy_correctness": false,
+    "lifecycle_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-page-render-owner-review-wave-14.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-105r-independent-outcome-neutral-page-render-owner-review-wave-14.json"
+  ]
+}
