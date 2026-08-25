@@ -16,7 +16,13 @@
     "route_page_independent_review_sha256": "3910255856a757e612b6f6d75522fe394ac19e4e011836c1aedbcfd29eb344be",
     "route_page_static_linkage_integration_sha256": "87cc180746d91837dc2d256ab8b49c6f06781deebeee1f2937ca0c58fa140fb8",
     "route_page_candidate_census_sha256": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
-    "route_page_candidate_independent_review_sha256": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396"
+    "route_page_candidate_independent_review_sha256": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396",
+    "run_083_dashboard_verification_sha256": "e0f7f40b3d49492368ff930d163f8d677bb52f93b848a09126ab12b97a9572ef",
+    "run_084_designated_application_preflight_sha256": "5422f40ee5663b3d4765f81d8b298e6338f6d0bcb763c761e97b06afa0a5effd",
+    "run_084_page_graph_sha256": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+    "run_084_page_graph_independent_review_sha256": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+    "run_084b_backend_semantic_sha256": "ff1bf008d6dd9d5d478b14328415a4c8187b6e09fa9e2ef57bea8daeec7de879",
+    "run_084br_backend_semantic_independent_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -61,7 +67,19 @@
     "route_page_render_owner_single_candidates": 43,
     "route_page_render_owner_multi_candidates": 2,
     "route_page_render_owner_no_candidates": 348,
-    "static_route_files_registered": 38
+    "static_route_files_registered": 38,
+    "full_page_tree_files": 1058,
+    "full_page_tree_tsx_files": 1007,
+    "full_page_tree_ts_files": 51,
+    "full_page_tree_production_tsx": 963,
+    "full_page_tree_literal_rendered_roots": 711,
+    "full_page_tree_imported_supports": 227,
+    "full_page_tree_adjudicated_non_roots": 25,
+    "backend_semantic_role_rows": 1789,
+    "backend_semantic_unique_paths": 1755,
+    "backend_semantic_async_role_rows": 197,
+    "backend_semantic_async_unique_paths": 189,
+    "backend_whole_file_semantically_reviewed": 0
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -2342,7 +2360,7 @@
     "completion": false
   },
   "current_route_page_candidate_census": {
-    "status": "STATIC_CANDIDATE_RELATIONS_MATERIALIZED_PENDING_INDEPENDENT_REVIEW_ZERO_CREDIT",
+    "status": "STATIC_CANDIDATE_RELATIONS_INDEPENDENTLY_REVIEWED_GO_ZERO_DOWNSTREAM_CREDIT",
     "route_denominator": 3003,
     "page_denominator": 393,
     "exact_route_name_cardinalities": {
@@ -2411,5 +2429,96 @@
     "ease": false,
     "pass": false,
     "completion": false
+  },
+  "current_audit_artifact_verification_history": {
+    "run_083": {
+      "status": "GO_EXACT_SUPERSEDED_DASHBOARD_ARTIFACT_ZERO_APPLICATION_CREDIT",
+      "dashboard_sha256": "fb58b937c99542e48f3f449c293720a8805b5a7484d0c8b86057b08c5edbb8e3",
+      "receipt_sha256": "e0f7f40b3d49492368ff930d163f8d677bb52f93b848a09126ab12b97a9572ef",
+      "viewports_verified": 4,
+      "local_links_verified": "172/172",
+      "anchors_verified": "10/10",
+      "duplicate_ids": 0,
+      "console_warnings": 0,
+      "console_errors": 0,
+      "current_dashboard_credit": false,
+      "application_browser_credit": false
+    }
+  },
+  "current_designated_application_access_preflight": {
+    "run_id": "RUN-084-DESIGNATED-APPLICATION-ACCESS-PREFLIGHT",
+    "status": "BLOCKED_AUTHENTICATION_AND_BUILD_ATTRIBUTION_CONTINUE_STATIC_AUDIT",
+    "observed_states": [
+      "PUBLIC_MARKETING_HOME",
+      "SIGNED_OUT_LOGIN_FORM"
+    ],
+    "current_browser_session_authenticated": false,
+    "visible_environment_or_build_marker": "NOT_PRESENT",
+    "credentials_read_or_entered": false,
+    "forms_submitted": false,
+    "screenshots_retained": false,
+    "page_level_horizontal_overflow": false,
+    "console_warning_count": 0,
+    "console_error_count": 0,
+    "application_browser_credit": false,
+    "runtime_credit": false,
+    "test_credit": false,
+    "pass_credit": false,
+    "completion_credit": false
+  },
+  "current_full_inertia_page_tree": {
+    "run_id": "RUN-084-PAGE-GRAPH",
+    "status": "GO_STATIC_FULL_PAGE_TREE_CANDIDATE_CENSUS_ZERO_DOWNSTREAM_CREDIT",
+    "independent_review_discrepancies": 0,
+    "physical_page_tree_files": 1058,
+    "tsx_files": 1007,
+    "ts_files": 51,
+    "production_tsx_partition": {
+      "total": 963,
+      "literal_rendered_roots": 711,
+      "imported_support_components": 227,
+      "adjudicated_unrendered_unimported_non_roots": 25
+    },
+    "historical_wording_superseded": "The 25-path cohort is unrendered and unimported, not resolver-imported.",
+    "feature_mapping_credit": false,
+    "framework_route_credit": false,
+    "build_credit": false,
+    "application_browser_credit": false,
+    "runtime_credit": false,
+    "executed_test_credit": false,
+    "usability_credit": false,
+    "pass_credit": false,
+    "completion_credit": false
+  },
+  "current_backend_semantic_classification": {
+    "run_id": "RUN-084B",
+    "status": "GO_STATIC_BACKEND_CANDIDATE_CLASSIFICATION_ZERO_DOWNSTREAM_CREDIT",
+    "independent_review_discrepancies": 0,
+    "role_rows": 1789,
+    "unique_source_paths": 1755,
+    "role_counts": {
+      "EVENT": 14,
+      "JOB": 126,
+      "LISTENER": 12,
+      "MODEL": 782,
+      "OUTBOX_RELATED": 45,
+      "POLICY": 75,
+      "SERVICE_ENTRY": 735
+    },
+    "async_role_rows": 197,
+    "async_unique_paths": 189,
+    "allowed_prompt_classification": "Evidence gap",
+    "whole_file_semantically_reviewed": 0,
+    "feature_mapping_credit": false,
+    "framework_reachability_credit": false,
+    "runtime_credit": false,
+    "database_credit": false,
+    "executed_test_credit": false,
+    "application_browser_credit": false,
+    "benchmark_credit": false,
+    "ease_credit": false,
+    "pass_credit": false,
+    "final_finding_credit": false,
+    "completion_credit": false
   }
 }

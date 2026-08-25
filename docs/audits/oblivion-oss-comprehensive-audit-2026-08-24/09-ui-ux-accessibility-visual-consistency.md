@@ -95,6 +95,12 @@ The unknown-build observation records 6 routes, 24 route/viewport cells, 5 pre-s
 
 The later RUN-072 check selected 3 routes but stopped after `/my-day` redirected both available contexts to `/login`; authenticated cells remain 0 and no credentials or mutations occurred.
 
+## RUN-084 current designated-application access preflight
+
+The current controlled session is signed out. A navigation-only preflight observed the public home page and the login form; the login view was checked at 1280×720 with no page-level horizontal overflow and zero console warnings/errors. No credentials were read or entered, no form was submitted, no private record was opened, and no screenshot was retained. The target exposed no independently proven non-production marker or deployed commit/release identity.
+
+This is public/login access evidence only. Signed-in application routes, representative role/Site behavior, responsive families, journeys, workflows, ease, rendered current-source visuals, runtime, tests, Pass, and completion all remain unobserved and zero-credit.
+
 ## Provisional pattern risks requiring attributable resampling
 
 1. Focus restoration was a candidate across four unknown-build overlay families; trigger, initial focus, close mechanism and restored locator were not captured.

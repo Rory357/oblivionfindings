@@ -1,0 +1,113 @@
+{
+  "schema_version": "run-084r-independent-full-inertia-page-graph-review-wave-09-v1",
+  "run_id": "RUN-084R-INDEPENDENT-FULL-INERTIA-PAGE-GRAPH-REVIEW",
+  "status": "GO_STATIC_FULL_PAGE_TREE_CANDIDATE_CENSUS_ZERO_DOWNSTREAM_CREDIT",
+  "reviewed_on": "2026-08-25",
+  "agent_task_path": "/root/run084_page_graph_review",
+  "decision": {
+    "verdict": "GO",
+    "discrepancies": 0,
+    "page_tree_enumeration_authorized": true,
+    "static_structural_classification_authorized": true,
+    "support_owner_relations_authorized_as_candidates_only": true,
+    "feature_mapping_authorized": false,
+    "matrix_mutation_authorized": false,
+    "downstream_credit_authorized": false
+  },
+  "pins": {
+    "audit_head": "cdf8721d339f770c176ebee7688868547885500a",
+    "audit_tree": "b787f46e02a08a1d538ce7741af39d96763143a3",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "producer": "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json",
+    "producer_sha256": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+    "generator": "generators/build-full-inertia-page-graph-wave-09.py",
+    "generator_sha256": "6917252a65c09cb894c0d275d00a770b0f451cb6ff26dc78fbfd2661d81c52e6",
+    "producer_embedded_generator_sha256": "6917252a65c09cb894c0d275d00a770b0f451cb6ff26dc78fbfd2661d81c52e6"
+  },
+  "methods": [
+    "Recomputed the page-tree Git paths, blob IDs, content SHA-256 values, row IDs and disjoint partitions from the pinned application commit.",
+    "Regenerated the producer in memory and reproduced its exact SHA-256.",
+    "Independently red-teamed regex literals, string literals, TypeScript import-type queries, dynamic imports, type-only relations, test/spec importers, generated route modules, path precedence, import cycles and production-only reverse reachability.",
+    "Verified every row retains false runtime, build, browser, executed-test, FEATURE-ID mapping, Pass and completion credit."
+  ],
+  "verified_denominators": {
+    "page_tree_files": 1058,
+    "tsx_files": 1007,
+    "production_non_test_tsx": 963,
+    "excluded_test_spec_story_tsx": 44,
+    "ts_files": 51,
+    "production_ts_helpers": 32,
+    "test_spec_ts_files": 19,
+    "literal_rendered_page_roots": 711,
+    "imported_support_components": 227,
+    "adjudicated_unrendered_unimported_non_roots": 25,
+    "production_partition_sum": 963,
+    "all_rows_with_verified_path_blob_content_and_id": 1058
+  },
+  "verified_path_hashes": {
+    "page_tree": "f978a623c7fd4fef92b28d71b960f03dc666ab8c7e44981f0f3c7fabd31a4b2d",
+    "tsx": "1437136af4a37b6f86d66ae66f8a8ce7bc7d34f296a256c589dc0f92935fdf6f",
+    "production_non_test_tsx": "1ba9fbc49d0fd8185392561afe2abefd1d66d7264c96a804da93768e45cc8f55",
+    "excluded_test_spec_story_tsx": "d265c4e23c9224f4eff5ee8076c99dc1610ec1e152c0a1ad4a843214ad580674",
+    "ts": "0563785ec5849d847d3f84d1013a6a6a9fb4c70ca13cd5201662ae65939b8e97",
+    "production_ts_helpers": "eef70b94016448af6a6aedfe895673491526f429aff98b1b1962a95546467580",
+    "test_spec_ts": "4d397294ea5a3e1a5c5ded7c596c4fbcd53ab4d71bbc3be7d8b3078e1fa17600",
+    "literal_rendered_page_roots": "a847a52ea3342a3ed53ba4860fcb41bcb0d33f44b7fa1545c6d623ae41fb2702",
+    "imported_support_components": "c9f165c3896e189ed38ffa2b69ed632cefb03abf56f927707133c58ac6c937ff",
+    "adjudicated_non_roots": "89db7b14d5e8db8acd9e85dd633cb5cdb86707315eb4c4fef5d9429b0c008361"
+  },
+  "verified_import_graph": {
+    "all_source_page_value_edges": 719,
+    "production_page_value_edges": 620,
+    "production_page_value_edges_with_test_importer": 0,
+    "type_only_edges": 85,
+    "genuine_dynamic_runtime_imports": 6,
+    "typescript_import_type_queries": 1,
+    "typescript_import_type_query_anchor": "resources/js/pages/sites/meal-planner/index.tsx:142",
+    "true_unresolved_internal_literals": 0,
+    "generated_route_modules_absent_at_application_pin": 86,
+    "outside_resources_js_imports": 1,
+    "page_tree_cycle_components": 0,
+    "all_227_support_paths_have_production_direct_imports": true
+  },
+  "verified_support_owner_candidates": {
+    "orphan": 1,
+    "orphan_path": "resources/js/pages/catering/_tabs.tsx",
+    "single_rendered_root": 151,
+    "shared_rendered_roots": 75,
+    "credit_boundary": "Candidate relations only. Singleton or shared root reachability does not propagate a FEATURE-ID."
+  },
+  "external_contradiction": {
+    "status": "PRE_EXISTING_REPORTING_WORDING_REQUIRES_CORRECTION",
+    "loci": [
+      "evidence/source/current-static-semantic-census.json:171",
+      "generators/integrate-source-wave-01.py:356"
+    ],
+    "incorrect_wording": "The 25 paths are described as resolver-imported.",
+    "correct_boundary": "The 25 paths are unrendered and unimported; the separate hidden support cohort contains 227 imported paths."
+  },
+  "credit_boundary": {
+    "page_tree_enumeration_credit": true,
+    "static_structural_classification_credit": true,
+    "support_owner_candidate_relation_credit": true,
+    "feature_mapping_credit": false,
+    "benchmark_mapping_credit": false,
+    "framework_route_credit": false,
+    "build_credit": false,
+    "application_browser_credit": false,
+    "runtime_credit": false,
+    "executed_test_credit": false,
+    "usability_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "attestation": {
+    "repository_files_written_by_reviewer": 0,
+    "application_runtime_started": false,
+    "tests_executed": false,
+    "browser_used": false,
+    "incidental_python_cache": "The read-only in-memory review recreated one generator __pycache__ entry; the root orchestrator removed that exact generated cache before integration."
+  }
+}

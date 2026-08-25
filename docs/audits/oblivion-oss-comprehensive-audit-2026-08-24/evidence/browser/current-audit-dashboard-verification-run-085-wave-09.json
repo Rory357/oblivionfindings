@@ -1,0 +1,127 @@
+{
+  "schema_version": "run-085-audit-dashboard-verification-wave-09-v1",
+  "run_id": "RUN-085-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_ANCHOR_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "verified_on": "2026-08-25",
+  "surface": "IN_APP_BROWSER_LOCAL_AUDIT_DASHBOARD",
+  "url": "http://127.0.0.1:8771/audit-dashboard.html?v=run085-13fe4bbd#progress",
+  "pins": {
+    "audit_checkpoint_commit_before_reporting_commit": "cdf8721d339f770c176ebee7688868547885500a",
+    "audit_checkpoint_tree_before_reporting_commit": "b787f46e02a08a1d538ce7741af39d96763143a3",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "run_084_page_graph_sha256": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+    "run_084r_page_graph_review_sha256": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+    "run_084b_backend_semantic_sha256": "ff1bf008d6dd9d5d478b14328415a4c8187b6e09fa9e2ef57bea8daeec7de879",
+    "run_084br_backend_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63",
+    "run_084_designated_application_preflight_sha256": "5422f40ee5663b3d4765f81d8b298e6338f6d0bcb763c761e97b06afa0a5effd",
+    "run_085_reporting_generator_sha256": "5d8ed000d117725afb6e775f9630d4e04af6852f4ad8fb57f02e2998d9551dd7",
+    "run_085_reporting_receipt_sha256": "d07f39f8442ea137e999d62de2045ebd7d442831477e74da8bc42ba4f7949e5c",
+    "dashboard_generator_sha256": "31a5f4f0ae62f945377620c6d4ba011126555b9cf00c379eeae187837e5cda89",
+    "dashboard_html_sha256": "13fe4bbdc5dcfc45c7f1ba7d08e305abb8c549e3eb9b29832dc6eaab8af23717"
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "page_client_width": 1425,
+      "page_scroll_width": 1425,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "scrollable_table_wraps": 0,
+      "navigation_bounded": true,
+      "navigation_scrollable": false
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "page_client_width": 1265,
+      "page_scroll_width": 1265,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "scrollable_table_wraps": 0,
+      "navigation_bounded": true,
+      "navigation_scrollable": false
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "page_client_width": 1009,
+      "page_scroll_width": 1009,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "scrollable_table_wraps": 0,
+      "navigation_bounded": true,
+      "navigation_scrollable": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "page_client_width": 375,
+      "page_scroll_width": 375,
+      "page_level_horizontal_overflow": false,
+      "table_wraps": 9,
+      "unbounded_table_wraps": 0,
+      "scrollable_table_wraps": 9,
+      "navigation_bounded": true,
+      "navigation_scrollable": true,
+      "intentional_mobile_overflow": "Navigation and wide tables remain bounded by horizontally scrollable containers; the page itself does not overflow."
+    }
+  ],
+  "dom_and_link_checks": {
+    "anchor_elements": 281,
+    "unique_local_resource_links": 182,
+    "local_resource_paths_existing": 182,
+    "missing_local_resource_paths": 0,
+    "hash_anchor_links": 10,
+    "hash_anchor_targets_existing": 10,
+    "missing_hash_anchor_targets": 0,
+    "duplicate_ids": 0,
+    "console_warning_count": 0,
+    "console_error_count": 0
+  },
+  "visible_boundary_checks": {
+    "run_071_085_checkpoint_heading": true,
+    "run_083_historical_dashboard_go": true,
+    "run_084_signed_out_designated_application_preflight": true,
+    "full_page_tree_1058": true,
+    "production_partition_963_equals_711_plus_227_plus_25": true,
+    "backend_role_rows_1789": true,
+    "mapping_remains_0_of_340": true,
+    "no_completion_claim": true
+  },
+  "visual_review": {
+    "desktop_inspected": true,
+    "mobile_inspected": true,
+    "page_level_clipping_observed": false,
+    "unbounded_table_or_navigation_overflow_observed": false,
+    "temporary_viewport_override_reset": true,
+    "screenshots_persisted_to_repository": false
+  },
+  "attestation": {
+    "audit_artifact_only": true,
+    "application_routes_opened_for_this_verification": 0,
+    "application_state_changed": false,
+    "external_state_changed": false,
+    "credentials_read_or_entered": false,
+    "forms_submitted": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact_verification": true,
+    "application_browser_credit": false,
+    "responsive_application_credit": false,
+    "rendered_application_visual_credit": false,
+    "workflow_credit": false,
+    "finding_credit": false,
+    "runtime_credit": false,
+    "test_credit": false,
+    "release_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  }
+}

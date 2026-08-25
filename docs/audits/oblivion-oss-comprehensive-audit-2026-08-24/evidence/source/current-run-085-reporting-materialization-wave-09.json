@@ -1,0 +1,89 @@
+{
+  "schema_version": "run-085-reporting-materialization-wave-09-v1",
+  "run_id": "RUN-085-REPORTING-MATERIALIZATION",
+  "status": "CURRENT_PAGE_BACKEND_PREFLIGHT_REPORTING_REFRESHED_ZERO_DOWNSTREAM_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "generator_sha256": "5d8ed000d117725afb6e775f9630d4e04af6852f4ad8fb57f02e2998d9551dd7",
+    "backend_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63"
+  },
+  "inputs": {
+    "evidence/browser/current-audit-dashboard-verification-run-083-wave-08.json": "e0f7f40b3d49492368ff930d163f8d677bb52f93b848a09126ab12b97a9572ef",
+    "evidence/browser/current-designated-application-access-preflight-run-084-wave-09.json": "5422f40ee5663b3d4765f81d8b298e6338f6d0bcb763c761e97b06afa0a5effd",
+    "generators/build-full-inertia-page-graph-wave-09.py": "6917252a65c09cb894c0d275d00a770b0f451cb6ff26dc78fbfd2661d81c52e6",
+    "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+    "evidence/source/raw-run-084r-independent-full-inertia-page-graph-review-wave-09.json": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+    "generators/build-run-084b-backend-semantic-classification-wave-09.py": "6996e2e9ac957af2af921346cab07edbd797c7077014ddd2e1d39272141f4fc4",
+    "evidence/source/root-run-084b-backend-semantic-classification-wave-09.json": "ff1bf008d6dd9d5d478b14328415a4c8187b6e09fa9e2ef57bea8daeec7de879",
+    "evidence/source/raw-run-084br-independent-backend-semantic-classification-review-wave-09.json": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63"
+  },
+  "outputs": {
+    "00-executive-summary.md": "1f28efae63107d7c872611ec55147d7a1af5ccac90af474de3e522433f382651",
+    "01-repository-module-map.md": "60198fc16c70f2f52da487a6b59f1bfc153a6fc80973821bd6e906d8eac2ff60",
+    "09-ui-ux-accessibility-visual-consistency.md": "27fa04e15cbd0eedb92514835884d0344db09f279a2295cea94ae0d1071a6e7c",
+    "13-unresolved-questions-and-evidence-gaps.md": "6f4b7ddf5b7bc296bb7c04f4f23bf8d09e197675ac73bc9c1ceec3ba2db7c792",
+    "findings.json": "eb06c23b7940d3602f9b34fa7dc68da828e54b81236ea037a9d06edeff949e46",
+    "generators/build-current-audit-dashboard.py": "31a5f4f0ae62f945377620c6d4ba011126555b9cf00c379eeae187837e5cda89"
+  },
+  "preserved": {
+    "02-eight-pass-coverage-ledger.csv": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+    "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "04-workflow-usability-scorecard.csv": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+    "05-browser-visual-coverage-matrix.csv": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "06-open-source-benchmark-register.csv": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "07-module-findings.md": "5a8de7d5c9e181d8da0425e7f040e8744dd85cbfda16573ef824ce3219f85712",
+    "08-cross-module-journeys.md": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+    "11-prioritised-roadmap.md": "e5c2f41bf98d3415de97d18d853f1d7c351b337ba544fbf8c81330ec63dcf02d",
+    "12-native-build-and-do-not-copy-register.md": "44ae85422a6863d4804fec7d495107b9bdc937257f023767fb306ccd755e137a",
+    "inventory.json": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa"
+  },
+  "counts": {
+    "prompt_required_paths_present": 18,
+    "full_page_tree_files": 1058,
+    "production_tsx": 963,
+    "literal_rendered_roots": 711,
+    "imported_support_components": 227,
+    "adjudicated_unrendered_unimported_non_roots": 25,
+    "backend_role_rows": 1789,
+    "backend_unique_paths": 1755,
+    "backend_whole_file_semantically_reviewed": 0,
+    "canonical_features": 340,
+    "feature_mappings": 0,
+    "provisional_finding_records": 12,
+    "final_findings": 0,
+    "current_signed_in_application_routes_observed": 0
+  },
+  "checks": {
+    "run_083_dashboard_verification_preserved_as_exact_history": true,
+    "run_084_page_graph_independent_review_go": true,
+    "run_084_backend_independent_review_go": true,
+    "run_084_designated_application_session_signed_out": true,
+    "historical_25_path_wording_explicitly_superseded_without_rewriting_history": true,
+    "provisional_finding_records_byte_semantics_preserved": true,
+    "matrix_byte_identical": true,
+    "dashboard_requires_fresh_run_085_verification": true,
+    "application_source_paths_written": 0
+  },
+  "credit_boundary": {
+    "feature_mapping": false,
+    "benchmark_mapping": false,
+    "final_no_match": false,
+    "framework_reachability": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "executed_tests": false,
+    "application_browser": false,
+    "workflow_or_ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}

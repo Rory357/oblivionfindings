@@ -37,6 +37,12 @@ The retained RUN-078 evidence-gap denominators are unchanged: 3,003 route-like r
 
 All 38/38 route PHP files have a literal static registration path, but no Laravel route table, build, test, or application browser lane was executed. RUN-082R independently reproduces the candidate relations and static registration closure with zero discrepancies and returns GO limited to candidate-only static evidence. It awards 0 feature mappings and 0 downstream credit; the matrix remains `dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390`.
 
+## RUN-084/R/B/BR full page-tree and backend role overlay
+
+The independently reviewed current page-tree census contains 1,058 physical files: 1,007 TSX and 51 TS. The 963 production TSX paths partition exactly as 711 literal rendered roots, 227 imported supports, and 25 adjudicated unrendered/unimported non-roots. This current boundary explicitly supersedes older “resolver-imported” wording for the 25-path cohort while preserving the historical evidence bytes. Page/import structure and support-owner relations remain static candidates only; no FEATURE-ID inheritance is permitted.
+
+The independently reviewed backend structural ledger contains 1,789 overlapping role rows over 1,755 unique paths: 782 models, 75 policies, 735 services, 126 jobs, 14 events, 12 listeners, 45 outbox-related rows, and 197 async role rows over 189 paths. Every role row is classified `Evidence gap`, and whole-file semantic review remains 0. These denominators establish inspectable source queues only; canonical ownership, action/Site/privacy semantics, runtime, tests, feature mapping, benchmark mapping, findings, Pass, and completion remain open.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |

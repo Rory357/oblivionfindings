@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-084-DESIGNATED-APPLICATION-ACCESS-PREFLIGHT",
+  "status": "BLOCKED_AUTHENTICATION_AND_BUILD_ATTRIBUTION_CONTINUE_STATIC_AUDIT",
+  "observed_at": "2026-08-25T14:39:21.0788553+12:00",
+  "pins": {
+    "audit_checkpoint_commit": "cdf8721d339f770c176ebee7688868547885500a",
+    "audit_checkpoint_tree": "b787f46e02a08a1d538ce7741af39d96763143a3",
+    "application_source_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_source_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "root_agents_sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"
+  },
+  "target": {
+    "owner_designated_url": "https://oblivionfindings.com",
+    "environment_classification": "NOT_INDEPENDENTLY_PROVEN_NON_PRODUCTION",
+    "visible_environment_or_build_marker": "NOT_PRESENT",
+    "deployed_commit_or_release": "NOT_PRESENT",
+    "observed_asset_basename": "app-DpCHbvaC.js",
+    "asset_to_application_source_commit_attribution": false
+  },
+  "safe_browser_observations": [
+    {
+      "claim_label": "Observed",
+      "url": "https://oblivionfindings.com/",
+      "state": "PUBLIC_MARKETING_HOME",
+      "viewport": "1280x720",
+      "authentication_state": "PUBLIC",
+      "evidence": "Rendered DOM exposed the public Oblivion Findings marketing navigation and content. No private application record or signed-in surface was opened.",
+      "screenshot_retained": false,
+      "application_browser_credit": false
+    },
+    {
+      "claim_label": "Observed",
+      "url": "https://oblivionfindings.com/login",
+      "state": "SIGNED_OUT_LOGIN_FORM",
+      "viewport": "1280x720",
+      "authentication_state": "NOT_AUTHENTICATED",
+      "evidence": "The rendered page showed the login heading, email and password fields, remember-me control, login action, and Microsoft/Google alternatives. No value was entered and no form was submitted.",
+      "page_scroll_width": 1280,
+      "page_client_width": 1280,
+      "page_level_horizontal_overflow": false,
+      "console_warning_count": 0,
+      "console_error_count": 0,
+      "screenshot_retained": false,
+      "application_browser_credit": false
+    }
+  ],
+  "access_preflight": {
+    "current_browser_session_authenticated": false,
+    "approved_browser_username_secret_present": false,
+    "approved_browser_password_secret_present": false,
+    "approved_ssh_username_secret_present": false,
+    "approved_ssh_password_secret_present": false,
+    "representative_roles_established": false,
+    "approved_site_scope_established": false,
+    "synthetic_resettable_fixtures_established": false,
+    "non_production_status_proved": false,
+    "deployed_build_identity_proved": false
+  },
+  "blocked_claims": [
+    {
+      "claim_label": "Blocked",
+      "scope": "SIGNED_IN_APPLICATION_ROUTES",
+      "reason": "The current controlled browser session reaches the login form and has no authenticated application session or approved runtime credential inputs."
+    },
+    {
+      "claim_label": "Blocked",
+      "scope": "CURRENT_SOURCE_BROWSER_ATTRIBUTION",
+      "reason": "No visible environment/build marker, deployed commit, reproducible release identifier, or exact asset-to-source proof was available."
+    },
+    {
+      "claim_label": "Not safely reproducible",
+      "scope": "MUTATING_OR_SENSITIVE_WORKFLOWS",
+      "reason": "Representative demo roles, approved Sites, resettable synthetic records, and exact cleanup boundaries are not established."
+    }
+  ],
+  "mutation_attestation": {
+    "navigation_only": true,
+    "credentials_read_or_entered": false,
+    "forms_submitted": false,
+    "meaningful_filters_changed": false,
+    "records_opened": false,
+    "sensitive_values_captured": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false
+  },
+  "credit_boundary": {
+    "public_page_observation": true,
+    "login_page_observation": true,
+    "non_production_environment_proof": false,
+    "deployed_build_attribution": false,
+    "signed_in_application_browser": false,
+    "representative_role_or_site_coverage": false,
+    "route_or_feature_browser_coverage": false,
+    "responsive_family_or_journey_coverage": false,
+    "workflow_or_ease_credit": false,
+    "runtime_credit": false,
+    "test_credit": false,
+    "pass_credit": false,
+    "completion_credit": false,
+    "audit_complete": false
+  },
+  "minimum_future_input": "A manually signed-in browser session using the documented demo administrator account, plus authoritative confirmation or a visible marker that the target is non-production and an exact deployed commit/release identifier. Representative roles, approved Sites, synthetic resettable records, and cleanup boundaries remain separately required before sensitive or mutating journey execution.",
+  "attestation": "This receipt records only a non-mutating public/login access preflight. It does not inherit the user's earlier session, attribute the deployment to the audited source, or award signed-in application-browser, route, workflow, ease, runtime, test, Pass, release, or completion credit."
+}
