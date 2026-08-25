@@ -1,0 +1,145 @@
+{
+  "schema_version": "run-108-audit-dashboard-verification-wave-14-v1",
+  "run_id": "RUN-108-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "checkpoint_commit": "7d488c2c84659f1b3896cbf73333d33b65d96b03",
+    "checkpoint_tree": "a0c4dd95029692fea1a366130d6e2e1f1f17a3cc",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "dashboard_html_sha256": "f8da66612ea5680740a237fcd09f9752ae85ae843c747c1927a10acba89a3b0f",
+    "dashboard_generator_sha256": "8cb5eafa53dab3f781d5eed85a8074303c2ac083e4ee5480233fa25ec40aabd0",
+    "reporting_materializer_sha256": "4e0cc512006312207755fea09cbb09a9e702878157daddcb4283eceea08d5e8e",
+    "reporting_receipt_sha256": "83e52ffb239fcd8fdff72eb02fba1a96258659f4b7e891275227adca4f85aea2",
+    "review_overlay_receipt_sha256": "9c1600d2365c3527e185f313b7cb1586705f39cefb15d5d212dc708b45b630ea",
+    "independent_overlay_review_sha256": "4a3252a37d03a609cdf69a4f0a56b41e120d3ba2314dede88317de9c50bfd9e4",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser with viewport capability, semantic DOM inspection, visual inspection, navigation exercise, and local target existence checks",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-f8da66612ea5#progress",
+      "exact_dashboard_loaded": true,
+      "response_status": 200,
+      "response_bytes": 133109,
+      "cachebuster": "main-f8da66612ea5",
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": true,
+      "screenshot_retained": false,
+      "navigation_only": true,
+      "application_or_external_state_changed": false
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual": "1440x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual": "1280x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual": "1024x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "390x844",
+        "actual": "390x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0
+      }
+    ],
+    "viewports_verified": 4,
+    "viewports_required": 4,
+    "anchor_elements": 380,
+    "local_link_occurrences": 370,
+    "unique_local_links": "231/231",
+    "local_link_failures": [],
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "navigation_targets": "10/10",
+    "navigation_links_exercised": [
+      "#gaps",
+      "#progress"
+    ],
+    "missing_navigation_targets": [],
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "artifact_authored_ids": 10,
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_boundary_checks": {
+      "cumulative_source_owner_records_612": true,
+      "route_page_split_265_347": true,
+      "distinct_feature_ids_256": true,
+      "reviewed_page_candidates_24_as_20_owners_3_shared_1_gap": true,
+      "page_partition_711_as_347_owner_5_shared_359_residual": true,
+      "controller_action_bridges_53_unchanged": true,
+      "current_queue_accounting_507_total_59_reviewed_54_owned_2_shared_3_alias_448_unreviewed_453_without_ownership": true,
+      "bounded_residual_3317": true,
+      "one_operating_organisation_across_multiple_sites": true,
+      "site_permission_privacy_direct_object_lifecycle_boundaries_unproved": true,
+      "gate_4_open": true,
+      "completion_credit_zero": true,
+      "matrix_mapping_remains_0_of_340": true
+    }
+  },
+  "mutation_attestation": {
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false,
+    "audit_artifact_only": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
