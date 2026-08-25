@@ -1,0 +1,129 @@
+{
+  "schema_version": "run-094-audit-dashboard-verification-wave-11-v2",
+  "run_id": "RUN-094-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "checkpoint_commit": "786a2e2f8ab21142d0cb93bd9f5ceb1bf1aa6bb5",
+    "checkpoint_tree": "a1b32e32ef254a07016990051ed30eb28fdf8b9e",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "dashboard_html_sha256": "28d5171acca058824f6e20145c68cf5cc983542884f43c3903a63284722818bc",
+    "dashboard_generator_sha256": "94d08b89f7fb066a506a2a35230d813f3b270508cdda010e8d479cc070872d84",
+    "reporting_materializer_sha256": "1abd297628af26da886fcd6f95fc117d1ab4a719bebf5f1c1bd9b7499c9f47f1",
+    "reporting_receipt_sha256": "3b9a694f1c127b49cedee7979681baff985adb1aec859deff10b99c5e07d85ae",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "exact_dashboard_loaded": true,
+      "cachebuster": "main-28d5171acca0",
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": false,
+      "screenshot_retained": false,
+      "console_error_log_entries": null,
+      "console_log_boundary": "Exact post-correction console credit comes from the four Playwright contexts below; in-app console entries were not separately retrieved after the correction.",
+      "viewport_override_boundary": "The in-app viewport capability reported the same actual size for multiple requested breakpoints, so it was not used for exact responsive-size credit."
+    },
+    "exact_viewport_fallback": {
+      "tool": "bundled Playwright browser runtime",
+      "reason": "The in-app viewport control did not report the requested exact sizes, so the same bundled Playwright browser API was used from a temporary local verification script that was deleted immediately after execution; no screenshots were retained.",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-28d5171acca0#progress",
+      "navigation_only": true,
+      "application_or_external_state_changed": false
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual": "1440x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual": "1280x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual": "1024x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "390x844",
+        "actual": "390x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0
+      }
+    ],
+    "viewports_verified": 4,
+    "viewports_required": 4,
+    "local_links": "200/200",
+    "local_link_failures": [],
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "missing_navigation_targets": [],
+    "duplicate_ids": 0,
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_boundary_checks": {
+      "run_086_baseline_counts_530_212_318_235": true,
+      "run_078_baseline_route_decision_label": true,
+      "run_079_baseline_page_decision_label": true,
+      "cumulative_source_owner_records_548": true,
+      "route_page_split_221_327": true,
+      "distinct_feature_ids_239": true,
+      "controller_action_bridges_9": true,
+      "shared_relations_2": true,
+      "current_queue_accounting_10_owned_2_shared_495_unreviewed_497_without_ownership": true,
+      "bounded_residual_3381": true,
+      "two_part_review_method": true,
+      "gate_4_open": true,
+      "completion_credit_zero": true,
+      "rejected_all_11_projection_absent": true
+    }
+  },
+  "mutation_attestation": {
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false,
+    "audit_artifact_only": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}

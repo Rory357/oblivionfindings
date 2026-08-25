@@ -25,7 +25,13 @@
     "run_084br_backend_semantic_independent_review_sha256": "9329910ce16af47586ed022c797ce2552bbaa769434b05aa9e077b28b913fd63",
     "run_086_static_source_feature_ownership_generator_sha256": "d6933ea5d4078cc8de459552d43a471d57974cb271977654fdb4d8866b387567",
     "run_086_static_source_feature_ownership_ledger_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
-    "run_086r_static_source_feature_ownership_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699"
+    "run_086r_static_source_feature_ownership_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+    "run_089_designated_application_preflight_sha256": "d9c47be6e4f7f2c1f179548321d674c104d56b94f6920d8c9256b0727369e3f8",
+    "run_090_direct_exact_review_queue_sha256": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+    "run_091_closed_chain_cohort_sha256": "7b1fea57104e9f4bfea7ee450ef535ac57e7fa69bc978212b4eafb0fe1ed0cae",
+    "run_091r_closed_chain_review_sha256": "fb88ca666bc9f91298ab33fefa1dadbb39a4a612215fca814932f59bfc2f199b",
+    "run_092_reviewed_ownership_overlay_sha256": "5390e55d9e47d1845afa8b3848bdab7687747cbb62c946dd4d66d3c435e8de0b",
+    "run_092r_reviewed_ownership_overlay_review_sha256": "1111d30aa24935116c37f27bead824ca1bcca7444157e456d959e821af00669a"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -83,10 +89,15 @@
     "backend_semantic_async_role_rows": 197,
     "backend_semantic_async_unique_paths": 189,
     "backend_whole_file_semantically_reviewed": 0,
-    "static_source_feature_ownership_records": 530,
-    "static_source_feature_ownership_route_records": 212,
-    "static_source_feature_ownership_page_records": 318,
-    "static_source_feature_ownership_distinct_feature_ids": 235
+    "static_source_feature_ownership_records": 548,
+    "static_source_feature_ownership_route_records": 221,
+    "static_source_feature_ownership_page_records": 327,
+    "static_source_feature_ownership_distinct_feature_ids": 239,
+    "static_controller_action_bridges": 9,
+    "bounded_static_source_ownership_percent": "13.947569",
+    "bounded_static_source_residual_records": 3381,
+    "direct_exact_queue_records": 507,
+    "direct_exact_queue_pending_unreviewed": 495
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {
@@ -2453,20 +2464,18 @@
     }
   },
   "current_designated_application_access_preflight": {
-    "run_id": "RUN-084-DESIGNATED-APPLICATION-ACCESS-PREFLIGHT",
+    "run_id": "RUN-089-DESIGNATED-APPLICATION-ACCESS-PREFLIGHT",
     "status": "BLOCKED_AUTHENTICATION_AND_BUILD_ATTRIBUTION_CONTINUE_STATIC_AUDIT",
     "observed_states": [
-      "PUBLIC_MARKETING_HOME",
+      "PUBLIC_HOME",
       "SIGNED_OUT_LOGIN_FORM"
     ],
     "current_browser_session_authenticated": false,
+    "earlier_user_login_persisted_in_controlled_tab": false,
     "visible_environment_or_build_marker": "NOT_PRESENT",
     "credentials_read_or_entered": false,
     "forms_submitted": false,
     "screenshots_retained": false,
-    "page_level_horizontal_overflow": false,
-    "console_warning_count": 0,
-    "console_error_count": 0,
     "application_browser_credit": false,
     "runtime_credit": false,
     "test_credit": false,
@@ -2529,37 +2538,66 @@
     "completion_credit": false
   },
   "current_static_source_feature_ownership": {
-    "run_id": "RUN-086-REVIEWED-STATIC-ROUTE-PAGE-FEATURE-OWNERSHIP-WAVE-10",
-    "review_run_id": "RUN-086R-INDEPENDENT-REVIEWED-STATIC-ROUTE-PAGE-FEATURE-OWNERSHIP",
-    "status": "GO_STATIC_SOURCE_FEATURE_OWNERSHIP_ONLY",
-    "ledger_records": 530,
-    "route_records": 212,
-    "page_records": 318,
-    "distinct_feature_ids": 235,
-    "ledger_sha256": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
-    "independent_review_sha256": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+    "run_id": "RUN-092-REVIEWED-STATIC-SOURCE-OWNERSHIP-OVERLAY-WAVE-11",
+    "review_run_id": "RUN-092R-INDEPENDENT-REVIEWED-STATIC-SOURCE-OWNERSHIP-OVERLAY",
+    "status": "GO_REVIEWED_BOUNDED_STATIC_SOURCE_OWNERSHIP_AND_ACTION_BRIDGES_ONLY",
+    "baseline_records": 530,
+    "overlay_source_records": 18,
+    "owner_chains_added": 9,
+    "shared_relation_chains_retained_unowned": 2,
+    "source_owner_records": 548,
+    "route_owner_records": 221,
+    "page_owner_records": 327,
+    "distinct_feature_ids": 239,
+    "static_controller_action_bridges": 9,
+    "bounded_denominator": 3929,
+    "bounded_ownership_percent": "13.947569",
+    "bounded_residual_records": 3381,
+    "queue_accounting": {
+      "direct_exact_queue_records": 507,
+      "reviewed_queue_surface_rows": 12,
+      "owner_queue_surface_rows": 10,
+      "shared_queue_surface_rows": 2,
+      "pending_unreviewed_queue_surface_rows": 495,
+      "queue_surfaces_without_ownership": 497,
+      "auxiliary_chain_page_rows_reviewed": 10,
+      "wholesale_queue_ownership_authorized": false
+    },
     "independent_review_discrepancies": 0,
     "gate_4": {
       "status": "PARTIAL_BOUNDED_STATIC_SOURCE_OWNERSHIP_INCOMPLETE",
-      "static_records": 530,
-      "canonical_route_page_denominator": null,
       "complete": false
     },
     "credit_boundary": {
       "STATIC_SOURCE_FEATURE_OWNERSHIP": true,
-      "feature_mapping_complete": false,
+      "STATIC_CONTROLLER_ACTION_BRIDGE": true,
+      "two_shared_relations_as_one_to_one_ownership": false,
+      "wholesale_507_queue_ownership": false,
+      "complete_route_page_feature_crosswalk": false,
       "framework_route_reachability": false,
+      "navigation": false,
       "runtime": false,
       "database": false,
       "build": false,
       "application_browser": false,
       "executed_tests": false,
-      "benchmark_mapping": false,
+      "benchmark": false,
       "ease": false,
       "pass": false,
       "final_finding": false,
       "completion": false,
       "audit_complete": false
     }
+  },
+  "current_direct_exact_route_page_review_queue": {
+    "run_id": "RUN-090-DIRECT-EXACT-ROUTE-PAGE-REVIEW-QUEUE-WAVE-11",
+    "status": "CANDIDATE_QUEUE_PARTIALLY_REVIEWED_NO_WHOLESALE_OWNERSHIP_CREDIT",
+    "records": 507,
+    "reviewed_queue_surfaces": 12,
+    "owned_queue_surfaces": 10,
+    "shared_queue_surfaces": 2,
+    "pending_unreviewed": 495,
+    "without_ownership": 497,
+    "wholesale_ownership_authorized": false
   }
 }

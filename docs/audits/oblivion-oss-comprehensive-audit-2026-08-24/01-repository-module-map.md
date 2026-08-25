@@ -49,6 +49,14 @@ RUN-086/R independently establishes 530 one-to-one static source-owner records: 
 
 This ledger is a bounded source subset, not an all-route/all-page crosswalk. `FEATURE-ID` ownership must not be inherited through support imports, route-group prefixes, controller containment, whole-file symbols, names, presence, or candidate overlap. The framework-expanded route/page denominator, reachability, Site/permission/privacy behaviour, runtime, browser, test, benchmark, Pass, finding, and completion evidence all remain open.
 
+## RUN-090–092 direct-exact queue and reviewed owner-chain overlay
+
+RUN-090 freezes 507 zero-credit direct-exact candidate surfaces: 504 routes and 3 pages across 79 candidate FEATURE-IDs. It deliberately selects no disjoint, partial, or shared relation and grants no ownership. RUN-091 then closes controller resolution, exact method containment, sole literal render, page identity, and singleton matrix projection for 11 high-confidence chains.
+
+Complete semantic review accepts nine chains and excludes two shared chains. RUN-092 adds 9 route owners, 9 page owners, and 9 controller-action bridges with immutable source/blob/content/method-slice and row digests. The combined bounded overlay is 548 owner records (221 route + 327 page) across 239 FEATURE-IDs; four feature IDs are new to the prior 235-ID owner set. The route and page owner sets span 36 and 234 FEATURE-IDs respectively, with 31 in their overlap.
+
+The two excluded chains remain explicit `SHARED_RELATION` records: the Milesight connection/settings page also implements provider-sync behaviour, and the resource-calendar connection/settings page also implements calendar-sync behaviour. The queue remains 495 rows unreviewed and 497 rows without ownership. These closed-chain bridges do not imply framework reachability, navigation, runtime, build, Site/permission/privacy correctness, tests, mapping completeness, benchmark equivalence, findings, Passes, or completion.
+
 ## Candidate register
 
 | # | ID | Module | Class | User job | Canonical owner |

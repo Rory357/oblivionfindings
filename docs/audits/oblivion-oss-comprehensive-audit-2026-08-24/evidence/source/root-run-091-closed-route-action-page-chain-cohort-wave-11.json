@@ -1,0 +1,1510 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "RUN-091-CLOSED-ROUTE-ACTION-PAGE-CHAIN-COHORT-WAVE-11",
+  "status": "STATIC_CANDIDATE_COHORT_COMPLETE_PENDING_THREE_FRESH_REVIEWS_ZERO_CREDIT",
+  "generated_on": "2026-08-25",
+  "pins": {
+    "checkpoint_commit": "786a2e2f8ab21142d0cb93bd9f5ceb1bf1aa6bb5",
+    "checkpoint_tree": "a1b32e32ef254a07016990051ed30eb28fdf8b9e",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "generator": "generators/build-closed-route-action-page-chain-cohort-wave-11.py",
+    "generator_sha256": "68c47e238fa0ab11971b867bebe56ca8b5ffe93429ef0d2a026881d55f29d9a9",
+    "inputs": {
+      "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+      "evidence/source/current-route-page-classification-wave-07.json": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+      "evidence/source/root-run-082-exact-owner-containment-candidate-manifest-wave-08.json": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
+      "evidence/source/raw-run-082r-independent-exact-owner-containment-review-wave-08.json": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396",
+      "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+      "evidence/source/raw-run-084r-independent-full-inertia-page-graph-review-wave-09.json": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+      "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+      "evidence/source/raw-run-086r-independent-reviewed-static-route-page-feature-ownership-wave-10.json": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5"
+    }
+  },
+  "architecture_rule": "Oblivion Findings is one operating organisation with multiple Sites. Static chain ownership does not establish permission, approved-Site reach, direct-object concealment, privacy, lifecycle, runtime, or release correctness.",
+  "selection_contract": {
+    "rule": "Select RUN-078 explicit-unmapped routes where RUN-082 exact route-name and exact unique controller-method lanes are identical singletons; require that method slice to contain exactly one literal RUN-077 rendered unresolved page whose RUN-082 candidate union is the same singleton FEATURE-ID and whose RUN-084 partition is LITERAL_RENDERED_PAGE_ROOT.",
+    "required_page_relations": [
+      "RENDER_OWNER_ONLY",
+      "BOTH_LANES_IDENTICAL"
+    ],
+    "prohibited_inheritance": [
+      "route group prefix",
+      "adjacency",
+      "import",
+      "controller or directory containment",
+      "render ownership without exact action closure",
+      "page or file presence",
+      "navigation",
+      "middleware",
+      "prior credit"
+    ],
+    "semantic_boundary": "Exact static closure creates a bounded review cohort only. Reviewers must read every complete route statement, controller-method slice, page root, and canonical user job before deciding."
+  },
+  "counts": {
+    "chains": 11,
+    "route_records": 11,
+    "page_records": 11,
+    "controller_actions": 11,
+    "controller_action_bridge_candidates": 11,
+    "distinct_feature_ids": 9,
+    "distinct_H_feature_ids": 9,
+    "distinct_D_feature_ids": 0,
+    "page_relations": {
+      "RENDER_OWNER_ONLY": 10,
+      "BOTH_LANES_IDENTICAL": 1
+    },
+    "queue_overlap_surface_rows": 12,
+    "queue_only_surface_rows": 495,
+    "auxiliary_chain_page_rows": 10,
+    "queue_chain_union_surface_rows": 517,
+    "ownership_credit_awarded": 0,
+    "framework_routes_executed": 0,
+    "runtime_credit": 0,
+    "build_credit": 0,
+    "application_browser_credit": 0,
+    "executed_test_credit": 0,
+    "benchmark_credit": 0,
+    "pass_credit": 0,
+    "completion_credit": 0
+  },
+  "identity": {
+    "route_record_id_list_sha256": "a54901d758b2b40afc4071c90248fdaab3229175e7034f07065025fb4aa0d159",
+    "page_record_id_list_sha256": "a0608b327322ceb6915c62c60767444c26b3e4a77871192d630bc549f18de100",
+    "feature_id_list_sha256": "f0d27f9c01e639eb51d7674a6bffe4dcdd1bfdf6adbd43a7ba404df99715f139",
+    "chain_key_list_sha256": "d58a680e353b2cbcaef732f020660e525e08858627398280d3e4d58da3d8eedd",
+    "queue_overlap_surface_key_list_sha256": "c2313a4be481c8d20b9baf873caebef68c1e8f1873dac66d1f99dca0c1cd348f",
+    "queue_chain_union_surface_key_list_sha256": "a34d9af69ca61c41ffb63cea031674030c21cdd612b5dcd55daf9cc7320a2a0d",
+    "chain_record_sha256_list_sha256": "ead43cf5072fbc9691e4ea2ae5911e9bdc5eb39d9bbb2c54c53925511ecbc184",
+    "records_sha256": "ed36ce99c7950ba85a4d3a6a787fac7ad2bd4843058707ee2110c11c642e16c2"
+  },
+  "review_partitions": [
+    {
+      "partition_id": "A",
+      "assignment_rule": "int(SHA256(chain_key), 16) mod 3; 0=A, 1=B, 2=C",
+      "chain_count": 4,
+      "chain_key_list_sha256": "01f178919158f2b208c3c0687fefc0e4617bbecea8d105613ac577fb203695c3",
+      "chain_record_sha256_list_sha256": "20afb72c3054f83720e9c2916c4e2155b9ecf3b32ee63963d077ae09cbbc6283",
+      "review_status": "PENDING"
+    },
+    {
+      "partition_id": "B",
+      "assignment_rule": "int(SHA256(chain_key), 16) mod 3; 0=A, 1=B, 2=C",
+      "chain_count": 2,
+      "chain_key_list_sha256": "aed06c3636befacfe75ba20f0ece6d824d8fbd3c726ee3b0f3fabda9d8b680fe",
+      "chain_record_sha256_list_sha256": "887f940d471d4fc228ebb4ef860dcb5db8d270df1af0b233b95797ceed7bfa15",
+      "review_status": "PENDING"
+    },
+    {
+      "partition_id": "C",
+      "assignment_rule": "int(SHA256(chain_key), 16) mod 3; 0=A, 1=B, 2=C",
+      "chain_count": 5,
+      "chain_key_list_sha256": "3a2069025dfeced7d8c620610b86a9ab4f87835fe2023494daad47b6d873e102",
+      "chain_record_sha256_list_sha256": "8d0d99a8c7a4f954bd59704a3e2f6791d566b671c49ee5c1625c744cafe969a3",
+      "review_status": "PENDING"
+    }
+  ],
+  "records": [
+    {
+      "chain_id": "RUN091-CHAIN-01",
+      "chain_key": "RUN077-ROUTE-0174|PAGE-ROOT-2FD318D39C396BAD|CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+      "review_partition": "C",
+      "candidate_feature_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0174",
+        "original_partition": "A",
+        "route_file": "routes/compliance.php",
+        "route_file_sha256": "66455e9b6f409f76126541ecf36dafec6f89921b804a25127a4f1616f3f56fe0",
+        "route_file_blob_id": "00b8a1b55ad20a4a0e931459f4a6d5bd2e774cda",
+        "source_key": "routes/compliance.php:16:5:get:1",
+        "source_anchor": "routes/compliance.php:16",
+        "route_method": "get",
+        "literal_uri": "/compliance",
+        "literal_route_name": "compliance.index",
+        "action_expression": "[ComplianceDashboardController::class, 'index']",
+        "statement_excerpt": "Route::get('/compliance', [ComplianceDashboardController::class, 'index']) ->middleware('permission:compliance.view') ->name('compliance.index');",
+        "statement_sha256": "2523e1d9ce2cc14b27f2eb6d7a249cfd8fec00debc1ea3ec303a88a216e8a5af",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-COMP-EXCEPTION-COMMAND-CENTRE"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-COMP-EXCEPTION-COMMAND-CENTRE"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\Compliance\\ComplianceDashboardController",
+        "controller_file": "app/Http/Controllers/Compliance/ComplianceDashboardController.php",
+        "controller_file_sha256": "7e79b126491996603024a03c676a862143e92730dd336dcc3c7a0856e0c6831b",
+        "controller_file_blob_id": "c7f75e49a91b48f120aecb0ff1bfe7dfde270940",
+        "method": "index",
+        "definition_line": 24,
+        "definition_anchor": "app/Http/Controllers/Compliance/ComplianceDashboardController.php:24",
+        "method_review_slice": {
+          "start_line": 24,
+          "end_line": 91,
+          "next_method_definition_line": null,
+          "line_count": 68,
+          "text": "    public function index(Request $request)\n    {\n        $user = $request->user();\n        abort_unless($user && $user->canDo('compliance.view'), 403);\n\n        $period = $this->metrics->normalisePeriod($request->query('period'));\n\n        $canManage = $user->canDo('governance.compliance.manage');\n        $canViewControlRoom = $user->canDo('controlRoom.viewAny');\n        $canTriage = $canViewControlRoom && $user->canDo('controlRoom.alerts.manage');\n\n        $owners = User::query()->orderBy('name')->limit(200);\n        $this->siteAccess->applyStaffScope($owners, $user, self::STAFF_SITE_BYPASS_PERMISSIONS);\n\n        $relatedIncidents = ClientIncident::query()->latest()->limit(50);\n        $this->siteAccess->applyClientIncidentScope(\n            $relatedIncidents,\n            $user,\n            self::INCIDENT_SITE_BYPASS_PERMISSIONS,\n        );\n\n        return inertia('compliance/index', [\n            'period' => $period,\n            'kpis' => $this->metrics->exceptionKpis($user, $period),\n            'whatsDue' => $this->metrics->whatsDue($user),\n            'controlRoom' => $this->metrics->controlRoomSummary($user),\n            'charts' => $this->metrics->trends($user, $period),\n            'can' => [\n                'manage' => $canManage,\n                'triage' => $canTriage,\n                'viewControlRoom' => $canViewControlRoom,\n                'viewAudit' => $user->canDo('audit.viewAny'),\n                'viewReports' => $user->canDo('reports.viewAny'),\n            ],\n            // Reference data for the create/record/respond wizards — only sent to users\n            // who can actually manage obligations (the wizards are manage-gated).\n            'frameworks' => collect(ComplianceObligation::frameworkOptions())\n                ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])\n                ->values(),\n            'owners' => $canManage\n                ? $owners->get(['id', 'name'])\n                : [],\n            'obligations' => $canManage\n                ? ComplianceObligation::query()\n                    ->where('status', '!=', 'complete')\n                    ->orderBy('due_date')\n                    ->limit(100)\n                    ->get()\n                    ->map(fn (ComplianceObligation $o) => [\n                        'id' => $o->id,\n                        'title' => $o->obligation_title,\n                        'framework' => $o->getFrameworkLabel(),\n                        'due_date' => $o->due_date?->toDateString(),\n                    ])\n                    ->values()\n                : [],\n            'relatedIncidents' => $canManage\n                ? $relatedIncidents\n                    ->get()\n                    ->map(fn (ClientIncident $i) => [\n                        'id' => $i->id,\n                        'label' => $i->title ?? \"Incident #{$i->id}\",\n                    ])\n                    ->values()\n                : [],\n        ]);\n    }\n}",
+          "text_sha256": "c5a039265a82990d70282f1c510b37e449cd865e11b5055581611f81b46405dd"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/Compliance/ComplianceDashboardController.php:45",
+        "render_syntax": "inertia('compliance/index', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-2FD318D39C396BAD",
+        "original_partition": "A",
+        "page_file": "resources/js/pages/compliance/index.tsx",
+        "page_file_sha256": "1c8cfe96e707e294a6d1a683b056c52945e2b45e6df7cb4d2824b59741b8bd53",
+        "page_file_blob_id": "f16f27bfcbc4d6d461f14564600e6d4f14321206",
+        "render_names": [
+          "compliance/index"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "compliance/index",
+          "page_file": "resources/js/pages/compliance/index.tsx",
+          "source_file": "app/Http/Controllers/Compliance/ComplianceDashboardController.php",
+          "source_file_sha256": "7e79b126491996603024a03c676a862143e92730dd336dcc3c7a0856e0c6831b",
+          "source_file_blob_id": "c7f75e49a91b48f120aecb0ff1bfe7dfde270940",
+          "source_line": 45,
+          "source_column": 16,
+          "start_byte": 1586,
+          "source_anchor": "app/Http/Controllers/Compliance/ComplianceDashboardController.php:45",
+          "call_kind": "inertia",
+          "syntax": "inertia('compliance/index', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-COMP-EXCEPTION-COMMAND-CENTRE"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/compliance/index.tsx",
+          "app/Http/Controllers/Compliance/ComplianceDashboardController.php:45"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-COMP-EXCEPTION-COMMAND-CENTRE",
+        "feature_class": "H",
+        "module": "Compliance",
+        "user_job": "Review Site-scoped compliance exceptions, due work, and triage",
+        "route_names": "compliance.index",
+        "route_paths": "routes/compliance.php:15-18",
+        "page_files": "resources/js/pages/compliance/index.tsx:397-420",
+        "backend_anchors": "app/Http/Controllers/Compliance/ComplianceDashboardController.php:24-89",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "a4226fad794c807036e5e94a315a73e94ba71cae509a7c1298797b81f54444f9",
+        "page_candidate_sha256": "134f746ccf085527e6420d3a9b12c73b636c39eaabfc759a7a133c46fadf3c80",
+        "route_manifest_sha256": "5be6438bf4605a7cee4fbda0c082a90ab4739c8d90b4f11b2df3f5a299bf55e1",
+        "page_manifest_sha256": "0dba7c8a0d7f8a159442ddb0e27f0e13af71abf2d279c7e69fa47ce60d5ff8ce",
+        "page_graph_sha256": "359567ba939771ef37e12d0e1df34dd6ec69fab7b9c8dd1ad7255d791ed01e40",
+        "feature_projection_sha256": "bdfa6bf903299afb8dff8a6bfacbd3c0bb7c2c4c03d31a324f858a29c8397f24",
+        "method_review_slice_sha256": "c5a039265a82990d70282f1c510b37e449cd865e11b5055581611f81b46405dd",
+        "joined_chain_evidence_sha256": "f4dca2c7d98fd137ea49bb0da0eb8e56187867af20d787ab6416b8ea22fd832d"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "7447b1f993795194c6aae5b907f1c933761230dd0544602940620733a47858cf"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-02",
+      "chain_key": "RUN077-ROUTE-0589|PAGE-ROOT-636314D5B8CE1E1A|CAP-FIN-FX-REVALUATION",
+      "review_partition": "A",
+      "candidate_feature_id": "CAP-FIN-FX-REVALUATION",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0589",
+        "original_partition": "C",
+        "route_file": "routes/finance.php",
+        "route_file_sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+        "route_file_blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "source_key": "routes/finance.php:597:9:get:178",
+        "source_anchor": "routes/finance.php:597",
+        "route_method": "get",
+        "literal_uri": "/fx-revaluations/create",
+        "literal_route_name": "fx-revaluations.create",
+        "action_expression": "[FxRevaluationController::class, 'create']",
+        "statement_excerpt": "Route::get('/fx-revaluations/create', [FxRevaluationController::class, 'create'])->name('fx-revaluations.create');",
+        "statement_sha256": "a16c17990433c3fa6a07f17fb281c36c8ba40b1694cd4f135a655bf24af9c9ba",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FIN-FX-REVALUATION"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FIN-FX-REVALUATION"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Domain\\Finance\\Http\\Controllers\\FxRevaluationController",
+        "controller_file": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php",
+        "controller_file_sha256": "1bc7062eeac5d36889fa058c476207919971c96beeda2dac72a60f75b797545b",
+        "controller_file_blob_id": "adf4ad66c51f31167d97f76d7de3a886e70c4d3d",
+        "method": "create",
+        "definition_line": 41,
+        "definition_anchor": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:41",
+        "method_review_slice": {
+          "start_line": 41,
+          "end_line": 53,
+          "next_method_definition_line": 54,
+          "line_count": 13,
+          "text": "    public function create(Request $request)\n    {\n        $orgId = $request->user()->organization_id;\n        $date = $request->get('date', now()->toDateString());\n\n        $preview = $this->fxRevaluationService->calculateUnrealisedGainLoss($orgId, $date);\n\n        return Inertia::render('finance/fx-revaluations/Create', [\n            'preview' => $preview,\n            'date' => $date,\n        ]);\n    }\n",
+          "text_sha256": "a904fd702d42404a22a320bc3e5a3a5a443d02faf29ea4151fb7ca9fcbff4b4f"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:48",
+        "render_syntax": "Inertia::render('finance/fx-revaluations/Create', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-636314D5B8CE1E1A",
+        "original_partition": "A",
+        "page_file": "resources/js/pages/finance/fx-revaluations/Create.tsx",
+        "page_file_sha256": "34276b902e90da6bf8bbce9b5e902fe1d9c43c29340436d1d936c10e3cc0bce1",
+        "page_file_blob_id": "62572ebf719c17de86ebd6e717e61045e7282165",
+        "render_names": [
+          "finance/fx-revaluations/Create"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "finance/fx-revaluations/Create",
+          "page_file": "resources/js/pages/finance/fx-revaluations/Create.tsx",
+          "source_file": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php",
+          "source_file_sha256": "1bc7062eeac5d36889fa058c476207919971c96beeda2dac72a60f75b797545b",
+          "source_file_blob_id": "adf4ad66c51f31167d97f76d7de3a886e70c4d3d",
+          "source_line": 48,
+          "source_column": 16,
+          "start_byte": 1604,
+          "source_anchor": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:48",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('finance/fx-revaluations/Create', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FIN-FX-REVALUATION"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/finance/fx-revaluations/Create.tsx",
+          "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:48"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FIN-FX-REVALUATION",
+        "feature_class": "H",
+        "module": "Finance",
+        "user_job": "Preview, create, and post an FX revaluation to the general ledger.",
+        "route_names": "fx-revaluations.create; fx-revaluations.index; fx-revaluations.post; fx-revaluations.store",
+        "route_paths": "routes/finance.php:594-600",
+        "page_files": "resources/js/pages/finance/fx-revaluations/Index.tsx:1-351",
+        "backend_anchors": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:11-82; app/Domain/Finance/Services/AccountingSyncProviders/XeroSyncProvider.php:27-319; app/Domain/Finance/Services/FxRevaluationService.php:12-190",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "6f1e2fd8c0d12aa8a994d2c403541bb879f5a661820d8f989d3afab5c2d62c01",
+        "page_candidate_sha256": "884d7e016b8f0115c856f3a0fe2b2042541b046cc20b925c0e1f53519f8d5e10",
+        "route_manifest_sha256": "e3f57f2e9406fd39711ed1fd6c97428a2e488d1895a001c909d93fd9d421806f",
+        "page_manifest_sha256": "8c67a34b7c3b41df2b6786a24786658dc02dfc60ddedc969b6d4ab5ec8f2b0ef",
+        "page_graph_sha256": "dcaaf7f941c9a9152e8d70358a738d74db78ccb2b79c25bed9b28f2b55b6f12e",
+        "feature_projection_sha256": "c7e006e289f63fb9864a0dbb935f215e574d0a13cf1d12fa32c41c57fa6f1010",
+        "method_review_slice_sha256": "a904fd702d42404a22a320bc3e5a3a5a443d02faf29ea4151fb7ca9fcbff4b4f",
+        "joined_chain_evidence_sha256": "7d23584fb0eec01e47c267990163619a27cdc5df5041c9ea9dff5b77bf94b0a3"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "dba4c2c6805869921d7d967a523574b3249b76b29d6de7230e045d3b80b91b66"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-03",
+      "chain_key": "RUN077-ROUTE-0592|PAGE-ROOT-679D3E7F4B5402CB|CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+      "review_partition": "C",
+      "candidate_feature_id": "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0592",
+        "original_partition": "C",
+        "route_file": "routes/finance.php",
+        "route_file_sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+        "route_file_blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "source_key": "routes/finance.php:604:9:get:181",
+        "source_anchor": "routes/finance.php:604",
+        "route_method": "get",
+        "literal_uri": "/integrations",
+        "literal_route_name": "integrations.index",
+        "action_expression": "[AccountingIntegrationController::class, 'index']",
+        "statement_excerpt": "Route::get('/integrations', [AccountingIntegrationController::class, 'index'])->name('integrations.index');",
+        "statement_sha256": "3fbf0e4242316d44bc025323a3dfb959cfffc8713d8e6eb0b030c10154cb4d41",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Domain\\Finance\\Http\\Controllers\\AccountingIntegrationController",
+        "controller_file": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+        "controller_file_sha256": "55f16f3c6a2cde692d2159bd8d1f66027988d514af0d9520d6378403a6177a8e",
+        "controller_file_blob_id": "2e81c4755769f03aae726f7e4c9094f752da78d3",
+        "method": "index",
+        "definition_line": 23,
+        "definition_anchor": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:23",
+        "method_review_slice": {
+          "start_line": 23,
+          "end_line": 71,
+          "next_method_definition_line": 72,
+          "line_count": 49,
+          "text": "    public function index(Request $request)\n    {\n        $orgId = $request->user()->organization_id;\n\n        $integrations = FinAccountingIntegration::forOrganization($orgId)\n            ->with('createdBy:id,name')\n            ->withCount('syncLogs')\n            ->orderByDesc('created_at')\n            ->get()\n            ->map(fn (FinAccountingIntegration $integration) => [\n                'id' => $integration->id,\n                'provider' => $integration->provider,\n                'tenant_id' => $integration->tenant_id,\n                'sync_direction' => $integration->sync_direction,\n                'is_active' => $integration->is_active,\n                'last_sync_at' => $integration->last_sync_at?->toDateTimeString(),\n                'last_sync_status' => $integration->last_sync_status,\n                'last_error' => $integration->last_error,\n                'has_token' => (bool) $integration->access_token,\n                'token_expired' => $integration->isTokenExpired(),\n                'sync_logs_count' => $integration->sync_logs_count,\n                'created_by' => $integration->createdBy?->name,\n                'created_at' => $integration->created_at->toDateTimeString(),\n                'settings' => $integration->settings ?? [],\n                'recent_logs' => $integration->syncLogs()\n                    ->orderByDesc('started_at')\n                    ->limit(5)\n                    ->get()\n                    ->map(fn ($log) => [\n                        'id' => $log->id,\n                        'direction' => $log->direction,\n                        'entity_type' => $log->entity_type,\n                        'entity_count' => $log->entity_count,\n                        'success_count' => $log->success_count,\n                        'error_count' => $log->error_count,\n                        'started_at' => $log->started_at->toDateTimeString(),\n                        'completed_at' => $log->completed_at?->toDateTimeString(),\n                        'duration_ms' => $log->duration_ms,\n                    ]),\n            ]);\n\n        return Inertia::render('finance/Integrations/Index', [\n            'integrations' => $integrations,\n        ]);\n    }\n\n    /**\n     * Create a new accounting integration.\n     */",
+          "text_sha256": "74009186a7f2291bd166f6eb48c87f0ed5677709751eecce908f65f7771956dd"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:64",
+        "render_syntax": "Inertia::render('finance/Integrations/Index', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-679D3E7F4B5402CB",
+        "original_partition": "A",
+        "page_file": "resources/js/pages/finance/Integrations/Index.tsx",
+        "page_file_sha256": "98910ec3b7351f05f5c6aa996e017413ece7b7b343f1c415358d5a7ca52cd48c",
+        "page_file_blob_id": "72d73b042d9e70ba3282a92a39820a2806a50bb1",
+        "render_names": [
+          "finance/Integrations/Index"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "finance/Integrations/Index",
+          "page_file": "resources/js/pages/finance/Integrations/Index.tsx",
+          "source_file": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php",
+          "source_file_sha256": "55f16f3c6a2cde692d2159bd8d1f66027988d514af0d9520d6378403a6177a8e",
+          "source_file_blob_id": "2e81c4755769f03aae726f7e4c9094f752da78d3",
+          "source_line": 64,
+          "source_column": 16,
+          "start_byte": 2705,
+          "source_anchor": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:64",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('finance/Integrations/Index', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/finance/Integrations/Index.tsx",
+          "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:64"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FIN-ACCOUNTING-INTEGRATION-CONFIGURATION",
+        "feature_class": "H",
+        "module": "Finance",
+        "user_job": "Configure an accounting integration, test its connection, manage mappings, disconnect it, and manually request a sync.",
+        "route_names": "integrations.destroy; integrations.index; integrations.mapping; integrations.mapping.update; integrations.store; integrations.test; integrations.update",
+        "route_paths": "routes/finance.php:602-612",
+        "page_files": "resources/js/pages/finance/Integrations/Index.tsx:1-570",
+        "backend_anchors": "app/Domain/Finance/Http/Controllers/AccountingIntegrationController.php:14-241; app/Domain/Finance/Models/FinAccountingIntegration.php:13-108",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "ee9d2b508a7efc998df22f0b2f8b1cae4f3ba7bd8edf462416a9887fad8e9603",
+        "page_candidate_sha256": "3bd206d14b64d573d52bdd21bc022fd45ee3899c3458a899efc9a952626c4e1c",
+        "route_manifest_sha256": "c26eda032323cb5f88c7aa7bab51c8f9170405845894f77d47a57ca3858b372a",
+        "page_manifest_sha256": "2e4163f919f191ddd5c10524180fdaa1086796de50fa68ca58691caf17515871",
+        "page_graph_sha256": "3e866022b6588e097d4dc539e9c0ba72a280cc3b92dede1eb4e7d63ef84543c7",
+        "feature_projection_sha256": "a5ac28587e9bdf66d64cdee2797297a24b5faaceb6be34ac58ddf2d2cf2c9247",
+        "method_review_slice_sha256": "74009186a7f2291bd166f6eb48c87f0ed5677709751eecce908f65f7771956dd",
+        "joined_chain_evidence_sha256": "4a9ea038d1ff0d83ebbea38c69885a1b62b0a2dbc7e7ee7fd7bbe811c3773bc7"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "c871708c16162d1b33ecd1131727da187f6c763608786241d40759756eedd7ce"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-04",
+      "chain_key": "RUN077-ROUTE-0691|PAGE-ROOT-F49C616A9709CD23|CAP-FLEET-VEHICLE-REGISTER",
+      "review_partition": "A",
+      "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0691",
+        "original_partition": "A",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:52:9:get:8",
+        "source_anchor": "routes/fleet-assets.php:52",
+        "route_method": "get",
+        "literal_uri": "/vehicles/{asset}",
+        "literal_route_name": "fleet-assets.vehicles.show",
+        "action_expression": "[VehicleController::class, 'show']",
+        "statement_excerpt": "Route::get('/vehicles/{asset}', [VehicleController::class, 'show'])->whereNumber('asset')->name('fleet-assets.vehicles.show');",
+        "statement_sha256": "2d993ab3cd428b1290b29988687480ed4d59776608cfbae3e27f1865c200ee9b",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FLEET-VEHICLE-REGISTER"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FLEET-VEHICLE-REGISTER"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\VehicleController",
+        "controller_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+        "controller_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+        "controller_file_blob_id": "49897a4f91a2484c0633c6a575f554ed725acb1f",
+        "method": "show",
+        "definition_line": 247,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:247",
+        "method_review_slice": {
+          "start_line": 247,
+          "end_line": 427,
+          "next_method_definition_line": 428,
+          "line_count": 181,
+          "text": "    public function show(Request $request, Asset $asset)\n    {\n        $user = $request->user();\n        abort_unless($user, 403);\n        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);\n        $hasFleetFields = $this->hasFleetFields();\n\n        $eagerLoads = [\n            'fleetState',\n            'geofences',\n            'workOrders' => fn ($q) => $q->latest()->limit(10),\n            'bookings' => fn ($q) => $q->latest()->limit(10),\n        ];\n        if ($hasFleetFields) {\n            $eagerLoads[] = 'homeSite';\n            $eagerLoads[] = 'primaryDriver';\n        }\n\n        $asset->load($eagerLoads);\n\n        $trips = FleetTrip::query()\n            ->where('asset_id', $asset->id)\n            ->latest('started_at')\n            ->limit(20)\n            ->get()\n            ->map(fn ($trip) => [\n                'id' => $trip->id,\n                'started_at' => optional($trip->started_at)->toISOString(),\n                'ended_at' => optional($trip->ended_at)->toISOString(),\n                'distance_km' => $trip->distance_km,\n                'duration_s' => $trip->duration_s,\n                'status' => $trip->status,\n                'start_address' => $trip->start_address,\n                'end_address' => $trip->end_address,\n            ])->values();\n\n        $signals = FleetSignal::query()\n            ->where('asset_id', $asset->id)\n            ->latest('occurred_at')\n            ->limit(20)\n            ->get()\n            ->map(fn ($s) => [\n                'id' => $s->id,\n                'signal_type' => $s->signal_type,\n                'severity' => $s->severity_hint,\n                'occurred_at' => optional($s->occurred_at)->toISOString(),\n                'payload' => $s->payload,\n            ])->values();\n\n        $fuelLogs = FleetFuelLog::query()\n            ->where('asset_id', $asset->id)\n            ->latest('logged_at')\n            ->limit(10)\n            ->get()\n            ->map(fn ($log) => [\n                'id' => $log->id,\n                'logged_at' => optional($log->logged_at)->toISOString(),\n                'fuel_type' => $log->fuel_type,\n                'quantity_litres' => $log->quantity_litres,\n                'total_cost' => $log->total_cost,\n                'odometer_km' => $log->odometer_km,\n            ])->values();\n\n        $driverSessions = FleetDriverSession::query()\n            ->where('asset_id', $asset->id)\n            ->with('user:id,name')\n            ->latest('started_at')\n            ->limit(10)\n            ->get()\n            ->map(fn ($s) => [\n                'id' => $s->id,\n                'driver' => $s->user ? ['id' => $s->user->id, 'name' => $s->user->name] : null,\n                'started_at' => optional($s->started_at)->toISOString(),\n                'ended_at' => optional($s->ended_at)->toISOString(),\n                'status' => $s->status,\n            ])->values();\n\n        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);\n\n        // Eligible drivers: users who have an HR driver eligibility record\n        $eligibleDrivers = User::query()\n            ->whereHas('hrDriverEligibility')\n            ->with('hrDriverEligibility')\n            ->orderBy('name')\n            ->get(['id', 'name', 'email'])\n            ->map(fn ($u) => [\n                'id' => $u->id,\n                'name' => $u->name,\n                'email' => $u->email,\n                'licence_status' => $u->hrDriverEligibility?->status,\n                'licence_expires_at' => optional($u->hrDriverEligibility?->licence_expires_at)->toDateString(),\n            ])->values();\n\n        return Inertia::render('fleet-assets/vehicles/show', [\n            'asset' => [\n                'id' => $asset->id,\n                'name' => $asset->name,\n                'asset_tag' => $asset->asset_tag,\n                'category' => $asset->category,\n                'status' => $asset->status,\n                'registration_number' => $hasFleetFields ? $asset->registration_number : null,\n                'registration_expires_at' => $hasFleetFields ? optional($asset->registration_expires_at)->toDateString() : null,\n                'wof_expires_at' => $hasFleetFields ? optional($asset->wof_expires_at)->toDateString() : null,\n                'cof_expires_at' => $hasFleetFields ? optional($asset->cof_expires_at)->toDateString() : null,\n                'fuel_type' => $hasFleetFields ? $asset->fuel_type : null,\n                'odometer_km' => $hasFleetFields ? $asset->odometer_km : null,\n                'manufacturer' => $asset->manufacturer,\n                'model' => $asset->model,\n                'serial_number' => $asset->serial_number,\n                'home_site' => $hasFleetFields && $asset->homeSite ? [\n                    'id' => $asset->homeSite->id,\n                    'name' => $asset->homeSite->name,\n                ] : null,\n                'primary_driver' => $hasFleetFields && $asset->primaryDriver ? [\n                    'id' => $asset->primaryDriver->id,\n                    'name' => $asset->primaryDriver->name,\n                    'email' => $asset->primaryDriver->email,\n                ] : null,\n                'has_wheelchair_ramp' => (bool) $asset->has_wheelchair_ramp,\n                'has_hoist' => (bool) $asset->has_hoist,\n                'has_child_seat_anchors' => (bool) $asset->has_child_seat_anchors,\n                'has_medical_storage' => (bool) $asset->has_medical_storage,\n                'seating_capacity' => $asset->seating_capacity,\n                'accessibility_notes' => $asset->accessibility_notes,\n                'inspection_due_at' => optional($asset->inspection_due_at)->toDateString(),\n            ],\n            'state' => $asset->fleetState ? [\n                'status' => $asset->fleetState->status,\n                'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),\n                'lat' => $asset->fleetState->latitude,\n                'lng' => $asset->fleetState->longitude,\n                'speed_kph' => $asset->fleetState->speed_kph,\n                'heading_deg' => $asset->fleetState->heading_deg,\n                'battery_pct' => $asset->fleetState->battery_pct,\n                'consent_blocked' => $asset->fleetState->consent_blocked,\n            ] : null,\n            'trips' => $trips,\n            'signals' => $signals,\n            'fuel_logs' => $fuelLogs,\n            'driver_sessions' => $driverSessions,\n            'geofences' => $asset->geofences->map(fn ($g) => [\n                'id' => $g->id,\n                'name' => $g->name,\n                'type' => $g->type,\n                'breach_type' => $g->breach_type,\n                'is_active' => $g->is_active,\n                'shape' => $g->shape,\n            ])->values(),\n            'work_orders' => $asset->workOrders,\n            'bookings' => $asset->bookings,\n            'incidents' => Schema::hasTable('fleet_incidents') ? FleetIncident::where('asset_id', $asset->id)\n                ->latest('occurred_at')\n                ->limit(10)\n                ->get()\n                ->map(fn ($i) => [\n                    'id' => $i->id,\n                    'incident_type' => $i->incident_type,\n                    'severity' => $i->severity,\n                    'occurred_at' => optional($i->occurred_at)->toISOString(),\n                    'status' => $i->status,\n                    'location' => $i->location,\n                ])\n                ->values() : collect(),\n            'sites' => $sites,\n            'eligible_drivers' => $eligibleDrivers,\n            'service_prediction' => $this->buildServicePrediction($asset),\n            'can' => [\n                'manage' => $this->canManageFleet($user),\n                'inspect' => $this->canManageMaintenance($user),\n                'view_vehicle_technology' => $this->vehicleTechnology->canView($user, $asset),\n            ],\n            'vehicle_technology' => Inertia::optional(\n                fn () => $this->vehicleTechnology->present($user, $asset),\n            ),\n            'timeline' => Inertia::optional(fn () => app(FleetTimelineService::class)\n                ->forVehicle($asset->id, now()->subDays(14), 40)\n                ->toArray()\n            ),\n        ]);\n    }\n",
+          "text_sha256": "7969d128d24dba0f09e19ed3eafc55f1b9a84bf17a4d7e31a4084168cf1fe118"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:340",
+        "render_syntax": "Inertia::render('fleet-assets/vehicles/show', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-F49C616A9709CD23",
+        "original_partition": "B",
+        "page_file": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+        "page_file_sha256": "72cb083e156d44279682ade62db2cb5a47d066e49f3a0c4054a067853bfe604a",
+        "page_file_blob_id": "f9313885f30c22af5295048b12ec38e336a35fc2",
+        "render_names": [
+          "fleet-assets/vehicles/show"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "fleet-assets/vehicles/show",
+          "page_file": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+          "source_file": "app/Http/Controllers/FleetAssets/VehicleController.php",
+          "source_file_sha256": "478a1a0a33868536fc3b2baf5db2d06732ddb5fa16094997a5128dc2267b5239",
+          "source_file_blob_id": "49897a4f91a2484c0633c6a575f554ed725acb1f",
+          "source_line": 340,
+          "source_column": 16,
+          "start_byte": 13507,
+          "source_anchor": "app/Http/Controllers/FleetAssets/VehicleController.php:340",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('fleet-assets/vehicles/show', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FLEET-VEHICLE-REGISTER"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "app/Http/Controllers/FleetAssets/VehicleController.php:340",
+          "resources/js/pages/fleet-assets/vehicles/show.tsx"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Maintain vehicles and vehicle-specific state",
+        "route_names": "fleet-assets.fuel.index; fleet-assets.fuel.store; fleet-assets.trips.index; fleet-assets.trips.playback; fleet-assets.trips.playback.data; fleet-assets.trips.toggle-personal; fleet-assets.vehicles.alerts-config; fleet-assets.vehicles.alerts-config.save; fleet-assets.vehicles.bulk-action; fleet-assets.vehicles.index; fleet-assets.vehicles.show; fleet-assets.vehicles.update",
+        "route_paths": "routes/fleet-assets.php:51-66",
+        "page_files": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/VehicleController.php:31-194; app/Http/Controllers/FleetAssets/VehicleController.php:247-340; app/Http/Controllers/FleetAssets/VehicleController.php:475-550",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "f4d5cabda3ecb1b1a15fe2e03498b88abc82a9bcfe61b91ac3e74df9abaf4acf",
+        "page_candidate_sha256": "160fb18badfbb980c5ade4267a86a0facc52734214c9cdb84de8aa4d48cc36a8",
+        "route_manifest_sha256": "8239cd0c5439236ddbdf8e2bcc824106ed5be363080882c1115fbe1b1d484874",
+        "page_manifest_sha256": "cf5d4158783c3329211de19d43bc9a06bdf74b28021460e6f09fe7ffec3b34f6",
+        "page_graph_sha256": "54e5ec87a28a679a4cd3236d0f8645917343825a2de76d3254ffa010af6dba05",
+        "feature_projection_sha256": "bfa6379bc2d8918237480060414b89dd2e61ffa2d907d639a62ec1fd9892f164",
+        "method_review_slice_sha256": "7969d128d24dba0f09e19ed3eafc55f1b9a84bf17a4d7e31a4084168cf1fe118",
+        "joined_chain_evidence_sha256": "1ee6230e86b1d26d31e2508aa638087167e079b5b8b0999d5558cda7372819ae"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "cd94f70e1ac6df373788f689bc773da0703a8cffded458f6aef23c5899bb1c9e"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-05",
+      "chain_key": "RUN077-ROUTE-0744|PAGE-ROOT-426A6C2394C33788|CAP-FLEET-WORK-ORDER-LIFECYCLE",
+      "review_partition": "B",
+      "candidate_feature_id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0744",
+        "original_partition": "A",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:165:9:get:61",
+        "source_anchor": "routes/fleet-assets.php:165",
+        "route_method": "get",
+        "literal_uri": "/maintenance/work-orders/{workOrder}",
+        "literal_route_name": "fleet-assets.work-orders.show",
+        "action_expression": "[WorkOrderController::class, 'show']",
+        "statement_excerpt": "Route::get('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'show'])->whereNumber('workOrder')->name('fleet-assets.work-orders.show');",
+        "statement_sha256": "c25344f5f8ddf27380c1bca6c972d5390c3dd827506e749e3b961d15e4c5f24d",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FLEET-WORK-ORDER-LIFECYCLE"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FLEET-WORK-ORDER-LIFECYCLE"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController",
+        "controller_file": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+        "controller_file_sha256": "e3a6e66076cbfab0d8b2e068ab2fe6a65d8fde73b7d553ce831e8b09360451ba",
+        "controller_file_blob_id": "080d48daf3f97c8ad313b33237a332f976ba29c9",
+        "method": "show",
+        "definition_line": 202,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/WorkOrderController.php:202",
+        "method_review_slice": {
+          "start_line": 202,
+          "end_line": 214,
+          "next_method_definition_line": 215,
+          "line_count": 13,
+          "text": "    public function show(Request $request, FleetWorkOrder $workOrder)\n    {\n        $workOrder->load([\n            'asset:id,name,asset_tag,category,status',\n            'reportedBy:id,name,email',\n            'assignedTo:id,name,email',\n        ]);\n\n        return Inertia::render('fleet-assets/maintenance/work-orders/show', [\n            'work_order' => $workOrder,\n        ]);\n    }\n",
+          "text_sha256": "13dc9f363aa51e8a6aa907d4a240885c6dcf23ff357992a8ad088b380d6ddcbf"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/FleetAssets/WorkOrderController.php:210",
+        "render_syntax": "Inertia::render('fleet-assets/maintenance/work-orders/show', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-426A6C2394C33788",
+        "original_partition": "B",
+        "page_file": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+        "page_file_sha256": "c2c642689d7a98eadf250affd37cdae520dd907eb848db741c839758299720c1",
+        "page_file_blob_id": "ec98be215e9bdfbb158d96b31078385243b6037a",
+        "render_names": [
+          "fleet-assets/maintenance/work-orders/show"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "fleet-assets/maintenance/work-orders/show",
+          "page_file": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+          "source_file": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+          "source_file_sha256": "e3a6e66076cbfab0d8b2e068ab2fe6a65d8fde73b7d553ce831e8b09360451ba",
+          "source_file_blob_id": "080d48daf3f97c8ad313b33237a332f976ba29c9",
+          "source_line": 210,
+          "source_column": 16,
+          "start_byte": 8978,
+          "source_anchor": "app/Http/Controllers/FleetAssets/WorkOrderController.php:210",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('fleet-assets/maintenance/work-orders/show', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FLEET-WORK-ORDER-LIFECYCLE"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "app/Http/Controllers/FleetAssets/WorkOrderController.php:210",
+          "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-WORK-ORDER-LIFECYCLE",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Create, progress, and close a fleet work order",
+        "route_names": "fleet-assets.checklists.index; fleet-assets.checklists.run-page; fleet-assets.work-orders.bulk-action; fleet-assets.work-orders.create; fleet-assets.work-orders.index; fleet-assets.work-orders.options.search; fleet-assets.work-orders.show; fleet-assets.work-orders.store; fleet-assets.work-orders.update",
+        "route_paths": "routes/fleet-assets.php:163-165; routes/fleet-assets.php:163-183; routes/fleet-assets.php:180-183",
+        "page_files": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/WorkOrderController.php:13-281",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "d8e1e81d2b0b4e786d56f504f7c89504925c4145e274d5b50af6b52255e6eff2",
+        "page_candidate_sha256": "746ad0e37c41959f6e7846c5629f2d59c229112bdc7c6750ecb5fdf41c2c76f4",
+        "route_manifest_sha256": "a88124943d9d48f9fc70986ef7643a26626615b9d5a7f311e9f72b0d77e9af60",
+        "page_manifest_sha256": "359985bceed12938c3de1be716e8f02ee57f70c05f999130dc59769d3c6875f3",
+        "page_graph_sha256": "1dd129afee4694e019652ebde8ec3e9adf0c195d2a8f9d2413bee68ace582d60",
+        "feature_projection_sha256": "25c5790f6f7bc9f42ddb9577fd682b3ee6900559930d1babaf6560c3fc92b7ac",
+        "method_review_slice_sha256": "13dc9f363aa51e8a6aa907d4a240885c6dcf23ff357992a8ad088b380d6ddcbf",
+        "joined_chain_evidence_sha256": "6e3460b75dd02567d28ad252ee9c0da7c1627af9641d533e564835e07d25515b"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "9c95411c4286e0f359a412503762567c4bafab9f3723b0effbce8b1020c36171"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-06",
+      "chain_key": "RUN077-ROUTE-0765|PAGE-ROOT-B20D273C1F997799|CAP-FLEET-RESIDENT-TRACKING",
+      "review_partition": "C",
+      "candidate_feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0765",
+        "original_partition": "A",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:212:9:get:82",
+        "source_anchor": "routes/fleet-assets.php:212",
+        "route_method": "get",
+        "literal_uri": "/resident-tracking",
+        "literal_route_name": "fleet-assets.resident-tracking.index",
+        "action_expression": "[ResidentTrackingController::class, 'index']",
+        "statement_excerpt": "Route::get('/resident-tracking', [ResidentTrackingController::class, 'index'])->name('fleet-assets.resident-tracking.index');",
+        "statement_sha256": "93290e7d15114de48b8faeafa86d747acbf3c2d61448703788f6b60368f6b89e",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController",
+        "controller_file": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+        "controller_file_sha256": "47799db3da0f0c665e6dd88ac865f5a37bb4def0c696f0a88e400651c5a05ff5",
+        "controller_file_blob_id": "9c8798914f8ca25697641c77be332c2475ca6792",
+        "method": "index",
+        "definition_line": 44,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:44",
+        "method_review_slice": {
+          "start_line": 44,
+          "end_line": 288,
+          "next_method_definition_line": 289,
+          "line_count": 245,
+          "text": "    public function index(Request $request)\n    {\n        $user = $request->user();\n        $authorizedClientIds = $this->getAuthorizedClientIds($user);\n\n        // Get tracking devices actively assigned to clients (canonical).\n        $clientDevices = $this->deviceAccess->visibleDevices($user)\n            ->where('domain', 'tracking')\n            ->whereHas('assignments', function ($q) use ($authorizedClientIds) {\n                $q->active()\n                    ->collectionActive()\n                    ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)\n                    ->whereIn('assignable_id', $authorizedClientIds);\n            })\n            ->with(['assignments' => fn ($q) => $q\n                ->active()\n                ->collectionActive()\n                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)\n                ->whereIn('assignable_id', $authorizedClientIds)\n                ->with('consent.consentType')])\n            ->get();\n\n        // Site-authoritative geofences. Asset provenance is only a fallback\n        // when the geofence itself has no site_id.\n        $geofences = collect();\n        try {\n            if (Schema::hasTable('asset_geofences')) {\n                $geofences = $this->applyGeofenceScope(\n                    AssetGeofence::query()->where('is_active', true),\n                    $user,\n                )->get();\n            }\n        } catch (\\Throwable) {\n            $geofences = collect();\n        }\n\n        // Load client data. The house geofence relation is constrained to the\n        // same site-safe set used by the map, so nested payloads cannot leak a\n        // contradictory foreign fence.\n        $clientIds = $clientDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->values();\n        $allowedGeofenceIds = $geofences->pluck('id')->all();\n        $clients = Client::with([\n            'site' => fn ($query) => $query->select(['id', 'name']),\n            'houseGeofence' => fn ($query) => $query->whereIn('asset_geofences.id', $allowedGeofenceIds),\n        ])\n            ->whereIn('id', $clientIds)\n            ->get()\n            ->keyBy('id');\n        $clientDevices = $clientDevices\n            ->filter(function (Device $device) use ($clients): bool {\n                $assignment = $device->assignments->first();\n                $client = $assignment\n                    ? $clients->get($assignment->assignable_id)\n                    : null;\n\n                return $assignment !== null\n                    && $client !== null\n                    && $this->trackingPrivacy->assignmentAuthorisesResidentLocation($assignment, $client);\n            });\n        $consentedClientIds = $clientDevices\n            ->map(fn (Device $device): int => (int) $device->assignments->first()->assignable_id)\n            ->unique()\n            ->values()\n            ->all();\n        $residentAlertBindings = $this->residentAlertBindings($clientDevices);\n\n        // Load active outings.\n        $activeOutingClientIds = [];\n        try {\n            if (Schema::hasTable('fleet_outings') && Schema::hasTable('fleet_outing_residents')) {\n                $activeOutingIds = $this->applyOutingScope(\n                    FleetOuting::query()->where('status', 'active'),\n                    $user,\n                    $authorizedClientIds,\n                )->pluck('id');\n                $activeOutingClientIds = DB::table('fleet_outing_residents')\n                    ->whereIn('outing_id', $activeOutingIds)\n                    ->whereIn('client_id', $authorizedClientIds)\n                    ->pluck('fleet_outing_residents.client_id')\n                    ->toArray();\n            }\n        } catch (\\Throwable) {\n            $activeOutingClientIds = [];\n        }\n\n        // Build resident tracking data.\n        $residents = $clientDevices->map(function (Device $device) use ($clients, $activeOutingClientIds) {\n            $assignment = $device->assignments->first();\n            if (! $assignment) {\n                return null;\n            }\n\n            $client = $clients->get($assignment->assignable_id);\n            if (! $client) {\n                return null;\n            }\n\n            return $this->buildResidentPayload($device, $client, $activeOutingClientIds);\n        })->filter()->values();\n\n        // Stats.\n        $totalTracked = $residents->count();\n        $online = $residents->where('status', 'online')->count();\n        $offline = $residents->where('status', 'offline')->count();\n        $inGeofence = $residents->where('geofence_status', 'in_zone')->count();\n        $outsideGeofence = $residents->where('geofence_status', 'outside_zone')->count();\n        $lowBattery = $residents->filter(fn ($r) => ($r['battery_status'] ?? null) === 'low')->count();\n        $safetyScore = $totalTracked > 0 ? round(($inGeofence / max($totalTracked, 1)) * 100, 1) : 0;\n        $avgBattery = $totalTracked > 0 ? round($residents->avg(fn ($r) => $r['battery'] ?? 0), 0) : 0;\n\n        $totalClientQuery = Client::query()\n            ->where('status', 'active')\n            ->whereIn('id', $authorizedClientIds);\n        $totalClients = $totalClientQuery->count();\n        $untracked = max(0, $totalClients - $totalTracked);\n\n        // Recent alerts (unchanged).\n        $recentAlerts = [];\n        try {\n            if (Schema::hasTable('control_room_alerts')) {\n                $recentAlertQuery = ControlRoomAlert::whereIn('source', ['tracker', 'resident_tracker', 'geofence'])\n                    ->actionable();\n                $this->applyResidentAlertAuthority($recentAlertQuery, $residentAlertBindings);\n                $recentAlerts = $recentAlertQuery->latest()->limit(5)->get()\n                    ->map(function ($alert) {\n                        $client = $alert->client_id ? Client::find($alert->client_id) : null;\n\n                        return [\n                            'id' => $alert->id,\n                            'title' => $alert->alert_type ?? 'Alert',\n                            'severity' => $alert->severity ?? 'medium',\n                            'status' => $alert->status ?? 'open',\n                            'created_at' => $alert->created_at?->toISOString(),\n                            'resident_name' => $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : null,\n                        ];\n                    })->toArray();\n            }\n        } catch (\\Throwable) {\n            $recentAlerts = [];\n        }\n\n        // Active outings (unchanged).\n        $activeOutings = [];\n        try {\n            if (Schema::hasTable('fleet_outings')) {\n                $activeOutings = $this->applyOutingScope(\n                    FleetOuting::query()->where('status', 'active'),\n                    $user,\n                    $authorizedClientIds,\n                )\n                    ->with([\n                        'asset' => fn ($query) => $query\n                            ->whereIn('assets.id', $this->accessibleAssetIds($user))\n                            ->select(['id', 'name']),\n                    ])\n                    ->withCount(['clients as authorized_resident_count' => fn ($query) => $query\n                        ->whereIn('clients.id', $authorizedClientIds)])\n                    ->latest()->limit(10)->get()\n                    ->map(fn ($o) => [\n                        'id' => $o->id, 'title' => $o->title ?? 'Outing',\n                        'destination' => $o->destination ?? 'Unknown',\n                        'resident_count' => (int) $o->authorized_resident_count,\n                        'departed_at' => $o->actual_departure?->toISOString() ?? $o->planned_departure?->toISOString(),\n                        'vehicle_name' => $o->asset?->name ?? null,\n                    ])->toArray();\n            }\n        } catch (\\Throwable) {\n            $activeOutings = [];\n        }\n\n        // Geofences for map: every active fence (with applies_to scope).\n        $mapGeofences = $this->buildMapGeofences($geofences);\n\n        $focusClientId = $request->integer('focus') ?: null;\n        if ($focusClientId && ! in_array($focusClientId, $consentedClientIds, true)) {\n            $focusClientId = null;\n        }\n\n        // Hero alert stats (safety command centre band).\n        $activeAlertCount = 0;\n        $wandering7d = 0;\n        $panic7d = 0;\n        try {\n            if (Schema::hasTable('control_room_alerts')) {\n                $alertBase = ControlRoomAlert::query()\n                    ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])\n                    ->whereNotNull('client_id');\n                $this->applyResidentAlertAuthority($alertBase, $residentAlertBindings);\n                $activeAlertCount = (clone $alertBase)->actionable()->count();\n                $wandering7d = (clone $alertBase)\n                    ->whereIn('alert_type', ['geofence_breach', 'wandering'])\n                    ->where('triggered_at', '>=', now()->subDays(7))\n                    ->count();\n                $panic7d = (clone $alertBase)\n                    ->where(function ($q) {\n                        $q->whereIn('alert_type', ['sos', 'panic', 'man_down'])\n                            ->orWhere('alert_type', 'like', '%panic%')\n                            ->orWhere('alert_type', 'like', '%sos%');\n                    })\n                    ->where('triggered_at', '>=', now()->subDays(7))\n                    ->count();\n            }\n        } catch (\\Throwable) {\n            // hero counts stay zero when the alerts table is unavailable\n        }\n\n        $tab = $request->input('tab') === 'wandering' ? 'wandering' : 'tracking';\n\n        return Inertia::render('fleet-assets/resident-tracking/index', [\n            'tab' => $tab,\n            'residents' => $residents,\n            'stats' => [\n                'tracked' => $totalTracked, 'online' => $online, 'offline' => $offline,\n                'untracked' => $untracked,\n                'online_percent' => $totalTracked > 0 ? round(($online / $totalTracked) * 100, 1) : 0,\n                'in_geofence' => $inGeofence, 'outside_geofence' => $outsideGeofence,\n                'low_battery' => $lowBattery, 'safety_score' => $safetyScore, 'avg_battery' => $avgBattery,\n                'panic_active' => $residents->filter(fn ($r) => $r['panic_active'] ?? false)->count(),\n                'active_alerts' => $activeAlertCount,\n                'wandering_7d' => $wandering7d,\n                'panic_7d' => $panic7d,\n            ],\n            'recent_alerts' => $recentAlerts,\n            'active_outings' => $activeOutings,\n            'geofences' => $mapGeofences,\n            'focus_client_id' => $focusClientId,\n            // Wandering-alerts tab payload (merged from the retired\n            // /fleet-assets/wandering-alerts page) — only when the tab is open.\n            'wandering' => $tab === 'wandering'\n                ? $this->wanderingPayload($request, $clientDevices, $residentAlertBindings)\n                : null,\n            // Assign-tracker modal payload (retired /resident-tracking/assign\n            // page) — only when opened via ?new=1.\n            'assign' => $request->boolean('new') ? $this->assignPayload($user) : null,\n            'can' => [\n                'manage' => (bool) $user?->canDo('fleet.manage'),\n                'manage_alerts' => (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.alerts.manage')),\n            ],\n        ])->toResponse($request)->withHeaders($this->privateLocationHeaders());\n    }\n\n    /**\n     * Wandering-alerts tab payload — ported from the retired\n     * WanderingAlertController index.\n     */",
+          "text_sha256": "89c50bf6b482e447e08b7ce46c92ead745590b6d5fde97f04f929a07b7d777dc"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:252",
+        "render_syntax": "Inertia::render('fleet-assets/resident-tracking/index', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-B20D273C1F997799",
+        "original_partition": "B",
+        "page_file": "resources/js/pages/fleet-assets/resident-tracking/index.tsx",
+        "page_file_sha256": "b2c62fbcb9790e0ec9ec24fdd029204f110bf4b809e664ac4014cb2c043c6439",
+        "page_file_blob_id": "63ece09643526f6f8925da9629d095610d4dcfa1",
+        "render_names": [
+          "fleet-assets/resident-tracking/index"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "fleet-assets/resident-tracking/index",
+          "page_file": "resources/js/pages/fleet-assets/resident-tracking/index.tsx",
+          "source_file": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+          "source_file_sha256": "47799db3da0f0c665e6dd88ac865f5a37bb4def0c696f0a88e400651c5a05ff5",
+          "source_file_blob_id": "9c8798914f8ca25697641c77be332c2475ca6792",
+          "source_line": 252,
+          "source_column": 16,
+          "start_byte": 11404,
+          "source_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:252",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('fleet-assets/resident-tracking/index', ...)"
+        },
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "candidate_union_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:252",
+          "resources/js/pages/fleet-assets/resident-tracking/index.tsx"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "View consented, authorised resident transport tracking",
+        "route_names": "fleet-assets.resident-tracking.assign; fleet-assets.resident-tracking.assign.store; fleet-assets.resident-tracking.export; fleet-assets.resident-tracking.history; fleet-assets.resident-tracking.index; fleet-assets.resident-tracking.locate-now; fleet-assets.resident-tracking.privacy-status; fleet-assets.resident-tracking.unassign",
+        "route_paths": "routes/fleet-assets.php:207-224; routes/fleet-assets.php:212-223",
+        "page_files": "resources/js/pages/fleet-assets/resident-tracking/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:34-754",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "a87ee23c363b0968f43c94f37b404dbc70188f1a2cac418da0f250902a92c815",
+        "page_candidate_sha256": "6dc32f1985bda27dd34ddff5086eac51f6f27c96c4026084d4c1687a0d2c227d",
+        "route_manifest_sha256": "1e4e06e250b5af27eb37d55f8f55d2ca677f99a2844e3a42b4abacb74c7ecb68",
+        "page_manifest_sha256": "339e1e5e81b8f2d998f7befc95befbb5bd4a3acdd73ebd5e2e3330afdcc8bf4a",
+        "page_graph_sha256": "5c76011f1006edafcd55b23dc289dc5e0b1c1001b898fe0a84768873f7da4fd4",
+        "feature_projection_sha256": "16ba57fb11e85181d7b6aeb8559bb2da583e88cb945c89725f447d3461b2fd84",
+        "method_review_slice_sha256": "89c50bf6b482e447e08b7ce46c92ead745590b6d5fde97f04f929a07b7d777dc",
+        "joined_chain_evidence_sha256": "1696a4b4dc14eb1efec9c44ec5c5879ea4cd406832faf369ba1f9c7bda8ed69b"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "fc25eb622cb224d2ec8fc4d747715a540addded80e8a6aedbfce98e60530d259"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-07",
+      "chain_key": "RUN077-ROUTE-0767|PAGE-ROOT-D16A49CB1BA329C4|CAP-FLEET-RESIDENT-TRACKING",
+      "review_partition": "C",
+      "candidate_feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0767",
+        "original_partition": "A",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:214:9:get:84",
+        "source_anchor": "routes/fleet-assets.php:214",
+        "route_method": "get",
+        "literal_uri": "/resident-tracking/history/{client}",
+        "literal_route_name": "fleet-assets.resident-tracking.history",
+        "action_expression": "[ResidentTrackingController::class, 'history']",
+        "statement_excerpt": "Route::get('/resident-tracking/history/{client}', [ResidentTrackingController::class, 'history'])->whereNumber('client')->name('fleet-assets.resident-tracking.history');",
+        "statement_sha256": "7e3f5d39c5b1a496e27764df409553166601b554cf6f442d3653216a6863ae08",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController",
+        "controller_file": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+        "controller_file_sha256": "47799db3da0f0c665e6dd88ac865f5a37bb4def0c696f0a88e400651c5a05ff5",
+        "controller_file_blob_id": "9c8798914f8ca25697641c77be332c2475ca6792",
+        "method": "history",
+        "definition_line": 575,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:575",
+        "method_review_slice": {
+          "start_line": 575,
+          "end_line": 675,
+          "next_method_definition_line": 676,
+          "line_count": 101,
+          "text": "    public function history(Request $request, Client $client)\n    {\n        $user = $request->user();\n        // The parent telemetry permissions are enforced by route middleware.\n        // Once they pass, conceal a Client outside the user's Site/object\n        // scope so this direct location-history route cannot confirm it exists.\n        $this->assertCanDiscoverClientHistory($user, $client);\n        $assignment = $this->assertHasActiveTrackingConsent($user, $client);\n        $device = $assignment->device;\n\n        // Range pills: today | 24h | 7d | 30d | custom. Default 24h.\n        $range = $request->string('range')->toString() ?: '24h';\n        [$dateFrom, $dateTo] = $this->resolveHistoryRange(\n            $range,\n            $request->input('date_from'),\n            $request->input('date_to'),\n        );\n        [$dateFrom, $dateTo] = $this->boundHistoryRangeToAssignment(\n            $assignment,\n            $dateFrom,\n            $dateTo,\n        );\n\n        $eventTypesInput = $request->input('event_types');\n        $eventTypes = is_array($eventTypesInput)\n            ? $eventTypesInput\n            : array_filter(array_map('trim', explode(',', (string) $eventTypesInput)));\n\n        $filters = [\n            'date_from' => $dateFrom,\n            'date_to' => $dateTo,\n            'event_types' => $eventTypes,\n        ];\n\n        $locations = app(IntegrationEventHistoryService::class)\n            ->forDevice($device, $filters, true, $assignment->retention_days);\n        $currentAssignment = $this->trackingPrivacy->authorisedClientAssignment($client);\n        abort_unless(\n            $currentAssignment\n                && (int) $currentAssignment->id === (int) $assignment->id\n                && (int) $currentAssignment->device_id === (int) $assignment->device_id\n                && (int) $currentAssignment->consent_id === (int) $assignment->consent_id,\n            403,\n        );\n\n        $availableEventTypes = $locations\n            ->pluck('event_type')\n            ->filter()\n            ->unique()\n            ->values();\n\n        $client->loadMissing(['site' => fn ($query) => $query->select(['id', 'name'])]);\n        $houseGeofence = $client->house_geofence_id\n            ? $this->applyGeofenceScope(\n                AssetGeofence::query()->whereKey($client->house_geofence_id),\n                $request->user(),\n            )->first()\n            : null;\n        $client->setRelation('houseGeofence', $houseGeofence);\n\n        $resident = $device ? $this->buildResidentPayload($device, $client, []) : null;\n\n        return Inertia::render('fleet-assets/resident-tracking/history', [\n            'client' => [\n                'id' => $client->id,\n                'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),\n                'house' => $client->site?->name ?? 'Unknown',\n                'photo' => $client->profile_photo_url,\n            ],\n            'resident' => $resident,\n            'tracker' => $device ? [\n                'id' => $device->id,\n                'device_uid' => $device->device_uid,\n                'name' => $device->name,\n                'serial' => $device->serial_number,\n                'status' => $device->status?->value,\n                'detail_url' => \"/security-devices/devices/{$device->id}\",\n            ] : null,\n            'locations' => $locations,\n            'available_event_types' => $availableEventTypes,\n            'filters' => [\n                'range' => $range,\n                'date_from' => $dateFrom ? substr((string) $dateFrom, 0, 10) : null,\n                'date_to' => $dateTo ? substr((string) $dateTo, 0, 10) : null,\n                'event_types' => $eventTypes,\n            ],\n            'privacy_status_url' => route(\n                'fleet-assets.resident-tracking.privacy-status',\n                ['client' => $client->id],\n                false,\n            ),\n            'export_url' => route(\n                'fleet-assets.resident-tracking.export',\n                ['client' => $client->id],\n                false,\n            ),\n            'can_export' => $user->canDo('assets.telemetry.export'),\n            'retention_days' => (int) $assignment->retention_days,\n        ])->toResponse($request)->withHeaders($this->privateLocationHeaders());\n    }\n",
+          "text_sha256": "74704714b05ca9a665fbe38da37f2a5939ae78771b8b40fdd4635e2e068ff103"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:637",
+        "render_syntax": "Inertia::render('fleet-assets/resident-tracking/history', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-D16A49CB1BA329C4",
+        "original_partition": "B",
+        "page_file": "resources/js/pages/fleet-assets/resident-tracking/history.tsx",
+        "page_file_sha256": "ca965a15cb31cf648f6fd00b7c716298cb4fdb2c4cfc47b022bf3772d7ddc084",
+        "page_file_blob_id": "7971cb00574829d449d32ef1b0890d7e6c9c28c0",
+        "render_names": [
+          "fleet-assets/resident-tracking/history"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "fleet-assets/resident-tracking/history",
+          "page_file": "resources/js/pages/fleet-assets/resident-tracking/history.tsx",
+          "source_file": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php",
+          "source_file_sha256": "47799db3da0f0c665e6dd88ac865f5a37bb4def0c696f0a88e400651c5a05ff5",
+          "source_file_blob_id": "9c8798914f8ca25697641c77be332c2475ca6792",
+          "source_line": 637,
+          "source_column": 16,
+          "start_byte": 28494,
+          "source_anchor": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:637",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('fleet-assets/resident-tracking/history', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FLEET-RESIDENT-TRACKING"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:637",
+          "resources/js/pages/fleet-assets/resident-tracking/history.tsx"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-RESIDENT-TRACKING",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "View consented, authorised resident transport tracking",
+        "route_names": "fleet-assets.resident-tracking.assign; fleet-assets.resident-tracking.assign.store; fleet-assets.resident-tracking.export; fleet-assets.resident-tracking.history; fleet-assets.resident-tracking.index; fleet-assets.resident-tracking.locate-now; fleet-assets.resident-tracking.privacy-status; fleet-assets.resident-tracking.unassign",
+        "route_paths": "routes/fleet-assets.php:207-224; routes/fleet-assets.php:212-223",
+        "page_files": "resources/js/pages/fleet-assets/resident-tracking/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/ResidentTrackingController.php:34-754",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "fc56a51ada575b89df7101bd36047bf091e194117c3e5e77a0684657a9c7426a",
+        "page_candidate_sha256": "645377444a3a6a7e0fb28e716f104a886b8b355ba50ee86238836b5a28095a46",
+        "route_manifest_sha256": "a9060a32ecc1b799ec80df68a2b38c39d7e49049d719e05426594fff4403ce1f",
+        "page_manifest_sha256": "f5b91cc929d78b660035461057b0b4f8e2f1eedbb99490dd145d86426f83f3a0",
+        "page_graph_sha256": "e17470effe69a58ab4dfb82b1269ded17fb0674cfd72a0206dc21bdff0e15cbe",
+        "feature_projection_sha256": "16ba57fb11e85181d7b6aeb8559bb2da583e88cb945c89725f447d3461b2fd84",
+        "method_review_slice_sha256": "74704714b05ca9a665fbe38da37f2a5939ae78771b8b40fdd4635e2e068ff103",
+        "joined_chain_evidence_sha256": "3f4e5c68ca4d99a0e07274c5a805e185ced6aea5599df880c71b6af0fb31f99a"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "89155b812f4032c428da5bfd7ccb6e41faa63a0a319ef33e2262fed3f46d2213"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-08",
+      "chain_key": "RUN077-ROUTE-0789|PAGE-ROOT-1B90E4C65E93DAD0|CAP-FLEET-HANDOVER-LIFECYCLE",
+      "review_partition": "A",
+      "candidate_feature_id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0789",
+        "original_partition": "A",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:258:5:get:106",
+        "source_anchor": "routes/fleet-assets.php:258",
+        "route_method": "get",
+        "literal_uri": "/handovers/{handover}",
+        "literal_route_name": "fleet-assets.handovers.show",
+        "action_expression": "[HandoverController::class, 'show']",
+        "statement_excerpt": "Route::get('/handovers/{handover}', [HandoverController::class, 'show']) ->whereNumber('handover') ->name('fleet-assets.handovers.show');",
+        "statement_sha256": "7054b628473abb8ff797dbe72750f75223c20b604f9016617598bd52ae6bc370",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-FLEET-HANDOVER-LIFECYCLE"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-FLEET-HANDOVER-LIFECYCLE"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\FleetAssets\\HandoverController",
+        "controller_file": "app/Http/Controllers/FleetAssets/HandoverController.php",
+        "controller_file_sha256": "9bfad3e61467eea9b92e9e7722672d2450578268117a1bb8dec88c2a9c6d68c3",
+        "controller_file_blob_id": "7a217bca8bf20c731660bf801030c71f2d0366b1",
+        "method": "show",
+        "definition_line": 303,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/HandoverController.php:303",
+        "method_review_slice": {
+          "start_line": 303,
+          "end_line": 351,
+          "next_method_definition_line": 352,
+          "line_count": 49,
+          "text": "    public function show(FleetShiftHandover $handover)\n    {\n        $this->assertCanAccessSpecificHandover(\n            request()->user(),\n            $handover,\n            'You are not authorized to view handovers for vehicles at this site.',\n        );\n\n        $handover->load([\n            'asset' => fn ($assetQuery) => $assetQuery->select($this->vehicleOptionColumns()),\n            'outgoingUser:id,name',\n            'incomingUser:id,name',\n        ]);\n\n        return Inertia::render('fleet-assets/handovers/show', [\n            'handover' => [\n                'id' => $handover->id,\n                'asset' => $handover->asset ? [\n                    'id' => $handover->asset->id,\n                    'name' => $handover->asset->name,\n                    'registration_number' => $handover->asset->registration_number,\n                ] : null,\n                'outgoing_user' => $handover->outgoingUser ? [\n                    'id' => $handover->outgoingUser->id,\n                    'name' => $handover->outgoingUser->name,\n                ] : null,\n                'incoming_user' => $handover->incomingUser ? [\n                    'id' => $handover->incomingUser->id,\n                    'name' => $handover->incomingUser->name,\n                ] : null,\n                'odometer_km' => $handover->odometer_km,\n                'fuel_level' => $handover->fuel_level,\n                'exterior_condition' => $handover->exterior_condition,\n                'interior_condition' => $handover->interior_condition,\n                'keys_present' => $handover->keys_present,\n                'documents_present' => $handover->documents_present,\n                'first_aid_kit' => $handover->first_aid_kit,\n                'fire_extinguisher' => $handover->fire_extinguisher,\n                'damage_notes' => $handover->damage_notes,\n                'notes' => $handover->notes,\n                'status' => $handover->status,\n                'handed_over_at' => optional($handover->handed_over_at)->toISOString(),\n                'accepted_at' => optional($handover->accepted_at)->toISOString(),\n                'created_at' => optional($handover->created_at)->toISOString(),\n            ],\n            'current_user_id' => request()->user()->id,\n        ]);\n    }\n",
+          "text_sha256": "c6ea4745e398af3de6d1ddae9207dee652ca3806267efecc71194f25a66204a6"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/FleetAssets/HandoverController.php:317",
+        "render_syntax": "Inertia::render('fleet-assets/handovers/show', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-1B90E4C65E93DAD0",
+        "original_partition": "B",
+        "page_file": "resources/js/pages/fleet-assets/handovers/show.tsx",
+        "page_file_sha256": "a4ff5db29e491eb1295eb92bd24c7a1345f8caf4987add3ec4a73fe052e73051",
+        "page_file_blob_id": "d7b7469034460053264dca55e1de1e4c06cf87e0",
+        "render_names": [
+          "fleet-assets/handovers/show"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "fleet-assets/handovers/show",
+          "page_file": "resources/js/pages/fleet-assets/handovers/show.tsx",
+          "source_file": "app/Http/Controllers/FleetAssets/HandoverController.php",
+          "source_file_sha256": "9bfad3e61467eea9b92e9e7722672d2450578268117a1bb8dec88c2a9c6d68c3",
+          "source_file_blob_id": "7a217bca8bf20c731660bf801030c71f2d0366b1",
+          "source_line": 317,
+          "source_column": 16,
+          "start_byte": 12721,
+          "source_anchor": "app/Http/Controllers/FleetAssets/HandoverController.php:317",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('fleet-assets/handovers/show', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-FLEET-HANDOVER-LIFECYCLE"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "app/Http/Controllers/FleetAssets/HandoverController.php:317",
+          "resources/js/pages/fleet-assets/handovers/show.tsx"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-HANDOVER-LIFECYCLE",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Create, accept, or dispute a fleet handover",
+        "route_names": "fleet-assets.handovers.accept; fleet-assets.handovers.create; fleet-assets.handovers.dispute; fleet-assets.handovers.index; fleet-assets.handovers.show; fleet-assets.handovers.store",
+        "route_paths": "routes/fleet-assets.php:254-270; routes/fleet-assets.php:254-272",
+        "page_files": "resources/js/pages/fleet-assets/handovers/index.tsx",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/HandoverController.php:19-536",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "2cb9d858cf03e16e55d20fedcf8bf5d48827d4dbeeec4ace7c36deedaf671faf",
+        "page_candidate_sha256": "cba2b0b3500920be9c5858701c11caa5632ffd5fc7415f14692eaab5b132af1c",
+        "route_manifest_sha256": "d812debb06622f3b6e2499f3206727b5858b3cd416073679f67361cbf802d8ce",
+        "page_manifest_sha256": "804dfa921cc657709c4b766303ec4ac6b9de4ac9b45f9b66f54635b083730ce7",
+        "page_graph_sha256": "8cdf53e4ba81753dfb217250a4c4a842c106ddacb4bbe0d7cfefd73038018431",
+        "feature_projection_sha256": "48d2fdbc425f02f6287f8359bfb56e16dc5bb97c859cc8ec529e264375765375",
+        "method_review_slice_sha256": "c6ea4745e398af3de6d1ddae9207dee652ca3806267efecc71194f25a66204a6",
+        "joined_chain_evidence_sha256": "9fa29c99256a59f214ee739c07ed4714a8f0533ec09d71ae5ce811c4945ccee6"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "25cde7a1b7273f6493f901d68f70eba6df5c4537c4fcea5f3e17b6b12913f562"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-09",
+      "chain_key": "RUN077-ROUTE-2670|PAGE-ROOT-4E95A6D47CF2DFCE|CAP-INT-SITE-PROVIDER-CONNECTION",
+      "review_partition": "C",
+      "candidate_feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-2670",
+        "original_partition": "B",
+        "route_file": "routes/security-devices.php",
+        "route_file_sha256": "c92b48d3edf7b0d89bd5bdcd77c74b4139d2959fd459b9a53c08fc71e7b0ba3f",
+        "route_file_blob_id": "2a804bf7370fb146e7b96a29c3622004b03163ad",
+        "source_key": "routes/security-devices.php:511:13:get:108",
+        "source_anchor": "routes/security-devices.php:511",
+        "route_method": "get",
+        "literal_uri": "/",
+        "literal_route_name": "security-devices.integrations.unifi",
+        "action_expression": "[UnifiController::class, 'index']",
+        "statement_excerpt": "Route::get('/', [UnifiController::class, 'index']) ->name('security-devices.integrations.unifi');",
+        "statement_sha256": "f7d6c30f13d5d052a8b4076bb33f4fa53684c0a86ea5c27ae41d021f5b68b3a5",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Domain\\SecurityDevices\\Http\\Controllers\\Integrations\\UnifiController",
+        "controller_file": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+        "controller_file_sha256": "0d47aa8a84e8aa3d95c759be491f660ce8bc93dbfbc6a40fa67ea61feaa536b4",
+        "controller_file_blob_id": "93eabc161f49481c4b38ea24702e8dfe5d5e8a53",
+        "method": "index",
+        "definition_line": 53,
+        "definition_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:53",
+        "method_review_slice": {
+          "start_line": 53,
+          "end_line": 215,
+          "next_method_definition_line": 216,
+          "line_count": 163,
+          "text": "    public function index(Request $request)\n    {\n        $user = $request->user();\n        abort_unless($this->userCanManage($user), 403);\n\n        $siteIds = $this->access->accessibleSiteIds($user);\n\n        // Provider connection (never expose encrypted values or raw config)\n        $providerConnection = IntegrationProviderConnection::query()\n            ->forProvider(self::PROVIDER)\n            ->first();\n\n        $connectionConfig = is_array($providerConnection?->config) ? $providerConnection->config : [];\n        $discoveredSites = collect($connectionConfig['discovered_sites'] ?? [])\n            ->map(fn (array $site) => [\n                'mapping_token' => $this->mappingToken((string) ($site['external_id'] ?? '')),\n                'name' => $site['name'] ?? 'Unknown',\n                'device_count' => is_numeric(data_get($site, 'meta.device_count')) ? (int) data_get($site, 'meta.device_count') : null,\n            ])\n            ->filter(fn (array $site) => $site['mapping_token'] !== '')\n            ->values()\n            ->all();\n\n        // Site configs with related site metadata\n        $siteConfigs = IntegrationSiteConfig::query()\n            ->forProvider(self::PROVIDER)\n            ->whereIn('site_id', $siteIds)\n            ->whereHas('site')\n            ->with('site:id,name,type')\n            ->orderBy('site_id')\n            ->get()\n            ->map(fn (IntegrationSiteConfig $config) => [\n                'id' => $config->id,\n                'site_id' => $config->site_id,\n                'site_name' => $config->site?->name ?? 'Unknown site',\n                'site_type' => $config->site?->type,\n                'status' => $config->status,\n                'mapped_external_site_name' => $config->mapped_external_site_name,\n                'is_active' => (bool) $config->is_active,\n            ])\n            ->values()\n            ->all();\n\n        // All approved application Sites available for mapping\n        $sites = Site::query()\n            ->whereIn('id', $siteIds)\n            ->orderBy('name')\n            ->get(['id', 'name', 'type']);\n\n        // Rooms used for room assignment in settings\n        $rooms = SiteRoom::query()\n            ->whereIn('site_id', $siteIds)\n            ->orderBy('site_id')\n            ->orderBy('sort_order')\n            ->orderBy('name')\n            ->get(['id', 'site_id', 'name']);\n\n        // Synced UniFi devices — reads from canonical Security & Devices registry.\n        // Resolves site/room context via device_assignments.\n        $syncedDevices = $this->access->visibleDevices($user)\n            ->byProvider(self::PROVIDER)\n            ->with(['assignments' => fn ($q) => $q->active()])\n            ->orderBy('name')\n            ->get()\n            ->map(function (Device $device) use ($sites, $rooms) {\n                // Resolve site/room from active assignment.\n                $assignment = $device->assignments->first(fn ($a) => $a->released_at === null);\n                $siteId = null;\n                $roomId = null;\n\n                if ($assignment) {\n                    if ($assignment->assignable_type === 'site') {\n                        $siteId = $assignment->assignable_id;\n                    } elseif ($assignment->assignable_type === 'room') {\n                        $roomId = $assignment->assignable_id;\n                        // Resolve site from room.\n                        $room = $rooms->firstWhere('id', $roomId);\n                        $siteId = $room?->site_id;\n                    }\n                }\n\n                $site = $siteId ? $sites->firstWhere('id', $siteId) : null;\n                $room = $roomId ? $rooms->firstWhere('id', $roomId) : null;\n\n                return [\n                    'id' => $device->id,\n                    'site_id' => $siteId,\n                    'site_name' => $site?->name ?? 'Unassigned',\n                    'site_type' => $site?->type,\n                    'room_id' => $roomId,\n                    'room_name' => $room?->name,\n                    'name' => $device->name,\n                    'domain' => $device->domain,\n                    'category' => $device->category,\n                    'subcategory' => $device->subcategory,\n                    'status' => $device->status?->value,\n                    'health_status' => $device->health_status?->value,\n                    'model' => $device->model,\n                    'manufacturer' => $device->manufacturer,\n                    'firmware_version' => $device->firmware_version,\n                    'last_seen_at' => $device->last_seen_at?->toISOString(),\n                    'detail_url' => \"/security-devices/devices/{$device->id}\",\n                ];\n            })\n            ->sortBy('site_name')\n            ->values()\n            ->all();\n\n        // Recent sync logs\n        $syncLogs = IntegrationSyncLog::query()\n            ->forProvider(self::PROVIDER)\n            ->where(function ($query) use ($siteIds): void {\n                $query->whereNull('site_id')->orWhereIn('site_id', $siteIds);\n            })\n            ->orderByDesc('created_at')\n            ->limit(20)\n            ->get()\n            ->map(fn (IntegrationSyncLog $log) => [\n                'id' => $log->id,\n                'action' => $log->action,\n                'status' => $log->status,\n                'items_processed' => $log->items_processed,\n                'items_created' => $log->items_created,\n                'items_updated' => $log->items_updated,\n                'items_errored' => $log->items_errored,\n                'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,\n                'started_at' => $log->started_at?->toDateTimeString(),\n                'completed_at' => $log->completed_at?->toDateTimeString(),\n            ])\n            ->values()\n            ->all();\n\n        return Inertia::render('security-devices/integrations/unifi', [\n            'providerConnection' => $providerConnection ? [\n                'status' => $providerConnection->status,\n                'secret_last4' => $providerConnection->secret_last4,\n                'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),\n                'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),\n                'sites_synced_at' => $connectionConfig['sites_synced_at'] ?? null,\n                'disabled_at' => $providerConnection->disabled_at?->toDateTimeString(),\n                'disabled_reason' => in_array($providerConnection->disabled_reason, self::DISABLE_REASONS, true)\n                    ? $providerConnection->disabled_reason\n                    : null,\n                'requires_credential_replacement' => (bool) $providerConnection->requires_credential_replacement,\n                'recovery_credentials_replaced_at' => $providerConnection->recovery_credentials_replaced_at?->toDateTimeString(),\n                'defaults' => collect($connectionConfig)->only([\n                    'refresh_interval_minutes', 'alert_motion_events', 'alert_device_offline',\n                    'quiet_hours_start', 'quiet_hours_end',\n                ])->all(),\n            ] : null,\n            'discoveredSites' => $discoveredSites,\n            'siteConfigs' => $siteConfigs,\n            'sites' => $sites,\n            'rooms' => $rooms,\n            'syncedDevices' => $syncedDevices,\n            'syncLogs' => $syncLogs,\n            'siteCredentials' => $this->siteCredentials->present($user, self::PROVIDER),\n            'can' => [\n                'manage' => $this->userCanManage($user),\n            ],\n        ]);\n    }\n",
+          "text_sha256": "6d9566b4919298bb0692627cf638339daa1934db25575640630ee17b6da8fd5d"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:185",
+        "render_syntax": "Inertia::render('security-devices/integrations/unifi', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-4E95A6D47CF2DFCE",
+        "original_partition": "C",
+        "page_file": "resources/js/pages/security-devices/integrations/unifi.tsx",
+        "page_file_sha256": "be5f5bddbcd6f13256ea01c896fe23495a2fa3c2925db3f42c0f35daba87724e",
+        "page_file_blob_id": "08a1c015e52e8017e53a3b68d276add22fbb1b8a",
+        "render_names": [
+          "security-devices/integrations/unifi"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "security-devices/integrations/unifi",
+          "page_file": "resources/js/pages/security-devices/integrations/unifi.tsx",
+          "source_file": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php",
+          "source_file_sha256": "0d47aa8a84e8aa3d95c759be491f660ce8bc93dbfbc6a40fa67ea61feaa536b4",
+          "source_file_blob_id": "93eabc161f49481c4b38ea24702e8dfe5d5e8a53",
+          "source_line": 185,
+          "source_column": 16,
+          "start_byte": 7726,
+          "source_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:185",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('security-devices/integrations/unifi', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/security-devices/integrations/unifi.tsx",
+          "app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:185"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+        "feature_class": "H",
+        "module": "Integrations",
+        "user_job": "Configure Site provider connections and governed secrets",
+        "route_names": "security-devices.integrations; security-devices.integrations.milesight; security-devices.integrations.milesight.key; security-devices.integrations.milesight.remove; security-devices.integrations.milesight.rotate; security-devices.integrations.milesight.test; security-devices.integrations.milesight.webhook.remove; security-devices.integrations.milesight.webhook.save; security-devices.integrations.unifi; security-devices.integrations.unifi.disable; security-devices.integrations.unifi.key; security-devices.integrations.unifi.rotate; security-devices.integrations.unifi.test",
+        "route_paths": "routes/security-devices.php:385-387; routes/security-devices.php:504; routes/security-devices.php:504-520; routes/security-devices.php:508-509; routes/security-devices.php:598-599; routes/security-devices.php:598-614; routes/sites.php:423-447; routes/sites.php:77-78",
+        "page_files": "resources/js/pages/security-devices/integrations.tsx:468-555; resources/js/pages/security-devices/integrations/milesight.tsx:146-790; resources/js/pages/security-devices/integrations/unifi.tsx:263-683",
+        "backend_anchors": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:39-381; app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:53-513; app/Http/Controllers/Sites/SiteIntegrationController.php:253-290; app/Http/Controllers/Sites/SiteIntegrationController.php:29-162; app/Http/Controllers/Sites/SiteIntegrationController.php:504-582; app/Http/Controllers/Sites/SiteIntegrationController.php:94-101; app/Http/Controllers/Sites/SiteIntegrationController.php:94-603; app/Models/Integration/IntegrationProviderConnection.php:20-99; app/Models/Integration/IntegrationSiteConfig.php:15-88; app/Models/Integration/IntegrationSiteSecret.php:14-75; app/Policies/SitePolicy.php:20-34; app/Services/Integration/IntegrationSecretManager.php:21; app/Services/Integration/IntegrationSecretManager.php:21-130; app/Services/Integration/IntegrationSecretManager.php:41-600",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "82c846677448a40c02a84cd21da5292fe9da1a1a9e055076937881a2c457fc76",
+        "page_candidate_sha256": "6160c9069db00987edc2e04471d2cfa189ddd4d0a7ae289022d32b2be21ceb32",
+        "route_manifest_sha256": "5562433203cb2c462112e11371a28041ba4567eebc932ef70346acdfce132ec1",
+        "page_manifest_sha256": "84bafba93c0c7f64335cf25115bfa1c8257b348ec8f64d1c099c00750d48e862",
+        "page_graph_sha256": "8927cd3154bdbaf66d79bb6bbeee613cf8ca6c4e15dcdc0b860ec66f1ca6cb6b",
+        "feature_projection_sha256": "62dd8a00c1a11b4a60182dd7c509fe9c9eaaa5ab015c26b55db9451914822d59",
+        "method_review_slice_sha256": "6d9566b4919298bb0692627cf638339daa1934db25575640630ee17b6da8fd5d",
+        "joined_chain_evidence_sha256": "67475dd789c5180bd5344958b6d45ed8a823551c38a8456352ce3df01c5b9b57"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "dcdc5e3fb2cf4cfcaee8857e8d1ec5460ee98242e33df1e937b3a1e0767aebc6"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-10",
+      "chain_key": "RUN077-ROUTE-2703|PAGE-ROOT-01375CB6E81E6D31|CAP-INT-SITE-PROVIDER-CONNECTION",
+      "review_partition": "B",
+      "candidate_feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-2703",
+        "original_partition": "B",
+        "route_file": "routes/security-devices.php",
+        "route_file_sha256": "c92b48d3edf7b0d89bd5bdcd77c74b4139d2959fd459b9a53c08fc71e7b0ba3f",
+        "route_file_blob_id": "2a804bf7370fb146e7b96a29c3622004b03163ad",
+        "source_key": "routes/security-devices.php:601:13:get:141",
+        "source_anchor": "routes/security-devices.php:601",
+        "route_method": "get",
+        "literal_uri": "/",
+        "literal_route_name": "security-devices.integrations.milesight",
+        "action_expression": "[MilesightController::class, 'index']",
+        "statement_excerpt": "Route::get('/', [MilesightController::class, 'index']) ->name('security-devices.integrations.milesight');",
+        "statement_sha256": "7182418ff7977eeeb47cffab0c3ba3602b6ac0c4ecb94b395d6b4d63115d97d9",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Domain\\SecurityDevices\\Http\\Controllers\\Integrations\\MilesightController",
+        "controller_file": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php",
+        "controller_file_sha256": "bfffff1c98bfbfd9ad311d40e3524659024b5f1589f6c68b3468356549bb30db",
+        "controller_file_blob_id": "154851fc09ca38d88e1f810c5a054ed8e35d3e94",
+        "method": "index",
+        "definition_line": 39,
+        "definition_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:39",
+        "method_review_slice": {
+          "start_line": 39,
+          "end_line": 141,
+          "next_method_definition_line": 142,
+          "line_count": 103,
+          "text": "    public function index(Request $request)\n    {\n        $user = $request->user();\n        abort_unless($this->userCanManage($user), 403);\n\n        $providerConnection = IntegrationProviderConnection::query()\n            ->forProvider(self::PROVIDER)\n            ->first();\n\n        $config = is_array($providerConnection?->config) ? $providerConnection->config : [];\n        $latestWebhookEventAt = IntegrationEvent::query()\n            ->where('provider', self::PROVIDER)\n            ->latest('received_at')\n            ->first(['received_at'])\n            ?->received_at;\n        $siteIds = $this->access->accessibleSiteIds($user);\n        $discoveredApplications = collect($config['discovered_applications'] ?? [])\n            ->filter(fn (mixed $application): bool => is_array($application))\n            ->map(fn (array $application): array => [\n                'mapping_token' => $this->mappingToken((string) ($application['external_id'] ?? '')),\n                'name' => (string) ($application['name'] ?? 'Unknown application'),\n                'device_count' => is_numeric(data_get($application, 'meta.device_count'))\n                    ? (int) data_get($application, 'meta.device_count')\n                    : null,\n            ])\n            ->filter(fn (array $application): bool => $application['mapping_token'] !== '')\n            ->values()\n            ->all();\n        $siteConfigs = IntegrationSiteConfig::query()\n            ->forProvider(self::PROVIDER)\n            ->whereIn('site_id', $siteIds)\n            ->whereHas('site')\n            ->with('site:id,name,type')\n            ->orderBy('site_id')\n            ->get()\n            ->map(fn (IntegrationSiteConfig $siteConfig): array => [\n                'id' => $siteConfig->id,\n                'site_id' => $siteConfig->site_id,\n                'site_name' => $siteConfig->site?->name ?? 'Unknown Site',\n                'site_type' => $siteConfig->site?->type,\n                'mapped_external_site_name' => $siteConfig->mapped_external_site_name,\n                'is_active' => (bool) $siteConfig->is_active,\n            ])\n            ->values()\n            ->all();\n        $sites = Site::query()\n            ->whereIn('id', $siteIds)\n            ->orderBy('name')\n            ->get(['id', 'name', 'type']);\n\n        $syncLogs = IntegrationSyncLog::query()\n            ->forProvider(self::PROVIDER)\n            ->where(function ($query) use ($siteIds): void {\n                $query->whereNull('site_id')->orWhereIn('site_id', $siteIds);\n            })\n            ->orderByDesc('created_at')\n            ->limit(10)\n            ->get()\n            ->map(fn (IntegrationSyncLog $log) => [\n                'id' => $log->id,\n                'action' => $log->action,\n                'status' => $log->status,\n                'items_processed' => $log->items_processed,\n                'items_created' => $log->items_created,\n                'items_updated' => $log->items_updated,\n                'items_errored' => $log->items_errored,\n                'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,\n                'started_at' => $log->started_at?->toDateTimeString(),\n                'completed_at' => $log->completed_at?->toDateTimeString(),\n            ])\n            ->values()\n            ->all();\n\n        return Inertia::render('security-devices/integrations/milesight', [\n            'providerConnection' => $providerConnection ? [\n                'status' => $providerConnection->status,\n                'secret_last4' => $providerConnection->secret_last4,\n                'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),\n                'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),\n                'endpoint_configured' => filled($config['base_url'] ?? null),\n                'client_id_configured' => filled($config['client_id'] ?? null),\n                'applications_synced_at' => $config['applications_synced_at'] ?? null,\n                'webhook_configured' => $this->secrets->applicationConfigured(\n                    $providerConnection,\n                    IntegrationSecretManager::PURPOSE_WEBHOOK,\n                ) || filled($config['webhook_secret_encrypted'] ?? null),\n                'webhook_secret_last4' => filled($config['webhook_secret_last4'] ?? null)\n                    ? (string) $config['webhook_secret_last4']\n                    : null,\n                'webhook_url' => route('webhooks.receive', ['provider' => self::PROVIDER]),\n                'last_webhook_received_at' => $latestWebhookEventAt?->toDateTimeString(),\n            ] : null,\n            'discoveredApplications' => $discoveredApplications,\n            'siteConfigs' => $siteConfigs,\n            'sites' => $sites,\n            'syncLogs' => $syncLogs,\n            'siteCredentials' => $this->siteCredentials->present($user, self::PROVIDER),\n            'can' => [\n                'manage' => $this->userCanManage($user),\n            ],\n        ]);\n    }\n",
+          "text_sha256": "31b995825995433fbe54531d0c433f8eb2a7d29865c7e433fa5532ffe8ddc4c9"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:112",
+        "render_syntax": "Inertia::render('security-devices/integrations/milesight', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-01375CB6E81E6D31",
+        "original_partition": "C",
+        "page_file": "resources/js/pages/security-devices/integrations/milesight.tsx",
+        "page_file_sha256": "16ea2173e988ee724ff06ceda2eff221bd5b19d5b411df5561dea0685755add3",
+        "page_file_blob_id": "b8c772f98eb87c7418433a36dad455735a49178f",
+        "render_names": [
+          "security-devices/integrations/milesight"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "security-devices/integrations/milesight",
+          "page_file": "resources/js/pages/security-devices/integrations/milesight.tsx",
+          "source_file": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php",
+          "source_file_sha256": "bfffff1c98bfbfd9ad311d40e3524659024b5f1589f6c68b3468356549bb30db",
+          "source_file_blob_id": "154851fc09ca38d88e1f810c5a054ed8e35d3e94",
+          "source_line": 112,
+          "source_column": 16,
+          "start_byte": 4835,
+          "source_anchor": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:112",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('security-devices/integrations/milesight', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-INT-SITE-PROVIDER-CONNECTION"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/security-devices/integrations/milesight.tsx",
+          "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:112"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-INT-SITE-PROVIDER-CONNECTION",
+        "feature_class": "H",
+        "module": "Integrations",
+        "user_job": "Configure Site provider connections and governed secrets",
+        "route_names": "security-devices.integrations; security-devices.integrations.milesight; security-devices.integrations.milesight.key; security-devices.integrations.milesight.remove; security-devices.integrations.milesight.rotate; security-devices.integrations.milesight.test; security-devices.integrations.milesight.webhook.remove; security-devices.integrations.milesight.webhook.save; security-devices.integrations.unifi; security-devices.integrations.unifi.disable; security-devices.integrations.unifi.key; security-devices.integrations.unifi.rotate; security-devices.integrations.unifi.test",
+        "route_paths": "routes/security-devices.php:385-387; routes/security-devices.php:504; routes/security-devices.php:504-520; routes/security-devices.php:508-509; routes/security-devices.php:598-599; routes/security-devices.php:598-614; routes/sites.php:423-447; routes/sites.php:77-78",
+        "page_files": "resources/js/pages/security-devices/integrations.tsx:468-555; resources/js/pages/security-devices/integrations/milesight.tsx:146-790; resources/js/pages/security-devices/integrations/unifi.tsx:263-683",
+        "backend_anchors": "app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php:39-381; app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php:53-513; app/Http/Controllers/Sites/SiteIntegrationController.php:253-290; app/Http/Controllers/Sites/SiteIntegrationController.php:29-162; app/Http/Controllers/Sites/SiteIntegrationController.php:504-582; app/Http/Controllers/Sites/SiteIntegrationController.php:94-101; app/Http/Controllers/Sites/SiteIntegrationController.php:94-603; app/Models/Integration/IntegrationProviderConnection.php:20-99; app/Models/Integration/IntegrationSiteConfig.php:15-88; app/Models/Integration/IntegrationSiteSecret.php:14-75; app/Policies/SitePolicy.php:20-34; app/Services/Integration/IntegrationSecretManager.php:21; app/Services/Integration/IntegrationSecretManager.php:21-130; app/Services/Integration/IntegrationSecretManager.php:41-600",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "9e5aaaa4f8594abc180697fc5212210c57dcdef634114a51e40f6066dd2d7ca2",
+        "page_candidate_sha256": "28e6c2a6cbd39d98a41d7a73a08b2d86a312d247cc92c158a27d4d1c0f916ccb",
+        "route_manifest_sha256": "10c1f4a634c04a456503a470c18f399e75a4758b067b3ced5b95e3c222d33833",
+        "page_manifest_sha256": "1ee591787841ee1dcc5a0375a7aa883a7c17b0f9f62c32c404f2a9d4d35bde15",
+        "page_graph_sha256": "7f72d6a3c30e1cc2c8b24c9141a777e161073e382eb5244c7cef7f56152557b4",
+        "feature_projection_sha256": "62dd8a00c1a11b4a60182dd7c509fe9c9eaaa5ab015c26b55db9451914822d59",
+        "method_review_slice_sha256": "31b995825995433fbe54531d0c433f8eb2a7d29865c7e433fa5532ffe8ddc4c9",
+        "joined_chain_evidence_sha256": "f39f65e7496abf8372e7401f3c11c255f194fc8d2c394b4bce5d1b7c7d41759a"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "5b23150491e675e983899a78bfdab708a3116c86b8d578925e7230ca6c0f7bb8"
+    },
+    {
+      "chain_id": "RUN091-CHAIN-11",
+      "chain_key": "RUN077-ROUTE-2803|PAGE-ROOT-2558067F89264E11|CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+      "review_partition": "A",
+      "candidate_feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-2803",
+        "original_partition": "B",
+        "route_file": "routes/settings.php",
+        "route_file_sha256": "37c98a2f1ef9312644a7a4ce9301cd1e31b3a8aa70b2add72c1222b251e610e8",
+        "route_file_blob_id": "d4b00c33b29b3ed82b9abb16467c62b0679c8239",
+        "source_key": "routes/settings.php:312:9:get:86",
+        "source_anchor": "routes/settings.php:312",
+        "route_method": "get",
+        "literal_uri": "settings/calendar-sync",
+        "literal_route_name": "settings.calendar-sync",
+        "action_expression": "[CalendarSyncSettingsController::class, 'index']",
+        "statement_excerpt": "Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index']) ->name('settings.calendar-sync');",
+        "statement_sha256": "f4a408fc0905eeb0c31463e00906e53a47e7861b9321cef4aba17c0a3c749387",
+        "candidate_relation": "BOTH_LANES_IDENTICAL",
+        "name_candidate_feature_ids": [
+          "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION"
+        ],
+        "backend_candidate_feature_ids": [
+          "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION"
+        ]
+      },
+      "controller_action_bridge": {
+        "relation_class": "STATIC_CONTROLLER_ACTION_BRIDGE_CANDIDATE",
+        "controller_fqcn": "App\\Http\\Controllers\\Settings\\CalendarSyncSettingsController",
+        "controller_file": "app/Http/Controllers/Settings/CalendarSyncSettingsController.php",
+        "controller_file_sha256": "8514557673fdbbd3de1307decf2756f76b3b81a73c7fa793516b6d25d4473801",
+        "controller_file_blob_id": "814b4ce8fa32db662f463f384280d1bde4f204f3",
+        "method": "index",
+        "definition_line": 43,
+        "definition_anchor": "app/Http/Controllers/Settings/CalendarSyncSettingsController.php:43",
+        "method_review_slice": {
+          "start_line": 43,
+          "end_line": 118,
+          "next_method_definition_line": 119,
+          "line_count": 76,
+          "text": "    public function index(Request $request): Response\n    {\n        $this->authorizeManage($request);\n\n        $siteIds = $this->siteAccess->accessibleSiteIds(\n            $request->user(),\n            self::SITE_BYPASS_PERMISSIONS,\n        );\n\n        $connections = CalendarSyncConnection::query()\n            ->get()\n            ->keyBy('provider');\n\n        $providers = collect(self::PROVIDERS)->map(function (string $label, string $key) use ($connections) {\n            $conn = $connections->get($key);\n\n            return [\n                'key' => $key,\n                'label' => $label,\n                'configured' => $this->isConfigured($key),\n                'connected' => (bool) $conn?->isConnected(),\n                'accountEmail' => $conn?->account_email,\n                'accountName' => $conn?->account_name,\n                'lastSyncedAt' => $conn?->last_synced_at?->toIso8601String(),\n                'status' => $conn?->status ?? CalendarSyncConnection::STATUS_DISCONNECTED,\n            ];\n        })->values()->all();\n\n        $mappingGroups = CalendarSyncMapping::query()\n            ->active()\n            ->whereIn('site_id', $siteIds)\n            ->get()\n            ->groupBy(fn (CalendarSyncMapping $mapping): int => (int) $mapping->site_id);\n        abort_if(\n            $mappingGroups->contains(fn ($siteMappings): bool => $siteMappings->count() > 1),\n            409,\n            'Calendar mapping configuration requires reconciliation before it can be managed.',\n        );\n        $mappings = $mappingGroups->map(fn ($siteMappings) => $siteMappings->first());\n\n        $sites = Site::query()\n            ->active()\n            ->notArchived()\n            ->whereNull('archived_at')\n            ->whereIn('id', $siteIds)\n            ->orderBy('name')\n            ->get(['id', 'name', 'type'])\n            ->map(function (Site $site) use ($mappings) {\n                $mapping = $mappings->get($site->id);\n\n                return [\n                    'id' => $site->id,\n                    'name' => $site->name,\n                    'type' => $site->type,\n                    'mapping' => $mapping ? $this->mappingPayload($mapping) : null,\n                ];\n            })\n            ->values()\n            ->all();\n\n        return Inertia::render('settings/calendar-sync', [\n            'providers' => $providers,\n            'sites' => $sites,\n            'sources' => CalendarSources::pushable(),\n            'directions' => [\n                ['key' => CalendarSyncMapping::DIRECTION_ONE_WAY, 'label' => 'One-way (push out)'],\n                ['key' => CalendarSyncMapping::DIRECTION_TWO_WAY, 'label' => 'Two-way (push + pull busy)'],\n            ],\n            'settings' => $this->loadSettings(),\n            'anyConnected' => collect($providers)->contains('connected', true),\n        ]);\n    }\n\n    /**\n     * Upsert the per-house mapping. An empty provider deactivates the house's mappings.\n     */",
+          "text_sha256": "48a56def05a1acc3f2bac61c720c39ce41efac08a08ab2dc56be95c19ad9ee7c"
+        },
+        "literal_render_count_inside_method_slice": 1,
+        "render_source_anchor": "app/Http/Controllers/Settings/CalendarSyncSettingsController.php:103",
+        "render_syntax": "Inertia::render('settings/calendar-sync', ...)",
+        "ownership_credit": false
+      },
+      "page_source": {
+        "page_record_id": "PAGE-ROOT-2558067F89264E11",
+        "original_partition": "C",
+        "page_file": "resources/js/pages/settings/calendar-sync.tsx",
+        "page_file_sha256": "7f17c162ac151737a6e993130639f75ab6f4c34e5cad16e2b40843395514e5d6",
+        "page_file_blob_id": "c4a62756991a76284d12c745e3bcb33c6317c9aa",
+        "render_names": [
+          "settings/calendar-sync"
+        ],
+        "render_call_count": 1,
+        "joined_render_callsite": {
+          "render_name": "settings/calendar-sync",
+          "page_file": "resources/js/pages/settings/calendar-sync.tsx",
+          "source_file": "app/Http/Controllers/Settings/CalendarSyncSettingsController.php",
+          "source_file_sha256": "8514557673fdbbd3de1307decf2756f76b3b81a73c7fa793516b6d25d4473801",
+          "source_file_blob_id": "814b4ce8fa32db662f463f384280d1bde4f204f3",
+          "source_line": 103,
+          "source_column": 16,
+          "start_byte": 3561,
+          "source_anchor": "app/Http/Controllers/Settings/CalendarSyncSettingsController.php:103",
+          "call_kind": "Inertia::render",
+          "syntax": "Inertia::render('settings/calendar-sync', ...)"
+        },
+        "candidate_relation": "RENDER_OWNER_ONLY",
+        "candidate_union_feature_ids": [
+          "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION"
+        ],
+        "page_graph_partition": "LITERAL_RENDERED_PAGE_ROOT",
+        "page_graph_prompt_classification": "Evidence gap",
+        "page_graph_root_source_anchors": [
+          "resources/js/pages/settings/calendar-sync.tsx",
+          "app/Http/Controllers/Settings/CalendarSyncSettingsController.php:103"
+        ]
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-INT-SITE-RESOURCE-CALENDAR-CONNECTION",
+        "feature_class": "H",
+        "module": "Integrations",
+        "user_job": "Configure application-level calendar provider connections, approved-Site resource mappings, cadence, and conflict policy.",
+        "route_names": "settings.calendar-sync; settings.calendar-sync.callback; settings.calendar-sync.connect; settings.calendar-sync.disconnect; settings.calendar-sync.mapping; settings.calendar-sync.resources; settings.calendar-sync.settings",
+        "route_paths": "routes/settings.php:312-331",
+        "page_files": "resources/js/pages/settings/calendar-sync.tsx:117-140",
+        "backend_anchors": "app/Http/Controllers/Settings/CalendarSyncOAuthController.php:12-109; app/Http/Controllers/Settings/CalendarSyncSettingsController.php:22-260",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "evidence_digests": {
+        "route_candidate_sha256": "569fe2c13d9549151c473a31d720a65e47736383e35723f59619ff7979aacc61",
+        "page_candidate_sha256": "e3c7dd4a10a4f952b148438f479bd5905dde2e2661f7ee7183bd13692c0e166a",
+        "route_manifest_sha256": "b87ffa0970c50493ae91a54afba42f4d64376dbc4146c42be858b5fc2d3f3252",
+        "page_manifest_sha256": "b0bc364f4052f6e585e0b2871a4ef941b16759a0aa94f9cf13fd754543e17a9f",
+        "page_graph_sha256": "19d91750435dd03f8a3069416b903c9fc3df159c126965835022f347ede433fa",
+        "feature_projection_sha256": "6ae7b7bb58909d9f248b23c32231f318c31016d0f4e7fc18f414f785c0a653cf",
+        "method_review_slice_sha256": "48a56def05a1acc3f2bac61c720c39ce41efac08a08ab2dc56be95c19ad9ee7c",
+        "joined_chain_evidence_sha256": "5c48b2bbdc40c75aa8dc5ea78f15c08bdb3527413556c6d66234f96cade7cc17"
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_CHAIN",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "route_ownership_credit": false,
+        "page_ownership_credit": false,
+        "controller_action_bridge_credit": false
+      },
+      "chain_record_sha256": "967bb2db24c801e83530f02aa32c8080e6c50b8ec98b6d503a14ad834b33746c"
+    }
+  ],
+  "fresh_review_contract": {
+    "status": "PENDING",
+    "required_reviews": 3,
+    "required_outcome_per_chain": true,
+    "allowed_outcomes": [
+      "OWNER_CHAIN",
+      "SHARED_RELATION",
+      "ALIAS_OR_REDIRECT",
+      "DEAD_OR_NONCANONICAL",
+      "EVIDENCE_GAP"
+    ],
+    "required_checks": [
+      "Reconstruct the assigned chains directly from pinned matrix, route/page manifest, classification, candidate manifest, page graph, and prior reviewed ledger.",
+      "Read the complete route statement, exact controller-method review slice, rendered page root, and canonical matrix user job.",
+      "Reject shared shells, multi-feature actions/pages, semantic mismatch, nonexact actions, multiple/dynamic render roots, dead/noncanonical routes, and evidence gaps.",
+      "Return an explicit outcome and rationale for every assigned chain; literal matches alone are insufficient.",
+      "Keep permission/Site/privacy readiness and all framework/runtime/browser/test/benchmark/Pass/finding/completion credit separate and false."
+    ],
+    "ownership_integration_authorized": false
+  },
+  "projected_overlay_only_if_all_11_are_explicit_owner_chain": {
+    "static_route_owners": {
+      "before": 212,
+      "after": 223
+    },
+    "static_page_owners": {
+      "before": 318,
+      "after": 329
+    },
+    "bounded_static_source_owners": {
+      "before": 530,
+      "after": 552,
+      "denominator": 3929
+    },
+    "bounded_static_source_ownership_percent_after": "14.049376",
+    "explicit_unmapped_routes": {
+      "before": 3003,
+      "after": 2992
+    },
+    "page_evidence_gaps": {
+      "before": 393,
+      "after": 382
+    },
+    "distinct_owned_feature_ids": {
+      "before": 235,
+      "after": 240
+    },
+    "static_controller_action_bridges": {
+      "before": 0,
+      "after": 11
+    },
+    "projection_credit_awarded": false
+  },
+  "denominator_boundary": {
+    "run_077_bounded_static_records": 3929,
+    "framework_expanded_route_page_denominator": null,
+    "page_denominator_711_roots_vs_963_page_tree_files_resolved": false,
+    "gate_4_complete": false
+  },
+  "credit_boundary": {
+    "closed_static_candidate_cohort": true,
+    "static_source_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "navigation": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-closed-route-action-page-chain-cohort-wave-11.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/root-run-091-closed-route-action-page-chain-cohort-wave-11.json"
+  ]
+}

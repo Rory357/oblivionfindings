@@ -1,0 +1,286 @@
+{
+  "schema_version": "run-091r-independent-closed-route-action-page-chain-review-wave-11-v1",
+  "run_id": "RUN-091R-INDEPENDENT-CLOSED-ROUTE-ACTION-PAGE-CHAIN-REVIEW",
+  "status": "GO_THREE_PART_REVIEW_COMPLETE_NINE_OWNER_CHAINS_TWO_SHARED_RELATIONS",
+  "reviewed_on": "2026-08-25",
+  "decision": {
+    "verdict": "GO_WITH_EXPLICIT_NON_OWNER_DECISIONS",
+    "mechanical_discrepancies": 0,
+    "owner_chains": 9,
+    "shared_relation_chains": 2,
+    "static_source_feature_ownership_records_authorized": 18,
+    "static_controller_action_bridges_authorized": 9,
+    "all_11_owner_overlay_authorized": false,
+    "complete_route_page_feature_crosswalk_authorized": false,
+    "matrix_mutation_authorized": false,
+    "downstream_credit_authorized": false,
+    "gate_4_complete": false
+  },
+  "pins": {
+    "checkpoint_commit": "786a2e2f8ab21142d0cb93bd9f5ceb1bf1aa6bb5",
+    "checkpoint_tree": "a1b32e32ef254a07016990051ed30eb28fdf8b9e",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "producer": "evidence/source/root-run-091-closed-route-action-page-chain-cohort-wave-11.json",
+    "producer_sha256": "7b1fea57104e9f4bfea7ee450ef535ac57e7fa69bc978212b4eafb0fe1ed0cae",
+    "generator": "generators/build-closed-route-action-page-chain-cohort-wave-11.py",
+    "generator_sha256": "68c47e238fa0ab11971b867bebe56ca8b5ffe93429ef0d2a026881d55f29d9a9",
+    "direct_queue_sha256": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+    "inputs": {
+      "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+      "evidence/source/current-route-page-classification-wave-07.json": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+      "evidence/source/root-run-082-exact-owner-containment-candidate-manifest-wave-08.json": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
+      "evidence/source/raw-run-082r-independent-exact-owner-containment-review-wave-08.json": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396",
+      "evidence/source/root-run-084-full-inertia-page-graph-wave-09.json": "f3856a7a86cd236684e223713a99dd64b18df692338e5d7aba688701b7c438f9",
+      "evidence/source/raw-run-084r-independent-full-inertia-page-graph-review-wave-09.json": "036394a207f6f31c336f748bae9daed75d86549529de538510374149d56f506e",
+      "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+      "evidence/source/raw-run-086r-independent-reviewed-static-route-page-feature-ownership-wave-10.json": "56c4832af941353aaf230ca17c792ea7191c6aebfc05bc1c511a757d5998d699",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5"
+    }
+  },
+  "methods": [
+    "Three read-only reviewers independently reconstructed disjoint fresh partitions A, B, and C from the pinned matrix, route/page manifest, classification, candidate manifest, page graph, and prior reviewed ownership ledger without trusting the producer generator.",
+    "Every reviewer recomputed partition membership, source/blob/content fields, component and joined-evidence digests, method-review-slice digests, chain-row digests, and false downstream boundaries.",
+    "Every assigned route statement, complete controller-method slice, complete page root, and canonical matrix user job was read before an explicit OWNER_CHAIN or SHARED_RELATION decision was returned.",
+    "A direct literal match was rejected as one-to-one ownership where the full method/page implemented another explicit matrix feature."
+  ],
+  "verified_counts": {
+    "partition_reviews": 3,
+    "go_review_completeness": 3,
+    "mechanical_discrepancies": 0,
+    "reviewed_chains": 11,
+    "owner_chains": 9,
+    "shared_relation_chains": 2,
+    "accepted_route_records": 9,
+    "accepted_page_records": 9,
+    "accepted_source_records": 18,
+    "accepted_controller_action_bridges": 9,
+    "accepted_distinct_feature_ids": 8,
+    "shared_route_records_retained_unowned": 2,
+    "shared_page_records_retained_unowned": 2,
+    "reviewer_written_files": 0,
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0
+  },
+  "verified_global_identity": {
+    "reviewed_route_record_id_list_sha256": "a54901d758b2b40afc4071c90248fdaab3229175e7034f07065025fb4aa0d159",
+    "reviewed_page_record_id_list_sha256": "a0608b327322ceb6915c62c60767444c26b3e4a77871192d630bc549f18de100",
+    "reviewed_feature_id_list_sha256": "f0d27f9c01e639eb51d7674a6bffe4dcdd1bfdf6adbd43a7ba404df99715f139",
+    "reviewed_chain_key_list_sha256": "d58a680e353b2cbcaef732f020660e525e08858627398280d3e4d58da3d8eedd",
+    "reviewed_chain_record_sha256_list_sha256": "ead43cf5072fbc9691e4ea2ae5911e9bdc5eb39d9bbb2c54c53925511ecbc184",
+    "reviewed_records_sha256": "ed36ce99c7950ba85a4d3a6a787fac7ad2bd4843058707ee2110c11c642e16c2",
+    "owner_chain_key_list_sha256": "70fc80182cc8466362a1d312867c9a24f9329852729c565bea07371f9e3ee585",
+    "owner_route_record_id_list_sha256": "f555d6b1031c8d04cdb15869662c7a08838eaffe84fdeaba8dc07471ad105ed8",
+    "owner_page_record_id_list_sha256": "486b658651b75a4b87b3e0540ff1925836ee4a63263ce604f2aff71d9a874edc",
+    "owner_feature_id_list_sha256": "2f02ff110e037045ce71e141db510dc0793dce9d34e2bcde510793b2b2c8333a",
+    "owner_chain_record_sha256_list_sha256": "a83b940f137c2687458e873dc8933391e9e0b781a7f361895f6d205634a68525",
+    "shared_chain_key_list_sha256": "64a90e557d61c22b713c71631621ce21b527784d0950935ce8cde2414d4fd0ca",
+    "shared_route_record_id_list_sha256": "06931487f6f33213f593f53dbe9773db9c8bc0d4c6e167e880a5296e5291e7fa",
+    "shared_page_record_id_list_sha256": "0bf20bbf8f808dc5094871d638468b2514de285cbca77a0b8eca08a13b86b2d2",
+    "shared_feature_id_list_sha256": "24fdc7959513a8b405783b438e06ac7a905578709b16b4a93d6241e792397b3d"
+  },
+  "partition_reviews": [
+    {
+      "partition_id": "A",
+      "reviewer_task_path": "/root/run084_reporting_reconcile",
+      "verdict": "GO_REVIEW_COMPLETE_THREE_OWNER_ONE_SHARED",
+      "chain_count": 4,
+      "owner_chains": 3,
+      "shared_relation_chains": 1,
+      "chain_key_list_sha256": "01f178919158f2b208c3c0687fefc0e4617bbecea8d105613ac577fb203695c3",
+      "chain_record_sha256_list_sha256": "20afb72c3054f83720e9c2916c4e2155b9ecf3b32ee63963d077ae09cbbc6283",
+      "discrepancies": {
+        "pins": [],
+        "partition": [],
+        "row_fields": [],
+        "source_hashes_or_blobs": [],
+        "evidence_digests": [],
+        "false_boundaries": []
+      },
+      "wrote_files": false,
+      "write_scope": []
+    },
+    {
+      "partition_id": "B",
+      "reviewer_task_path": "/root/run086_gate_reaudit",
+      "verdict": "GO_REVIEW_COMPLETE_ONE_OWNER_ONE_SHARED",
+      "chain_count": 2,
+      "owner_chains": 1,
+      "shared_relation_chains": 1,
+      "chain_key_list_sha256": "aed06c3636befacfe75ba20f0ece6d824d8fbd3c726ee3b0f3fabda9d8b680fe",
+      "chain_record_sha256_list_sha256": "887f940d471d4fc228ebb4ef860dcb5db8d270df1af0b233b95797ceed7bfa15",
+      "canonical_partition_records_sha256": "6a30e3b4f06db6dc3c4c21dc427bb9ff9f1887e1cd3eb97f3be28a0b20723678",
+      "discrepancies": {
+        "pins": [],
+        "records": [],
+        "source_anchors_or_hashes": [],
+        "evidence_digests": [],
+        "credit_boundaries": []
+      },
+      "wrote_files": false,
+      "write_scope": []
+    },
+    {
+      "partition_id": "C",
+      "reviewer_task_path": "/root/run087_reporting_design",
+      "verdict": "GO_REVIEW_COMPLETE_FIVE_OWNER",
+      "chain_count": 5,
+      "owner_chains": 5,
+      "shared_relation_chains": 0,
+      "chain_key_list_sha256": "3a2069025dfeced7d8c620610b86a9ab4f87835fe2023494daad47b6d873e102",
+      "chain_record_sha256_list_sha256": "8d0d99a8c7a4f954bd59704a3e2f6791d566b671c49ee5c1625c744cafe969a3",
+      "discrepancies": {
+        "partition": [],
+        "pins": [],
+        "source_fields": [],
+        "component_digests": [],
+        "joined_chain_digests": [],
+        "record_digests": [],
+        "credit_boundaries": []
+      },
+      "wrote_files": false,
+      "write_scope": []
+    }
+  ],
+  "chain_decisions": [
+    {
+      "chain_id": "RUN091-CHAIN-01",
+      "partition_id": "C",
+      "chain_record_sha256": "7447b1f993795194c6aae5b907f1c933761230dd0544602940620733a47858cf",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The permission-gated compliance route, Site-scoped command-centre action, sole compliance/index render, complete page, and exception/due-work matrix job are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-02",
+      "partition_id": "A",
+      "chain_record_sha256": "dba4c2c6805869921d7d967a523574b3249b76b29d6de7230e045d3b80b91b66",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The create route, unique FX revaluation action, sole render, complete page, and preview/create revaluation job are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-03",
+      "partition_id": "C",
+      "chain_record_sha256": "c871708c16162d1b33ecd1131727da187f6c763608786241d40759756eedd7ce",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The accounting-integration index route/action, sole finance integration render, complete provider configuration page, and canonical configuration job are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-04",
+      "partition_id": "A",
+      "chain_record_sha256": "cd94f70e1ac6df373788f689bc773da0703a8cffded458f6aef23c5899bb1c9e",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The vehicle show route/action/page form the vehicle register/profile; linked fleet summaries remain subordinate projections rather than a second page owner."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-05",
+      "partition_id": "B",
+      "chain_record_sha256": "9c95411c4286e0f359a412503762567c4bafab9f3723b0effbce8b1020c36171",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The work-order show route/action/page displays the exact work order and its lifecycle progression, closure statuses, cost, and notes without a competing page owner."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-06",
+      "partition_id": "C",
+      "chain_record_sha256": "fc25eb622cb224d2ec8fc4d747715a540addded80e8a6aedbfce98e60530d259",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The authorised and consent-filtered resident tracking index action, sole root, complete page, and tracking job are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-07",
+      "partition_id": "C",
+      "chain_record_sha256": "89155b812f4032c428da5bfd7ccb6e41faa63a0a319ef33e2262fed3f46d2213",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The concealed, consent-checked, retention-bounded resident history action, sole history render, complete page, and resident-tracking job are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-08",
+      "partition_id": "A",
+      "chain_record_sha256": "25cde7a1b7273f6493f901d68f70eba6df5c4537c4fcea5f3e17b6b12913f562",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The handover show route, unique action, sole page, and accept/dispute handover lifecycle are one coherent static feature chain."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-09",
+      "partition_id": "C",
+      "chain_record_sha256": "dcdc5e3fb2cf4cfcaee8857e8d1ec5460ee98242e33df1e937b3a1e0767aebc6",
+      "outcome": "OWNER_CHAIN",
+      "rationale": "The governed UniFi integration action and complete page configure, test, and synchronise one provider connection within accessible Sites without exposing raw secrets."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-10",
+      "partition_id": "B",
+      "chain_record_sha256": "5b23150491e675e983899a78bfdab708a3116c86b8d578925e7230ca6c0f7bb8",
+      "outcome": "SHARED_RELATION",
+      "rationale": "The Milesight method/page also implements application discovery, Site mapping, Device synchronisation/removal, and sync logs explicitly assigned to CAP-INT-SITE-PROVIDER-SYNC; no one-to-one owner is allowed."
+    },
+    {
+      "chain_id": "RUN091-CHAIN-11",
+      "partition_id": "A",
+      "chain_record_sha256": "967bb2db24c801e83530f02aa32c8080e6c50b8ec98b6d503a14ad834b33746c",
+      "outcome": "SHARED_RELATION",
+      "rationale": "The calendar connection/settings page also directly initiates Sync now and its same page slice is assigned to CAP-INT-SITE-RESOURCE-CALENDAR-SYNC; no one-to-one owner is allowed."
+    }
+  ],
+  "bounded_integration_projection": {
+    "status": "AUTHORIZED_FOR_NINE_EXPLICIT_OWNER_CHAINS_ONLY",
+    "baseline_source_owner_records": 530,
+    "accepted_new_source_owner_records": 18,
+    "combined_source_owner_records": 548,
+    "combined_route_owner_records": 221,
+    "combined_page_owner_records": 327,
+    "combined_distinct_feature_ids": 239,
+    "combined_distinct_H_feature_ids": 223,
+    "combined_distinct_D_feature_ids": 16,
+    "combined_route_distinct_feature_ids": 36,
+    "combined_page_distinct_feature_ids": 234,
+    "combined_route_page_feature_overlap": 31,
+    "static_controller_action_bridges": 9,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "13.947569",
+    "bounded_static_source_residual_records": 3381,
+    "residual_explicit_unmapped_routes": 2992,
+    "combined_semantic_shared_routes": 5,
+    "pre_existing_shared_routes": 3,
+    "new_chain_level_shared_routes": 2,
+    "residual_unadjudicated_page_roots": 382,
+    "new_chain_level_shared_page_roots": 2,
+    "framework_expanded_denominator": null,
+    "gate_4_complete": false,
+    "projection_credit_awarded_by_receipt": false
+  },
+  "mutation_attestation": {
+    "review_execution_wrote_files": false,
+    "reviewer_write_scopes_empty": true,
+    "receipt_materialized_by_orchestrator_from_reviewer_returns": true,
+    "application_source_changed": false,
+    "matrix_changed": false,
+    "runtime_or_external_system_changed": false
+  },
+  "credit_boundary": {
+    "STATIC_SOURCE_FEATURE_OWNERSHIP_FOR_18_RECORDS": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_9_ACTIONS": true,
+    "two_shared_relations_as_one_to_one_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "navigation": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark_mapping": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "attestation": "Three fresh read-only partition reviews reproduced the complete RUN-091 packet with zero mechanical discrepancies. Nine chains are explicit bounded static owners; Milesight and calendar settings are retained as SHARED_RELATION because their full pages implement second explicit matrix features. Only 18 source records and nine controller-action bridges may be integrated. The matrix, framework denominator, reachability, runtime, browser, build, tests, benchmarks, ease, Passes, findings, completion, and Gate 4 remain unchanged or false."
+}
