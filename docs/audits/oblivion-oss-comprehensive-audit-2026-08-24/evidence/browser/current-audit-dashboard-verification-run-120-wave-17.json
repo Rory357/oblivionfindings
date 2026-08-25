@@ -1,0 +1,157 @@
+{
+  "schema_version": "run-120-audit-dashboard-verification-wave-17-v1",
+  "run_id": "RUN-120-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-26",
+  "pins": {
+    "checkpoint_commit": "67e1ccc9ce95b6ce286a683b0f7aa48bb5940fc1",
+    "checkpoint_tree": "a85b972cb88aa89726a9cd640692e2c914acc3b4",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "dashboard_html_sha256": "dfae522c35f4671214a1a0817d315b37f024ce91b38e22e5f7abc15aea9a86c5",
+    "dashboard_generator_sha256": "e68895e812785b3604b9872f7d38e70306326afaf79e7ba6c8935bc9f779baac",
+    "reporting_materializer_sha256": "83a827a1ea1f6d9fc8f485dcaf2cd8b6c644a37d6b56ee74f53597edea66be2e",
+    "reporting_receipt_sha256": "d2f80b1649fd4f8eaf965986eaf5b85dc4c906364271dbbd6513fe68c315b694",
+    "page_gap_cohort_sha256": "e468e7e7736e49eea629b4faec1fdce94d7de30eee478b08c81b90793622bd2e",
+    "independent_page_gap_review_sha256": "264236eccceb279522fb784a7c27db2ecc8fd0434e4e5668c33fbe263f1cbc9b",
+    "review_overlay_receipt_sha256": "33dd2f8ffa2b35c6651a6bf18923872e70ba5c2f91fce8b7222666bb8a91fc8b",
+    "independent_overlay_review_sha256": "043d57357e3ff1ede8f0effacdb71e4d802d98d53d555ab39316bce33fe06a2d",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser with viewport capability, semantic DOM inspection, visual inspection, navigation exercise, console inspection, and local target existence checks",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-dfae522c35f4#progress",
+      "exact_dashboard_loaded": true,
+      "response_status": 200,
+      "response_bytes": 152955,
+      "response_probe": "read-only local HTTP GET against the same cache-busted artifact URL",
+      "cachebuster": "main-dfae522c35f4",
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": true,
+      "screenshot_retained": false,
+      "navigation_only": true,
+      "application_or_external_state_changed": false
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual": "1440x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual": "1280x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual": "1024x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "390x844",
+        "actual": "390x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0
+      }
+    ],
+    "viewports_verified": 4,
+    "viewports_required": 4,
+    "anchor_elements": 449,
+    "local_link_occurrences": 439,
+    "unique_local_links": "264/264",
+    "local_link_failures": [],
+    "hash_bearing_link_occurrences": 351,
+    "unique_hash_bearing_path_hash_pairs": 191,
+    "hash_bearing_link_failures": [],
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "navigation_targets": "10/10",
+    "navigation_links_exercised": [
+      "#gaps",
+      "#progress"
+    ],
+    "missing_navigation_targets": [],
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "artifact_authored_ids": 10,
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_boundary_checks": {
+      "historical_source_owner_records_637": true,
+      "historical_route_page_split_288_349": true,
+      "current_source_owner_records_641": true,
+      "current_route_page_split_288_353": true,
+      "four_reviewed_pages_as_four_explicit_page_owners": true,
+      "page_ownership_not_inherited_from_parent_routes": true,
+      "distinct_feature_ids_256": true,
+      "route_partition_3218_as_288_owner_5_shared_4_alias_2921_residual": true,
+      "page_partition_711_as_353_owner_9_shared_349_residual": true,
+      "controller_action_bridges_76": true,
+      "current_queue_507_total_84_reviewed_77_owned_3_shared_4_alias_423_pending_430_without_ownership": true,
+      "historical_run_114_page_contexts_7_as_3_owned_4_gaps_0_credit": true,
+      "bounded_residual_3288": true,
+      "feature_sets_61_route_242_page_overlap_47": true,
+      "one_operating_organisation_across_multiple_sites": true,
+      "site_permission_privacy_direct_object_lifecycle_boundaries_unproved": true,
+      "gate_4_open": true,
+      "completion_credit_zero": true,
+      "matrix_mapping_remains_0_of_340": true
+    }
+  },
+  "mutation_attestation": {
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false,
+    "audit_artifact_only": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
