@@ -1,0 +1,166 @@
+{
+  "schema_version": "run-124-audit-dashboard-verification-wave-18-v1",
+  "run_id": "RUN-124-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-26",
+  "pins": {
+    "checkpoint_commit": "4edbdd93fb62b0b2e3fa8e89c4f8fa4a6a1d878f",
+    "checkpoint_tree": "39539034408349d1758cff064a6324681f12e54b",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "dashboard_html_sha256": "529e7ee11cd7f004cf9af72423142a4d774e099fd7e7e7b8d2ab6ef5fc4b2158",
+    "dashboard_generator_sha256": "d69e79b03ef820b52b1146300452e1d55edfcf11ad2b60fd3efdb03e33fbda4c",
+    "reporting_materializer_sha256": "4057dcf7fc745219a6fe4a47da141723503e8f6984ded0f36ee243a487946b03",
+    "reporting_receipt_sha256": "ffa7c751fb6a87ed358f015d13a28f10a7e5404f3a9569c40dee1e74e25e98b2",
+    "finance_chart_route_action_cohort_sha256": "cfe0e3635e5e86bf8e7e2f65d2094743738bfa5edc36e361ecf5eb14986f316e",
+    "independent_finance_chart_route_action_review_sha256": "f70ddd2ddc7ac0c734f4b48bdd19cd2733c3572d038b1dfa1aa185591e567e5f",
+    "reviewed_finance_chart_route_action_overlay_sha256": "d7aee21e7c4230b44707a22b7fa93478a84e9a5b4775ecd25aaffede764855ca",
+    "independent_overlay_review_sha256": "2130e3801b6ac163580bc56f23d6647136c83fdadc8ea65804b1559d36b29484",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser with explicit viewport capability, semantic DOM inspection, visual inspection, navigation exercise, console inspection, and local target existence checks",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-529e7ee11cd7#progress",
+      "exact_dashboard_loaded": true,
+      "response_status": 200,
+      "response_bytes": 159165,
+      "response_probe": "read-only local HTTP GET against the same cache-busted artifact URL",
+      "cachebuster": "main-529e7ee11cd7",
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": true,
+      "screenshot_retained": false,
+      "navigation_only": true,
+      "application_or_external_state_changed": false
+    },
+    "static_validation": {
+      "local_target_resolution": "Dashboard-relative filesystem target existence after this receipt was materialized",
+      "hash_pair_resolution": "Direct-child anchor and 64-hex code rows whose targets are regular files; every linked file SHA-256 matched",
+      "historical_directory_hash_rows_excluded_from_file_hash_denominator": 1
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual": "1440x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual": "1280x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual": "1024x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0
+      },
+      {
+        "requested": "390x844",
+        "actual": "390x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0
+      }
+    ],
+    "viewports_verified": 4,
+    "viewports_required": 4,
+    "anchor_elements": 472,
+    "local_link_occurrences": 462,
+    "unique_local_links": "275/275",
+    "local_link_failures": [],
+    "hash_bearing_file_link_occurrences": 373,
+    "unique_hash_bearing_file_path_hash_pairs": 202,
+    "hash_bearing_link_failures": [],
+    "historical_directory_hash_link_occurrences": 2,
+    "historical_directory_hash_unique_pairs": 1,
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "navigation_targets": "10/10",
+    "navigation_links_exercised": [
+      "#gaps",
+      "#progress"
+    ],
+    "missing_navigation_targets": [],
+    "dom_ids_observed": 11,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "artifact_authored_ids": 10,
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "exact_visible_boundary_checks": {
+      "current_source_owner_records_648": true,
+      "current_route_page_split_295_353": true,
+      "finance_review_outcomes_22_as_7_owner_7_shared_1_alias_0_dead_7_gap": true,
+      "finance_owner_overlay_7_routes_7_bridges_15_nonowners_0_pages": true,
+      "distinct_feature_ids_256": true,
+      "feature_sets_62_route_242_page_overlap_48": true,
+      "controller_action_bridges_83": true,
+      "route_partition_3218_as_295_owner_12_shared_5_alias_2906_residual": true,
+      "route_evidence_gaps_7_tagged_within_residual": true,
+      "page_partition_711_as_353_owner_9_shared_349_residual": true,
+      "page_evidence_gap_1_tagged_within_residual": true,
+      "finance_page_context_6_as_2_owned_4_unowned_0_credit": true,
+      "current_queue_507_total_106_reviewed_84_owned_10_shared_5_alias_7_gap_401_pending_423_without_ownership": true,
+      "bounded_residual_3281": true,
+      "one_operating_organisation_across_multiple_sites": true,
+      "site_permission_privacy_direct_object_ledger_lifecycle_concurrency_boundaries_unproved": true,
+      "gate_4_open": true,
+      "completion_credit_zero": true,
+      "matrix_mapping_remains_0_of_340": true
+    }
+  },
+  "mutation_attestation": {
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "application_or_external_state_changed": false,
+    "audit_artifact_only": true
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
