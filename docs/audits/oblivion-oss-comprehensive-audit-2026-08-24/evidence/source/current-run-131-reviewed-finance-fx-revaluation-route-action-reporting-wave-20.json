@@ -1,0 +1,766 @@
+{
+  "schema_version": "run-131-reviewed-finance-fx-revaluation-route-action-reporting-wave-20-v1",
+  "run_id": "RUN-131-REVIEWED-FINANCE-FX-REVALUATION-ROUTE-ACTION-REPORTING-WAVE-20",
+  "status": "REVIEWED_FINANCE_FX_REVALUATION_ROUTE_ACTION_OVERLAY_REPORTED_GATE_4_INCOMPLETE",
+  "generated_on": "2026-08-26",
+  "pins": {
+    "checkpoint_commit": "1009bf946fa8e4daff1cad1cecbf4b7d8c501ac1",
+    "checkpoint_tree": "91251cb4b14769f0e9cf07eb5a1c40c779f7e65f",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "materializer_sha256": "1fef8770c67099440468c12a2bd310f202f6d42c58d67e6586ce63cb49194e4f",
+    "overlay_sha256": "f32b3d997a9e7dd932e041f5acf30dea02ee5b62fee3b0901cfbe5cc59f2ed0a",
+    "independent_overlay_review_sha256": "4f7e5d74ce3711ce5ff00ac2a499ddde125115b1537a0de2e17375792f3d8590",
+    "superseded_dashboard_verification_sha256": "c6d92421fa9e51ae875067de414fb9c38e52708cd6293fae42dc82a5bb2bd9bc",
+    "superseded_dashboard_html_sha256": "0c5af1501561fa9a55a5ab9849d5c58338a21351508f875c849cec6aae25da75"
+  },
+  "inputs": {
+    "00-executive-summary.md": "5330bc30b7be9897331b4d36781e39062ff6df11d5a385b8d7e4858dec6169bb",
+    "01-repository-module-map.md": "8c17f4d5e50a88357ac0a2c5b76cf3c25c931726b87c6a6cd32b988bceeaa645",
+    "13-unresolved-questions-and-evidence-gaps.md": "8f2dafd9591aa138a90cb14313b2783a6feedefb9313c011da677f7ed39b2193",
+    "findings.json": "23224f06c7761d632604f56b584ebecb605c6481322a9f72b78643c643cc2b0e",
+    "generators/build-current-audit-dashboard.py": "5512cf1240f0884a3292c31b455316cb26915e4199af912068bf5d8003dc3a6d",
+    "generators/materialize-run-127-reviewed-finance-page-gap-reporting-wave-19.py": "a4e1d40d0b3db61b7333c198da54f81423447d8a2b36811fa04cd99f29b9736b",
+    "evidence/source/current-run-127-reviewed-finance-page-gap-reporting-wave-19.json": "9db62d439c45af768a7d1cd919251488a8c877fc20f59de27ec88e153588c040",
+    "evidence/browser/current-audit-dashboard-verification-run-128-wave-19.json": "c6d92421fa9e51ae875067de414fb9c38e52708cd6293fae42dc82a5bb2bd9bc",
+    "generators/build-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.py": "2e23ca7736f0e21460f130a6fafc89a68f228b6f8a52137a2209795d500b0982",
+    "evidence/source/root-run-129-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.json": "6d1efad203c368986ada06746f4314382b2dee4d214b25799dc531c02608180c",
+    "generators/materialize-independent-outcome-neutral-finance-fx-revaluation-route-action-review-wave-20.py": "c77ac164b6869bca82d929df623a19dd40f0c72fa593d7fb805c72c9ece8d60b",
+    "evidence/source/raw-run-129r-independent-outcome-neutral-finance-fx-revaluation-route-action-review-wave-20.json": "9eb86243c72c7aa0c0f1cf6d250b7ad4184c2e0602c8217b7f3c0e70dcded67a",
+    "generators/integrate-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.py": "3bdde28921e35b6a8ec45610af9a52cb55c0d37bdb2de179a2fa9eeecfe976e1",
+    "evidence/source/current-run-130-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.json": "f32b3d997a9e7dd932e041f5acf30dea02ee5b62fee3b0901cfbe5cc59f2ed0a",
+    "generators/materialize-independent-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-review-wave-20.py": "b5c879aa46805cdd699c0a39db8c6a1281af634838d772c8f164a8a48df326f3",
+    "evidence/source/raw-run-130r-independent-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.json": "4f7e5d74ce3711ce5ff00ac2a499ddde125115b1537a0de2e17375792f3d8590"
+  },
+  "outputs": {
+    "00-executive-summary.md": "633c98e5b6857fe60b8f59ad8d27878b1b86ce9fd83a33458f989c1764d1f731",
+    "01-repository-module-map.md": "7908307b07ad861a2b23b6cafd6798477711b8ec8d40a920c7aeb51f1282c9f9",
+    "13-unresolved-questions-and-evidence-gaps.md": "2e2a4be80aa1ba6b0c9a11a7c90eea17942a527dd9f35347b6aa66899f4ba2c5",
+    "findings.json": "153fe6e3b4e7190ebf0f1a1aa8010a53a5c11f7ac0442ada4bca062523110289",
+    "generators/build-current-audit-dashboard.py": "075d263989028297b4c35aea252f32ce1041f8bb08db53e45eff1fee8c64245e"
+  },
+  "preserved": {
+    "02-eight-pass-coverage-ledger.csv": "ee4dc3126113884b4b8661dc3a3d13ac6a61b9661b2cace58fe82dcbe1d2a4a6",
+    "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "04-workflow-usability-scorecard.csv": "ea6879340229541c198b5ac654bde6d26d38eaefdd29ff66e1026263f9546faa",
+    "05-browser-visual-coverage-matrix.csv": "564224d295f8a2d3bad6001b74743fb0a1d75eb41315a817264307353b74dd84",
+    "06-open-source-benchmark-register.csv": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+    "07-module-findings.md": "5a8de7d5c9e181d8da0425e7f040e8744dd85cbfda16573ef824ce3219f85712",
+    "08-cross-module-journeys.md": "ef4471ba75ac9080e4565989e4b038bf7d0ad306cad1984019882457517c853c",
+    "09-ui-ux-accessibility-visual-consistency.md": "27fa04e15cbd0eedb92514835884d0344db09f279a2295cea94ae0d1071a6e7c",
+    "10-architecture-data-integration-security.md": "ca5667b1c042024f32f320254baf063dd4bcd2c4b12972cf2aac29c02d782b22",
+    "11-prioritised-roadmap.md": "e5c2f41bf98d3415de97d18d853f1d7c351b337ba544fbf8c81330ec63dcf02d",
+    "12-native-build-and-do-not-copy-register.md": "44ae85422a6863d4804fec7d495107b9bdc937257f023767fb306ccd755e137a",
+    "inventory.json": "46cd688dd9543b186a608e950754abe9e30389a792156719f8a999130dfca5fa"
+  },
+  "counts": {
+    "source_owner_records": 654,
+    "route_owner_records": 297,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 62,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 48,
+    "static_controller_action_bridges": 85,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.645457",
+    "bounded_static_source_residual_records": 3275,
+    "residual_explicit_unmapped_routes": 2904,
+    "semantic_shared_routes": 12,
+    "reviewed_alias_routes": 5,
+    "reviewed_dead_routes": 0,
+    "evidence_gap_routes_tagged_within_residual": 7,
+    "residual_unadjudicated_page_roots": 345,
+    "semantic_shared_page_roots": 9,
+    "reviewed_alias_page_roots": 0,
+    "reviewed_dead_page_roots": 0,
+    "evidence_gap_page_roots_tagged_within_residual": 1,
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 108,
+    "owner_queue_surface_rows": 86,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 399,
+    "queue_surfaces_without_ownership": 421,
+    "new_reviewed_route_surface_rows": 2,
+    "new_owner_route_surface_rows": 2,
+    "new_shared_route_surface_rows": 0,
+    "new_alias_route_surface_rows": 0,
+    "new_dead_route_surface_rows": 0,
+    "new_evidence_gap_route_surface_rows": 0,
+    "wholesale_queue_ownership_authorized": false,
+    "reviewed_finance_fx_revaluation_route_actions": 2,
+    "reviewed_owner_route_actions_added": 2,
+    "reviewed_shared_relations": 0,
+    "reviewed_alias_or_redirect": 0,
+    "reviewed_dead_or_noncanonical": 0,
+    "reviewed_evidence_gaps": 0,
+    "reviewed_non_owner_rows_preserved": 0,
+    "route_owner_records_added": 2,
+    "controller_action_bridges_added": 2,
+    "page_owner_records_added": 0,
+    "direct_exact_queue_rows_added": 2,
+    "accepted_distinct_feature_ids": 1,
+    "new_distinct_feature_ids": 0,
+    "new_route_feature_ids": 0,
+    "new_page_feature_ids": 0,
+    "source_packet_expansion_records_preserved": 16,
+    "assurance_findings_preserved": 15,
+    "provisional_finding_records": 12,
+    "final_findings": 0,
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0
+  },
+  "checks": {
+    "run_129r_review_go": true,
+    "run_129r_outcome_conservation": "2=2+0+0+0+0",
+    "run_130r_overlay_review_go": true,
+    "all_discrepancy_classes_zero": true,
+    "published_identity_fields_verified": 40,
+    "source_packet_expansion_records_preserved": 16,
+    "assurance_findings_preserved": 15,
+    "route_owner_records_added": 2,
+    "controller_action_bridges_added": 2,
+    "page_owner_records_added": 0,
+    "direct_exact_queue_rows_added": 2,
+    "sibling_or_page_inheritance_used": false,
+    "matrix_byte_identical": true,
+    "reports_02_through_12_inventory_preserved": true,
+    "canonical_finding_record_semantics_preserved": true,
+    "application_source_paths_written": 0,
+    "one_organisation_multi_site_architecture_preserved": true,
+    "dashboard_requires_fresh_run_132_artifact_verification": true,
+    "gate_4_complete": false
+  },
+  "verified_identity": {
+    "owner_candidate_id_list_sha256": "c2fe18aef9cb177cec2c78564fc64b70bab1601a4562b66a10d15d1d55b70958",
+    "owner_route_record_id_list_sha256": "ca22dfda855373d9be5ffdcf36584964ce318e37ff18e7b5b031d48ffe986ea5",
+    "owner_source_record_key_list_sha256": "4d8b055337e1ba1060fcb3630f2b0daff62b6f639895751ff33b93f36b51d074",
+    "owner_action_key_list_sha256": "a5ff47c4e9bd0d71de49f56599f3f9391704814134069e34e41dda55e7f4050e",
+    "owner_bridge_key_list_sha256": "cef2abe41187dd897437e8489edac96e621aed77022b7be133cdfa3701a07800",
+    "owner_candidate_record_sha256_list_sha256": "10a8acbd85bae1936551a22115108171095b02d6654cd398ff65e0d2b33fff7e",
+    "owner_decision_record_sha256_list_sha256": "d68268cf91aa1f4974a276b561567103f7e9bc730852cf2c7501db4929d7cc13",
+    "owner_queue_id_list_sha256": "31f3762cce7511c4b08d49589fdff1d49bd42bd46335eb283d6f407e3853e09e",
+    "owner_queue_key_list_sha256": "94dcc2c12148d200f511571028c46f98370b1984036533031425c160a9aa4961",
+    "new_union_feature_id_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "new_route_feature_id_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "new_page_feature_id_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_source_record_key_list_sha256": "02c9fdc8b6603db3b281739e0c4688f93a16adf0fe4f7a389d61dc04600e51b9",
+    "prior_source_record_id_list_sha256": "a290263d5eb1a4bafad5592a04f6bedd167a81dcc917dd906646700f9ad325c7",
+    "combined_source_record_key_list_sha256": "9de3288dc0b07f034d099fd3f6723b6ed7620fa9d2e8e003fc2bcd558b3e699e",
+    "combined_source_record_id_list_sha256": "abdf6beef2cadc840860b0e43ce6acc3e15da51d85713d3fde98b6f8e37234b3",
+    "combined_feature_id_list_sha256": "874e55340e6abb600c50a64a147b81b9b5467587ee77f9e45eace4eb85ac55ca",
+    "combined_route_feature_id_list_sha256": "89c69d9c74178944f705a60d004f01e4e5922d06a929b0dfba2342aafd6a3b7a",
+    "combined_page_feature_id_list_sha256": "2fa6a11a5c66a016366db84ce89931db906b26cc911dfa88490cb6561ff261e8",
+    "combined_route_page_overlap_feature_id_list_sha256": "00b1e6141c19311c68d7f8bcd154d971f2099fa768993cca4845baadd02aa217",
+    "prior_bridge_key_list_sha256": "c8bc97e2afe9f849a3bcf81f271e0e43066266a0bd0c65770846ccc36cb88f61",
+    "combined_bridge_key_list_sha256": "8130f9c6b87e89b8b079edf4ee9d9563a5d226fbbf858290416845d236c87d1f",
+    "new_reviewed_queue_key_list_sha256": "94dcc2c12148d200f511571028c46f98370b1984036533031425c160a9aa4961",
+    "prior_reviewed_queue_key_list_sha256": "c1e9746f10ea6ea866b9cb78619f71f5e37533984bda904ea112b0a66a195a9c",
+    "combined_reviewed_queue_key_list_sha256": "113656569e79bc60019a2c82071fd7e7e3df19fab88b62e88d85d306e00d4de4",
+    "combined_route_record_id_list_sha256": "f77fa8670712c925ee67dc937622c88001d7feb6c9e38c658573352a8792dd73",
+    "combined_route_source_record_key_list_sha256": "f195902390d7e4febff184256f5ceb03b2897ef5d4d7e48ef6ece28d616a2b11",
+    "combined_page_record_id_list_sha256": "abef0c7e0e1ac503e06eb563aee6b19718f1192d7716ea214ee5d4859dce162e",
+    "combined_page_source_record_key_list_sha256": "652acf45451422bfd45af9ea1f12bffffef6f1e386511ec0dbda6d520e0bdd9b",
+    "new_overlay_source_records_sha256": "78c4390d9f68fb2b3e36b86cde5d86e9ff54c85ea34764af06f2b5a8d57ab9a6",
+    "new_overlay_row_sha256_list_sha256": "981d523b664020a414e753fc186432d7f9eb028ba1fe4284c6526ebc9e1bb91d",
+    "new_action_bridges_sha256": "ec11dc28486c6f94b79e99efd0a7f578281f1a60a634118c5d60cb2e09b80d39",
+    "new_action_bridge_row_sha256_list_sha256": "6c8eea94923402c384a787494c3cecad06f9b5ca3e28a6001ce2d8bbf3b7b097",
+    "reviewed_decision_record_sha256_list_sha256": "d68268cf91aa1f4974a276b561567103f7e9bc730852cf2c7501db4929d7cc13",
+    "reviewed_decisions_sha256": "1455ccabc2b0f7aa8810a0839e104b4bc2918f0688fb3dad774bec441311cc55",
+    "synthesis_record_sha256": "d6587bcf49ef21d19469402e77231f3bd8f55e8ca9cdc93aa53659c966af5329",
+    "source_packet_expansions_sha256": "ecd3919cb2a69c4a672a1f40a1172cb02ad8b4439ae72f9da84899ddb6bfb138",
+    "assurance_findings_sha256": "70a075b661a4d4beaa6d656899b9d97974651d1177b746ddc1093b91550b4383",
+    "assurance_finding_id_list_sha256": "dec1f2fac563d0ee9b6a9e0d489fdffe569ee0bede0570c5c5f512f850223af2",
+    "partition_reviews_sha256": "ccdd83025b2fdd55e49c4db86669861e51a6bef3d73323b3702275687afb3051"
+  },
+  "verified_outcome_conservation": {
+    "reviewed_outcomes_equation": "2 = 2 owner + 0 shared + 0 alias + 0 dead + 0 evidence gap",
+    "bounded_source_equation": "3929 = 654 owner + 3275 non-owner residual",
+    "owner_surface_equation": "654 = 297 route + 357 page",
+    "feature_union_equation": "256 = 62 route + 242 page - 48 overlap",
+    "route_universe_equation": "3218 = 297 owner + 12 shared + 5 alias + 0 dead + 2904 residual",
+    "evidence_gap_is_tagged_within_2904_route_residual": true,
+    "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+    "evidence_gap_is_tagged_within_345_page_residual": true,
+    "queue_equation": "507 = 108 reviewed + 399 pending",
+    "reviewed_queue_equation": "108 = 86 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "queue_without_ownership_equation": "421 = 399 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+  },
+  "verified_projection_reconciliation": {
+    "run129r_projection_credit_awarded": false,
+    "run130_current_static_overlay_credit_applied": true,
+    "current_source_owner_records": 654,
+    "current_route_owner_records": 297,
+    "current_page_owner_records": 357,
+    "current_static_controller_action_bridges": 85,
+    "current_reviewed_queue_surface_rows": 108,
+    "current_pending_unreviewed_queue_surface_rows": 399,
+    "correctness_or_downstream_credit_authorized": false,
+    "rule": "RUN129R authorized a projection only; RUN130 applies exactly that bounded static ownership and no correctness credit."
+  },
+  "verified_denominator_boundary": {
+    "run_077_bounded_static_records": 3929,
+    "framework_expanded_route_page_denominator": null,
+    "page_denominator_711_roots_vs_1058_page_tree_files_resolved": false,
+    "complete_route_page_feature_crosswalk": false,
+    "gate_4_complete": false
+  },
+  "verified_source_packet_expansion_preservation": {
+    "total_disclosed_expansion_entries": 16,
+    "widened_existing_packet_files": 14,
+    "newly_followed_files": 2,
+    "original_required_source_files": 36,
+    "original_material_dependency_method_slices": 13,
+    "cohort_source_review_packet_sha256": "73269f26602fe2213e9715b9183b9765e4151c1d9fc3c37d934a4bfb2e99a940",
+    "source_packet_expansions_sha256": "ecd3919cb2a69c4a672a1f40a1172cb02ad8b4439ae72f9da84899ddb6bfb138",
+    "original_source_review_complete": false,
+    "original_source_packet_completeness_claimed": false,
+    "original_material_dependency_semantics_complete": false,
+    "original_packet_retroactively_described_as_complete": false,
+    "correctness_credit_authorized": false,
+    "expanded_file_records": [
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "docs/architecture/single-tenant-application.md:1-13"
+        ],
+        "expanded_review_loci": [
+          "docs/architecture/single-tenant-application.md:1-21"
+        ],
+        "expansion_reason": "include the legacy organisational-context rule at lines 15-17",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Models/Concerns/WritesLegacyOrganizationStorageContext.php",
+        "sha256": "265b76912c184888fc137988ccd30ba72d43ee89eb7167ba5f6fdcd31ea99118",
+        "blob_id": "88cb7cdb717fa4a15fa5b02ac34adda6f2353899",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Models/Concerns/WritesLegacyOrganizationStorageContext.php:1-26"
+        ],
+        "expanded_review_loci": [
+          "app/Models/Concerns/WritesLegacyOrganizationStorageContext.php:1-32"
+        ],
+        "expansion_reason": "include the complete storage assignment body",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Http/Middleware/EnsurePermission.php",
+        "sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+        "blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Http/Middleware/EnsurePermission.php:1-23"
+        ],
+        "expanded_review_loci": [
+          "app/Http/Middleware/EnsurePermission.php:1-29"
+        ],
+        "expansion_reason": "include the explicit 403 denial and pass-through",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Models/User.php",
+        "sha256": "0d184ebe6a28395b34b195751ffb62390f4c32828c982103ad613430bc4e59ae",
+        "blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Models/User.php:359-407"
+        ],
+        "expanded_review_loci": [
+          "app/Models/User.php:359-436"
+        ],
+        "expansion_reason": "include canDo and permission-alias resolution",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Providers/AuthServiceProvider.php",
+        "sha256": "7bcbfb866f657f1e64665806b9f496f3994ba0e90f59686ef71fb97c458b47be",
+        "blob_id": "6a8a0d76b68f18ef5df613e41a7a97ba08431cb5",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Providers/AuthServiceProvider.php:1-212"
+        ],
+        "expanded_review_loci": [
+          "app/Providers/AuthServiceProvider.php:1-216"
+        ],
+        "expansion_reason": "include the complete policy registration body",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinCurrency.php",
+        "sha256": "c38acc4fcfa6705bf58527c3a16c4730a43f96c52f4278e78805f8d35d3d37cd",
+        "blob_id": "1e6a6161b38de1335ac3f57d05a33c11916a0fae",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinCurrency.php:1-65"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinCurrency.php:1-79"
+        ],
+        "expansion_reason": "include organisation, active, and base scopes",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinFxRate.php",
+        "sha256": "b04ca1e1d52076549fcf721d452ca235cd467beb3c940a1f828cbdd0607ab6a5",
+        "blob_id": "892949c0ffc4b2bf01be5cd3d9d5f47a7c929c5d",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinFxRate.php:1-51"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinFxRate.php:1-63"
+        ],
+        "expansion_reason": "include pair and as-at-date scope bodies",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinBill.php",
+        "sha256": "467220b9a994070626369fcb7e5153cdbcd994e9196f171df8b00aefbfacbc04",
+        "blob_id": "9f63e12e02407c0788e57336c0785baa6ab2b198",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinBill.php:1-130"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinBill.php:1-153"
+        ],
+        "expansion_reason": "include the complete amount-due and scope semantics",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinBankAccount.php",
+        "sha256": "7dfde42851923705cdade60a9569eeabc6975e57c0eab9bd1dac9001c01fc78f",
+        "blob_id": "046a3753952293fb7208b2a75d0c8278f02c912f",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinBankAccount.php:1-71"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinBankAccount.php:1-86"
+        ],
+        "expansion_reason": "include organisation and active scopes",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinJournal.php",
+        "sha256": "27455075c067e39e76ef0d29f754ff2d9a684c5bd35af0c9c68deef742e423d8",
+        "blob_id": "29a17e5baf8d6224efa4122aa902dabb189aa5e7",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinJournal.php:1-114"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinJournal.php:1-137"
+        ],
+        "expansion_reason": "include organisation and journal-status scopes",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinJournalLine.php",
+        "sha256": "8bc6f37faacfcaab72c651c1baa897ef110e2e77a52ac1db102c33ce72bd633e",
+        "blob_id": "a9b50b65f2cde32223017126ad90894bfbb05929",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinJournalLine.php:1-64"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinJournalLine.php:1-78"
+        ],
+        "expansion_reason": "include the complete Site and allocation relationships",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinFiscalPeriod.php",
+        "sha256": "2c98c141041211b5ae52e54cb68ed511c43d4ff1584e237ed9c19c08f1f83de1",
+        "blob_id": "ca542953cd757ed22d5084a7134780d3fe89265a",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Models/FinFiscalPeriod.php:1-53"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Models/FinFiscalPeriod.php:1-65"
+        ],
+        "expansion_reason": "include the complete organisation and open-period scopes",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Events/JournalPosted.php",
+        "sha256": "7690e35aa5dcf5f30f61a625173f02fc32e6fc6fc5ed56a9dad1c7325c51aa57",
+        "blob_id": "735ec23d7001193f4c2f7a10f8dc22fcf2e30647",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Domain/Finance/Events/JournalPosted.php:1-20"
+        ],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Events/JournalPosted.php:1-24"
+        ],
+        "expansion_reason": "include the complete after-commit event contract",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Listeners/Finance/LogJournalPosted.php",
+        "sha256": "a9427dd5ba554b45c894b06890326ed6eb70dbd2703fa18ac0096ee40e942777",
+        "blob_id": "68f2c0418ee0fc9352b1dbcce63de162c14e1288",
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Listeners/Finance/LogJournalPosted.php:1-15"
+        ],
+        "expanded_review_loci": [
+          "app/Listeners/Finance/LogJournalPosted.php:1-18"
+        ],
+        "expansion_reason": "include the complete listener payload and method close",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Listeners/Finance/AllocatePayrollCosts.php",
+        "sha256": "728932d0d44839cb9f49281d758514c593c3020ff66a25132ebc8c2f55cd30f9",
+        "blob_id": "c376b9c3454dfe3f455e7b1c43ab60d57cc7bc9a",
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "app/Listeners/Finance/AllocatePayrollCosts.php:1-49"
+        ],
+        "expansion_reason": "newly follow the second registered listener and its adjustment-journal no-op",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "database/migrations/2026_03_28_000200_create_fin_accounts_table.php",
+        "sha256": "40f2b19b953267664856230bfb63f1c7fe6f6338bba722569ba297ec48c31181",
+        "blob_id": "8f2c96bfd620bfd1c7329c5a52f3153b0900ba81",
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "database/migrations/2026_03_28_000200_create_fin_accounts_table.php:1-44"
+        ],
+        "expansion_reason": "newly verify organisation/account-code uniqueness",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      }
+    ]
+  },
+  "verified_assurance_findings_preservation": {
+    "candidate_findings": 12,
+    "shared_findings": 3,
+    "total_findings": 15,
+    "assurance_findings_sha256": "70a075b661a4d4beaa6d656899b9d97974651d1177b746ddc1093b91550b4383",
+    "assurance_finding_id_list_sha256": "dec1f2fac563d0ee9b6a9e0d489fdffe569ee0bede0570c5c5f512f850223af2",
+    "final_finding_credit_authorized": false,
+    "correctness_or_downstream_credit_authorized": false,
+    "findings": [
+      {
+        "finding_id": "RUN129R-A-SITE-SCOPE",
+        "severity": "P1",
+        "category": "approved_site_and_canonical_scope",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:41-47",
+          "app/Domain/Finance/Models/FinBill.php:26-50",
+          "app/Domain/Finance/Models/FinBankAccount.php:77-80",
+          "app/Domain/Finance/Models/FinFxRevaluation.php:17-26"
+        ],
+        "observation": "The calculation aggregates organisation-filtered exposure without proving approved-Site scope; the result has no Site attribution."
+      },
+      {
+        "finding_id": "RUN129R-A-HISTORICAL-POPULATION",
+        "severity": "P1",
+        "category": "as_at_population_correctness",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:42-57",
+          "app/Domain/Finance/Services/FxRevaluationService.php:81-103",
+          "app/Domain/Finance/Models/FinBill.php:125-133"
+        ],
+        "observation": "A historical date controls the rate but current bill state, amount paid, and bank balance determine the exposure population."
+      },
+      {
+        "finding_id": "RUN129R-A-RATE-PROVENANCE",
+        "severity": "P1",
+        "category": "rate_quality_and_provenance",
+        "loci": [
+          "app/Domain/Finance/Services/CurrencyService.php:15-64",
+          "app/Domain/Finance/Services/CurrencyService.php:94-104",
+          "app/Domain/Finance/Models/FinFxRate.php:52-61",
+          "database/migrations/2026_03_28_003200_create_fin_fx_rates_table.php:22-25"
+        ],
+        "observation": "Missing rates silently fall back to mutable currency values or 1.0, external fetching is a manual placeholder, and equal-date provenance is not unique."
+      },
+      {
+        "finding_id": "RUN129R-A-SNAPSHOT",
+        "severity": "P1",
+        "category": "immutable_calculation_snapshot",
+        "loci": [
+          "resources/js/pages/finance/fx-revaluations/Create.tsx:51-69",
+          "app/Domain/Finance/Services/FxRevaluationService.php:132-143",
+          "database/migrations/2026_03_28_003300_create_fin_fx_revaluations_table.php:11-22"
+        ],
+        "observation": "Only an aggregate total and item count survive; source identities, amounts, rates, provenance, and preview identity are discarded."
+      },
+      {
+        "finding_id": "RUN129R-A-DUPLICATE-DRAFT",
+        "severity": "P1",
+        "category": "draft_idempotency_and_atomicity",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:54-69",
+          "app/Domain/Finance/Services/FxRevaluationService.php:132-143",
+          "database/migrations/2026_03_28_003300_create_fin_fx_revaluations_table.php:11-22"
+        ],
+        "observation": "No stable idempotency key, uniqueness constraint, or encompassing transaction prevents retry-created duplicate drafts; notes are a second write."
+      },
+      {
+        "finding_id": "RUN129R-A-ZERO-DRAFT",
+        "severity": "P2",
+        "category": "draft_lifecycle",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:32-36",
+          "app/Domain/Finance/Services/FxRevaluationService.php:132-143"
+        ],
+        "observation": "A missing base currency or empty calculation can still be persisted as a zero draft through a direct POST."
+      },
+      {
+        "finding_id": "RUN129R-B-DIRECT-OBJECT",
+        "severity": "P1",
+        "category": "canonical_object_and_direct_id_concealment",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/FxRevaluationController.php:72-75",
+          "app/Domain/Finance/Models/FinFxRevaluation.php:48-52",
+          "app/Providers/AuthServiceProvider.php:164-178"
+        ],
+        "observation": "Implicit binding is passed directly to the service without a canonical scoped lookup, policy mapping, action authorization, or concealment decision."
+      },
+      {
+        "finding_id": "RUN129R-B-SITE-ATTRIBUTION",
+        "severity": "P1",
+        "category": "approved_site_and_journal_attribution",
+        "loci": [
+          "docs/architecture/single-tenant-application.md:3-17",
+          "app/Domain/Finance/Models/FinFxRevaluation.php:17-26",
+          "app/Domain/Finance/Services/FxRevaluationService.php:183-221"
+        ],
+        "observation": "The bound revaluation and its journal lines contain no Site attribution and legacy organisation context proves no approved-Site authority."
+      },
+      {
+        "finding_id": "RUN129R-B-DUPLICATE-POST",
+        "severity": "P1",
+        "category": "concurrency_and_exactly_once_lifecycle",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:149-157",
+          "app/Domain/Finance/Services/FxRevaluationService.php:215-227",
+          "app/Domain/Finance/Services/JournalPostingService.php:272-342"
+        ],
+        "observation": "The pre-transaction draft check and unlocked revaluation permit stale concurrent requests to create separate journals; the mutex protects journal numbering only."
+      },
+      {
+        "finding_id": "RUN129R-B-IDEMPOTENCY-LINEAGE",
+        "severity": "P1",
+        "category": "idempotency_and_source_lineage",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:215-221",
+          "app/Domain/Finance/Services/JournalPostingService.php:343-361",
+          "database/migrations/2026_03_28_001000_create_fin_journals_table.php:20-35",
+          "database/migrations/2026_03_28_003300_create_fin_fx_revaluations_table.php:11-22"
+        ],
+        "observation": "The journal has a human-readable reference but no constrained source identity or stable idempotency key, and the revaluation has no unique posting constraint."
+      },
+      {
+        "finding_id": "RUN129R-B-LEDGER-PROVENANCE",
+        "severity": "P1",
+        "category": "ledger_and_rate_provenance",
+        "loci": [
+          "app/Domain/Finance/Services/FxRevaluationService.php:132-143",
+          "app/Domain/Finance/Services/FxRevaluationService.php:168-213",
+          "database/migrations/2026_03_28_000200_create_fin_accounts_table.php:11-36"
+        ],
+        "observation": "Posting relies on an aggregate without item/rate provenance and hard-coded account codes whose universal finance semantics are not established."
+      },
+      {
+        "finding_id": "RUN129R-B-EVENT-DURABILITY",
+        "severity": "P1",
+        "category": "event_and_downstream_durability",
+        "loci": [
+          "app/Domain/Finance/Events/JournalPosted.php:10-24",
+          "app/Providers/AppServiceProvider.php:524-532",
+          "app/Listeners/Finance/LogJournalPosted.php:8-17",
+          "app/Listeners/Finance/AllocatePayrollCosts.php:21-28"
+        ],
+        "observation": "The after-commit event is explicitly not a durable outbox; logging is best-effort and payroll allocation is a no-op for adjustment journals."
+      },
+      {
+        "finding_id": "RUN129R-SHARED-PERMISSION-STATIC-CONTEXT",
+        "severity": "UNEXECUTED_STATIC_CONTEXT",
+        "category": "permission_declaration",
+        "loci": [
+          "routes/finance.php:62",
+          "routes/finance.php:594-600",
+          "bootstrap/app.php:65-73",
+          "app/Http/Middleware/EnsurePermission.php:11-27",
+          "app/Models/User.php:359-407"
+        ],
+        "observation": "Both actions declare auth plus finance.ledger.manage and the middleware has deny precedence, but no representative-role or exact-action execution proves permission correctness.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN129R-SHARED-ACTION-TEST-GAP",
+        "severity": "P1",
+        "category": "executable_assurance",
+        "loci": [
+          "tests/Browser/Finance/FinanceMiscTest.php:206-214",
+          "tests/Browser/Finance/FinanceMiscTest.php:316-323"
+        ],
+        "observation": "Frozen tests load Index and Create only; they do not execute store/post, forged IDs, Site scope, journal assertions, replay, concurrency, rollback, events, or rate snapshots.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN129R-SHARED-SOURCE-PACKET-EXPANSION",
+        "severity": "EVIDENCE_BOUNDARY",
+        "category": "source_packet_completeness",
+        "loci": [],
+        "observation": "The cohort correctly claimed no source completeness. Semantic review pinned 14 expanded existing files and two newly followed files; this does not rewrite the cohort or grant correctness credit.",
+        "correctness_credit_authorized": false
+      }
+    ]
+  },
+  "verified_overlay_credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_2_RECORDS": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_2_ACTIONS": true,
+    "static_page_feature_ownership": false,
+    "frontend_caller_ownership": false,
+    "prior_owner_or_bridge_inheritance": false,
+    "matrix_mutation": false,
+    "wholesale_507_queue_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "navigation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "rate_and_snapshot_correctness": false,
+    "ledger_integrity_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_and_idempotency_correctness": false,
+    "event_and_downstream_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "verified_overlay_review_credit_boundary": {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "direct_exact_queue_review": false,
+    "complete_route_page_feature_crosswalk": false,
+    "matrix_mutation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "rate_and_snapshot_correctness": false,
+    "ledger_integrity_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "event_or_downstream_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "REPORTING_REFRESH_FOR_REVIEWED_OVERLAY": true,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "new_queue_review": false,
+    "matrix_mutation": false,
+    "application_source_mutation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "rate_and_snapshot_correctness": false,
+    "ledger_integrity_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "event_or_downstream_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-131-reviewed-finance-fx-revaluation-route-action-reporting-wave-20.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-131-reviewed-finance-fx-revaluation-route-action-reporting-wave-20.json"
+  ]
+}
