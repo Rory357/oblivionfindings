@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import ast
 from collections import Counter
 import hashlib
 import json
@@ -14,11 +15,11 @@ PRIOR = SOURCE / "current-run-138-reviewed-outcome-neutral-finance-invoice-index
 COHORT = SOURCE / "root-run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.json"
 REVIEW = SOURCE / "raw-run-141r-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.json"
 OUTPUT = SOURCE / "current-run-142-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json"
-EXPECTED_HEAD = "19cd019da8ea0cf8953296fddf423045e4299d74"
-EXPECTED_TREE = "3ce2d122fd6755c90447d235841133ed45e1089b"
+EXPECTED_HEAD = "1f4b83e7fdf97c72e90f2be4c81ada2d3e2017e7"
+EXPECTED_TREE = "530f9825a389b6135250bc27553e0f5e2c71d572"
 EXPECTED_COHORT = "9062d90b961e496b0bf5ad48fc3f930a8161394fb8d2b9b88ad298807bd90fc3"
 EXPECTED_REVIEW = "02f78f9e6305c783fd13b790f5d0e044e437bfc2d6853eeb49ec5a65cdd8fd8b"
-EXPECTED_INPUT_MAP_SHA256 = "27d1725c7663ac69e3fe1676cfb8092c0ea2073cfa8ceaef676be8361fb51f15"
+EXPECTED_INPUT_MAP_SHA256 = "aff29ff15eb469fb2365f46078b7ef4a327e138ce70f590859bcd0e70bc29af8"
 INPUTS = [
     "03-feature-to-benchmark-matrix.csv",
     "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json",
@@ -43,6 +44,7 @@ INPUTS = [
     "evidence/source/root-run-129-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.json",
     "evidence/source/root-run-133-outcome-neutral-finance-accounting-integration-route-action-cohort-wave-21.json",
     "evidence/source/root-run-137-outcome-neutral-finance-invoice-index-route-action-cohort-wave-22.json",
+    "evidence/source/raw-run-137r-independent-outcome-neutral-finance-invoice-index-route-action-review-wave-22.json",
     "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json",
     "evidence/source/root-run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.json",
     "evidence/source/raw-run-141r-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.json",
@@ -231,9 +233,12 @@ def main() -> None:
     out["pins"]["cohort_generator_sha256"] = "d3cfd34687ba6c6a9b6afecfe9bfc02d2b700b15de881c1ef651877c486fd6a0"
     out["pins"]["review_materializer"] = "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.py"
     out["pins"]["review_materializer_sha256"] = "41c2b9855fd8a0f6510dbf9e5fcd61c27be4de7178fef7a6a77dbf5b52ffb699"
-    assert len(INPUTS) == 25 and len(set(INPUTS)) == 25
+    assert len(INPUTS) == 26 and len(set(INPUTS)) == 26
     out["pins"]["inputs"] = {name: digest(AUDIT / name) for name in INPUTS}
     assert hjson(out["pins"]["inputs"]) == EXPECTED_INPUT_MAP_SHA256
+    run137r_path = "evidence/source/raw-run-137r-independent-outcome-neutral-finance-invoice-index-route-action-review-wave-22.json"
+    assert out["pins"]["inputs"][run137r_path] == "a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f"
+    assert git("rev-parse", f"HEAD:{AUDIT.relative_to(ROOT).as_posix()}/{run137r_path}") == "495c9faf8b701b0fb1138dc8a80f80cb1f082b92"
     run139_path = "evidence/source/current-run-139-reviewed-finance-invoice-index-route-action-reporting-wave-22.json"
     run139 = read_audit(run139_path)
     assert out["pins"]["inputs"][run139_path] == "bdc0b866db9409220bcac7bf66075e8cf89460fb40d61021fe7c98a705597231"
@@ -259,6 +264,21 @@ def main() -> None:
         "reviewed_non_owner_records_preserved": 0, "current_static_overlay_credit_applied": True,
         "page_ownership_inherited": False, "prior_page_owner_context_inherited_or_recredited": False,
         "caller_or_sibling_ownership_used": False, "cohort_sha256": EXPECTED_COHORT, "review_sha256": EXPECTED_REVIEW,
+    }
+    out["lineage_correction"] = {
+        "correction_id":"RUN142-CORRECTION-01",
+        "reason":"DIRECTLY_READ_RUN137R_QUEUE_LINEAGE_INPUT_WAS_OMITTED_FROM_DECLARED_INPUT_MAP",
+        "corrective_parent_commit":EXPECTED_HEAD,"corrective_parent_tree":EXPECTED_TREE,
+        "added_input_path":run137r_path,
+        "added_input_sha256":"a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f",
+        "added_input_blob_id":"495c9faf8b701b0fb1138dc8a80f80cb1f082b92",
+        "prior_declared_input_count":25,"corrected_declared_input_count":26,
+        "prior_input_map_sha256":"27d1725c7663ac69e3fe1676cfb8092c0ea2073cfa8ceaef676be8361fb51f15",
+        "corrected_input_map_sha256":EXPECTED_INPUT_MAP_SHA256,
+        "non_amend_corrective_commit":True,
+        "ownership_outcomes_changed":False,"counts_changed":False,"identity_changed":False,
+        "queue_outcomes_changed":False,"expansions_or_findings_changed":False,
+        "noninheritance_changed":False,"credit_boundary_changed":False,
     }
     out["architecture_rule"] = review["architecture_rule"]
     out["source_packet_expansion_preservation"] = review["source_packet_expansion"]
@@ -405,7 +425,7 @@ def main() -> None:
     assert out["noninheritance_boundary"]["current_overlay_correctness_and_downstream_credit"] is False
     generator_rel = str(Path(__file__).resolve().relative_to(ROOT)).replace("\\", "/")
     output_rel = str(OUTPUT.relative_to(ROOT)).replace("\\", "/")
-    out["mutation_attestation"] = {"application_source_changed":False,"matrix_changed":False,"reports_changed":False,"dashboard_generator_changed":False,"dashboard_html_changed":False,"runtime_or_external_system_changed":False,"audit_artifacts_only":True,"whole_repository_status_scope_asserted":True,"only_expected_untracked_run142_artifacts_present":True,"expected_status_paths":[generator_rel,output_rel],"application_source_files_changed":0,"test_files_changed":0,"matrix_files_changed":0,"dashboard_or_reporting_files_changed":0,"only_run142_generator_and_output_written":True}
+    out["mutation_attestation"] = {"application_source_changed":False,"matrix_changed":False,"reports_changed":False,"dashboard_generator_changed":False,"dashboard_html_changed":False,"runtime_or_external_system_changed":False,"audit_artifacts_only":True,"whole_repository_status_scope_asserted":True,"only_expected_modified_run142_artifacts_present":True,"expected_status_paths":[generator_rel,output_rel],"application_source_files_changed":0,"test_files_changed":0,"matrix_files_changed":0,"dashboard_or_reporting_files_changed":0,"only_run142_generator_and_output_written":True}
     out["artifact_completion_test_met"] = True
     out["audit_completion_test_met"] = False
     out["wrote_files"] = [generator_rel, output_rel]
@@ -439,6 +459,22 @@ def main() -> None:
     assert out["architecture_rule"] == review["architecture_rule"]
     assert "one operating organisation across multiple Sites" in out["architecture_rule"]
     assert out["wrote_files"] == [generator_rel, output_rel]
+    parsed_generator = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    literal_reads = {
+        call.args[0].value
+        for call in ast.walk(parsed_generator)
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "read_audit"
+        and call.args and isinstance(call.args[0], ast.Constant) and isinstance(call.args[0].value, str)
+    }
+    assert literal_reads <= set(INPUTS)
+    assert all(name in INPUTS for name in overlay_names)
+    correction = out["lineage_correction"]
+    assert correction["added_input_path"] in out["pins"]["inputs"]
+    assert correction["added_input_sha256"] == out["pins"]["inputs"][correction["added_input_path"]]
+    assert correction["corrected_input_map_sha256"] == hjson(out["pins"]["inputs"])
+    assert correction["prior_declared_input_count"] + 1 == correction["corrected_declared_input_count"] == len(out["pins"]["inputs"])
+    assert correction["non_amend_corrective_commit"] is True
+    assert all(value is False for key, value in correction.items() if key.endswith("_changed"))
     run139_counts = run139["counts"]
     for key, expected in {
         "source_owner_records":661,"route_owner_records":304,"page_owner_records":357,
@@ -701,8 +737,9 @@ def main() -> None:
     OUTPUT.write_bytes(encoded)
     assert OUTPUT.read_bytes() == encoded and not encoded.startswith(b"\xef\xbb\xbf") and b"\r\n" not in encoded
     json.loads(encoded, object_pairs_hook=lambda pairs: dict(pairs) if len(pairs) == len({k for k, _ in pairs}) else (_ for _ in ()).throw(AssertionError("duplicate JSON key")))
-    expected_status = {f"?? {generator_rel}", f"?? {output_rel}"}
-    assert set(git("status", "--short").splitlines()) == expected_status
+    expected_status = {f" M {generator_rel}", f" M {output_rel}"}
+    actual_status = subprocess.run(["git","status","--short"], cwd=ROOT, check=True, text=True, capture_output=True).stdout.splitlines()
+    assert set(actual_status) == expected_status
     assert not list(AUDIT.rglob("__pycache__"))
 
 if __name__ == "__main__":

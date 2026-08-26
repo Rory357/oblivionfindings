@@ -4,8 +4,8 @@
   "status": "ONE_REVIEWED_FINANCE_SITE_PORTFOLIO_OVERVIEW_ROUTE_ACTION_OWNER_AND_BRIDGE_INTEGRATED_STATIC_ONLY",
   "generated_on": "2026-08-26",
   "pins": {
-    "checkpoint_commit": "19cd019da8ea0cf8953296fddf423045e4299d74",
-    "checkpoint_tree": "3ce2d122fd6755c90447d235841133ed45e1089b",
+    "checkpoint_commit": "1f4b83e7fdf97c72e90f2be4c81ada2d3e2017e7",
+    "checkpoint_tree": "530f9825a389b6135250bc27553e0f5e2c71d572",
     "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
     "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
     "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
@@ -15,7 +15,7 @@
     "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
     "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
     "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.py",
-    "generator_sha256": "94d7dab1c9ec2b1be25470c5e9dc005b242fb3cf3cb74228e7153487b5729175",
+    "generator_sha256": "c7c7baeb6f34542911370092ea88e7620142be3863742f73ca1434b91f02f005",
     "cohort_generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.py",
     "cohort_generator_sha256": "d3cfd34687ba6c6a9b6afecfe9bfc02d2b700b15de881c1ef651877c486fd6a0",
     "review_materializer": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.py",
@@ -43,6 +43,7 @@
       "evidence/source/root-run-129-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.json": "6d1efad203c368986ada06746f4314382b2dee4d214b25799dc531c02608180c",
       "evidence/source/root-run-133-outcome-neutral-finance-accounting-integration-route-action-cohort-wave-21.json": "58d87fa101e4e1b51d232baf80e1a2e3ef75dad89f37dc0dcd615c2f16e29ce4",
       "evidence/source/root-run-137-outcome-neutral-finance-invoice-index-route-action-cohort-wave-22.json": "e2a6a346365ada6013b82f4e29aa955ffcedf7f3b53ab88279c700407d3012bc",
+      "evidence/source/raw-run-137r-independent-outcome-neutral-finance-invoice-index-route-action-review-wave-22.json": "a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f",
       "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
       "evidence/source/root-run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.json": "9062d90b961e496b0bf5ad48fc3f930a8161394fb8d2b9b88ad298807bd90fc3",
       "evidence/source/raw-run-141r-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.json": "02f78f9e6305c783fd13b790f5d0e044e437bfc2d6853eeb49ec5a65cdd8fd8b",
@@ -1836,7 +1837,7 @@
     "runtime_or_external_system_changed": false,
     "audit_artifacts_only": true,
     "whole_repository_status_scope_asserted": true,
-    "only_expected_untracked_run142_artifacts_present": true,
+    "only_expected_modified_run142_artifacts_present": true,
     "expected_status_paths": [
       "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.py",
       "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-142-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json"
@@ -1852,5 +1853,26 @@
   "wrote_files": [
     "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/integrate-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.py",
     "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-142-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json"
-  ]
+  ],
+  "lineage_correction": {
+    "correction_id": "RUN142-CORRECTION-01",
+    "reason": "DIRECTLY_READ_RUN137R_QUEUE_LINEAGE_INPUT_WAS_OMITTED_FROM_DECLARED_INPUT_MAP",
+    "corrective_parent_commit": "1f4b83e7fdf97c72e90f2be4c81ada2d3e2017e7",
+    "corrective_parent_tree": "530f9825a389b6135250bc27553e0f5e2c71d572",
+    "added_input_path": "evidence/source/raw-run-137r-independent-outcome-neutral-finance-invoice-index-route-action-review-wave-22.json",
+    "added_input_sha256": "a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f",
+    "added_input_blob_id": "495c9faf8b701b0fb1138dc8a80f80cb1f082b92",
+    "prior_declared_input_count": 25,
+    "corrected_declared_input_count": 26,
+    "prior_input_map_sha256": "27d1725c7663ac69e3fe1676cfb8092c0ea2073cfa8ceaef676be8361fb51f15",
+    "corrected_input_map_sha256": "aff29ff15eb469fb2365f46078b7ef4a327e138ce70f590859bcd0e70bc29af8",
+    "non_amend_corrective_commit": true,
+    "ownership_outcomes_changed": false,
+    "counts_changed": false,
+    "identity_changed": false,
+    "queue_outcomes_changed": false,
+    "expansions_or_findings_changed": false,
+    "noninheritance_changed": false,
+    "credit_boundary_changed": false
+  }
 }
