@@ -1,0 +1,740 @@
+{
+  "schema_version": "run-138r-independent-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22-v1",
+  "run_id": "RUN-138R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FINANCE-INVOICE-INDEX-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-22",
+  "status": "GO_THREE_PART_POST_COMMIT_REVIEW_COMPLETE_1_OWNER_1_BRIDGE_BOUNDED_STATIC_ONLY",
+  "reviewed_on": "2026-08-26",
+  "decision": {
+    "verdict": "GO",
+    "independent_reviews": 3,
+    "mechanical_source_blob_checks_reported": 57,
+    "mechanical_identity_fields_recomputed": 41,
+    "lineage_identity_fields_recomputed": 41,
+    "input_hashes_verified": 23,
+    "reviewers_wrote_files": 0,
+    "mechanical_discrepancies": 0,
+    "semantic_or_preservation_discrepancies": 0,
+    "lineage_or_credit_discrepancies": 0,
+    "arithmetic_identity_or_denominator_discrepancies": 0,
+    "byte_provenance_or_credit_discrepancies": 0,
+    "route_owner_records_verified": 1,
+    "controller_action_bridges_verified": 1,
+    "page_owner_records_verified": 0,
+    "source_packet_expansion_records_verified": 12,
+    "assurance_findings_verified": 9,
+    "published_identity_fields_verified": 41,
+    "bounded_static_route_feature_ownership_authorized": true,
+    "static_controller_action_bridges_authorized": true,
+    "static_page_feature_ownership_authorized": false,
+    "wholesale_queue_ownership_authorized": false,
+    "complete_route_page_feature_crosswalk_authorized": false,
+    "matrix_mutation_authorized": false,
+    "reporting_materialization_authorized": true,
+    "correctness_or_downstream_credit_authorized": false,
+    "gate_4_complete": false
+  },
+  "pins": {
+    "review_checkpoint_commit": "d6ebbfcacb96b292248208175db633288ab5a21c",
+    "review_checkpoint_tree": "266bc43ad6ee51c858c2624d14aaccbb082d00a6",
+    "producer_checkpoint_commit": "97c1813915da6122dd6cc3485d3c5338797c34d1",
+    "producer_checkpoint_tree": "1ba2cecf1f091724cdaf45757f01029cc87d5e13",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "producer_generator": "generators/integrate-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22.py",
+    "producer_generator_sha256": "76f9f34a249b901e4448166155eb0e5a314390bebfc90c6d28f5df08c1cb6baf",
+    "producer_generator_blob_id": "fe5e15df811aae227c0884adf86e1006625c4dea",
+    "producer": "evidence/source/current-run-138-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22.json",
+    "producer_sha256": "005a55c952ec3f3b2a5bac9f3c99000fa4eae65a488764dfd1f4662063431701",
+    "producer_blob_id": "ce96719e3a0773e675aec42d3642fbfb9787c86e",
+    "cohort_sha256": "e2a6a346365ada6013b82f4e29aa955ffcedf7f3b53ab88279c700407d3012bc",
+    "cohort_review_sha256": "a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f",
+    "materializer": "generators/materialize-independent-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-review-wave-22.py",
+    "materializer_sha256": "867cf33924bcaf7cf34fa5d22c0a99a920d75f2255ef437adeca1e0a9734af3f",
+    "producer_literal_dictionary_count_checked": 29,
+    "review_materializer_literal_dictionary_count_checked": 15,
+    "inputs": {
+      "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+      "evidence/source/current-run-092-reviewed-static-source-ownership-overlay-wave-11.json": "5390e55d9e47d1845afa8b3848bdab7687747cbb62c946dd4d66d3c435e8de0b",
+      "evidence/source/current-run-098-reviewed-route-controller-only-ownership-overlay-wave-12.json": "7f76c9cfeae906a64c92013fbf9a12cf180d39a315bfa13e778b6332365cdd2a",
+      "evidence/source/current-run-102-reviewed-outcome-neutral-route-action-ownership-overlay-wave-13.json": "cf68900351832c790ec53b4996daaf640c604c498f902c85dec681113bf492dd",
+      "evidence/source/current-run-106-reviewed-outcome-neutral-page-render-owner-ownership-overlay-wave-14.json": "9c1600d2365c3527e185f313b7cb1586705f39cefb15d5d212dc708b45b630ea",
+      "evidence/source/current-run-110-reviewed-outcome-neutral-page-render-owner-tail-ownership-overlay-wave-15.json": "9375fb374b589c5068334795fa03d80a7ba1fd35695808f99c9e2591e886efca",
+      "evidence/source/current-run-114-reviewed-outcome-neutral-name-only-route-action-ownership-overlay-wave-16.json": "cbeb46be682ca0c9ca54012e2c27cf548b54e9cbb75b050fcd61691ca43aaef2",
+      "evidence/source/current-run-118-reviewed-outcome-neutral-respite-handover-page-gap-ownership-overlay-wave-17.json": "33dd2f8ffa2b35c6651a6bf18923872e70ba5c2f91fce8b7222666bb8a91fc8b",
+      "evidence/source/current-run-122-reviewed-outcome-neutral-finance-chart-route-action-ownership-overlay-wave-18.json": "d7aee21e7c4230b44707a22b7fa93478a84e9a5b4775ecd25aaffede764855ca",
+      "evidence/source/current-run-126-reviewed-outcome-neutral-finance-page-gap-ownership-overlay-wave-19.json": "15ab65b479daa7e7c3f2f3fbd979a13ead87dfbedf31c163a27b5eb809b12f10",
+      "evidence/source/current-run-130-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.json": "f32b3d997a9e7dd932e041f5acf30dea02ee5b62fee3b0901cfbe5cc59f2ed0a",
+      "evidence/source/current-run-134-reviewed-outcome-neutral-finance-accounting-integration-route-action-ownership-overlay-wave-21.json": "e82514d96ac01db1cba72e9a469b2bb9c15404d2c42ff124c816e38b086bb669",
+      "evidence/source/raw-run-134r-independent-reviewed-outcome-neutral-finance-accounting-integration-route-action-ownership-overlay-wave-21.json": "da3107cdcbb4ab286c208f85d994676d00f933d4002a966fb89773f8ef0857d3",
+      "evidence/source/root-run-091-closed-route-action-page-chain-cohort-wave-11.json": "7b1fea57104e9f4bfea7ee450ef535ac57e7fa69bc978212b4eafb0fe1ed0cae",
+      "evidence/source/root-run-113-outcome-neutral-name-only-route-action-cohort-wave-16.json": "0849ca5c10e31a4f3e5133a521a570d60b004e723fb17a7f2e812e485f345461",
+      "evidence/source/root-run-121-outcome-neutral-finance-chart-route-action-cohort-wave-18.json": "cfe0e3635e5e86bf8e7e2f65d2094743738bfa5edc36e361ecf5eb14986f316e",
+      "evidence/source/root-run-129-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.json": "6d1efad203c368986ada06746f4314382b2dee4d214b25799dc531c02608180c",
+      "evidence/source/root-run-133-outcome-neutral-finance-accounting-integration-route-action-cohort-wave-21.json": "58d87fa101e4e1b51d232baf80e1a2e3ef75dad89f37dc0dcd615c2f16e29ce4",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "evidence/source/root-run-137-outcome-neutral-finance-invoice-index-route-action-cohort-wave-22.json": "e2a6a346365ada6013b82f4e29aa955ffcedf7f3b53ab88279c700407d3012bc",
+      "evidence/source/raw-run-137r-independent-outcome-neutral-finance-invoice-index-route-action-review-wave-22.json": "a3659294a8d2f9c203968a885da7b48f928d5341dbcb2b177eb85b40a058411f",
+      "evidence/source/current-run-135-reviewed-finance-accounting-integration-route-action-reporting-wave-21.json": "af70461527e7b22855b0a7917121112ca973fe4e88450b6b87ef0b5ae39d99da"
+    }
+  },
+  "architecture_rule": "Oblivion Findings is one operating organisation across multiple Sites. Static route and action ownership does not prove approved-Site access, permission correctness, canonical ownership, direct-object concealment, privacy, query or projection correctness, minimisation, lifecycle, concurrency, durability, or release readiness.",
+  "review_methods": [
+    "Partition A independently checked exact committed files, worktree bytes, Git objects, deterministic replay, and conservation arithmetic.",
+    "Partition B independently traced the selected route, controller actions, feature identity, page and sibling noninheritance, and Site/privacy/correctness boundaries.",
+    "Partition C independently checked lineage, packet expansions, findings, all 41 identities, matrix zero-credit, and every downstream zero-credit field.",
+    "The orchestrator replayed the committed producer byte-for-byte at its checkpoint and materialized this receipt from the three read-only returns."
+  ],
+  "reviewers": [
+    {
+      "review_id": "RUN138R_POST_COMMIT_MECHANICAL_REPLAY_ACCOUNTING_1",
+      "reviewer_task_path": "/root/run138_mechanical_seal",
+      "verdict": "GO",
+      "confidence": "HIGH",
+      "discrepancies": 0,
+      "source_blob_checks": 57,
+      "identity_fields_recomputed": 41,
+      "input_hashes_verified": 23,
+      "source_key_collisions": 0,
+      "source_id_collisions": 0,
+      "bridge_key_collisions": 0,
+      "queue_key_collisions": 0,
+      "ast_duplicate_literal_keys": 0,
+      "audit_pycache_count": 0,
+      "verified_scope": [
+        "exact RUN138 commit, tree, two-file diff, blobs, hashes, and clean application trees",
+        "23 of 23 pinned inputs and a byte-identical mocked producer-era replay from the RUN137R checkpoint",
+        "one owner and bridge, 41 identities, collision freedom, conservation accounting, and no audit pycache"
+      ],
+      "audit_artifact_writes": false,
+      "reviewer_wrote_files": false
+    },
+    {
+      "review_id": "RUN138R_PARTITION_2_SEMANTIC_OWNERSHIP_NONINHERITANCE",
+      "reviewer_task_path": "/root/run138_semantic_seal",
+      "verdict": "GO",
+      "confidence": "HIGH",
+      "discrepancies": 0,
+      "exact_single_route_owner": true,
+      "exact_single_action_bridge": true,
+      "direct_index_render_verified": "app/Domain/Finance/Http/Controllers/InvoiceController.php:109",
+      "existing_page_owners_preserved": 2,
+      "new_or_recredited_page_owners": 0,
+      "required_source_files": 33,
+      "material_dependency_method_slices": 10,
+      "source_packet_expansions": 12,
+      "assurance_findings": 9,
+      "owner_key": "route|RUN077-ROUTE-0634|CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "action_key": "RUN077-ROUTE-0634|app/Domain/Finance/Http/Controllers/InvoiceController.php:index|CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "bridge_key": [
+        "app/Domain/Finance/Http/Controllers/InvoiceController.php",
+        "index",
+        "CAP-FIN-BILLING-INVOICE-LIFECYCLE"
+      ],
+      "verified_scope": [
+        "the selected invoices.index route, InvoiceController::index, exact feature identity, and direct Index render",
+        "bounded CAP-FIN-BILLING-INVOICE-LIFECYCLE route ownership without page inheritance or recredit",
+        "preserved Index and Show page owners, next queue boundary 78, Site/privacy boundaries, and zero correctness credit"
+      ],
+      "audit_artifact_writes": false,
+      "reviewer_wrote_files": false
+    },
+    {
+      "review_id": "RUN138R_PARTITION_3_LINEAGE_PROVENANCE_IDENTITY_CREDIT",
+      "reviewer_task_path": "/root/run138_lineage_seal",
+      "verdict": "GO",
+      "confidence": "HIGH",
+      "discrepancies": 0,
+      "exact_added_files": 2,
+      "workspace_clean": true,
+      "identity_fields_recomputed": 41,
+      "matrix_mapping_credit_rows": 0,
+      "matrix_rows": 340,
+      "all_downstream_credit_false": true,
+      "verified_scope": [
+        "RUN137 cohort, two candidate reviews, synthesis, RUN138 generator and receipt lineage",
+        "33-file and 10-slice packet, twelve disclosed expansions, nine findings, and 41 published identities",
+        "exactly two bounded static credit keys true with matrix, correctness, runtime, browser, tests, benchmark, release, and completion false"
+      ],
+      "audit_artifact_writes": false,
+      "reviewer_wrote_files": false
+    }
+  ],
+  "verified_combined_counts": {
+    "source_owner_records": 661,
+    "route_owner_records": 304,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 63,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 49,
+    "static_controller_action_bridges": 92,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.823619",
+    "bounded_static_source_residual_records": 3268,
+    "residual_explicit_unmapped_routes": 2897,
+    "semantic_shared_routes": 12,
+    "reviewed_alias_routes": 5,
+    "reviewed_dead_routes": 0,
+    "evidence_gap_routes_tagged_within_residual": 7,
+    "residual_unadjudicated_page_roots": 345,
+    "semantic_shared_page_roots": 9,
+    "reviewed_alias_page_roots": 0,
+    "reviewed_dead_page_roots": 0,
+    "evidence_gap_page_roots_tagged_within_residual": 1
+  },
+  "verified_queue_accounting": {
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 115,
+    "owner_queue_surface_rows": 93,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 392,
+    "queue_surfaces_without_ownership": 414,
+    "new_reviewed_route_surface_rows": 1,
+    "new_owner_route_surface_rows": 1,
+    "new_shared_route_surface_rows": 0,
+    "new_alias_route_surface_rows": 0,
+    "new_dead_route_surface_rows": 0,
+    "new_evidence_gap_route_surface_rows": 0,
+    "wholesale_queue_ownership_authorized": false
+  },
+  "verified_identity": {
+    "owner_candidate_id_list_sha256": "fa7a0f3b58b92c921488067dc8cabcef0c6c9ac53e32bf370044aac0ea0abca3",
+    "owner_route_record_id_list_sha256": "53bdc83541b806c06969b4cb77afcad8c70c458eaee9f68105b282eaecf327f7",
+    "owner_source_record_key_list_sha256": "a785bed63533ecda887b3a89d3ffd29d03992b5335852d18f87ee1624d6bf4e9",
+    "owner_action_key_list_sha256": "3745b3df2eb3a9d812b62f81495a1f8b313d4ac8002361a185e46dd034f0213b",
+    "owner_bridge_key_list_sha256": "0d8f3141c6558559b169e4c8b04f90f2d1fecde685c701e648a602c799c38f58",
+    "owner_candidate_record_sha256_list_sha256": "3e551db02de22e0601929700a71f54f54926a893ce4a718c312436d56a81d131",
+    "owner_decision_record_sha256_list_sha256": "b942160fc2197522018cf04de8fd9929e71ac9166d2891cb499c5154f78fed06",
+    "owner_queue_id_list_sha256": "31ccc591157abc1b8c87291619db9382a0bbc0516826c9a13bf4e68afe26f7e3",
+    "owner_queue_key_list_sha256": "3182d1c35ad750953e38bd8808659357d56c74a85c7070e9e354c3639a5ebd83",
+    "new_union_feature_id_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "new_route_feature_id_list_sha256": "7bc53a139456c100c3b52608228bf9f2a5776a4ad429372404c05663b5dc021d",
+    "new_page_feature_id_list_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_source_record_key_list_sha256": "3e6fadc773711705aeb62da073934a05e4404edf6b9a174dc2a2465f8091b0bd",
+    "prior_source_record_id_list_sha256": "ce32de5f14093c8125a96e25b97912b10e48bf1cce1b9be5841e70739d76001d",
+    "combined_source_record_key_list_sha256": "06d83edf37cd73f331dcb3866e7fdde9451ee83e098d63e0a34bad89fc27c36e",
+    "combined_source_record_id_list_sha256": "239389f8390a920606207e71e7a61e98b57d2a1c56895d1a9e0e6fcec5065ced",
+    "combined_feature_id_list_sha256": "874e55340e6abb600c50a64a147b81b9b5467587ee77f9e45eace4eb85ac55ca",
+    "combined_route_feature_id_list_sha256": "fc618328f72dfa1375407b15b00617afb7f3ec971aa1d8d128fc8fd22e25b0b9",
+    "combined_page_feature_id_list_sha256": "2fa6a11a5c66a016366db84ce89931db906b26cc911dfa88490cb6561ff261e8",
+    "combined_route_page_overlap_feature_id_list_sha256": "2c57b6c12c3117e85e3db885e789788885d2de92d4c1b080b5953cfeec0977be",
+    "prior_bridge_key_list_sha256": "9f5cc86fc8c9527685bf1f3cce4801b9ee8c974e30f5fdb424b3cd8e793c0834",
+    "combined_bridge_key_list_sha256": "464f1ff258206d9246a6d34376878901e6e85c32ed584c63c85c9eb08f2d163b",
+    "new_reviewed_queue_key_list_sha256": "3182d1c35ad750953e38bd8808659357d56c74a85c7070e9e354c3639a5ebd83",
+    "prior_reviewed_queue_key_list_sha256": "464bde3341bea712d04a0b14e05863439937c842fd86e8d95767ec5ca7e2d591",
+    "combined_reviewed_queue_key_list_sha256": "25200b6fef377defdaa3ff5ba5f36915c0a962460e92b440af8f1f4c1e9dce49",
+    "combined_route_record_id_list_sha256": "7576468148a8f01cd57e853d4d080768517079708435f5d2bd76bd89af7611f3",
+    "combined_route_source_record_key_list_sha256": "ef3eed351791aed84576c4f11530abb91bae9546f5abeb5f38842e7aa8e090f8",
+    "combined_page_record_id_list_sha256": "abef0c7e0e1ac503e06eb563aee6b19718f1192d7716ea214ee5d4859dce162e",
+    "combined_page_source_record_key_list_sha256": "652acf45451422bfd45af9ea1f12bffffef6f1e386511ec0dbda6d520e0bdd9b",
+    "new_overlay_source_records_sha256": "8fd147510181d1241d0b9b659efbf600bde02d2875dc6df969c8acd760a432ac",
+    "new_overlay_row_sha256_list_sha256": "339114b107b4ec257cdd07f3fdb2b58fbfd09e41f7f36f3f3ff6184deeb87d36",
+    "new_action_bridges_sha256": "dce3711e933a1e53bdd531daed4c467af6beda12e465d397ed6983bfc63070ba",
+    "new_action_bridge_row_sha256_list_sha256": "b7c7dd183565e7ab16d4bea3a522c1d31ffc57a699d3c9ab6e52fd98a6422c39",
+    "reviewed_decision_record_sha256_list_sha256": "b942160fc2197522018cf04de8fd9929e71ac9166d2891cb499c5154f78fed06",
+    "reviewed_decisions_sha256": "9ed9e01043ad5299d7a75a6df4f39c4c3937b638c5c644aec9cc08cdc0ac385b",
+    "synthesis_record_sha256": "c13d4987fc3f7d3423038dd521efe64912f9eb32ae1d9d53e20cd8d2c087ca50",
+    "source_packet_expansions_sha256": "4473a0e032f32c790215b0565d9de361a71f282a821ab164cb525c63cf02f99a",
+    "assurance_findings_sha256": "2513c9a99a955694a13fb49bddaeced702b59adb50622940064b1c910e5a791c",
+    "assurance_finding_id_list_sha256": "901ba3ac9459e450f7d7835bcb566f603e8ed9e482f5ca13d72ef3fee3c39135",
+    "independent_reviews_sha256": "90fa53e6e91b4ae45ab88878bf4b3599eefabadcd4515b49783ae199457d1dfd",
+    "independent_review_record_sha256_list_sha256": "f3763abf1e9ef7f4eec6160c33f743376d07afd98da8f8ed6b1aa7062d74a49a"
+  },
+  "verified_conservation": {
+    "reviewed_outcomes_equation": "1 = 1 owner + 0 shared + 0 alias + 0 dead + 0 evidence gap",
+    "bounded_source_equation": "3929 = 661 owner + 3268 non-owner residual",
+    "owner_surface_equation": "661 = 304 route + 357 page",
+    "feature_union_equation": "256 = 63 route + 242 page - 49 overlap",
+    "route_universe_equation": "3218 = 304 owner + 12 shared + 5 alias + 0 dead + 2897 residual",
+    "evidence_gap_is_tagged_within_2897_route_residual": true,
+    "page_universe_equation": "711 = 357 owner + 9 shared + 0 alias + 0 dead + 345 residual",
+    "evidence_gap_is_tagged_within_345_page_residual": true,
+    "queue_equation": "507 = 115 reviewed + 392 pending",
+    "reviewed_queue_equation": "115 = 93 owner + 10 shared + 5 alias + 0 dead + 7 evidence gap",
+    "queue_without_ownership_equation": "414 = 392 pending + 10 shared + 5 alias + 0 dead + 7 evidence gap"
+  },
+  "verified_projection_reconciliation": {
+    "run137r_projection_credit_awarded": false,
+    "run138_current_static_overlay_credit_applied": true,
+    "current_source_owner_records": 661,
+    "current_route_owner_records": 304,
+    "current_page_owner_records": 357,
+    "current_static_controller_action_bridges": 92,
+    "current_reviewed_queue_surface_rows": 115,
+    "current_pending_unreviewed_queue_surface_rows": 392,
+    "correctness_or_downstream_credit_authorized": false,
+    "rule": "RUN137R authorized a projection only; RUN138 applies exactly one route owner and bridge with no page or correctness credit."
+  },
+  "verified_denominator_boundary": {
+    "run_077_bounded_static_records": 3929,
+    "framework_expanded_route_page_denominator": null,
+    "page_denominator_711_roots_vs_1058_page_tree_files_resolved": false,
+    "complete_route_page_feature_crosswalk": false,
+    "gate_4_complete": false
+  },
+  "verified_page_context_boundary": {
+    "literal_inertia_page_callsites": 1,
+    "existing_page_owner_context_rows": 2,
+    "frontend_static_path_contexts": 7,
+    "existing_index_page_record_id": "PAGE-ROOT-B4964DF8343DF25A",
+    "existing_index_page_owner_row_id": "RUN086-PAGE-MAP-0207",
+    "existing_show_page_record_id": "PAGE-ROOT-E1ACF667B368A747",
+    "existing_show_page_owner_row_id": "RUN086-PAGE-MAP-0272",
+    "existing_page_feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+    "new_page_owner_records": 0,
+    "page_ownership_inherited": false,
+    "page_ownership_reassigned": false,
+    "rule": "Index and Show remain existing page-owner context; the selected render and callers transfer no page or correctness ownership."
+  },
+  "verified_noninheritance_boundary": {
+    "selected_queue_index_zero_based": 77,
+    "selected_queue_id": "RUN090-ROUTE-0078",
+    "selected_route_record_id": "RUN077-ROUTE-0634",
+    "prior_page_owner_context_inherited_or_recredited": false,
+    "frontend_path_or_navigation_ownership_used": false,
+    "next_queue_index_zero_based": 78,
+    "next_queue_id": "RUN090-ROUTE-0079",
+    "next_route_record_id": "RUN077-ROUTE-0669",
+    "next_feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+    "next_boundary_selected_or_credited": false
+  },
+  "verified_source_packet_expansion_preservation": {
+    "total_disclosed_expansion_entries": 12,
+    "widened_existing_packet_files": 7,
+    "newly_followed_files": 5,
+    "original_required_source_files": 33,
+    "original_material_dependency_method_slices": 10,
+    "cohort_source_review_packet_sha256": "d357634ecafca5373cc7141d4d604599431ac836ed2e7274bd5b508d2fadf81e",
+    "source_packet_expansions_sha256": "4473a0e032f32c790215b0565d9de361a71f282a821ab164cb525c63cf02f99a",
+    "original_source_review_complete": false,
+    "original_source_packet_completeness_claimed": false,
+    "original_material_dependency_semantics_complete": false,
+    "original_packet_retroactively_described_as_complete": false,
+    "correctness_credit_authorized": false,
+    "expanded_file_records": [
+      {
+        "path": "resources/js/pages/finance/invoices/Index.tsx",
+        "sha256": "316c3abf37728ffadf1a40042714b84e196b2a91a83c512e833e4ae9af920a13",
+        "head_blob_id": "1b1b88b34c9eb877b248e5363ccfbdaf2fc3f606",
+        "application_commit_blob_id": "1b1b88b34c9eb877b248e5363ccfbdaf2fc3f606",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/pages/finance/invoices/Index.tsx:1-570"
+        ],
+        "expanded_review_loci": [
+          "resources/js/pages/finance/invoices/Index.tsx:1-583"
+        ],
+        "expansion_reason": "widen the canonical index page through both manager-only invoice-dialog callsites",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/pages/finance/invoices/Show.tsx",
+        "sha256": "815ac5992fafa4c4026db4658d311e9505494ed610f48dab9da8082afec37c19",
+        "head_blob_id": "cf40bf3677cf820add6592fda0b38135acc6d325",
+        "application_commit_blob_id": "cf40bf3677cf820add6592fda0b38135acc6d325",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/pages/finance/invoices/Show.tsx:92-190"
+        ],
+        "expanded_review_loci": [
+          "resources/js/pages/finance/invoices/Show.tsx:92-190",
+          "resources/js/pages/finance/invoices/Show.tsx:467-484"
+        ],
+        "expansion_reason": "include the sibling invoice-detail lifecycle callers without inheriting page ownership",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/components/finance/new-invoice-dialog.tsx",
+        "sha256": "46bb09ed60af52a5e31a13a2e65f6c18aebcbdd3fa8e7312243024e8bc56ee45",
+        "head_blob_id": "6af07a295143861545d856c7c1a98536b84860b9",
+        "application_commit_blob_id": "6af07a295143861545d856c7c1a98536b84860b9",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "resources/js/components/finance/new-invoice-dialog.tsx:94-251"
+        ],
+        "expansion_reason": "newly follow the manager-only invoice create/edit modal and raw client-id request contract",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/components/finance/record-receipt-dialog.tsx",
+        "sha256": "1770f05fbc3c0b9ac258900ea90434245a83dde1b995a962417d7c63e69488d5",
+        "head_blob_id": "14e2449aa4beaee79abc4e4cb6c5f61c99150ef5",
+        "application_commit_blob_id": "14e2449aa4beaee79abc4e4cb6c5f61c99150ef5",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "resources/js/components/finance/record-receipt-dialog.tsx:48-102"
+        ],
+        "expansion_reason": "newly follow the receipt caller fed by the index amount-due projection",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Services/PaymentSettlementSiteScope.php",
+        "sha256": "cd837fbf242cb6d94307a141d2df7ce9ea0bd79c31c7de2f80b8517de243645f",
+        "head_blob_id": "948a769757020ab5d404748e3ad957380ebb8a57",
+        "application_commit_blob_id": "948a769757020ab5d404748e3ad957380ebb8a57",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:15-122"
+        ],
+        "expansion_reason": "newly compare canonical settlement-Site scope with the index allocation summary query",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "tests/Feature/Finance/PaymentAllocationIntegrityTest.php",
+        "sha256": "a3fd9da7365aad939c2b2dc5d8a0c348f2e00b1fa0f493a6cd222a73cda6aa50",
+        "head_blob_id": "7b9e36ab9f733962b7f3ac250a410ae106aeac2b",
+        "application_commit_blob_id": "7b9e36ab9f733962b7f3ac250a410ae106aeac2b",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:88-254",
+          "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:596-625"
+        ],
+        "expansion_reason": "newly inspect unexecuted allocation integrity and immutable settlement-Site assertions",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/components/app-sidebar.tsx",
+        "sha256": "482fcfd319695ec22da2598abe4c4f00f95c27be42d93a9d79f97f695befb458",
+        "head_blob_id": "ff1d908a833d572c5015f2e24ee0be6e42382a3c",
+        "application_commit_blob_id": "ff1d908a833d572c5015f2e24ee0be6e42382a3c",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/components/app-sidebar.tsx:1848-1861"
+        ],
+        "expanded_review_loci": [
+          "resources/js/components/app-sidebar.tsx:1843-1861"
+        ],
+        "expansion_reason": "widen the static invoice navigation context without converting it to ownership proof",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/components/finance/receivables-hub.tsx",
+        "sha256": "70a93c6f81f817cf584af58f7306de8e90c545d68f8e8ce22e8123b50061ed65",
+        "head_blob_id": "6a89bd18dadb0c75c82791d590dece946ef3672f",
+        "application_commit_blob_id": "6a89bd18dadb0c75c82791d590dece946ef3672f",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/components/finance/receivables-hub.tsx:38-58"
+        ],
+        "expanded_review_loci": [
+          "resources/js/components/finance/receivables-hub.tsx:38-58",
+          "resources/js/components/finance/receivables-hub.tsx:125-145"
+        ],
+        "expansion_reason": "widen the invoice hub link and count-consumer context",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/pages/finance/billing/Index.tsx",
+        "sha256": "ad9c33a4a3573570d447e4085c73cb3ca9c986c5a67b4f29018ede125bda454d",
+        "head_blob_id": "4f0de634b6ff0a8caa0f8134231f3d96f57d80c7",
+        "application_commit_blob_id": "4f0de634b6ff0a8caa0f8134231f3d96f57d80c7",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/pages/finance/billing/Index.tsx:216-226"
+        ],
+        "expanded_review_loci": [
+          "resources/js/pages/finance/billing/Index.tsx:211-226"
+        ],
+        "expansion_reason": "widen the billing-hub invoice navigation callsite",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "resources/js/pages/operations/service-agreements/Show.tsx",
+        "sha256": "295774b0edcd71923b685e0f023ff1a76bb0fbf797d6fd463b9a18863a467378",
+        "head_blob_id": "b3e545024f3be2e1408d98bf73e32e268172ce29",
+        "application_commit_blob_id": "b3e545024f3be2e1408d98bf73e32e268172ce29",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "resources/js/pages/operations/service-agreements/Show.tsx:2068-2075"
+        ],
+        "expanded_review_loci": [
+          "resources/js/pages/operations/service-agreements/Show.tsx:2060-2075"
+        ],
+        "expansion_reason": "widen the service-agreement caller carrying an untrusted client-id filter",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Http/Middleware/HandleInertiaRequests.php",
+        "sha256": "9c3020ee317545f83d91b07560dc73ba45f3c90a16f24ba17cc86730ef59099f",
+        "head_blob_id": "2b465e6d64cc39ceaf1998a9d38c0d03f9410016",
+        "application_commit_blob_id": "2b465e6d64cc39ceaf1998a9d38c0d03f9410016",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": true,
+        "original_review_loci": [
+          "app/Http/Middleware/HandleInertiaRequests.php:990-1004"
+        ],
+        "expanded_review_loci": [
+          "app/Http/Middleware/HandleInertiaRequests.php:138-144",
+          "app/Http/Middleware/HandleInertiaRequests.php:990-1004"
+        ],
+        "expansion_reason": "widen the shared finance hub-count and exact AR permission context",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/Finance/Services/FinanceHubCountsService.php",
+        "sha256": "2165eacf985fe2ca6ca9bd51845ff38578930d0fe337b211c6ad1ab7e45884f7",
+        "head_blob_id": "096c68479ce9953bead680f718aae1a787876e93",
+        "application_commit_blob_id": "096c68479ce9953bead680f718aae1a787876e93",
+        "head_matches_application_commit_blob": true,
+        "original_packet_present": false,
+        "original_review_loci": [],
+        "expanded_review_loci": [
+          "app/Domain/Finance/Services/FinanceHubCountsService.php:48-105"
+        ],
+        "expansion_reason": "newly follow application-wide finance hub counts used beside the invoice index",
+        "expansion_changes_original_packet_bytes": false,
+        "expansion_authorizes_correctness_credit": false
+      }
+    ]
+  },
+  "verified_assurance_findings_preservation": {
+    "candidate_findings": 6,
+    "shared_findings": 3,
+    "total_findings": 9,
+    "assurance_findings_sha256": "2513c9a99a955694a13fb49bddaeced702b59adb50622940064b1c910e5a791c",
+    "assurance_finding_id_list_sha256": "901ba3ac9459e450f7d7835bcb566f603e8ed9e482f5ca13d72ef3fee3c39135",
+    "provisional_only": true,
+    "final_finding_credit_authorized": false,
+    "correctness_or_downstream_credit_authorized": false,
+    "findings": [
+      {
+        "finding_id": "RUN137R-CANDIDATE-SITE-PRIVACY-DIRECT-FILTER-CLIENTLESS",
+        "severity": "P1",
+        "category": "approved_site_privacy_direct_filter_and_canonical_ownership",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:39-80",
+          "app/Models/Client.php:1-80",
+          "app/Services/UserSiteAccessService.php:70-153",
+          "docs/architecture/single-tenant-application.md:1-21"
+        ],
+        "observation": "The list and summary use legacy organisation storage context, and a raw client_id filter is applied without first converging the Client and invoice through approved-Site scope. Clientless or funder invoices leave an additional canonical Site/privacy boundary unresolved.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-CANDIDATE-ALLOCATION-PROVENANCE-GROSS-KPI",
+        "severity": "P1",
+        "category": "allocation_provenance_and_summary_correctness",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:82-105",
+          "app/Domain/Finance/Models/FinPaymentAllocation.php:1-111",
+          "app/Domain/Finance/Services/PaymentSettlementSiteScope.php:15-122"
+        ],
+        "observation": "The per-page allocation aggregate is not constrained by canonical organisation, settlement Site, allocation type, or integrity provenance, while total_outstanding sums gross invoice totals rather than outstanding balances.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-CANDIDATE-VIEW-ONLY-LINE-MINIMIZATION",
+        "severity": "P1",
+        "category": "response_data_minimization",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:41-44",
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:107-123",
+          "resources/js/pages/finance/invoices/Index.tsx:53-79",
+          "resources/js/pages/finance/invoices/Index.tsx:565-583"
+        ],
+        "observation": "Invoice lines are eagerly returned to every finance.ar.view caller even though the frozen page uses them to prefill manager-only edit flows. Static ownership does not authorize that disclosure.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-CANDIDATE-CLIENT-PICKER-PERMISSION-COUPLING",
+        "severity": "P1",
+        "category": "permission_coupling_and_site_scope",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:107-123",
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:746-760",
+          "app/Services/UserSiteAccessService.php:70-153"
+        ],
+        "observation": "The manager-only invoice client picker asks UserSiteAccessService to accept reports.viewAny as a global fallback. That unrelated permission does not prove finance invoice authority or exact Site scope.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-CANDIDATE-APPLICATION-WIDE-SUMMARY-COUNTS",
+        "severity": "P2",
+        "category": "application_wide_metadata_and_query_efficiency",
+        "loci": [
+          "app/Domain/Finance/Http/Controllers/InvoiceController.php:98-105",
+          "app/Http/Middleware/HandleInertiaRequests.php:138-144",
+          "app/Domain/Finance/Services/FinanceHubCountsService.php:48-105"
+        ],
+        "observation": "The action loads every application-context invoice into PHP for summary derivation while shared middleware also computes application-wide finance hub counts. Neither query path proves approved-Site privacy or efficient bounded aggregation.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-CANDIDATE-CALLER-AUTHORITY-COMPLETENESS",
+        "severity": "P2",
+        "category": "caller_authority_and_discoverability",
+        "loci": [
+          "resources/js/pages/finance/invoices/Index.tsx:118-164",
+          "resources/js/components/finance/receivables-hub.tsx:38-58",
+          "resources/js/components/finance/receivables-hub.tsx:125-145",
+          "resources/js/components/app-sidebar.tsx:1843-1861",
+          "resources/js/pages/operations/service-agreements/Show.tsx:2060-2075",
+          "resources/js/pages/finance/billing/Index.tsx:211-226"
+        ],
+        "observation": "Static links and filter callers, including a raw client_id query parameter, establish discoverability only. They do not prove caller authority, route reachability, runtime behavior, or privacy correctness.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-SHARED-ACTION-TEST-GAP",
+        "severity": "P1",
+        "category": "executable_assurance",
+        "loci": [
+          "tests/Feature/Finance/InvoiceIndexReceiptTest.php:1-93",
+          "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:88-254",
+          "tests/Feature/Finance/PaymentAllocationIntegrityTest.php:596-625",
+          "tests/Browser/Finance/FinanceInvoicesTest.php:1-24"
+        ],
+        "observation": "Frozen tests do not establish the selected index action's foreign-Site, no-Site, forged client_id, view-only minimization, and global-Site positive contracts. No test was executed in this review.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-SHARED-SOURCE-PACKET-EXPANSION",
+        "severity": "EVIDENCE_BOUNDARY",
+        "category": "source_packet_completeness",
+        "loci": [],
+        "observation": "Semantic review pinned seven widened packet files and five newly followed files. This bounded expansion does not rewrite the cohort's explicit incompleteness or grant correctness credit.",
+        "correctness_credit_authorized": false
+      },
+      {
+        "finding_id": "RUN137R-SHARED-PAGE-CALLER-SIBLING-NONINHERITANCE",
+        "severity": "EVIDENCE_BOUNDARY",
+        "category": "ownership_noninheritance",
+        "loci": [
+          "resources/js/pages/finance/invoices/Index.tsx:118-164",
+          "resources/js/pages/finance/invoices/Show.tsx:92-118"
+        ],
+        "observation": "The selected Index render, existing Index owner, sibling Show owner, and static callers remain non-inheritable context. No page owner is added, reassigned, reopened, or re-credited.",
+        "correctness_credit_authorized": false
+      }
+    ]
+  },
+  "verified_producer_credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "static_page_feature_ownership": false,
+    "frontend_caller_ownership": false,
+    "prior_page_owner_context_inherited_or_recredited": false,
+    "matrix_mutation": false,
+    "wholesale_507_queue_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "navigation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_correctness": false,
+    "projection_correctness": false,
+    "response_minimization_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_and_idempotency_correctness": false,
+    "event_and_downstream_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "direct_exact_queue_review": false,
+    "current_overlay_ownership_credit": false,
+    "prior_page_owner_context_inherited_or_recredited": false,
+    "frontend_caller_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "matrix_mutation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "query_correctness": false,
+    "projection_correctness": false,
+    "response_minimization_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "event_or_downstream_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "mutation_attestation": {
+    "reviewers_edited_audit_artifacts": false,
+    "persistent_reviewer_workspace_mutation": false,
+    "receipt_materialized_by_orchestrator_from_reviewer_returns": true,
+    "application_source_changed": false,
+    "matrix_changed": false,
+    "runtime_or_external_system_changed": false,
+    "audit_artifacts_only": true
+  },
+  "attestation": "Three fresh read-only post-commit reviews and an exact producer replay found zero discrepancies. Exactly one invoice-index route owner and one controller-action bridge remain authorized as bounded static ownership only. Gate 4 and the comprehensive audit remain open.",
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-review-wave-22.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-138r-independent-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22.json"
+  ]
+}
