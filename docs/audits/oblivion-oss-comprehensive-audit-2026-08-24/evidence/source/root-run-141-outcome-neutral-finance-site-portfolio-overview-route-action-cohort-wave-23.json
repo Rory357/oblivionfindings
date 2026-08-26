@@ -1,0 +1,1178 @@
+{
+  "schema_version": "run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23-v1",
+  "run_id": "RUN-141-OUTCOME-NEUTRAL-FINANCE-SITE-PORTFOLIO-OVERVIEW-ROUTE-ACTION-COHORT-WAVE-23",
+  "status": "ONE_NAME_ONLY_FINANCE_SITE_PORTFOLIO_JSON_ROUTE_ACTION_CANDIDATE_PENDING_FRESH_REVIEW_ZERO_CREDIT",
+  "generated_on": "2026-08-26",
+  "pins": {
+    "checkpoint_commit": "61d544240837bdceabd126de1595729927db2177",
+    "checkpoint_tree": "8b64cacdcb88c9141cc068943e8628694da43d28",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "generator": "generators/build-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.py",
+    "generator_sha256": "d3cfd34687ba6c6a9b6afecfe9bfc02d2b700b15de881c1ef651877c486fd6a0",
+    "inputs": {
+      "generators/build-outcome-neutral-finance-invoice-index-route-action-cohort-wave-22.py": "93766689117c88173a08f8548a04d7e62f00eadf71fb7fefa302936e540c9bd9",
+      "03-feature-to-benchmark-matrix.csv": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "task-scripts/cap-fin-site-portfolio-overview.md": "4e928479e6cbac4bfaa08ac9a8619df0ae741ebfead4770ca77c803cdd96f8a8",
+      "evidence/source/root-run-077-route-page-universe-manifest-wave-07.json": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
+      "evidence/source/current-route-page-classification-wave-07.json": "7b534fea15e6c4ec98fbb2cb0c761e26116b2abee500c39e599b0e779729df97",
+      "evidence/source/root-run-082-exact-owner-containment-candidate-manifest-wave-08.json": "3c6ad4df13a09ae8ff8f19aee09a1907f9754a1877806659676c6c2898652f85",
+      "evidence/source/raw-run-082r-independent-exact-owner-containment-review-wave-08.json": "a6a4f886ca209bc41ffa86afec37f6bddaf062ac80a6b375391adeea20e1c396",
+      "evidence/source/root-run-086-reviewed-static-route-page-feature-ownership-wave-10.json": "bfec52a9bed7176045457e8920bdc7b65e1c1d5c5eeb28a266f49c12acf69bcf",
+      "generators/build-direct-exact-route-page-review-queue-wave-11.py": "73b12d328cfee86631670b0b6b6a9bb6e7cc4ee45380af1136d361584f6d241d",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "evidence/source/root-run-133-outcome-neutral-finance-accounting-integration-route-action-cohort-wave-21.json": "58d87fa101e4e1b51d232baf80e1a2e3ef75dad89f37dc0dcd615c2f16e29ce4",
+      "evidence/source/current-run-134-reviewed-outcome-neutral-finance-accounting-integration-route-action-ownership-overlay-wave-21.json": "e82514d96ac01db1cba72e9a469b2bb9c15404d2c42ff124c816e38b086bb669",
+      "evidence/source/root-run-137-outcome-neutral-finance-invoice-index-route-action-cohort-wave-22.json": "e2a6a346365ada6013b82f4e29aa955ffcedf7f3b53ab88279c700407d3012bc",
+      "evidence/source/current-run-138-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22.json": "005a55c952ec3f3b2a5bac9f3c99000fa4eae65a488764dfd1f4662063431701",
+      "evidence/source/current-run-139-reviewed-finance-invoice-index-route-action-reporting-wave-22.json": "bdc0b866db9409220bcac7bf66075e8cf89460fb40d61021fe7c98a705597231",
+      "audit-dashboard.html": "f9f11d0ac7d70ab5829ce0e41435b185279beb5141afe701c7a578fdce59399d",
+      "evidence/browser/current-audit-dashboard-verification-run-140-wave-22.json": "1cae6bb23a9ede9bcda9cd975de07476516eeb18d6746f1aacf2653ecfe0c74f",
+      "evidence/source/root-run-091-closed-route-action-page-chain-cohort-wave-11.json": "7b1fea57104e9f4bfea7ee450ef535ac57e7fa69bc978212b4eafb0fe1ed0cae",
+      "evidence/source/root-run-097-route-controller-only-candidate-cohort-wave-12.json": "69981d1bc22d76b8f17834040272260d9b33c151535a3ff2ef17ae4643923933",
+      "evidence/source/root-run-101-outcome-neutral-route-action-cohort-wave-13.json": "3a8f4c3f11668406f34db7e50ae561fe1c6516e7002eb7e8271851e62c3ff655",
+      "evidence/source/root-run-113-outcome-neutral-name-only-route-action-cohort-wave-16.json": "0849ca5c10e31a4f3e5133a521a570d60b004e723fb17a7f2e812e485f345461",
+      "evidence/source/root-run-121-outcome-neutral-finance-chart-route-action-cohort-wave-18.json": "cfe0e3635e5e86bf8e7e2f65d2094743738bfa5edc36e361ecf5eb14986f316e",
+      "evidence/source/root-run-129-outcome-neutral-finance-fx-revaluation-route-action-cohort-wave-20.json": "6d1efad203c368986ada06746f4314382b2dee4d214b25799dc531c02608180c",
+      "evidence/source/current-run-092-reviewed-static-source-ownership-overlay-wave-11.json": "5390e55d9e47d1845afa8b3848bdab7687747cbb62c946dd4d66d3c435e8de0b",
+      "evidence/source/current-run-098-reviewed-route-controller-only-ownership-overlay-wave-12.json": "7f76c9cfeae906a64c92013fbf9a12cf180d39a315bfa13e778b6332365cdd2a",
+      "evidence/source/current-run-102-reviewed-outcome-neutral-route-action-ownership-overlay-wave-13.json": "cf68900351832c790ec53b4996daaf640c604c498f902c85dec681113bf492dd",
+      "evidence/source/current-run-106-reviewed-outcome-neutral-page-render-owner-ownership-overlay-wave-14.json": "9c1600d2365c3527e185f313b7cb1586705f39cefb15d5d212dc708b45b630ea",
+      "evidence/source/current-run-110-reviewed-outcome-neutral-page-render-owner-tail-ownership-overlay-wave-15.json": "9375fb374b589c5068334795fa03d80a7ba1fd35695808f99c9e2591e886efca",
+      "evidence/source/current-run-114-reviewed-outcome-neutral-name-only-route-action-ownership-overlay-wave-16.json": "cbeb46be682ca0c9ca54012e2c27cf548b54e9cbb75b050fcd61691ca43aaef2",
+      "evidence/source/current-run-118-reviewed-outcome-neutral-respite-handover-page-gap-ownership-overlay-wave-17.json": "33dd2f8ffa2b35c6651a6bf18923872e70ba5c2f91fce8b7222666bb8a91fc8b",
+      "evidence/source/current-run-122-reviewed-outcome-neutral-finance-chart-route-action-ownership-overlay-wave-18.json": "d7aee21e7c4230b44707a22b7fa93478a84e9a5b4775ecd25aaffede764855ca",
+      "evidence/source/current-run-126-reviewed-outcome-neutral-finance-page-gap-ownership-overlay-wave-19.json": "15ab65b479daa7e7c3f2f3fbd979a13ead87dfbedf31c163a27b5eb809b12f10",
+      "evidence/source/current-run-130-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.json": "f32b3d997a9e7dd932e041f5acf30dea02ee5b62fee3b0901cfbe5cc59f2ed0a"
+    }
+  },
+  "architecture_rule": "Oblivion Findings serves one operating organisation across multiple Sites. Exact permission, approved-Site reach, canonical record ownership, privacy, and direct-object rules are the authorization boundaries; no tenant identity or tenant inheritance is introduced or credited.",
+  "selection_contract": {
+    "outcome_neutral": true,
+    "candidate_owner_projection_authorized": false,
+    "rule": "Select all and only zero-based RUN-090 queue index 78 after the committed RUN-139/RUN-140 boundary; require exact queue, route, name-only feature candidate, unique controller action, no prior review, no current owner, and no bridge collision identity.",
+    "name_only_rule": "The exact local token sites.overview supplies the sole matrix candidate. The backend lane supplies zero feature candidates. Effective finance.api.sites.overview and finance.sites.overview names distinguish the selected JSON route from the separate page route; the collision is review context only.",
+    "page_and_sibling_rule": "The existing page owner, separate page controller/route, and page-path callers are non-inheritable. RUN-141 contains zero page candidates and selects neither the sibling route nor any caller.",
+    "adjacent_boundary_rule": "Raw index 79 is already a RUN-098 owner plus bridge and is excluded with recredit prohibited. Raw index 80 is the next actually pending row and is frozen unselected.",
+    "prohibited_inheritance": [
+      "route group, local-name collision, adjacency, or queue proximity",
+      "existing page ownership, sibling controller/render, or page-path callers",
+      "permission middleware, declared architecture, or frozen source tests",
+      "the already reviewed raw index-79 route owner and bridge",
+      "runtime, browser, benchmark, ease, Pass, final finding, release, or completion"
+    ]
+  },
+  "current_baseline": {
+    "source_owner_records": 661,
+    "route_owner_records": 304,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 63,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 49,
+    "static_controller_action_bridges": 92,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.823619",
+    "bounded_static_source_residual_records": 3268,
+    "residual_explicit_unmapped_routes": 2897,
+    "semantic_shared_routes": 12,
+    "reviewed_alias_routes": 5,
+    "reviewed_dead_routes": 0,
+    "evidence_gap_routes_tagged_within_residual": 7,
+    "residual_unadjudicated_page_roots": 345,
+    "semantic_shared_page_roots": 9,
+    "reviewed_alias_page_roots": 0,
+    "reviewed_dead_page_roots": 0,
+    "evidence_gap_page_roots_tagged_within_residual": 1,
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 115,
+    "owner_queue_surface_rows": 93,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 392,
+    "queue_surfaces_without_ownership": 414,
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0
+  },
+  "source_review_packet": {
+    "source_tree_pinning_basis": {
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+      "head_app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+      "head_routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+      "head_resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+      "head_tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+      "every_required_file_matches_application_commit_blob": true
+    },
+    "required_source_files": [
+      {
+        "path": "routes/web.php",
+        "sha256": "5894a96a99997c984047b3aa9aef793c34c3d2d67fdac091e1022bcc3c05837e",
+        "blob_id": "cb6aec6dd2c44079a678ee1b92bcd1bddf2079fd",
+        "application_commit_blob_id": "cb6aec6dd2c44079a678ee1b92bcd1bddf2079fd",
+        "review_loci": [
+          "routes/web.php:369"
+        ],
+        "purpose": "finance route loader"
+      },
+      {
+        "path": "routes/finance.php",
+        "sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+        "blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "application_commit_blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "review_loci": [
+          "routes/finance.php:62",
+          "routes/finance.php:93-96",
+          "routes/finance.php:776-782"
+        ],
+        "purpose": "outer and nested groups, separate page route, selected JSON action, and local-name collision"
+      },
+      {
+        "path": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php",
+        "sha256": "fc5506dc241c2aa4c7a56facab35701a1c7d799a78d1332975ecb1b83cd0153b",
+        "blob_id": "916ff02337aba3f125f2c5e22b61d462b0b1dfd1",
+        "application_commit_blob_id": "916ff02337aba3f125f2c5e22b61d462b0b1dfd1",
+        "review_loci": [
+          "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:1-206"
+        ],
+        "purpose": "complete selected JSON controller and period helper"
+      },
+      {
+        "path": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php",
+        "sha256": "6e06a79061e38afa037b223b9bed1579b4463697a61961c5b894de7477e42877",
+        "blob_id": "ec7346ab7ca0b1d571767dbd974f53051bfc631d",
+        "application_commit_blob_id": "ec7346ab7ca0b1d571767dbd974f53051bfc631d",
+        "review_loci": [
+          "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:14-154"
+        ],
+        "purpose": "separate page-route controller and literal render sibling context"
+      },
+      {
+        "path": "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php",
+        "sha256": "60d2e93835f2815a6e2717bdb821f3c4b5d977b7af4e65ddc12665f4740f7b39",
+        "blob_id": "6604c0041120f740ac28fdd1750f823099e1d0d1",
+        "application_commit_blob_id": "6604c0041120f740ac28fdd1750f823099e1d0d1",
+        "review_loci": [
+          "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:25-70"
+        ],
+        "purpose": "aggregate approved-Site and exact global permission boundary"
+      },
+      {
+        "path": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php",
+        "sha256": "7f9dec1b873a155dfb465b3e7f1b5f72665be568a04017353f871bac16a2707f",
+        "blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "application_commit_blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "review_loci": [
+          "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php:12-70"
+        ],
+        "purpose": "immutable aggregate decision context"
+      },
+      {
+        "path": "app/Domain/Finance/Services/FinancialInsightsScope.php",
+        "sha256": "4848c0ab18f55d64339089d3dd1521d852cb76a799e5e1e4d98601855c60d567",
+        "blob_id": "9ecf190fbe71b7165c063cc742271c2075120504",
+        "application_commit_blob_id": "9ecf190fbe71b7165c063cc742271c2075120504",
+        "review_loci": [
+          "app/Domain/Finance/Services/FinancialInsightsScope.php:1-11"
+        ],
+        "purpose": "decision enum context"
+      },
+      {
+        "path": "app/Domain/Finance/Services/SiteFinancialDashboardService.php",
+        "sha256": "879608b31f8963a84a4b3433070de4a628e20f089d843c31a61757267920eec3",
+        "blob_id": "c9607718abca99fe7cb144f7d398118deb302bc9",
+        "application_commit_blob_id": "c9607718abca99fe7cb144f7d398118deb302bc9",
+        "review_loci": [
+          "app/Domain/Finance/Services/SiteFinancialDashboardService.php:88-134"
+        ],
+        "purpose": "selected multi-Site JSON projection"
+      },
+      {
+        "path": "app/Domain/Finance/Services/SiteCostService.php",
+        "sha256": "c5eaf1201daad0f00d9e92fe7ac0a086588c421e5832d0d8f0d8526a239cb0c9",
+        "blob_id": "2fe6e725ec8c1bd3d248bde303269e923d43a3eb",
+        "application_commit_blob_id": "2fe6e725ec8c1bd3d248bde303269e923d43a3eb",
+        "review_loci": [
+          "app/Domain/Finance/Services/SiteCostService.php:50-85"
+        ],
+        "purpose": "per-Site cost breakdown dependency"
+      },
+      {
+        "path": "app/Domain/Finance/Services/CostPerResidentService.php",
+        "sha256": "cd5e97102f2e7c9e8ea087155dbc71c3549c3833526253065269f689ffb8c9e3",
+        "blob_id": "144d6d996a92e227cd5dfaeeb93e12c236602714",
+        "application_commit_blob_id": "144d6d996a92e227cd5dfaeeb93e12c236602714",
+        "review_loci": [
+          "app/Domain/Finance/Services/CostPerResidentService.php:43-74"
+        ],
+        "purpose": "per-resident projection dependency"
+      },
+      {
+        "path": "app/Domain/Finance/Services/StaffingCostService.php",
+        "sha256": "f5f8f02c8c7be638f9624faa4f3b4ddf57a93cc7d0df6390e7bbbe8eb0ca51bb",
+        "blob_id": "1ad8e061ddd06ee7afbc9324d8dd9b11a0400b00",
+        "application_commit_blob_id": "1ad8e061ddd06ee7afbc9324d8dd9b11a0400b00",
+        "review_loci": [
+          "app/Domain/Finance/Services/StaffingCostService.php:81-106"
+        ],
+        "purpose": "batched staffing comparison dependency"
+      },
+      {
+        "path": "app/Services/UserSiteAccessService.php",
+        "sha256": "dda7c5d5ad50030bbf19fd1c157cd44cec27f0c49c0701ede06320858c155bf6",
+        "blob_id": "b61d639675ad84c20014f78ebb9462415092d21a",
+        "application_commit_blob_id": "b61d639675ad84c20014f78ebb9462415092d21a",
+        "review_loci": [
+          "app/Services/UserSiteAccessService.php:70-155"
+        ],
+        "purpose": "canonical accessible-Site and explicit bypass derivation"
+      },
+      {
+        "path": "app/Models/User.php",
+        "sha256": "0d184ebe6a28395b34b195751ffb62390f4c32828c982103ad613430bc4e59ae",
+        "blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "application_commit_blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "review_loci": [
+          "app/Models/User.php:359-415"
+        ],
+        "purpose": "exact capability evaluation"
+      },
+      {
+        "path": "app/Models/Site.php",
+        "sha256": "11c178749d93f2267eab14a22ad0bfc6dbb99384c9b219dac15f27c01a713040",
+        "blob_id": "6cf3a2d54f9c1650958c971b232014637a3d0a08",
+        "application_commit_blob_id": "6cf3a2d54f9c1650958c971b232014637a3d0a08",
+        "review_loci": [
+          "app/Models/Site.php:378-392"
+        ],
+        "purpose": "active and non-archived Site scopes"
+      },
+      {
+        "path": "app/Models/Client.php",
+        "sha256": "da16f2e4f76e7f8047c30f6a04554cca3d3b332a7c8640fda45bd870d79c58ca",
+        "blob_id": "90593038e0cb209bfdec6b0797c8d8e7134c530b",
+        "application_commit_blob_id": "90593038e0cb209bfdec6b0797c8d8e7134c530b",
+        "review_loci": [
+          "app/Models/Client.php:1-430"
+        ],
+        "purpose": "aggregate resolver Client-relationship query context"
+      },
+      {
+        "path": "bootstrap/app.php",
+        "sha256": "7869aa6a50968b1114d2b65e26de5fae85cae86387b77e94dfdd88c421bebd76",
+        "blob_id": "8d80f25b6cd086e3905b15e8851ff511c5088b92",
+        "application_commit_blob_id": "8d80f25b6cd086e3905b15e8851ff511c5088b92",
+        "review_loci": [
+          "bootstrap/app.php:1-96"
+        ],
+        "purpose": "permission middleware alias registration"
+      },
+      {
+        "path": "app/Http/Middleware/EnsurePermission.php",
+        "sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+        "blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "application_commit_blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "review_loci": [
+          "app/Http/Middleware/EnsurePermission.php:1-29"
+        ],
+        "purpose": "literal finance.dashboard enforcement path"
+      },
+      {
+        "path": "database/seeders/RbacSeeder.php",
+        "sha256": "f5d3f56f26e04c4e3363ba7f19357672e4f3671d54be39969b35f84312df7f03",
+        "blob_id": "bcf5206e1243e78401f043bc04f653cb5590db27",
+        "application_commit_blob_id": "bcf5206e1243e78401f043bc04f653cb5590db27",
+        "review_loci": [
+          "database/seeders/RbacSeeder.php:1-900"
+        ],
+        "purpose": "finance dashboard and view-all-Sites permission assignment context"
+      },
+      {
+        "path": "resources/js/pages/finance/sites-overview/Show.tsx",
+        "sha256": "f8d9ce0d29d2e5a7a9829f3f1c283c8a0f3fd86104f0e77b99645c90b7cf5f0e",
+        "blob_id": "b0f9cbd993b5b1f1c3279d744f4626c2c12ab11e",
+        "application_commit_blob_id": "b0f9cbd993b5b1f1c3279d744f4626c2c12ab11e",
+        "review_loci": [
+          "resources/js/pages/finance/sites-overview/Show.tsx:1-571"
+        ],
+        "purpose": "existing page owner and same-page route caller context"
+      },
+      {
+        "path": "resources/js/components/finance/overview-hub.tsx",
+        "sha256": "38ad90cb236457331b9b38b74acd14edd42f59ffa92b68da53270e60858642f3",
+        "blob_id": "57e1088a296715f2beaf49d3322002c8df7c1c84",
+        "application_commit_blob_id": "57e1088a296715f2beaf49d3322002c8df7c1c84",
+        "review_loci": [
+          "resources/js/components/finance/overview-hub.tsx:1-80"
+        ],
+        "purpose": "separate page-path navigation context"
+      },
+      {
+        "path": "resources/js/pages/sites/_ledger-panel.tsx",
+        "sha256": "0f44abf1552c72428029906575f2b061ccfe2465d13a5f2d1f60a49dd700d659",
+        "blob_id": "e052bec62b30119157d8d49b0dc297a6d62f461a",
+        "application_commit_blob_id": "e052bec62b30119157d8d49b0dc297a6d62f461a",
+        "review_loci": [
+          "resources/js/pages/sites/_ledger-panel.tsx:820-840"
+        ],
+        "purpose": "separate page-path cross-module caller context"
+      },
+      {
+        "path": "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php",
+        "sha256": "eba5afc431d883e3d04fd9ce63e9f1009f03f7cb284ca301dcc95ab52303495c",
+        "blob_id": "8388ccb5fbd0c586fcdbc2b65514c7b43223f016",
+        "application_commit_blob_id": "8388ccb5fbd0c586fcdbc2b65514c7b43223f016",
+        "review_loci": [
+          "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:98-115",
+          "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:280-390",
+          "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:493-531"
+        ],
+        "purpose": "unexecuted selected API scope, projection, and global-permission assertions"
+      },
+      {
+        "path": "tests/Feature/Finance/SitesFinancialOverviewTest.php",
+        "sha256": "6132da332d86ea7d3f840232dd4832e90240dc28721eefa24670fce38bc3e28d",
+        "blob_id": "d89cf90de8402e6e577f2b47985093e2fb2bfb64",
+        "application_commit_blob_id": "d89cf90de8402e6e577f2b47985093e2fb2bfb64",
+        "review_loci": [
+          "tests/Feature/Finance/SitesFinancialOverviewTest.php:1-164"
+        ],
+        "purpose": "unexecuted separate page-route and page-projection assertions"
+      },
+      {
+        "path": "docs/architecture/financial-insights-object-scope.md",
+        "sha256": "27ea11427ff09809a0c478e32b058a82b8eedeb11ad5d66eac3492d3d424df7c",
+        "blob_id": "5609f47941b5a78080e24648eb5d2f79bfbe468c",
+        "application_commit_blob_id": "5609f47941b5a78080e24648eb5d2f79bfbe468c",
+        "review_loci": [
+          "docs/architecture/financial-insights-object-scope.md:1-41"
+        ],
+        "purpose": "declared financial-insights object boundary"
+      },
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "application_commit_blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "review_loci": [
+          "docs/architecture/single-tenant-application.md:1-21"
+        ],
+        "purpose": "canonical one-organisation multi-Site boundary"
+      }
+    ],
+    "required_source_file_count": 25,
+    "required_source_file_identity_sha256": "a885a0d06b70b24c60da3dfef820974feb0c306cc1a0f28ac9e8ff347d339c5d",
+    "material_dependency_method_slices": [
+      {
+        "source_file": "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php",
+        "source_file_sha256": "60d2e93835f2815a6e2717bdb821f3c4b5d977b7af4e65ddc12665f4740f7b39",
+        "source_file_blob_id": "6604c0041120f740ac28fdd1750f823099e1d0d1",
+        "method": "resolveAggregate",
+        "definition_line": 35,
+        "definition_anchor": "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:35",
+        "review_slice": {
+          "start_line": 35,
+          "end_line": 71,
+          "next_method_definition_line": 72,
+          "line_count": 37,
+          "text": "    public function resolveAggregate(?User $user): FinancialInsightsScopeDecision\n    {\n        if (! $user || ! $user->canDo(self::BASE_PERMISSION)) {\n            return FinancialInsightsScopeDecision::denied();\n        }\n\n        $isGlobal = $user->canDo(self::GLOBAL_PERMISSION);\n        $siteIds = $this->siteAccess->accessibleSiteIds(\n            $user,\n            $isGlobal ? [self::GLOBAL_PERMISSION] : [],\n        );\n\n        $clientIds = $siteIds === []\n            ? []\n            : Client::query()\n                ->whereIn('site_id', $siteIds)\n                ->when(\n                    ! $isGlobal,\n                    fn (Builder $clients): Builder => $clients->whereHas(\n                        'supportWorkers',\n                        fn (Builder $workers): Builder => $workers->whereKey($user->id),\n                    ),\n                )\n                ->orderBy('id')\n                ->pluck('id')\n                ->map(fn ($clientId): int => (int) $clientId)\n                ->all();\n\n        if ($isGlobal) {\n            return FinancialInsightsScopeDecision::global($siteIds, $clientIds);\n        }\n\n        return $siteIds === []\n            ? FinancialInsightsScopeDecision::denied()\n            : FinancialInsightsScopeDecision::accessibleSites($siteIds, $clientIds);\n    }\n",
+          "text_sha256": "e2dffc41efac3b3a8a85c4b99ea6a5ef8d58d60397a26edc6f58e975a8c25493"
+        }
+      },
+      {
+        "source_file": "app/Services/UserSiteAccessService.php",
+        "source_file_sha256": "dda7c5d5ad50030bbf19fd1c157cd44cec27f0c49c0701ede06320858c155bf6",
+        "source_file_blob_id": "b61d639675ad84c20014f78ebb9462415092d21a",
+        "method": "accessibleSiteIds",
+        "definition_line": 70,
+        "definition_anchor": "app/Services/UserSiteAccessService.php:70",
+        "review_slice": {
+          "start_line": 70,
+          "end_line": 139,
+          "next_method_definition_line": 140,
+          "line_count": 70,
+          "text": "    public function accessibleSiteIds(?User $user, array $bypassPermissions = []): array\n    {\n        $cacheKey = implode('|', [\n            $user ? (string) ($user->getKey() ?? 'unsaved') : 'guest',\n            $user ? (string) spl_object_id($user) : 'guest',\n            implode(',', $bypassPermissions),\n        ]);\n        if (array_key_exists($cacheKey, $this->accessibleSiteIdsCache)) {\n            return $this->accessibleSiteIdsCache[$cacheKey];\n        }\n\n        if (! $user) {\n            return $this->accessibleSiteIdsCache[$cacheKey] = [];\n        }\n\n        if ($this->canBypass($user, $bypassPermissions)) {\n            return $this->accessibleSiteIdsCache[$cacheKey] = Site::query()\n                ->active()\n                ->notArchived()\n                ->whereNull('archived_at')\n                ->orderBy('id')\n                ->pluck('id')\n                ->map(fn ($siteId) => (int) $siteId)\n                ->all();\n        }\n\n        $user->loadMissing('hrEmployeeProfile');\n\n        $profile = $user->hrEmployeeProfile;\n        if (! $profile || ! $this->isCurrentEmployeeProfile($profile)) {\n            return $this->accessibleSiteIdsCache[$cacheKey] = [];\n        }\n\n        $secondarySiteIds = is_array($profile?->secondary_site_ids)\n            ? $profile->secondary_site_ids\n            : [];\n\n        $assignedSiteIds = collect([\n            $profile?->primary_site_id,\n            ...$secondarySiteIds,\n        ])\n            ->filter(fn ($siteId) => filled($siteId))\n            ->map(fn ($siteId) => (int) $siteId)\n            ->filter(fn (int $siteId) => $siteId > 0)\n            ->unique()\n            ->values()\n            ->all();\n\n        if ($assignedSiteIds === []) {\n            return $this->accessibleSiteIdsCache[$cacheKey] = [];\n        }\n\n        $currentSiteIds = Site::query()\n            ->active()\n            ->notArchived()\n            ->whereNull('archived_at')\n            ->whereIn('id', $assignedSiteIds)\n            ->pluck('id')\n            ->map(fn ($siteId) => (int) $siteId)\n            ->all();\n\n        return $this->accessibleSiteIdsCache[$cacheKey] = array_values(array_filter(\n            $assignedSiteIds,\n            fn (int $siteId) => in_array($siteId, $currentSiteIds, true),\n        ));\n    }\n\n    /**\n     * @param  array<int, string>  $bypassPermissions\n     */",
+          "text_sha256": "10c3c6ab09e8af629d2967499882f4e582f1475d511c769894e0d42d6a101955"
+        }
+      },
+      {
+        "source_file": "app/Services/UserSiteAccessService.php",
+        "source_file_sha256": "dda7c5d5ad50030bbf19fd1c157cd44cec27f0c49c0701ede06320858c155bf6",
+        "source_file_blob_id": "b61d639675ad84c20014f78ebb9462415092d21a",
+        "method": "canBypass",
+        "definition_line": 140,
+        "definition_anchor": "app/Services/UserSiteAccessService.php:140",
+        "review_slice": {
+          "start_line": 140,
+          "end_line": 155,
+          "next_method_definition_line": 156,
+          "line_count": 16,
+          "text": "    public function canBypass(?User $user, array $bypassPermissions = []): bool\n    {\n        if (! $user) {\n            return false;\n        }\n\n        foreach ($bypassPermissions as $permission) {\n            if ($user->canDo($permission)) {\n                return true;\n            }\n        }\n\n        return false;\n    }\n\n    /** @return array<int, int> */",
+          "text_sha256": "faaa852e18d3334484f199f59de0fde9ccf49823b3e67f841fe8d8cd2a31ed8a"
+        }
+      },
+      {
+        "source_file": "app/Models/User.php",
+        "source_file_sha256": "0d184ebe6a28395b34b195751ffb62390f4c32828c982103ad613430bc4e59ae",
+        "source_file_blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "method": "canDo",
+        "definition_line": 359,
+        "definition_anchor": "app/Models/User.php:359",
+        "review_slice": {
+          "start_line": 359,
+          "end_line": 415,
+          "next_method_definition_line": 416,
+          "line_count": 57,
+          "text": "    public function canDo(string $permissionKey): bool\n    {\n        $permissionKeys = $this->permissionLookupKeys($permissionKey);\n\n        if ($this->relationLoaded('permissionOverrides')\n            && $this->relationLoaded('roles')\n            && $this->roles->every(fn (Role $role) => $role->relationLoaded('permissions'))) {\n            $overrides = $this->permissionOverrides\n                ->filter(fn (Permission $permission) => in_array($permission->key, $permissionKeys, true));\n\n            if ($overrides->contains(fn (Permission $permission) => ! (bool) $permission->pivot->allowed)) {\n                return false;\n            }\n\n            if ($overrides->contains(fn (Permission $permission) => (bool) $permission->pivot->allowed)) {\n                return true;\n            }\n\n            return $this->roles->contains(\n                fn (Role $role) => $role->permissions->contains(\n                    fn (Permission $permission) => in_array($permission->key, $permissionKeys, true),\n                ),\n            );\n        }\n\n        // 1) explicit deny override wins\n        $deny = $this->permissionOverrides()\n            ->whereIn('permissions.key', $permissionKeys)\n            ->wherePivot('allowed', false)\n            ->exists();\n\n        if ($deny) {\n            return false;\n        }\n\n        // 2) explicit allow override\n        $allow = $this->permissionOverrides()\n            ->whereIn('permissions.key', $permissionKeys)\n            ->wherePivot('allowed', true)\n            ->exists();\n\n        if ($allow) {\n            return true;\n        }\n\n        // 3) role permissions\n        return $this->roles()\n            ->whereHas('permissions', fn ($q) => $q->whereIn('key', $permissionKeys))\n            ->exists();\n    }\n\n    /**\n     * Legacy permission keys kept as policy-layer synonyms while routes and\n     * controllers use the canonical namespace.\n     *\n     * @return list<string>\n     */",
+          "text_sha256": "8233962bec8d8a16dabd8e2c44ea427b442e5c2209fd6f0aff2e38465bab9777"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php",
+        "source_file_sha256": "7f9dec1b873a155dfb465b3e7f1b5f72665be568a04017353f871bac16a2707f",
+        "source_file_blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "method": "denied",
+        "definition_line": 61,
+        "definition_anchor": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php:61",
+        "review_slice": {
+          "start_line": 61,
+          "end_line": 65,
+          "next_method_definition_line": 66,
+          "line_count": 5,
+          "text": "    public static function denied(): self\n    {\n        return new self(FinancialInsightsScope::Denied, [], []);\n    }\n",
+          "text_sha256": "bce16b6084f7dea3516788acc0da29d37af6567a62a9240ec2c0fbd4d7a28148"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php",
+        "source_file_sha256": "7f9dec1b873a155dfb465b3e7f1b5f72665be568a04017353f871bac16a2707f",
+        "source_file_blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "method": "global",
+        "definition_line": 30,
+        "definition_anchor": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php:30",
+        "review_slice": {
+          "start_line": 30,
+          "end_line": 42,
+          "next_method_definition_line": 43,
+          "line_count": 13,
+          "text": "    public static function global(\n        array $siteIds,\n        array $clientIds,\n        ?int $siteId = null,\n        ?int $clientId = null,\n    ): self {\n        return new self(FinancialInsightsScope::Global, $siteIds, $clientIds, $siteId, $clientId);\n    }\n\n    /**\n     * @param  list<int>  $siteIds\n     * @param  list<int>  $clientIds\n     */",
+          "text_sha256": "41547ea81494fe35d4f278d452736cb8e39d7b544a4d839484ce1931ae47de92"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php",
+        "source_file_sha256": "7f9dec1b873a155dfb465b3e7f1b5f72665be568a04017353f871bac16a2707f",
+        "source_file_blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "method": "accessibleSites",
+        "definition_line": 43,
+        "definition_anchor": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php:43",
+        "review_slice": {
+          "start_line": 43,
+          "end_line": 51,
+          "next_method_definition_line": 52,
+          "line_count": 9,
+          "text": "    public static function accessibleSites(array $siteIds, array $clientIds, ?int $siteId = null): self\n    {\n        return new self(FinancialInsightsScope::AccessibleSite, $siteIds, $clientIds, $siteId);\n    }\n\n    /**\n     * @param  list<int>  $siteIds\n     * @param  list<int>  $clientIds\n     */",
+          "text_sha256": "1aa22adcfdfad6a5b3312b5239ad58c6c259c575e647d6f4bf6fee2ab664c03c"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php",
+        "source_file_sha256": "7f9dec1b873a155dfb465b3e7f1b5f72665be568a04017353f871bac16a2707f",
+        "source_file_blob_id": "e1e54e95cbd36a4b79ba8ab16d0573764c33b5c0",
+        "method": "isDenied",
+        "definition_line": 66,
+        "definition_anchor": "app/Domain/Finance/Services/FinancialInsightsScopeDecision.php:66",
+        "review_slice": {
+          "start_line": 66,
+          "end_line": 70,
+          "next_method_definition_line": 71,
+          "line_count": 5,
+          "text": "    public function isDenied(): bool\n    {\n        return $this->scope === FinancialInsightsScope::Denied;\n    }\n",
+          "text_sha256": "05df0c186e8886584219d345ffb3d780ef3af18581c1fda2fdf886e183ebbc51"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/SiteFinancialDashboardService.php",
+        "source_file_sha256": "879608b31f8963a84a4b3433070de4a628e20f089d843c31a61757267920eec3",
+        "source_file_blob_id": "c9607718abca99fe7cb144f7d398118deb302bc9",
+        "method": "getSiteSummaries",
+        "definition_line": 88,
+        "definition_anchor": "app/Domain/Finance/Services/SiteFinancialDashboardService.php:88",
+        "review_slice": {
+          "start_line": 88,
+          "end_line": 135,
+          "next_method_definition_line": 136,
+          "line_count": 48,
+          "text": "    public function getSiteSummaries(array $siteIds, ?Carbon $from = null, ?Carbon $to = null): array\n    {\n        $to = $to ?? Carbon::now();\n        $from = $from ?? $to->copy()->subMonths(1)->startOfMonth();\n\n        $sites = Site::query()\n            ->whereIn('id', $siteIds)\n            ->active()\n            ->notArchived()\n            ->whereNull('archived_at')\n            ->whereIn('type', ['house', 'facility'])\n            ->get();\n        $siteIds = $sites->pluck('id')->map(fn ($siteId): int => (int) $siteId)->all();\n\n        // Batch staffing costs for all sites in one query\n        $staffingBySite = $this->staffingCostService->perSiteComparison($siteIds, $from, $to);\n\n        $summaries = [];\n\n        foreach ($sites as $site) {\n            $breakdown = $this->siteCostService->breakdown($site->id, $from, $to);\n            $cpr = $this->costPerResidentService->calculate($site->id, $from, $to);\n            $staffing = $staffingBySite[$site->id] ?? ['wages' => '0.00', 'employer_oncost' => '0.00', 'total' => '0.00', 'oncost_pct' => '0.0'];\n\n            $summaries[] = [\n                'site_id' => $site->id,\n                'site_name' => $site->name,\n                'site_type' => $site->type,\n                'total_cost' => $breakdown['total'],\n                'cost_per_resident' => $cpr['cost_per_resident'],\n                'avg_residents' => $cpr['avg_residents'],\n                'staffing' => [\n                    'wages' => $staffing['wages'],\n                    'employer_oncost' => $staffing['employer_oncost'],\n                    'total_staffing_cost' => $staffing['total'],\n                    'oncost_pct_of_wages' => $staffing['oncost_pct'],\n                ],\n            ];\n        }\n\n        usort($summaries, fn ($a, $b) => bccomp($b['total_cost'], $a['total_cost'], 2));\n\n        return [\n            'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],\n            'sites' => $summaries,\n        ];\n    }\n",
+          "text_sha256": "36e2801c6823264848974e86f6687561139ae332f1bb2e1695dcaf8a15a550ec"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/SiteCostService.php",
+        "source_file_sha256": "c5eaf1201daad0f00d9e92fe7ac0a086588c421e5832d0d8f0d8526a239cb0c9",
+        "source_file_blob_id": "2fe6e725ec8c1bd3d248bde303269e923d43a3eb",
+        "method": "breakdown",
+        "definition_line": 50,
+        "definition_anchor": "app/Domain/Finance/Services/SiteCostService.php:50",
+        "review_slice": {
+          "start_line": 50,
+          "end_line": 85,
+          "next_method_definition_line": 86,
+          "line_count": 36,
+          "text": "    public function breakdown(int $siteId, Carbon $from, Carbon $to): array\n    {\n        $rows = FinCostAllocation::forSite($siteId)\n            ->forPeriod($from, $to)\n            ->select('event_type', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as entry_count'))\n            ->groupBy('event_type')\n            ->orderByDesc('total_amount')\n            ->get();\n\n        $categories = [];\n        $grandTotal = '0';\n\n        foreach ($rows as $row) {\n            $amount = number_format((float) $row->total_amount, 2, '.', '');\n            $categories[$row->event_type] = [\n                'amount' => $amount,\n                'label' => $this->eventTypeLabel($row->event_type),\n                'count' => (int) $row->entry_count,\n            ];\n            $grandTotal = bcadd($grandTotal, $amount, 2);\n        }\n\n        return [\n            'categories' => $categories,\n            'total' => $grandTotal,\n            'site_id' => $siteId,\n            'period_from' => $from->toDateString(),\n            'period_to' => $to->toDateString(),\n        ];\n    }\n\n    /**\n     * Monthly cost trend for a site over a range of months.\n     *\n     * @return array<string, string>  month (Y-m) → total cost\n     */",
+          "text_sha256": "09cb3d5f771e9514f5f0216f2f1f89b0b882213fc4e08ab3a9b0444e0acd00f0"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/CostPerResidentService.php",
+        "source_file_sha256": "cd5e97102f2e7c9e8ea087155dbc71c3549c3833526253065269f689ffb8c9e3",
+        "source_file_blob_id": "144d6d996a92e227cd5dfaeeb93e12c236602714",
+        "method": "calculate",
+        "definition_line": 43,
+        "definition_anchor": "app/Domain/Finance/Services/CostPerResidentService.php:43",
+        "review_slice": {
+          "start_line": 43,
+          "end_line": 74,
+          "next_method_definition_line": 75,
+          "line_count": 32,
+          "text": "    public function calculate(int $siteId, Carbon $from, Carbon $to): array\n    {\n        $site = Site::findOrFail($siteId);\n        $breakdown = $this->siteCostService->breakdown($siteId, $from, $to);\n        $totalCost = $breakdown['total'];\n\n        [$avgResidents, $method, $totalResidentDays, $periodDays] = $this->getAverageOccupancy($siteId, $from, $to);\n\n        $costPerResident = bccomp($avgResidents, '0', 2) > 0\n            ? bcdiv($totalCost, $avgResidents, 2)\n            : $totalCost;\n\n        return [\n            'site_id' => $siteId,\n            'site_name' => $site->name,\n            'period_from' => $from->toDateString(),\n            'period_to' => $to->toDateString(),\n            'total_cost' => $totalCost,\n            'avg_residents' => $avgResidents,\n            'cost_per_resident' => $costPerResident,\n            'breakdown' => $breakdown['categories'],\n            'occupancy_method' => $method,\n            'total_resident_days' => $totalResidentDays,\n            'period_days' => $periodDays,\n        ];\n    }\n\n    /**\n     * Cost per resident across all active residential sites.\n     *\n     * @return array<int, array>\n     */",
+          "text_sha256": "4de3a1eb50bfaa8b55ea65e1c0cabcc95ecad2bcf83df4fdbf7e5a7866313196"
+        }
+      },
+      {
+        "source_file": "app/Domain/Finance/Services/StaffingCostService.php",
+        "source_file_sha256": "f5f8f02c8c7be638f9624faa4f3b4ddf57a93cc7d0df6390e7bbbe8eb0ca51bb",
+        "source_file_blob_id": "1ad8e061ddd06ee7afbc9324d8dd9b11a0400b00",
+        "method": "perSiteComparison",
+        "definition_line": 81,
+        "definition_anchor": "app/Domain/Finance/Services/StaffingCostService.php:81",
+        "review_slice": {
+          "start_line": 81,
+          "end_line": 106,
+          "next_method_definition_line": 107,
+          "line_count": 26,
+          "text": "    public function perSiteComparison(array $siteIds, Carbon $from, Carbon $to): array\n    {\n        $rows = FinCostAllocation::query()\n            ->whereIn('site_id', $siteIds)\n            ->forPeriod($from, $to)\n            ->whereIn('event_type', ['payroll_cost', 'employer_oncost'])\n            ->select('site_id', 'event_type', DB::raw('SUM(amount) as total'))\n            ->groupBy('site_id', 'event_type')\n            ->get();\n\n        $bySite = [];\n        foreach ($rows as $row) {\n            $bySite[$row->site_id][$row->event_type] = (string) $row->total;\n        }\n\n        $results = [];\n        foreach ($siteIds as $siteId) {\n            $results[$siteId] = $this->buildBundle(collect($bySite[$siteId] ?? []));\n        }\n\n        return $results;\n    }\n\n    /**\n     * Build the staffing bundle from event_type totals.\n     */",
+          "text_sha256": "049280f286bfca957d4a203f3dd5a817a5e743943515c479739f5759f596683f"
+        }
+      },
+      {
+        "source_file": "app/Models/Site.php",
+        "source_file_sha256": "11c178749d93f2267eab14a22ad0bfc6dbb99384c9b219dac15f27c01a713040",
+        "source_file_blob_id": "6cf3a2d54f9c1650958c971b232014637a3d0a08",
+        "method": "scopeActive",
+        "definition_line": 378,
+        "definition_anchor": "app/Models/Site.php:378",
+        "review_slice": {
+          "start_line": 378,
+          "end_line": 382,
+          "next_method_definition_line": 383,
+          "line_count": 5,
+          "text": "    public function scopeActive($query)\n    {\n        return $query->where('is_active', true);\n    }\n",
+          "text_sha256": "c8c4d4236a87907eb98b7cac767b525617b12e85bc1367ce1b03a45bfcf3bb75"
+        }
+      },
+      {
+        "source_file": "app/Models/Site.php",
+        "source_file_sha256": "11c178749d93f2267eab14a22ad0bfc6dbb99384c9b219dac15f27c01a713040",
+        "source_file_blob_id": "6cf3a2d54f9c1650958c971b232014637a3d0a08",
+        "method": "scopeNotArchived",
+        "definition_line": 388,
+        "definition_anchor": "app/Models/Site.php:388",
+        "review_slice": {
+          "start_line": 388,
+          "end_line": 392,
+          "next_method_definition_line": 393,
+          "line_count": 5,
+          "text": "    public function scopeNotArchived($query)\n    {\n        return $query->where('archived', false);\n    }\n",
+          "text_sha256": "8f36ef194edac7ae91bc8c8f8456be8668b67a7c3baf60ec78bb894029091072"
+        }
+      }
+    ],
+    "material_dependency_method_slice_count": 14,
+    "known_excluded_expansion_candidates": [
+      "app/Domain/Finance/Models/FinCostAllocation.php",
+      "app/Domain/Finance/Models/FinJournal.php",
+      "app/Domain/Finance/Models/FinJournalLine.php",
+      "app/Domain/Hr/Models/HrEmployeeProfile.php",
+      "database/migrations/*financial-insights-dependency-schema*",
+      "tests/Browser/Finance/*financial-insights-or-sites-overview*"
+    ],
+    "source_review_complete": false,
+    "source_packet_completeness_claimed": false,
+    "material_dependency_semantics_complete": false,
+    "known_expansion_candidates_adjudicated": false,
+    "unexecuted_test_context_is_runtime_evidence": false,
+    "review_rule": "Review the selected JSON action and every frozen material dependency. Expand the packet for every outcome-material Site, permission, privacy, query, projection, page, caller, period, or test dependency. Unresolved identity or semantics require EVIDENCE_GAP; this producer chooses no outcome.",
+    "source_review_packet_sha256": "f26d6249445bfaa19a5b8ff193ecd74eefe90c606514ea1705c0181914a9271f"
+  },
+  "page_sibling_and_caller_context_non_inheritable": {
+    "existing_page_owner_record": {
+      "source_record_id": "PAGE-ROOT-FC2C5F5706FD9066",
+      "source_record_key": "page|PAGE-ROOT-FC2C5F5706FD9066|CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+      "owner_row_id": "RUN086-PAGE-MAP-0313",
+      "owner_row_sha256": "230df252051fa4e77c217a8fc26b7dadaf38c653b77ee55ea00d8340abdefb22",
+      "feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+      "page_file": "resources/js/pages/finance/sites-overview/Show.tsx",
+      "page_file_sha256": "f8d9ce0d29d2e5a7a9829f3f1c283c8a0f3fd86104f0e77b99645c90b7cf5f0e",
+      "current_static_page_owner_credit_preserved": true,
+      "ownership_inheritable_to_run141": false,
+      "route_or_correctness_credit_inheritable_to_run141": false
+    },
+    "separate_page_route_sibling": {
+      "queue_index_zero_based": 40,
+      "queue_id": "RUN090-ROUTE-0041",
+      "route_record_id": "RUN077-ROUTE-0418",
+      "local_literal_route_name": "sites.overview",
+      "effective_route_name": "finance.sites.overview",
+      "effective_uri": "/finance/sites",
+      "action_expression": "[SitesFinancialOverviewController::class, 'index']",
+      "relation_comparison": "BOTH_LANES_IDENTICAL",
+      "current_review_state": "PENDING_FRESH_SEMANTIC_REVIEW",
+      "selected_or_credited_by_run141": false,
+      "identity_or_outcome_inheritable_to_selected_api_action": false,
+      "controller_action_slice": {
+        "source_file": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php",
+        "source_file_sha256": "6e06a79061e38afa037b223b9bed1579b4463697a61961c5b894de7477e42877",
+        "source_file_blob_id": "ec7346ab7ca0b1d571767dbd974f53051bfc631d",
+        "method": "index",
+        "definition_line": 22,
+        "definition_anchor": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:22",
+        "review_slice": {
+          "start_line": 22,
+          "end_line": 154,
+          "next_method_definition_line": null,
+          "line_count": 133,
+          "text": "    public function index(Request $request)\n    {\n        $request->validate([\n            'from' => ['nullable', 'date'],\n            'to' => ['nullable', 'date'],\n        ]);\n\n        $to = $request->filled('to')\n            ? Carbon::parse($request->query('to'))->endOfDay()\n            : Carbon::now()->endOfDay();\n        $from = $request->filled('from')\n            ? Carbon::parse($request->query('from'))->startOfDay()\n            : $to->copy()->startOfMonth();\n\n        if ($from->gt($to)) {\n            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];\n        }\n\n        $scope = $this->scopeResolver->resolveAggregate($request->user());\n        abort_if($scope->isDenied(), 403);\n        $sites = Site::query()\n            ->whereIn('id', $scope->siteIds)\n            ->active()\n            ->notArchived()\n            ->whereNull('archived_at')\n            ->whereIn('type', ['house', 'residential', 'facility'])\n            ->orderBy('name')\n            ->get(['id', 'name', 'type', 'region']);\n\n        $siteIds = $sites->pluck('id')->all();\n        $comparison = $siteIds === []\n            ? []\n            : $this->siteCostService->compareSites($siteIds, $from, $to);\n\n        $fromPeriod = $from->format('Y-m');\n        $toPeriod = $to->format('Y-m');\n        $rows = [];\n        $totalSpend = '0.00';\n        $sitesOverBudget = 0;\n        $categoryKeys = [];\n\n        foreach ($sites as $site) {\n            $cost = $comparison[$site->id] ?? [\n                'categories' => [],\n                'total' => '0.00',\n                'site_id' => $site->id,\n                'period_from' => $from->toDateString(),\n                'period_to' => $to->toDateString(),\n            ];\n            $variance = $this->varianceService->siteVariance($site->id, $fromPeriod, $toPeriod);\n            $trend = $this->siteCostService->monthlyTrend($site->id, $from->copy()->startOfMonth(), $to);\n\n            $categories = collect($cost['categories'])\n                ->map(function (array $category, string $key) use (&$categoryKeys) {\n                    $categoryKeys[$key] = $category['label'] ?? ucfirst(str_replace('_', ' ', $key));\n\n                    return [\n                        'key' => $key,\n                        'label' => $category['label'] ?? ucfirst(str_replace('_', ' ', $key)),\n                        'amount' => $category['amount'] ?? '0.00',\n                        'count' => $category['count'] ?? 0,\n                    ];\n                })\n                ->values()\n                ->all();\n\n            $topCategory = collect($categories)\n                ->sortByDesc(fn (array $category) => (float) $category['amount'])\n                ->first();\n\n            $status = $variance['totals']['status'] ?? 'on_track';\n            if ($status === 'over_budget') {\n                $sitesOverBudget++;\n            }\n\n            $totalSpend = bcadd($totalSpend, (string) ($cost['total'] ?? '0.00'), 2);\n\n            $rows[] = [\n                'site' => [\n                    'id' => $site->id,\n                    'name' => $site->name,\n                    'type' => $site->type,\n                    'region' => $site->region,\n                ],\n                'total_cost' => $cost['total'] ?? '0.00',\n                'budget' => [\n                    'planned' => $variance['totals']['planned'] ?? '0.00',\n                    'actual' => $variance['totals']['actual'] ?? '0.00',\n                    'variance' => $variance['totals']['variance'] ?? '0.00',\n                    'variance_pct' => $variance['totals']['variance_pct'] ?? '0.0',\n                    'status' => $status,\n                ],\n                'top_category' => $topCategory ?: null,\n                'categories' => $categories,\n                'trend' => collect($trend)\n                    ->map(fn (string $amount, string $month) => [\n                        'month' => $month,\n                        'amount' => $amount,\n                    ])\n                    ->values()\n                    ->all(),\n                'dashboard_url' => \"/finance/sites/{$site->id}/financial-dashboard\",\n            ];\n        }\n\n        usort($rows, fn (array $a, array $b) => (float) $b['total_cost'] <=> (float) $a['total_cost']);\n\n        return Inertia::render('finance/sites-overview/Show', [\n            'filters' => [\n                'from' => $from->toDateString(),\n                'to' => $to->toDateString(),\n            ],\n            'kpis' => [\n                'total_cost' => $totalSpend,\n                'sites_over_budget' => $sitesOverBudget,\n                'site_count' => count($rows),\n                'avg_cost_per_site' => count($rows) > 0\n                    ? number_format((float) $totalSpend / count($rows), 2, '.', '')\n                    : '0.00',\n                'period' => [\n                    'from' => $from->toDateString(),\n                    'to' => $to->toDateString(),\n                ],\n                'top_spenders' => array_slice($rows, 0, 5),\n            ],\n            'sites' => $rows,\n            'categoryKeys' => collect($categoryKeys)\n                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])\n                ->values()\n                ->all(),\n        ]);\n    }\n}",
+          "text_sha256": "265cc7b203e31fcaea4c4e361bb22a58d12b885b96b106bbdc60bfb2de985f8b"
+        }
+      },
+      "literal_render_callsite": {
+        "source_file": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php",
+        "source_file_sha256": "6e06a79061e38afa037b223b9bed1579b4463697a61961c5b894de7477e42877",
+        "source_file_blob_id": "ec7346ab7ca0b1d571767dbd974f53051bfc631d",
+        "source_anchor": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:129",
+        "source_line": "return Inertia::render('finance/sites-overview/Show', [",
+        "source_line_sha256": "fe772982f169bcad099caf7b527b1b19aef649f76b7a984bb03ec99b5865cb29",
+        "render_name": "finance/sites-overview/Show",
+        "existing_page_record_id": "PAGE-ROOT-FC2C5F5706FD9066",
+        "existing_page_feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+        "selected_api_action_render_callsite": false,
+        "page_owner_inheritance_authorized": false
+      }
+    },
+    "page_path_caller_contexts": [
+      {
+        "source_file": "resources/js/pages/finance/sites-overview/Show.tsx",
+        "source_file_sha256": "f8d9ce0d29d2e5a7a9829f3f1c283c8a0f3fd86104f0e77b99645c90b7cf5f0e",
+        "source_file_blob_id": "b0f9cbd993b5b1f1c3279d744f4626c2c12ab11e",
+        "source_anchor": "resources/js/pages/finance/sites-overview/Show.tsx:182",
+        "source_line": "'/finance/sites',",
+        "source_line_sha256": "72d2a752ad9be545d3e72a5ddbed9e91e4258763d2fd2ec7e5ab62f3ae853ce2",
+        "targets_separate_page_route_only": true,
+        "selected_api_route_or_page_ownership_inheritable": false
+      },
+      {
+        "source_file": "resources/js/components/finance/overview-hub.tsx",
+        "source_file_sha256": "38ad90cb236457331b9b38b74acd14edd42f59ffa92b68da53270e60858642f3",
+        "source_file_blob_id": "57e1088a296715f2beaf49d3322002c8df7c1c84",
+        "source_anchor": "resources/js/components/finance/overview-hub.tsx:50",
+        "source_line": "href: '/finance/sites',",
+        "source_line_sha256": "6761d990d33aa872a6d32d36ee27edaef78bcb744a2dcd1c6c31cebbec222688",
+        "targets_separate_page_route_only": true,
+        "selected_api_route_or_page_ownership_inheritable": false
+      },
+      {
+        "source_file": "resources/js/pages/sites/_ledger-panel.tsx",
+        "source_file_sha256": "0f44abf1552c72428029906575f2b061ccfe2465d13a5f2d1f60a49dd700d659",
+        "source_file_blob_id": "e052bec62b30119157d8d49b0dc297a6d62f461a",
+        "source_anchor": "resources/js/pages/sites/_ledger-panel.tsx:831",
+        "source_line": "<Link href=\"/finance/sites\">",
+        "source_line_sha256": "726abb60e7336c01ed8ea8f5f1b43e62efa5864baa6153372fc2141fbece6331",
+        "targets_separate_page_route_only": true,
+        "selected_api_route_or_page_ownership_inheritable": false
+      }
+    ],
+    "page_path_caller_context_count": 3,
+    "selected_api_frontend_exact_caller_occurrences": [],
+    "selected_api_frontend_exact_caller_occurrence_count": 0,
+    "selected_api_frontend_caller_scan_denominator": "Git-tracked resources/js JavaScript and TypeScript source",
+    "ignored_generated_wayfinder_bindings_are_consumer_callers": false,
+    "api_frontend_caller_absence_is_not_dead_or_noncanonical_proof": true,
+    "new_page_owner_records": 0,
+    "page_ownership_inherited": false,
+    "page_ownership_reassigned": false,
+    "caller_presence_preselects_selected_api_outcome": false,
+    "page_context_sha256": "647edc59af1051bd57765fef202ee0a99bc47e1e3467052b5b257f2b18ba297f"
+  },
+  "excluded_immediate_raw_neighbor": {
+    "queue_index_zero_based": 79,
+    "queue_id": "RUN090-ROUTE-0080",
+    "route_record_id": "RUN077-ROUTE-0688",
+    "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "reviewed_owner_origin": "run098_overlay",
+    "reviewed_outcome": "OWNER_ROUTE_ACTION",
+    "existing_bridge_id": "RUN098-BRIDGE-07",
+    "already_reviewed": true,
+    "selected_for_run141": false,
+    "recredit_authorized": false
+  },
+  "next_pending_boundary": {
+    "queue_index_zero_based": 80,
+    "queue_id": "RUN090-ROUTE-0081",
+    "route_record_id": "RUN077-ROUTE-0689",
+    "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "review_state": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "selected_for_run141": false,
+    "credit_awarded": false
+  },
+  "provisional_assurance_questions": [
+    {
+      "question_id": "RUN141-Q-IDENTITY-COLLISION",
+      "category": "feature_identity",
+      "loci": [
+        "routes/finance.php:93-96",
+        "routes/finance.php:776-782"
+      ],
+      "question": "Does the JSON action implement the same Site-portfolio user job, a shared API relation, an alias, a noncanonical surface, or an evidence gap despite the duplicate unprefixed name token?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-EFFECTIVE-NAME-REACHABILITY",
+      "category": "route_registration",
+      "loci": [
+        "routes/finance.php:62",
+        "routes/finance.php:778-782"
+      ],
+      "question": "Does framework registration confirm finance.api.sites.overview independently of finance.sites.overview without using the shared local literal as inherited identity?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-SITE-SCOPE",
+      "category": "approved_site_privacy",
+      "loci": [
+        "app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:35-70",
+        "app/Domain/Finance/Services/SiteFinancialDashboardService.php:88-134"
+      ],
+      "question": "Do ordinary, global, no-Site, inactive-Site, and archived-Site actors receive exactly the authorized Site set and no foreign Site names or amounts?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-SITE-TYPE-CONVERGENCE",
+      "category": "query_projection_consistency",
+      "loci": [
+        "app/Domain/Finance/Services/SiteFinancialDashboardService.php:93-100",
+        "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:42-49"
+      ],
+      "question": "Is the API exclusion of residential Sites, while the page route includes them, intentional and consistent with the canonical portfolio?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-PERIOD-CONTRACT",
+      "category": "input_and_period_correctness",
+      "loci": [
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:58-66",
+        "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:194-205",
+        "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:22-38"
+      ],
+      "question": "Are invalid, inverted, date-only, timezone, default, and end-of-day period semantics validated and consistent between the selected API and separate page route?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-COST-PROVENANCE",
+      "category": "financial_projection",
+      "loci": [
+        "app/Domain/Finance/Services/SiteFinancialDashboardService.php:102-128",
+        "app/Domain/Finance/Services/SiteCostService.php:50-85",
+        "app/Domain/Finance/Services/CostPerResidentService.php:43-74",
+        "app/Domain/Finance/Services/StaffingCostService.php:81-106"
+      ],
+      "question": "Do allocation provenance and freshness plus cost, occupancy, resident, staffing, status, date, and Site predicates establish period-correct canonical summaries without stale, duplicate, or foreign data?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-CALLER-DISCOVERABILITY",
+      "category": "caller_and_handoff",
+      "loci": [
+        "resources/js/pages/finance/sites-overview/Show.tsx:182",
+        "resources/js/components/finance/overview-hub.tsx:50",
+        "resources/js/pages/sites/_ledger-panel.tsx:831"
+      ],
+      "question": "With zero exact frontend callers for the selected JSON endpoint, what authorized consumer, discoverability path, and workflow handoff establish its intended use?",
+      "credit_authorized": false
+    },
+    {
+      "question_id": "RUN141-Q-EXECUTABLE-ASSURANCE",
+      "category": "tests_and_runtime",
+      "loci": [
+        "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:280-390",
+        "tests/Feature/Finance/FinancialInsightsObjectScopeTest.php:493-531",
+        "tests/Feature/Finance/SitesFinancialOverviewTest.php:1-164"
+      ],
+      "question": "Do controlled executable tests cover the selected endpoint's authorization, Site privacy, projection, period errors, empty and error response states, global positive, and page/API divergence rather than only static expectations?",
+      "credit_authorized": false
+    }
+  ],
+  "provisional_assurance_question_count": 8,
+  "semantic_review_focus": [
+    "adjudicate selected JSON action identity without inheriting from the duplicate local route-name token",
+    "trace exact base permission, separately permissioned global reach, approved Sites, and no-Site denial",
+    "compare selected API and separate page Site-type and period semantics without conflating the surfaces",
+    "trace cost, resident, occupancy, staffing, date, status, and Site predicates through all material queries",
+    "establish the intended authorized consumer because the frozen frontend contains zero exact API callers",
+    "expand the packet and fail closed when any outcome-material dependency remains unresolved"
+  ],
+  "stop_rules": [
+    "Abort on checkpoint, tree, input, source-file blob, queue identity, owner, bridge, or boundary drift.",
+    "Use EVIDENCE_GAP for unresolved identity, Site, permission, privacy, query, projection, period, page, caller, or test semantics.",
+    "Do not integrate an outcome until two fresh independent reviews and a fresh synthesis reconcile the one row.",
+    "Do not recredit raw index 79 or inherit the sibling route/page/caller context.",
+    "Do not add correctness, runtime, application-browser, executed-test, benchmark, Pass, final-finding, release, or completion credit."
+  ],
+  "counts": {
+    "candidate_route_actions": 1,
+    "candidate_route_records": 1,
+    "candidate_controller_action_bridges": 1,
+    "candidate_page_records": 0,
+    "distinct_feature_ids": 1,
+    "distinct_feature_ids_not_in_current_owner_set": 0,
+    "distinct_feature_ids_not_in_current_route_owner_set": 1,
+    "both_lanes_identical_candidates": 0,
+    "name_only_candidates": 1,
+    "controller_files": 1,
+    "selected_literal_controller_render_callsites": 0,
+    "existing_page_owner_context_rows": 1,
+    "separate_page_route_sibling_context_rows": 1,
+    "page_path_caller_contexts": 3,
+    "selected_api_frontend_exact_caller_occurrences": 0,
+    "required_source_files": 25,
+    "material_dependency_method_slices": 14,
+    "known_excluded_expansion_candidates": 6,
+    "provisional_assurance_questions": 8,
+    "new_feature_ids": 0,
+    "queue_pending_before": 392,
+    "selected_pending_queue_surfaces": 1,
+    "queue_unselected_pending": 391,
+    "selected_queue_surfaces_still_pending": 1,
+    "current_reviewed_queue_surface_rows": 115,
+    "current_pending_queue_surface_rows": 392,
+    "excluded_already_reviewed_adjacent_rows": 1,
+    "next_pending_boundary_rows": 1,
+    "selected_outcomes": 0,
+    "ownership_credit_awarded": 0,
+    "controller_action_bridge_credit_awarded": 0,
+    "page_ownership_credit_awarded": 0,
+    "site_authorization_credit_awarded": 0,
+    "permission_credit_awarded": 0,
+    "privacy_credit_awarded": 0,
+    "query_correctness_credit_awarded": 0,
+    "projection_correctness_credit_awarded": 0,
+    "runtime_credit": 0,
+    "application_browser_credit": 0,
+    "executed_test_credit": 0,
+    "benchmark_credit": 0,
+    "pass_credit": 0,
+    "final_finding_credit": 0,
+    "completion_credit": 0,
+    "new_queue_review_credit": 0,
+    "matrix_mutation_credit": 0,
+    "application_source_mutation_credit": 0,
+    "release_credit": 0
+  },
+  "identity": {
+    "candidate_id_list_sha256": "f4074ec69208c7d5c51192feee87fe7ceadc05e9fc3eb4f028e6b59b5571e258",
+    "queue_index_list_sha256": "349c41201b62db851192665c504b350ff98c6b45fb62a8a2161f78b6534d8de9",
+    "queue_id_list_sha256": "c7007bb47a60cd5cceafea7c1e1a90c1ee4faa4815ff2754b8ce4272f12227a3",
+    "canonical_key_list_sha256": "3d407a84899569ef4bcf4192bcf9effbeb60cfcd2815e49a62579d92e52f8ba6",
+    "route_record_id_list_sha256": "96cb158ad41a976a3b69cbceaf0731f604158a381dc88b469fc9f6e0550f4170",
+    "literal_route_name_list_sha256": "7c45fd1258d7c9866ae57368b0b33111e50a395b32eb5c747b8b84cffb293a49",
+    "effective_route_name_list_sha256": "519f54651c3efff71bb12a8f15107dc97955d6acaa5e2f782259b7cca3f9054a",
+    "action_key_list_sha256": "4d38748aa7d37d16a768ec4e22e883c925bcb5ccb4193e0ec5507902a17ed5bf",
+    "candidate_record_sha256_list_sha256": "1ef060a32d4a436ba8db6a6dd904ef97b3e303b7168589aaae048352881bd160",
+    "records_sha256": "7166bdd46bc7a604e30f543f04b125a1638d08832d1b3ecffded99da3dac9800",
+    "source_review_packet_sha256": "f26d6249445bfaa19a5b8ff193ecd74eefe90c606514ea1705c0181914a9271f",
+    "page_context_sha256": "647edc59af1051bd57765fef202ee0a99bc47e1e3467052b5b257f2b18ba297f",
+    "excluded_adjacent_queue_record_sha256": "211f64b0be95130eb5aef8d196032b161102565f34c1568d1adbe0f78742b151",
+    "next_pending_queue_record_sha256": "b73b6a2cf4340520554c6725d701e26f1b313334e8025d6db4f5e7de51392fda"
+  },
+  "records": [
+    {
+      "candidate_id": "RUN141-FINANCE-SITE-PORTFOLIO-OVERVIEW-API-ROUTE-ACTION-01",
+      "action_key": "RUN077-ROUTE-0669|app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:sitesOverview|CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+      "run090_original_partition": "B",
+      "queue_index_zero_based": 78,
+      "queue_id": "RUN090-ROUTE-0079",
+      "queue_canonical_key": "route|RUN077-ROUTE-0669",
+      "candidate_feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+      "name_only_identity": {
+        "direct_identity": {
+          "lane": "EXACT_LITERAL_ROUTE_NAME",
+          "source_field": "literal_route_name",
+          "source_value": "sites.overview",
+          "matrix_field": "route_names",
+          "matrix_token": "sites.overview",
+          "case_sensitive_exact_equality": true,
+          "candidate_cardinality": 1
+        },
+        "relation_comparison": "NAME_ONLY",
+        "name_candidate_count": 1,
+        "name_candidate_feature_ids": [
+          "CAP-FIN-SITE-PORTFOLIO-OVERVIEW"
+        ],
+        "backend_candidate_count": 0,
+        "backend_candidate_feature_ids": [],
+        "backend_candidate_absence_is_not_negative_proof": true,
+        "unique_controller_resolution_is_review_context_not_feature_identity": true,
+        "candidate_only": true
+      },
+      "route_name_collision_context": {
+        "matrix_local_token": "sites.overview",
+        "selected_local_literal": "sites.overview",
+        "selected_effective_route_name": "finance.api.sites.overview",
+        "selected_effective_uri": "/finance/api/sites/overview",
+        "separate_page_local_literal": "sites.overview",
+        "separate_page_effective_route_name": "finance.sites.overview",
+        "separate_page_effective_uri": "/finance/sites",
+        "same_local_literal_occurrences_in_frozen_route_file": 2,
+        "collision_is_context_requiring_fresh_review": true,
+        "collision_establishes_inherited_identity_or_outcome": false
+      },
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0669",
+        "route_file": "routes/finance.php",
+        "route_file_sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+        "route_file_blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "source_key": "routes/finance.php:781:9:get:258",
+        "source_anchor": "routes/finance.php:781",
+        "route_method": "get",
+        "literal_uri": "/sites/overview",
+        "literal_route_name": "sites.overview",
+        "action_expression": "[FinancialInsightsApiController::class, 'sitesOverview']",
+        "statement_excerpt": "Route::get('/sites/overview', [FinancialInsightsApiController::class, 'sitesOverview']) ->name('sites.overview');",
+        "statement_sha256": "9f01cfa53be24b8c0ad8bff8060bbd4cd878da459bd8e545c8f34834e185cf23",
+        "static_group_context": {
+          "outer_uri_prefix": "finance",
+          "outer_name_prefix": "finance.",
+          "nested_uri_prefix": "api",
+          "nested_name_prefix": "api.",
+          "derived_uri": "/finance/api/sites/overview",
+          "derived_name": "finance.api.sites.overview",
+          "framework_registration_executed": false
+        }
+      },
+      "controller_action": {
+        "relation_class": "NAME_ONLY_EXACT_CONTROLLER_ACTION_REVIEW_CANDIDATE",
+        "controller_fqcn": "App\\Domain\\Finance\\Http\\Controllers\\FinancialInsightsApiController",
+        "primary_method_slice": {
+          "source_file": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php",
+          "source_file_sha256": "fc5506dc241c2aa4c7a56facab35701a1c7d799a78d1332975ecb1b83cd0153b",
+          "source_file_blob_id": "916ff02337aba3f125f2c5e22b61d462b0b1dfd1",
+          "method": "sitesOverview",
+          "definition_line": 58,
+          "definition_anchor": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:58",
+          "review_slice": {
+            "start_line": 58,
+            "end_line": 77,
+            "next_method_definition_line": 78,
+            "line_count": 20,
+            "text": "    public function sitesOverview(Request $request): JsonResponse\n    {\n        $scope = $this->scopeResolver->resolveAggregate($request->user());\n        abort_if($scope->isDenied(), 403);\n        [$from, $to] = $this->parsePeriod($request);\n\n        $data = $this->siteDashboardService->getSiteSummaries($scope->siteIds, $from, $to);\n\n        return response()->json($data);\n    }\n\n    /* ------------------------------------------------------------------ */\n    /*  Client Endpoints */\n    /* ------------------------------------------------------------------ */\n\n    /**\n     * GET /finance/api/clients/{client}/financial-summary\n     *\n     * Combined ledger + cost summary for a client.\n     */",
+            "text_sha256": "16c473c5bc773b39f09c8ac49f57475edfcd999bf6124cbe331d4705698a1622"
+          }
+        },
+        "transitive_local_helper_slices": [
+          {
+            "source_file": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php",
+            "source_file_sha256": "fc5506dc241c2aa4c7a56facab35701a1c7d799a78d1332975ecb1b83cd0153b",
+            "source_file_blob_id": "916ff02337aba3f125f2c5e22b61d462b0b1dfd1",
+            "method": "parsePeriod",
+            "definition_line": 194,
+            "definition_anchor": "app/Domain/Finance/Http/Controllers/FinancialInsightsApiController.php:194",
+            "review_slice": {
+              "start_line": 194,
+              "end_line": 206,
+              "next_method_definition_line": null,
+              "line_count": 13,
+              "text": "    private function parsePeriod(Request $request): array\n    {\n        $to = $request->filled('to')\n            ? Carbon::parse($request->query('to'))\n            : Carbon::now();\n\n        $from = $request->filled('from')\n            ? Carbon::parse($request->query('from'))\n            : $to->copy()->subMonth()->startOfMonth();\n\n        return [$from, $to];\n    }\n}",
+              "text_sha256": "41516ec9793da586b0176eb55c1399aadca9ff63138dc14697b0c2f5c1c803fc"
+            }
+          }
+        ],
+        "request_contracts": [],
+        "literal_inertia_page_callsites": [],
+        "literal_inertia_page_callsite_count": 0,
+        "returns_json_response": true,
+        "shared_source_review_packet_sha256": "f26d6249445bfaa19a5b8ff193ecd74eefe90c606514ea1705c0181914a9271f",
+        "external_dependency_semantics_complete": false,
+        "route_ownership_credit": false,
+        "controller_action_bridge_credit": false,
+        "page_ownership_credit": false
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FIN-SITE-PORTFOLIO-OVERVIEW",
+        "feature_class": "H",
+        "module": "Finance",
+        "user_job": "Compare financial summaries for every Site visible to the viewer.",
+        "route_names": "sites.overview",
+        "route_paths": "routes/finance.php:93-96",
+        "page_files": "resources/js/pages/finance/sites-overview/Show.tsx:1-571",
+        "backend_anchors": "app/Domain/Finance/Http/Controllers/SitesFinancialOverviewController.php:14-154; app/Domain/Finance/Services/FinancialInsightsScopeResolver.php:35-70",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "page_sibling_and_caller_context_sha256": "647edc59af1051bd57765fef202ee0a99bc47e1e3467052b5b257f2b18ba297f",
+      "collision_checks": {
+        "previous_review_source_collision": false,
+        "current_owner_source_collision": false,
+        "existing_controller_action_bridge_collision": false,
+        "duplicate_local_route_name_context_present": true,
+        "existing_page_owner_context_present": true,
+        "existing_page_owner_inheritance_authorized": false,
+        "sibling_route_identity_or_outcome_inheritance_authorized": false,
+        "immediate_raw_neighbor_already_reviewed_and_recredit_prohibited": true
+      },
+      "fresh_review_state": {
+        "status": "PENDING",
+        "allowed_outcomes": [
+          "OWNER_ROUTE_ACTION",
+          "SHARED_RELATION",
+          "ALIAS_OR_REDIRECT",
+          "DEAD_OR_NONCANONICAL",
+          "EVIDENCE_GAP"
+        ],
+        "selected_outcome": null,
+        "route_ownership_credit": false,
+        "controller_action_bridge_credit": false,
+        "page_ownership_credit": false,
+        "correctness_credit": false,
+        "downstream_credit": false
+      },
+      "evidence_digests": {
+        "queue_record_sha256": "c68159a2825572283d2c312c792910943993ca864aa427d28c1cf32ad75c808a",
+        "route_manifest_record_sha256": "d3e544f1f873acb90d998b510eeea7196148e8272b456e9ca04e1c2e3f27944b",
+        "route_candidate_record_sha256": "83f8efef77da53c7c1e70d682da414433a657a193ac57e058cea0be01108cf15",
+        "route_decision_sha256": "941e5b126ea73d9cd3326198b2f9bdb47406aefc9a3f5507f67557059aa6b79a",
+        "primary_method_slice_sha256": "16c473c5bc773b39f09c8ac49f57475edfcd999bf6124cbe331d4705698a1622",
+        "local_support_sha256": "a14caea6264f4bedff6cf12c60c3ec367cf298ef0c5062fe97cbc94e89dce0cd",
+        "request_support_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "source_review_packet_sha256": "f26d6249445bfaa19a5b8ff193ecd74eefe90c606514ea1705c0181914a9271f",
+        "page_context_sha256": "647edc59af1051bd57765fef202ee0a99bc47e1e3467052b5b257f2b18ba297f",
+        "provisional_assurance_questions_sha256": "df46641ca28327a5da281cc1e83064243a894254057639ba542a34f7edc59d90"
+      },
+      "candidate_record_sha256": "1cf385e029fe71de3b032c38298e833afe39aacb5063ef1ecba8ef7141b8db1f"
+    }
+  ],
+  "fresh_review_contract": {
+    "status": "PENDING",
+    "required_independent_candidate_reviews": 2,
+    "required_cohort_synthesis": 1,
+    "required_reviews": 3,
+    "reviewers_must_be_fresh_from_discovery_producer": true,
+    "cohort_synthesizer_must_be_fresh_from_both_candidate_reviewers": true,
+    "required_reconciled_outcome_per_candidate": true,
+    "allowed_outcomes": [
+      "OWNER_ROUTE_ACTION",
+      "SHARED_RELATION",
+      "ALIAS_OR_REDIRECT",
+      "DEAD_OR_NONCANONICAL",
+      "EVIDENCE_GAP"
+    ],
+    "selected_outcomes": [],
+    "disagreement_rule": "Unresolved reviewer disagreement, naming-collision ambiguity, or material packet incompleteness stops integration and requires EVIDENCE_GAP or bounded expansion plus fresh review.",
+    "page_owner_records_authorized": 0,
+    "ownership_integration_authorized": false,
+    "downstream_credit_authorized": false
+  },
+  "outcome_neutral_conservation_contract": {
+    "outcome_variables": "O owner, S shared, A alias, D dead, E evidence gap",
+    "equation": "O + S + A + D + E = 1",
+    "bounded_sources": "3929 = (661 + O) + (3268 - O)",
+    "owner_surfaces": "661 + O = (304 + O) routes + 357 pages",
+    "current_queue": "507 = 115 reviewed + 392 pending; 392 pending = 1 frozen candidate + 391 other pending",
+    "post_review_queue_projection_only": "507 = 116 reviewed + 391 pending",
+    "post_review_outcome_projection_only": "116 = (93 + O) owner + (10 + S) shared + (5 + A) alias + D dead + (7 + E) gap",
+    "post_review_without_ownership_projection_only": "414 - O = 391 pending + (10 + S) shared + (5 + A) alias + D dead + (7 + E) gap",
+    "route_universe": "3218 = (304 + O) owner + (12 + S) shared + (5 + A) alias + D dead + (2897 - O - S - A - D) residual; 7 + E gaps are tagged within residual",
+    "pages": "711 = 357 owner + 9 shared + 345 residual; one earlier gap remains tagged within residual",
+    "controller_action_bridges": "92 + O",
+    "feature_sets": "256 = 234 H + 22 D; route 63 + O, page 242, overlap 49 + O because the selected feature currently has page but no route ownership",
+    "matrix_mutation": "0 rows and 0 cells changed",
+    "bounded_ownership_percent": "100 * (661 + O) / 3929; no projection is current credit",
+    "all_owner_projection_only": {
+      "source_owner_records": 662,
+      "route_owner_records": 305,
+      "page_owner_records": 357,
+      "static_controller_action_bridges": 93,
+      "route_distinct_feature_ids": 64,
+      "route_page_feature_overlap": 50,
+      "bounded_static_source_residual_records": 3267,
+      "residual_explicit_unmapped_routes": 2896,
+      "bounded_static_source_ownership_percent": "16.849071",
+      "reviewed_queue_surface_rows": 116,
+      "owner_queue_surface_rows": 94,
+      "pending_unreviewed_queue_surface_rows": 391,
+      "queue_surfaces_without_ownership": 413,
+      "projection_credit_awarded": false
+    },
+    "projection_credit_awarded": false
+  },
+  "denominator_boundary": {
+    "run_077_bounded_static_records": 3929,
+    "framework_expanded_route_page_denominator": null,
+    "complete_route_page_feature_crosswalk": false,
+    "gate_4_complete": false
+  },
+  "credit_boundary": {
+    "route_action_candidate_cohort": true,
+    "static_route_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "page_ownership": false,
+    "new_queue_review": false,
+    "navigation": false,
+    "canonical_object_ownership": false,
+    "matrix_mutation": false,
+    "application_source_mutation": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "release": false,
+    "prior_page_owner_context_preserved": true,
+    "prior_page_owner_context_inherited": false,
+    "sibling_route_context_inherited": false,
+    "already_reviewed_adjacent_row_recredited": false,
+    "framework_route_reachability": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "direct_object_concealment": false,
+    "privacy_correctness": false,
+    "query_correctness": false,
+    "projection_correctness": false,
+    "period_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/root-run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.json"
+  ]
+}
