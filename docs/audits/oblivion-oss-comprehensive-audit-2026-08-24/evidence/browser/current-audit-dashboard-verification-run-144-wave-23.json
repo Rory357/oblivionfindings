@@ -1,0 +1,396 @@
+{
+  "schema_version": "run-144-audit-dashboard-verification-wave-23-v1",
+  "run_id": "RUN-144-AUDIT-DASHBOARD-VERIFICATION",
+  "status": "AUDIT_ARTIFACT_RESPONSIVE_LINK_CONSOLE_VERIFICATION_GO_ZERO_APPLICATION_CREDIT",
+  "generated_on": "2026-08-26",
+  "pins": {
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "checkpoint_commit": "7a63b9b23bee738a5c845b9e68e60043ab91fb1a",
+    "checkpoint_tree": "1e07c83a32c020d2ade23cee12faadd671af432f",
+    "matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "matrix_blob": "244b5ac7391e473fafb710cca1b9d97f1b670987",
+    "matrix_rows": 340,
+    "matrix_mapping_credit": "0/340",
+    "dashboard_generator_sha256": "010cb3feadec7c47b02c1ee57ec88579d036bd0852c05afc0f9fb64f55d15f9d",
+    "dashboard_generator_blob": "e73076f9dc9a76cdddbb2f13cccd99b3b0faceaf",
+    "dashboard_html_sha256": "7c58aea6feee37e25c4f7cedf80f00c7a4396df1667066c1d41713b72836a398",
+    "dashboard_html_blob": "d9a1bf88cfaa85cb1f8bb3b490d578a4a9a02e87",
+    "dashboard_html_bytes": 191748,
+    "reporting_materializer_sha256": "f1a2f957208f7ab20a0b7dfcf68e2c09edd33c218c792168e79cb0f55efdc719",
+    "reporting_materializer_blob": "f420a7e3ebff1939b7b54d844579a4b19f2b2935",
+    "reporting_receipt_sha256": "dcb542f98b8ed66bddc92498bcd95cf9c68815bab3f77960ccfbe3bfc7099f21",
+    "reporting_receipt_blob": "5e178b73edf6e978db8a7262467b1c5e202ed2f0",
+    "reviewed_overlay_lineage": {
+      "generators/materialize-run-139-reviewed-finance-invoice-index-route-action-reporting-wave-22.py": {
+        "sha256": "407ae22c49bd2333d0c9b36d33ee962af5db578adf316acd53cb9deabf0c5541",
+        "blob_id": "01c83b2a717e2b3b60abc916f5f1ca8396bae79e"
+      },
+      "evidence/source/current-run-139-reviewed-finance-invoice-index-route-action-reporting-wave-22.json": {
+        "sha256": "bdc0b866db9409220bcac7bf66075e8cf89460fb40d61021fe7c98a705597231",
+        "blob_id": "f3db35c386ce67d5a12366c012ef575979025c4d"
+      },
+      "generators/build-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.py": {
+        "sha256": "d3cfd34687ba6c6a9b6afecfe9bfc02d2b700b15de881c1ef651877c486fd6a0",
+        "blob_id": "cf138febfa77057d70511338684d4d8626ee024a"
+      },
+      "evidence/source/root-run-141-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.json": {
+        "sha256": "9062d90b961e496b0bf5ad48fc3f930a8161394fb8d2b9b88ad298807bd90fc3",
+        "blob_id": "d1896b3a40de3b03ed51d0a83e0a0f82553152ec"
+      },
+      "generators/materialize-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.py": {
+        "sha256": "41c2b9855fd8a0f6510dbf9e5fcd61c27be4de7178fef7a6a77dbf5b52ffb699",
+        "blob_id": "0ddd02fa462010ccb0c6c564b178c1215c844a63"
+      },
+      "evidence/source/raw-run-141r-independent-outcome-neutral-finance-site-portfolio-overview-route-action-review-wave-23.json": {
+        "sha256": "02f78f9e6305c783fd13b790f5d0e044e437bfc2d6853eeb49ec5a65cdd8fd8b",
+        "blob_id": "85df2177faaa5b36140c68d4ea129c2105b9f1a7"
+      },
+      "generators/integrate-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.py": {
+        "sha256": "c7c7baeb6f34542911370092ea88e7620142be3863742f73ca1434b91f02f005",
+        "blob_id": "48140e7c4c68242388fbc7f5b75b29a3f3a96b7e"
+      },
+      "evidence/source/current-run-142-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json": {
+        "sha256": "2d5228394090bcdad9ebfc3976be87260bf1dc5d110a8297974b00d908b63cdb",
+        "blob_id": "02d2c45076e1a8f7c7ef8a7ee10e4bbdb8ad0c6f"
+      },
+      "generators/materialize-independent-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-review-wave-23.py": {
+        "sha256": "0e9e9ecfef802d17e56bff1282d460fccf91c10525902f4aa6993c4a5f4679f2",
+        "blob_id": "71016a7ef09fae25c294e3173742607994ad0c29"
+      },
+      "evidence/source/raw-run-142r-independent-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json": {
+        "sha256": "005cbe019f16d7705f7d632b97a8f2629bf7c5653ba3ff9b30c50bd10e2a44df",
+        "blob_id": "57085069bb0e1135c8e612ca2a5f2ac570938c4d"
+      },
+      "evidence/browser/current-audit-dashboard-verification-run-140-wave-22.json": {
+        "sha256": "1cae6bb23a9ede9bcda9cd975de07476516eeb18d6746f1aacf2653ecfe0c74f",
+        "blob_id": "88ff4a6d72845c5f653e9ddcec170db0e6c646e4"
+      }
+    },
+    "superseded_dashboard_verification_sha256": "1cae6bb23a9ede9bcda9cd975de07476516eeb18d6746f1aacf2653ecfe0c74f",
+    "superseded_dashboard_verification_blob": "88ff4a6d72845c5f653e9ddcec170db0e6c646e4",
+    "superseded_dashboard_html_sha256": "f9f11d0ac7d70ab5829ce0e41435b185279beb5141afe701c7a578fdce59399d",
+    "superseded_dashboard_html_blob": "3527f9197dd4dcf50c8f176cfe187bc98ee82b33",
+    "receipt_materializer": "generators/materialize-run-144-audit-dashboard-verification-wave-23.py",
+    "receipt_materializer_sha256": "92e260790e1eb7d967c4bb74b00f8b800e615cabc1d1dc9cc9fc253be2615b3c",
+    "receipt_materializer_blob": "845d695f17c7f2c239f6253e747c64cc10f94b91"
+  },
+  "verification_method": {
+    "in_app_browser": {
+      "tool": "Codex in-app Browser with explicit viewport capability, semantic DOM inspection, transient visual inspection, full navigation exercise, console inspection, and local target checks",
+      "target_url": "http://127.0.0.1:8771/audit-dashboard.html?v=main-7a63b9b23-7c58aea6#progress",
+      "cachebuster": "main-7a63b9b23-7c58aea6",
+      "response_probe": "Read-only local HTTP GET against the same cache-busted artifact URL",
+      "response_status": 200,
+      "response_bytes": 191748,
+      "response_sha256": "7c58aea6feee37e25c4f7cedf80f00c7a4396df1667066c1d41713b72836a398",
+      "exact_dashboard_loaded": true,
+      "semantic_dom_inspection_completed": true,
+      "visual_inspection_completed": true,
+      "all_navigation_links_exercised": true,
+      "navigation_only": true,
+      "transient_screenshots_inspected": true,
+      "screenshot_retained": false,
+      "application_or_external_state_changed": false
+    },
+    "static_validation": {
+      "local_target_resolution": "Dashboard-relative filesystem target existence after this receipt was materialized",
+      "hash_pair_resolution": "Immediate-sibling anchor and 64-hex code rows within one list item; every regular-file target SHA-256 matched",
+      "historical_directory_hash_rows_excluded_from_file_hash_denominator": 2,
+      "historical_directory_hash_unique_pairs": 1,
+      "deterministic_receipt_serialization": true,
+      "materializer_byte_identical_runs": 2,
+      "browser_reexecution_claimed_by_materializer": false
+    }
+  },
+  "verification": {
+    "state": "GO",
+    "viewports_required": 4,
+    "viewports_verified": 4,
+    "viewports": [
+      {
+        "requested": "1440x900",
+        "actual_browser_viewport": "1440x900",
+        "observed_document_client": "1425x900",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "1280x800",
+        "actual_browser_viewport": "1280x800",
+        "observed_document_client": "1265x800",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 0,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "1024x768",
+        "actual_browser_viewport": "1024x768",
+        "observed_document_client": "1009x768",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 1,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": false,
+        "unintended_offscreen_elements": 0
+      },
+      {
+        "requested": "390x844",
+        "actual_browser_viewport": "390x844",
+        "observed_document_client": "375x844",
+        "response_status": 200,
+        "page_level_horizontal_overflow": false,
+        "page_overflow_px": 0,
+        "table_wraps": 9,
+        "tables_needing_bounded_horizontal_scroll": 9,
+        "tables_with_unbounded_overflow": 0,
+        "navigation_needing_bounded_horizontal_scroll": true,
+        "unintended_offscreen_elements": 0
+      }
+    ],
+    "responsive_visual_inspection": "4/4",
+    "font_loaded_at_all_viewports": true,
+    "unresolved_placeholders": 0,
+    "headings": 22,
+    "tables": 9,
+    "table_wraps": 9,
+    "anchor_elements": 587,
+    "hash_anchor_occurrences": 10,
+    "unique_hash_anchors": 10,
+    "local_link_occurrences": 577,
+    "unique_local_links": "330/330",
+    "local_link_failures": [],
+    "pre_materialization_forward_reference": {
+      "href": "evidence/browser/current-audit-dashboard-verification-run-144-wave-23.json",
+      "expected_missing_before_receipt_materialization": true,
+      "pre_materialization_filesystem_target_exists": false,
+      "excluded_from_pre_materialization_failure": true,
+      "resolved_after_receipt_materialization": true,
+      "hash_pair_required": false
+    },
+    "adjacent_hash_rows_total": 485,
+    "hash_bearing_file_link_occurrences": 483,
+    "unique_hash_bearing_file_path_hash_pairs": 257,
+    "hash_bearing_link_failures": [],
+    "historical_directory_hash_link_occurrences": 2,
+    "historical_directory_hash_unique_pairs": 1,
+    "navigation_targets": "10/10",
+    "missing_navigation_targets": [],
+    "navigation_links_exercised": [
+      "#progress",
+      "#checkpoint",
+      "#pages",
+      "#static-census",
+      "#runtime",
+      "#benchmarks",
+      "#modules",
+      "#findings",
+      "#architecture",
+      "#gaps"
+    ],
+    "navigation_link_results": [
+      {
+        "label": "Progress",
+        "target": "#progress",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "RUN-143",
+        "target": "#checkpoint",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Pages",
+        "target": "#pages",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Static census",
+        "target": "#static-census",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Runtime gates",
+        "target": "#runtime",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Benchmarks",
+        "target": "#benchmarks",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Modules",
+        "target": "#modules",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Provisional findings",
+        "target": "#findings",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Architecture",
+        "target": "#architecture",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      },
+      {
+        "label": "Gaps",
+        "target": "#gaps",
+        "target_exists": true,
+        "hash_matched": true,
+        "target_visible_after_click": true
+      }
+    ],
+    "dom_ids_observed": 11,
+    "artifact_authored_ids": 10,
+    "browser_injected_ids": [
+      "codex-browser-sidebar-comments-root"
+    ],
+    "duplicate_authored_ids": 0,
+    "console_warnings": 0,
+    "console_errors": 0,
+    "page_errors": 0,
+    "anchors": "10/10",
+    "anchor_failures": [],
+    "exact_visible_boundary_checks": {
+      "current_source_owner_records_662": true,
+      "current_route_page_split_305_357": true,
+      "distinct_feature_ids_256_as_234_h_and_22_d": true,
+      "feature_sets_64_route_242_page_overlap_50": true,
+      "controller_action_bridges_93": true,
+      "bounded_denominator_3929_percent_16_849071_residual_3267": true,
+      "route_partition_3218_as_305_owner_12_shared_5_alias_2896_residual_with_7_tagged_gaps": true,
+      "page_partition_711_as_357_owner_9_shared_345_residual_with_1_tagged_gap": true,
+      "queue_partition_507_as_116_reviewed_391_pending": true,
+      "reviewed_queue_116_as_94_owner_10_shared_5_alias_0_dead_7_gap": true,
+      "queue_without_ownership_413": true,
+      "site_portfolio_json_action_one_owner_one_bridge": true,
+      "existing_page_owner_context_page_root_and_run086_row": true,
+      "separate_sibling_route_run090_0041_run077_0418": true,
+      "three_page_path_callers_and_zero_selected_api_frontend_callers": true,
+      "excluded_neighbor_79_and_next_pending_80": true,
+      "packet_expansions_24_as_6_existing_18_new": true,
+      "source_locus_corrections_1": true,
+      "assurance_17_inputs_9_action_3_shared_0_final": true,
+      "page_sibling_caller_neighbor_next_noninheritance": true,
+      "one_operating_organisation_across_multiple_sites_non_tenant": true,
+      "gate_4_open_and_matrix_mapping_0_of_340": true,
+      "all_application_runtime_test_benchmark_pass_finding_completion_credit_zero": true
+    }
+  },
+  "mutation_attestation": {
+    "authorized_paths": [
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/audit-dashboard.html",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-144-audit-dashboard-verification-wave-23.py",
+      "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/browser/current-audit-dashboard-verification-run-144-wave-23.json"
+    ],
+    "whole_repository_status_exactly_authorized_paths": true,
+    "dashboard_generator_wrote_only_dashboard_html": true,
+    "receipt_materializer_wrote_only_receipt": true,
+    "matrix_changed": false,
+    "reporting_surfaces_changed": false,
+    "application_source_changed": false,
+    "tests_changed": false,
+    "build_outputs_changed": false,
+    "local_static_audit_server_used": true,
+    "application_runtime_started": false,
+    "navigation_only": true,
+    "forms_submitted": false,
+    "records_opened": false,
+    "screenshots_retained": false,
+    "database_changed": false,
+    "application_or_external_state_changed": false,
+    "application_tests_or_build_run": false
+  },
+  "credit_boundary": {
+    "audit_dashboard_artifact": true,
+    "static_source_feature_ownership": false,
+    "static_route_feature_ownership": false,
+    "static_page_feature_ownership": false,
+    "static_controller_action_bridge": false,
+    "queue_review": false,
+    "frontend_caller_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "application_navigation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_concealment_correctness": false,
+    "query_correctness": false,
+    "projection_correctness": false,
+    "period_correctness": false,
+    "allocation_provenance_or_reversal_correctness": false,
+    "utility_true_up_sign_correctness": false,
+    "response_minimization_correctness": false,
+    "lifecycle_correctness": false,
+    "concurrency_correctness": false,
+    "event_or_downstream_durability_correctness": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_or_workflow": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false
+}
