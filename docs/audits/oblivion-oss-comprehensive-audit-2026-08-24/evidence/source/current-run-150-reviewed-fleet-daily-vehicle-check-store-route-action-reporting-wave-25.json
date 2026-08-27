@@ -1,0 +1,362 @@
+{
+  "schema_version": "run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25-v1",
+  "run_id": "RUN-150-REVIEWED-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-REPORTING-WAVE-25",
+  "status": "REPORTING_MATERIALIZED_663_OWNERS_4_PROVISIONAL_SOURCE_OBSERVATIONS_ZERO_CORRECTNESS_OR_FINAL_CREDIT",
+  "generated_on": "2026-08-27",
+  "architecture_rule": {
+    "operating_organisations": 1,
+    "multiple_sites": true,
+    "multi_tenant": false
+  },
+  "pins": {
+    "checkpoint_commit": "198ac398589891c6c58aa334c1b0a11f11277de3",
+    "checkpoint_tree": "2deb006a1a4be647e4ea7d1a29b459b6f45bae2c",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "matrix_sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+    "benchmark_register_sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+    "run_145_mapping_receipt_sha256": "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9",
+    "run_147_dashboard_verification_sha256": "36e0595b3e90f439770c9e8aadbb01555591c79e38ffac54d3cfd6dc3b892cc0",
+    "materializer": "generators/materialize-run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25.py",
+    "materializer_sha256": "647fba32d9c3e304ddf8d952a4d7194bc25cbffcf24ef300c3db5310380f0c27",
+    "lineage": {
+      "generators/build-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25.py": {
+        "sha256": "c8c6a9f1500fe088f6c61c3edff5351095518d14661a77af86b327a9ee253f65",
+        "blob_id": "b9deb131d69a1770f5754675d0c773bf0ccb0f30"
+      },
+      "evidence/source/root-run-148-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25.json": {
+        "sha256": "621c1794a73e232b6fc9ff8d2b81ac9ae31ea2ccfe9f038ae77afe332b3ab28d",
+        "blob_id": "caa779f64c30dc653f243a85568bd3156b4764e1"
+      },
+      "generators/materialize-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25.py": {
+        "sha256": "c41b37679763c0ea0eb4a08fc14368692c5b4cc0176167c4369b637c6f68f4b3",
+        "blob_id": "a7dee009c519a6117b0aac16abcaff07f90eeb81"
+      },
+      "evidence/source/raw-run-148r-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25.json": {
+        "sha256": "6720a7570f7f0547fca222758c0632cb7514d953a20605e7c00d6ce88efc18b2",
+        "blob_id": "044a25e035d38dcbaa97f13bc241f0bdd21f3dab"
+      },
+      "generators/integrate-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.py": {
+        "sha256": "b5c7f04cd44ecd73dda9c7fe4a9e2e8616c68674cdc52d393ec696b06ad2327e",
+        "blob_id": "e8d9d1c9889be589a22db6dfea53d3122adce247"
+      },
+      "evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json": {
+        "sha256": "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55",
+        "blob_id": "c5f0a3bda99167f66650d63bfdb35e18d8ed93b5"
+      },
+      "generators/materialize-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.py": {
+        "sha256": "bd09980ac26a7e9d026eda518f1964f8a2a87ea75fecf271981e4017e8dcd57c",
+        "blob_id": "8947c8e02aa766d752aa1c7cd345e62d2ff8fa2b"
+      },
+      "evidence/source/current-run-149r-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.json": {
+        "sha256": "545694fc1b7bd5f4af244617fb421ece1265fe6e6f2cad2ca834115e7a9e75a2",
+        "blob_id": "66f0faa0b1894160e299fecd2e1c43962a3138d7"
+      }
+    }
+  },
+  "baseline_outputs": {
+    "00-executive-summary.md": "616fd626dc1292896955e657812404ccbdbb4e425b736f68b9ccb8f87e63d8ab",
+    "01-repository-module-map.md": "242b03dfa2f1c09eb7cb2860bf02047d9cc9886f655d060a0dac0843881dc763",
+    "13-unresolved-questions-and-evidence-gaps.md": "ada6ad349bb29d9168b7e93e5fc7d494d8701254b8fe10faa2df28afb0725965",
+    "findings.json": "9848a8edd8c7fa56cc753a77746f66434912ac0bafe42110f999457a7c43da5c",
+    "generators/build-current-audit-dashboard.py": "3eab383b5203ae9a3108f94ff67a276393f57afa39c00790da715e64f5247024"
+  },
+  "outputs": {
+    "00-executive-summary.md": {
+      "bytes": 102408,
+      "sha256": "c8b1885704825e69112af6f7830d01be2c34b9e9d97754e0c0986112d0488eb2"
+    },
+    "01-repository-module-map.md": {
+      "bytes": 29677,
+      "sha256": "3512e7dde9f08ce6cbc59a10c3e5c97c30c053704f87ebe4c3fb10cab7ea4c3a"
+    },
+    "13-unresolved-questions-and-evidence-gaps.md": {
+      "bytes": 26253,
+      "sha256": "753210c92a2438975b9aadff3d3ae72ea336a8e870b3faa7f204cd9bddcb7efa"
+    },
+    "findings.json": {
+      "bytes": 426548,
+      "sha256": "4d82edbe7595b20fd6cb3fba4f55e4e4a6fd2a202aa30c67d3e117280ad46621"
+    },
+    "generators/build-current-audit-dashboard.py": {
+      "bytes": 331974,
+      "sha256": "4ae8533890771f7e281e4e0da40afc0d6ee0cb89f257517d8bea998e380f3adc"
+    }
+  },
+  "counts": {
+    "source_owner_records": 663,
+    "route_owner_records": 306,
+    "page_owner_records": 357,
+    "distinct_feature_ids": 256,
+    "distinct_H_feature_ids": 234,
+    "distinct_D_feature_ids": 22,
+    "route_distinct_feature_ids": 64,
+    "page_distinct_feature_ids": 242,
+    "route_page_feature_overlap": 50,
+    "static_controller_action_bridges": 94,
+    "bounded_static_source_denominator": 3929,
+    "bounded_static_source_ownership_percent": "16.874523",
+    "bounded_static_source_residual_records": 3266,
+    "residual_explicit_unmapped_routes": 2895,
+    "semantic_shared_routes": 12,
+    "reviewed_alias_routes": 5,
+    "reviewed_dead_routes": 0,
+    "evidence_gap_routes_tagged_within_residual": 7,
+    "residual_unadjudicated_page_roots": 345,
+    "semantic_shared_page_roots": 9,
+    "reviewed_alias_page_roots": 0,
+    "reviewed_dead_page_roots": 0,
+    "evidence_gap_page_roots_tagged_within_residual": 1,
+    "direct_exact_queue_records": 507,
+    "reviewed_queue_surface_rows": 117,
+    "owner_queue_surface_rows": 95,
+    "shared_queue_surface_rows": 10,
+    "alias_queue_surface_rows": 5,
+    "dead_queue_surface_rows": 0,
+    "evidence_gap_queue_surface_rows": 7,
+    "pending_unreviewed_queue_surface_rows": 390,
+    "queue_surfaces_without_ownership": 412,
+    "new_reviewed_route_surface_rows": 1,
+    "new_owner_route_surface_rows": 1,
+    "new_shared_route_surface_rows": 0,
+    "new_alias_route_surface_rows": 0,
+    "new_dead_route_surface_rows": 0,
+    "new_evidence_gap_route_surface_rows": 0,
+    "wholesale_queue_ownership_authorized": false
+  },
+  "benchmark_state": {
+    "mapped": 2,
+    "final_no_match_or_NCM": 0,
+    "unresolved": 338
+  },
+  "review_preservation": {
+    "overlay_run_id": "RUN-149-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-WAVE-25",
+    "overlay_review_run_id": "RUN-149R-INDEPENDENT-REVIEWED-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-OWNERSHIP-OVERLAY-REVIEW-WAVE-25",
+    "independent_overlay_reviews": 3,
+    "discrepancies": 0,
+    "provisional_source_observations": 4,
+    "provisional_finding_records_unchanged": 12,
+    "final_findings": 0,
+    "ownership_material_expansion_files": 0,
+    "correctness_only_expansion_files": 4,
+    "nonblinding_disclosure": {
+      "review_a_blinded": false,
+      "review_a_prior_outcome_visible_in_team_status": false,
+      "review_b_blinded": false,
+      "review_b_prior_outcome_visible_in_team_status": true,
+      "reviewers_consulted_each_other": false,
+      "both_completed_independent_evidence_traces": true
+    }
+  },
+  "noninheritance": {
+    "preceding_index_79_owner_not_inherited_or_recredited": true,
+    "page_owner_not_inherited_or_recredited": true,
+    "frontend_caller_not_inherited_or_recredited": true,
+    "next_index_81_not_selected_or_credited": true,
+    "current_overlay_correctness_and_downstream_credit": false
+  },
+  "provisional_source_observations": {
+    "observations": [
+      {
+        "observation_id": "RUN148R-ASSURANCE-MUTATION-CAPABILITY",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "exact_mutation_capability",
+        "loci": [
+          "routes/fleet-assets.php:40-47",
+          "app/Http/Middleware/EnsurePermission.php:11-27"
+        ],
+        "observation": "The selected POST sits inside a read-labelled OR permission group accepting fleet.viewAny, assets.viewAny, or assets.viewAssigned; an exact daily-check mutation capability is not established.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "75e037324c539ef056da7017c67b2d7edd6b8ddcd6060825530a405d375e2259"
+      },
+      {
+        "observation_id": "RUN148R-ASSURANCE-SITE-DIRECT-OBJECT",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "approved_site_canonical_vehicle_direct_object_concealment",
+        "loci": [
+          "app/Http/Controllers/FleetAssets/DailyCheckController.php:136-140",
+          "app/Policies/AssetPolicy.php:17-21",
+          "app/Policies/AssetPolicy.php:74-87",
+          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184"
+        ],
+        "observation": "The store action validates raw assets.id existence but does not resolve a canonical vehicle through approved Sites, AssetPolicy, or a concealment-aware access service before mutation.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "2dd0f37e66d40ed1ec16f2e7206b2ec85f79ee96fab3f77081a12774c41a5c8a"
+      },
+      {
+        "observation_id": "RUN148R-ASSURANCE-TEMPLATE-DAY-CONCURRENCY",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "template_authority_and_daily_run_concurrency",
+        "loci": [
+          "app/Http/Controllers/FleetAssets/DailyCheckController.php:142-186",
+          "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:11-33"
+        ],
+        "observation": "Template first-or-create and same-day run check/update-or-create are not shown under an exact template authority, transaction, lock, or database uniqueness invariant.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "7e412be31bb5a46d186988e1b8fed78e2a7515a1bfc311482af422f41e57d1f1"
+      },
+      {
+        "observation_id": "RUN148R-ASSURANCE-MUTATION-TEST-COVERAGE",
+        "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+        "category": "representative_role_site_negative_path_execution",
+        "loci": [
+          "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-100",
+          "tests/Browser/Fleet/FleetTest.php:66-73"
+        ],
+        "observation": "Frozen tests cover GET rendering/compliance or a browser smoke only; no exact selected POST route-name/path mutation assertion was found or executed.",
+        "correctness_credit_authorized": false,
+        "final_finding_credit_authorized": false,
+        "observation_record_sha256": "a8ee50e527ec347ea8b17a4b6069988e9da77d723f72376c9b4042981d82ae7e"
+      }
+    ],
+    "observation_count": 4,
+    "provisional_source_observations_only": true,
+    "correctness_credit_authorized": false,
+    "final_finding_credit_authorized": false
+  },
+  "reporting_boundary": {
+    "matrix_rows_changed": 0,
+    "matrix_cells_changed": 0,
+    "benchmark_register_rows_changed": 0,
+    "benchmark_register_cells_changed": 0,
+    "matrix_mapping_credit": "2/340",
+    "final_no_match_or_NCM_credit": "0/340",
+    "dashboard_html_changed": false,
+    "dashboard_html_sha256_preserved": "277db943400776d0bd3be1b0c97afff69ea7b76e97c861abf5c135dc6be00c33",
+    "dashboard_requires_fresh_run_151_artifact_verification": true,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "verified_overlay_credit_boundary": {
+    "STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "static_page_feature_ownership": false,
+    "frontend_caller_ownership": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "template_authority_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "audit_or_event_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "matrix_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "verified_overlay_review_credit_boundary": {
+    "INDEPENDENT_OVERLAY_REVIEW_FOR_REPORTING": true,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "direct_exact_queue_review": false,
+    "current_overlay_ownership_credit": false,
+    "prior_sibling_owner_context_inherited_or_recredited": false,
+    "frontend_caller_ownership": false,
+    "next_queue_record_selected_or_credited": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "matrix_mutation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "template_authority_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "audit_or_event_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "credit_boundary": {
+    "REPORTING_REFRESH_FOR_REVIEWED_OVERLAY": true,
+    "direct_exact_queue_review": false,
+    "new_queue_review": false,
+    "new_source_ownership": false,
+    "new_route_ownership": false,
+    "new_page_ownership": false,
+    "new_controller_action_bridge": false,
+    "current_overlay_ownership_credit": false,
+    "complete_route_page_feature_crosswalk": false,
+    "framework_route_reachability": false,
+    "matrix_mutation": false,
+    "canonical_object_ownership_correctness": false,
+    "site_authorization_correctness": false,
+    "permission_correctness": false,
+    "privacy_correctness": false,
+    "direct_object_correctness": false,
+    "template_authority_correctness": false,
+    "concurrency_or_idempotency_correctness": false,
+    "audit_or_event_durability_correctness": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "responsive_application": false,
+    "visual_application_workflow": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "new_benchmark_mapping": false,
+    "final_no_match_or_NCM": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "feature_completion": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "completion_boundary": {
+    "framework_route_reachability_complete": false,
+    "semantic_assurance_complete": false,
+    "execution_complete": false,
+    "benchmark_complete": false,
+    "pass_8_complete": false,
+    "final_reconciliation_complete": false,
+    "no_live_agent_gate_complete": false,
+    "full_crosswalk_complete": false,
+    "gate_4_complete": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": true,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/00-executive-summary.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/01-repository-module-map.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/13-unresolved-questions-and-evidence-gaps.md",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/findings.json",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-current-audit-dashboard.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/current-run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25.json"
+  ]
+}
