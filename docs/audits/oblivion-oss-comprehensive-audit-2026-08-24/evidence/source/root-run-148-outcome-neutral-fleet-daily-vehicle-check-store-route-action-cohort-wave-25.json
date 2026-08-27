@@ -1,0 +1,680 @@
+{
+  "schema_version": "run-148-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25-v1",
+  "run_id": "RUN-148-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-COHORT-WAVE-25",
+  "status": "OUTCOME_NEUTRAL_SOURCE_PACKET_READY_FRESH_REVIEW_REQUIRED_ZERO_OWNERSHIP_CREDIT",
+  "generated_on": "2026-08-27",
+  "pins": {
+    "checkpoint_commit": "2e578dab7cebf861f1b1e466c6d75f8e200d9d20",
+    "checkpoint_tree": "c59743a1b48db2f278ec9fd1eb7a25bf44d270df",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "prompt_path": "C:\\Users\\steph\\Downloads\\oblivion-open-source-benchmark-and-8-pass-audit-prompt.md",
+    "prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
+    "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25.py",
+    "generator_sha256": "c8c6a9f1500fe088f6c61c3edff5351095518d14661a77af86b327a9ee253f65",
+    "inputs": {
+      "generators/build-outcome-neutral-finance-site-portfolio-overview-route-action-cohort-wave-23.py": "d3cfd34687ba6c6a9b6afecfe9bfc02d2b700b15de881c1ef651877c486fd6a0",
+      "03-feature-to-benchmark-matrix.csv": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "task-scripts/cap-fleet-daily-vehicle-check.md": "48c79c9c220d1ddfa9ab063ed8e3196d64259eb3389b171a93fc48c404604b34",
+      "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json": "5d38c3507eef04aa4bad3c713fbd3817d4cbb2879d0713476a8d4717f715e4a5",
+      "evidence/source/current-run-142-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json": "2d5228394090bcdad9ebfc3976be87260bf1dc5d110a8297974b00d908b63cdb",
+      "evidence/source/raw-run-142r-independent-reviewed-outcome-neutral-finance-site-portfolio-overview-route-action-ownership-overlay-wave-23.json": "005cbe019f16d7705f7d632b97a8f2629bf7c5653ba3ff9b30c50bd10e2a44df",
+      "evidence/source/current-run-143-reviewed-finance-site-portfolio-overview-route-action-reporting-wave-23.json": "dcb542f98b8ed66bddc92498bcd95cf9c68815bab3f77960ccfbe3bfc7099f21",
+      "evidence/browser/current-audit-dashboard-verification-run-144-wave-23.json": "fd21527929483cca88e03af8a8ff2f5e8095c5af280fc27546486e3ddc6dd7f5",
+      "evidence/benchmark/current-run-145-finance-invoice-fx-benchmark-mapping-wave-24.json": "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9",
+      "evidence/source/current-run-146-finance-benchmark-reporting-wave-24.json": "50953b6281cf198f6dc6ff56027d0eebe7e78697781d459dd620ed9bb2b1277e",
+      "evidence/browser/current-audit-dashboard-verification-run-147-wave-24.json": "36e0595b3e90f439770c9e8aadbb01555591c79e38ffac54d3cfd6dc3b892cc0",
+      "audit-dashboard.html": "277db943400776d0bd3be1b0c97afff69ea7b76e97c861abf5c135dc6be00c33"
+    }
+  },
+  "architecture_rule": "One operating organisation across multiple Sites. Exact roles and capabilities, approved Sites, canonical record ownership, foreign-Site/direct-object concealment, and privacy are the boundary; legacy tenant_id or organization_id storage is not a new tenancy design.",
+  "selection_contract": {
+    "source": "evidence/source/root-run-090-direct-exact-route-page-review-queue-wave-11.json",
+    "rule": "Select all and only zero-based RUN-090 queue index 80 after the committed RUN-147 boundary. Preserve the preceding reviewed GET route and next pending vehicle route as non-inheritable context.",
+    "selected_queue_indices_zero_based": [
+      80
+    ],
+    "selected_queue_ids": [
+      "RUN090-ROUTE-0081"
+    ],
+    "selected_route_record_ids": [
+      "RUN077-ROUTE-0689"
+    ],
+    "selected_feature_ids": [
+      "CAP-FLEET-DAILY-VEHICLE-CHECK"
+    ],
+    "selection_outcome_neutral": true,
+    "ownership_decisions_authored": 0,
+    "page_candidates_selected": 0
+  },
+  "current_baseline": {
+    "run142_overlay_sha256": "2d5228394090bcdad9ebfc3976be87260bf1dc5d110a8297974b00d908b63cdb",
+    "run142_overlay_review_sha256": "005cbe019f16d7705f7d632b97a8f2629bf7c5653ba3ff9b30c50bd10e2a44df",
+    "run143_reporting_sha256": "dcb542f98b8ed66bddc92498bcd95cf9c68815bab3f77960ccfbe3bfc7099f21",
+    "run144_dashboard_receipt_sha256": "fd21527929483cca88e03af8a8ff2f5e8095c5af280fc27546486e3ddc6dd7f5",
+    "run145_benchmark_receipt_sha256": "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9",
+    "run146_reporting_sha256": "50953b6281cf198f6dc6ff56027d0eebe7e78697781d459dd620ed9bb2b1277e",
+    "run147_dashboard_receipt_sha256": "36e0595b3e90f439770c9e8aadbb01555591c79e38ffac54d3cfd6dc3b892cc0",
+    "dashboard_html_sha256": "277db943400776d0bd3be1b0c97afff69ea7b76e97c861abf5c135dc6be00c33",
+    "source_owner_records": 662,
+    "route_owner_records": 305,
+    "page_owner_records": 357,
+    "static_controller_action_bridges": 93,
+    "reviewed_queue_surface_rows": 116,
+    "pending_unreviewed_queue_surface_rows": 391,
+    "benchmark_mappings": 2,
+    "benchmark_final_ncms": 0,
+    "benchmark_unresolved_targets": 338
+  },
+  "source_review_packet": {
+    "source_tree_pinning_basis": {
+      "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+      "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+      "head_app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+      "head_routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+      "head_resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+      "head_resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+      "head_tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+      "every_required_file_matches_application_commit_blob": true
+    },
+    "required_source_files": [
+      {
+        "path": "routes/fleet-assets.php",
+        "sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "application_commit_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "review_loci": [
+          "routes/fleet-assets.php:34-52"
+        ],
+        "purpose": "auth group, read-permission group, selected POST route, preceding reviewed GET route, and next vehicle route"
+      },
+      {
+        "path": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+        "sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7",
+        "blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+        "application_commit_blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+        "review_loci": [
+          "app/Http/Controllers/FleetAssets/DailyCheckController.php:15-190"
+        ],
+        "purpose": "complete selected controller including the sibling page action and selected store mutation"
+      },
+      {
+        "path": "app/Models/FleetChecklistRun.php",
+        "sha256": "11f0572b7525b465392083a33dd6a687392e07bb776dd185b6928dca51f304cd",
+        "blob_id": "3f39f1b5be3dc3524c73af8359107c5f2e7f0f88",
+        "application_commit_blob_id": "3f39f1b5be3dc3524c73af8359107c5f2e7f0f88",
+        "review_loci": [
+          "app/Models/FleetChecklistRun.php:1-40"
+        ],
+        "purpose": "selected mutation target fillable fields, casts, and relations"
+      },
+      {
+        "path": "app/Models/FleetChecklistTemplate.php",
+        "sha256": "a8b294859d923972b8554def5ccd89636f3e27f88e9efd302a69998009f9aee2",
+        "blob_id": "ea49d6d82941b15e5d9a514cf676bc5f414ec6cf",
+        "application_commit_blob_id": "ea49d6d82941b15e5d9a514cf676bc5f414ec6cf",
+        "review_loci": [
+          "app/Models/FleetChecklistTemplate.php:1-29"
+        ],
+        "purpose": "selected first-or-create template target and legacy storage-context concern"
+      },
+      {
+        "path": "app/Models/Asset.php",
+        "sha256": "ba455db793fd59faff49f3092695227f7fe5b1db17d9ada3610ce62835d28012",
+        "blob_id": "e644731fbcf65f91ae06cb6b240b346e492a306b",
+        "application_commit_blob_id": "e644731fbcf65f91ae06cb6b240b346e492a306b",
+        "review_loci": [
+          "app/Models/Asset.php:1-336"
+        ],
+        "purpose": "raw exists target, Site/home-Site fields and canonical vehicle scope context"
+      },
+      {
+        "path": "app/Models/User.php",
+        "sha256": "0d184ebe6a28395b34b195751ffb62390f4c32828c982103ad613430bc4e59ae",
+        "blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "application_commit_blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "review_loci": [
+          "app/Models/User.php:346-437"
+        ],
+        "purpose": "exact capability evaluation context for route middleware"
+      },
+      {
+        "path": "app/Http/Middleware/EnsurePermission.php",
+        "sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+        "blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "application_commit_blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "review_loci": [
+          "app/Http/Middleware/EnsurePermission.php:1-29"
+        ],
+        "purpose": "pipe-separated route permission enforcement"
+      },
+      {
+        "path": "bootstrap/app.php",
+        "sha256": "7869aa6a50968b1114d2b65e26de5fae85cae86387b77e94dfdd88c421bebd76",
+        "blob_id": "8d80f25b6cd086e3905b15e8851ff511c5088b92",
+        "application_commit_blob_id": "8d80f25b6cd086e3905b15e8851ff511c5088b92",
+        "review_loci": [
+          "bootstrap/app.php:1-96"
+        ],
+        "purpose": "permission middleware alias registration"
+      },
+      {
+        "path": "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php",
+        "sha256": "486507fe939cb84fa65b054f7cb24767f72c015e71963fbcf7960b6c28ee7cf5",
+        "blob_id": "e000edc95b446d9a7d1a23cd10f6c1bdb3ea743e",
+        "application_commit_blob_id": "e000edc95b446d9a7d1a23cd10f6c1bdb3ea743e",
+        "review_loci": [
+          "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:9-33"
+        ],
+        "purpose": "checklist template/run schema and asset/user foreign keys"
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/daily-check.tsx",
+        "sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+        "blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+        "application_commit_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+        "review_loci": [
+          "resources/js/pages/fleet-assets/daily-check.tsx:59-101"
+        ],
+        "purpose": "tracked selected POST caller and payload"
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+        "sha256": "9849b30d9860526638ca81d07fef2b6d4c6359f47e7b6109744221d0215db5b0",
+        "blob_id": "bcad4053c7c94ca6ad9456b7d239d1f615bc504d",
+        "application_commit_blob_id": "bcad4053c7c94ca6ad9456b7d239d1f615bc504d",
+        "review_loci": [
+          "resources/js/pages/fleet-assets/vehicles/index.tsx:275-295"
+        ],
+        "purpose": "separate navigation caller to the already-reviewed daily-check page"
+      },
+      {
+        "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+        "sha256": "72cb083e156d44279682ade62db2cb5a47d066e49f3a0c4054a067853bfe604a",
+        "blob_id": "f9313885f30c22af5295048b12ec38e336a35fc2",
+        "application_commit_blob_id": "f9313885f30c22af5295048b12ec38e336a35fc2",
+        "review_loci": [
+          "resources/js/pages/fleet-assets/vehicles/show.tsx:1140-1160"
+        ],
+        "purpose": "separate vehicle-detail navigation caller"
+      },
+      {
+        "path": "resources/js/components/app-sidebar.tsx",
+        "sha256": "482fcfd319695ec22da2598abe4c4f00f95c27be42d93a9d79f97f695befb458",
+        "blob_id": "ff1d908a833d572c5015f2e24ee0be6e42382a3c",
+        "application_commit_blob_id": "ff1d908a833d572c5015f2e24ee0be6e42382a3c",
+        "review_loci": [
+          "resources/js/components/app-sidebar.tsx:1360-1380"
+        ],
+        "purpose": "sidebar navigation context only"
+      },
+      {
+        "path": "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php",
+        "sha256": "bfd2abe95b6b289aa973963fe81806c304e4c9c0dd57aa1a8a8d6b8fe65d9b04",
+        "blob_id": "d38cabe66a5e88cb4df3d93a54af8914e8835dbb",
+        "application_commit_blob_id": "d38cabe66a5e88cb4df3d93a54af8914e8835dbb",
+        "review_loci": [
+          "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-100"
+        ],
+        "purpose": "unexecuted GET-only page/compliance assertion; not selected mutation evidence"
+      },
+      {
+        "path": "tests/Browser/Fleet/FleetTest.php",
+        "sha256": "8e83cb2ede1440d550f7303d41190ac4bd8422a8c54d9abb8a5df6944df9b1b3",
+        "blob_id": "396bc3b69e0ecc77b73c97fab7a7484392025d6f",
+        "application_commit_blob_id": "396bc3b69e0ecc77b73c97fab7a7484392025d6f",
+        "review_loci": [
+          "tests/Browser/Fleet/FleetTest.php:66-73"
+        ],
+        "purpose": "unexecuted GET-only browser smoke; not selected mutation evidence"
+      },
+      {
+        "path": "docs/architecture/single-tenant-application.md",
+        "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+        "blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "application_commit_blob_id": "d204082ce6b328ceb8518edcaebf77d2868d689b",
+        "review_loci": [
+          "docs/architecture/single-tenant-application.md:1-21"
+        ],
+        "purpose": "canonical one-organisation multi-Site boundary"
+      }
+    ],
+    "required_source_file_count": 16,
+    "required_source_file_identity_sha256": "d8fecae4408cc9b63100ce7e05c48e3691d9084cccb8bad363f485fb3e026349",
+    "selected_controller_action_slice": {
+      "source_file": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+      "source_file_sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7",
+      "source_file_blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+      "method": "store",
+      "definition_line": 134,
+      "definition_anchor": "app/Http/Controllers/FleetAssets/DailyCheckController.php:134",
+      "review_slice": {
+        "start_line": 134,
+        "end_line": 191,
+        "next_method_definition_line": null,
+        "line_count": 58,
+        "text": "    public function store(Request $request)\n    {\n        $data = $request->validate([\n            'asset_id' => ['required', 'integer', 'exists:assets,id'],\n            'condition' => ['required', 'string', 'in:good,issue'],\n            'notes' => ['nullable', 'string', 'max:2000'],\n        ]);\n\n        // Find or create the daily_check template\n        $template = FleetChecklistTemplate::firstOrCreate(\n            ['type' => 'daily_check'],\n            [\n                'name' => 'Daily Vehicle Check',\n                'type' => 'daily_check',\n                'items' => [\n                    ['label' => 'Visual Condition', 'type' => 'select', 'options' => ['good', 'issue']],\n                    ['label' => 'Notes', 'type' => 'text'],\n                ],\n                'is_active' => true,\n            ]\n        );\n\n        // Check if already checked today\n        $today = now()->startOfDay();\n        $existing = FleetChecklistRun::query()\n            ->where('asset_id', $data['asset_id'])\n            ->where('template_id', $template->id)\n            ->where('completed_at', '>=', $today)\n            ->first();\n\n        if ($existing) {\n            // Update existing check\n            $existing->update([\n                'responses' => [\n                    'condition' => $data['condition'],\n                ],\n                'passed' => $data['condition'] === 'good',\n                'notes' => $data['notes'] ?? null,\n                'user_id' => $request->user()->id,\n                'completed_at' => now(),\n            ]);\n        } else {\n            FleetChecklistRun::create([\n                'template_id' => $template->id,\n                'asset_id' => $data['asset_id'],\n                'user_id' => $request->user()->id,\n                'responses' => [\n                    'condition' => $data['condition'],\n                ],\n                'passed' => $data['condition'] === 'good',\n                'notes' => $data['notes'] ?? null,\n                'completed_at' => now(),\n            ]);\n        }\n\n        return back()->with('success', 'Daily check recorded.');\n    }\n}",
+        "text_sha256": "532915dacc635e8b448dcb9351e3971b5f27458fc27e037c72c0e6435d49206a"
+      }
+    },
+    "selected_controller_action_slice_sha256": "532915dacc635e8b448dcb9351e3971b5f27458fc27e037c72c0e6435d49206a",
+    "already_reviewed_sibling_page_action_slice": {
+      "source_file": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+      "source_file_sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7",
+      "source_file_blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+      "method": "index",
+      "definition_line": 19,
+      "definition_anchor": "app/Http/Controllers/FleetAssets/DailyCheckController.php:19",
+      "review_slice": {
+        "start_line": 19,
+        "end_line": 133,
+        "next_method_definition_line": 134,
+        "line_count": 115,
+        "text": "    public function index(Request $request)\n    {\n        $user = $request->user();\n        $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');\n\n        // Get vehicles, optionally filtered to user's site\n        $query = Asset::vehicles();\n\n        if ($hasFleetFields && $request->user()?->site_id) {\n            $query->where(function ($q) use ($request) {\n                $q->where('home_site_id', $request->user()->site_id)\n                  ->orWhere('site_id', $request->user()->site_id);\n            });\n        }\n\n        $vehicles = $query->orderBy('name')->get(['id', 'name', 'asset_tag', 'status']);\n\n        // Get today's checks\n        $today = now()->startOfDay();\n        $todayChecks = FleetChecklistRun::query()\n            ->where('completed_at', '>=', $today)\n            ->whereHas('template', function ($q) {\n                $q->where('type', 'daily_check');\n            })\n            ->get()\n            ->keyBy('asset_id');\n\n        $vehicleData = $vehicles->map(function ($v) use ($todayChecks) {\n            $check = $todayChecks->get($v->id);\n            return [\n                'id' => $v->id,\n                'name' => $v->name,\n                'asset_tag' => $v->asset_tag,\n                'status' => $v->status,\n                'checked_today' => $check !== null,\n                'check_result' => $check ? ($check->passed ? 'good' : 'issue') : null,\n                'check_notes' => $check?->notes,\n                'checked_at' => $check?->completed_at?->toISOString(),\n                'checked_by' => $check?->user?->name ?? null,\n            ];\n        })->values();\n\n        $checkedCount = $vehicleData->where('checked_today', true)->count();\n\n        // Roadworthiness badges (org-wide) — same COUNT patterns as\n        // VehicleController::index; the pre-drive check is exactly where an\n        // expired WOF must be visible.\n        $wofDue = Asset::query()->where(fn ($q) => $q->vehicles())->wofExpiring(30)->count();\n        $wofExpired = Asset::query()\n            ->where(fn ($q) => $q->vehicles())\n            ->whereNotNull('wof_expires_at')\n            ->where('wof_expires_at', '<', now())\n            ->count();\n        $regoDue = Asset::query()->where(fn ($q) => $q->vehicles())->registrationExpiring(30)->count();\n        $regoExpired = Asset::query()\n            ->where(fn ($q) => $q->vehicles())\n            ->whereNotNull('registration_expires_at')\n            ->where('registration_expires_at', '<', now())\n            ->count();\n        $cofDue = Asset::query()\n            ->where(fn ($q) => $q->vehicles())\n            ->whereNotNull('cof_expires_at')\n            ->where('cof_expires_at', '<=', now()->addDays(30))\n            ->where('cof_expires_at', '>=', now())\n            ->count();\n        $cofExpired = Asset::query()\n            ->where(fn ($q) => $q->vehicles())\n            ->whereNotNull('cof_expires_at')\n            ->where('cof_expires_at', '<', now())\n            ->count();\n        $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');\n        $insuranceExpiring = $hasInsuranceExpiry\n            ? Asset::query()\n                ->where(fn ($q) => $q->vehicles())\n                ->whereNotNull('insurance_expires_at')\n                ->where('insurance_expires_at', '<=', now()->addDays(30))\n                ->where('insurance_expires_at', '>=', now())\n                ->count()\n            : null;\n        $insuranceExpired = $hasInsuranceExpiry\n            ? Asset::query()\n                ->where(fn ($q) => $q->vehicles())\n                ->whereNotNull('insurance_expires_at')\n                ->where('insurance_expires_at', '<', now())\n                ->count()\n            : null;\n        $alertQuery = ControlRoomAlert::query()->actionable();\n        $this->siteAccess->applyAlertScope($alertQuery, $user, ['fleet.manage']);\n        $openAlerts = (clone $alertQuery)->count();\n        $criticalAlerts = (clone $alertQuery)\n            ->where('severity', 'critical')\n            ->count();\n\n        return Inertia::render('fleet-assets/daily-check', [\n            'vehicles' => $vehicleData,\n            'summary' => [\n                'total' => $vehicleData->count(),\n                'checked' => $checkedCount,\n                'unchecked' => $vehicleData->count() - $checkedCount,\n            ],\n            'compliance' => [\n                'wof_due' => $wofDue,\n                'wof_expired' => $wofExpired,\n                'rego_due' => $regoDue,\n                'rego_expired' => $regoExpired,\n                'cof_due' => $cofDue,\n                'cof_expired' => $cofExpired,\n                'insurance_expiring' => $insuranceExpiring,\n                'insurance_expired' => $insuranceExpired,\n                'open_alerts' => $openAlerts,\n                'critical_alerts' => $criticalAlerts,\n            ],\n        ]);\n    }\n",
+        "text_sha256": "c48d893c50c600023037365a766a74a04c1a25ba86485be4fad0c792f04d721b"
+      }
+    },
+    "already_reviewed_sibling_page_action_inheritable": false,
+    "material_dependency_method_slices": [
+      {
+        "source_file": "app/Models/Asset.php",
+        "source_file_sha256": "ba455db793fd59faff49f3092695227f7fe5b1db17d9ada3610ce62835d28012",
+        "source_file_blob_id": "e644731fbcf65f91ae06cb6b240b346e492a306b",
+        "method": "scopeVehicles",
+        "definition_line": 327,
+        "definition_anchor": "app/Models/Asset.php:327",
+        "review_slice": {
+          "start_line": 327,
+          "end_line": 336,
+          "next_method_definition_line": null,
+          "line_count": 10,
+          "text": "    public function scopeVehicles($query)\n    {\n        // Grouped so the orWhereHas branch can't escape and poison constraints\n        // chained onto the scope (status/site filters etc.).\n        return $query->where(function ($q) {\n            $q->where('category', 'vehicle')\n                ->orWhereHas('categoryRef', fn ($qq) => $qq->where('slug', 'vehicle'));\n        });\n    }\n}",
+          "text_sha256": "aa9a4285c1a023ee3927f7b56ba66d4c1fc22e0da4b6041859b71b9c0073b736"
+        }
+      },
+      {
+        "source_file": "app/Models/User.php",
+        "source_file_sha256": "0d184ebe6a28395b34b195751ffb62390f4c32828c982103ad613430bc4e59ae",
+        "source_file_blob_id": "fea4665a309992d9098e1e080f4bf11d63fcc675",
+        "method": "canDo",
+        "definition_line": 359,
+        "definition_anchor": "app/Models/User.php:359",
+        "review_slice": {
+          "start_line": 359,
+          "end_line": 415,
+          "next_method_definition_line": 416,
+          "line_count": 57,
+          "text": "    public function canDo(string $permissionKey): bool\n    {\n        $permissionKeys = $this->permissionLookupKeys($permissionKey);\n\n        if ($this->relationLoaded('permissionOverrides')\n            && $this->relationLoaded('roles')\n            && $this->roles->every(fn (Role $role) => $role->relationLoaded('permissions'))) {\n            $overrides = $this->permissionOverrides\n                ->filter(fn (Permission $permission) => in_array($permission->key, $permissionKeys, true));\n\n            if ($overrides->contains(fn (Permission $permission) => ! (bool) $permission->pivot->allowed)) {\n                return false;\n            }\n\n            if ($overrides->contains(fn (Permission $permission) => (bool) $permission->pivot->allowed)) {\n                return true;\n            }\n\n            return $this->roles->contains(\n                fn (Role $role) => $role->permissions->contains(\n                    fn (Permission $permission) => in_array($permission->key, $permissionKeys, true),\n                ),\n            );\n        }\n\n        // 1) explicit deny override wins\n        $deny = $this->permissionOverrides()\n            ->whereIn('permissions.key', $permissionKeys)\n            ->wherePivot('allowed', false)\n            ->exists();\n\n        if ($deny) {\n            return false;\n        }\n\n        // 2) explicit allow override\n        $allow = $this->permissionOverrides()\n            ->whereIn('permissions.key', $permissionKeys)\n            ->wherePivot('allowed', true)\n            ->exists();\n\n        if ($allow) {\n            return true;\n        }\n\n        // 3) role permissions\n        return $this->roles()\n            ->whereHas('permissions', fn ($q) => $q->whereIn('key', $permissionKeys))\n            ->exists();\n    }\n\n    /**\n     * Legacy permission keys kept as policy-layer synonyms while routes and\n     * controllers use the canonical namespace.\n     *\n     * @return list<string>\n     */",
+          "text_sha256": "8233962bec8d8a16dabd8e2c44ea427b442e5c2209fd6f0aff2e38465bab9777"
+        }
+      },
+      {
+        "source_file": "app/Http/Middleware/EnsurePermission.php",
+        "source_file_sha256": "d9477e5fe8d3dd762332be8ddf3929e4e6098d039e625af40a0241a0ab958e30",
+        "source_file_blob_id": "9ebdca335ed3d70003a4e021245dc95acd4bcc8c",
+        "method": "handle",
+        "definition_line": 11,
+        "definition_anchor": "app/Http/Middleware/EnsurePermission.php:11",
+        "review_slice": {
+          "start_line": 11,
+          "end_line": 29,
+          "next_method_definition_line": null,
+          "line_count": 19,
+          "text": "    public function handle(Request $request, Closure $next, string $permissionKey): Response\n    {\n        $user = $request->user();\n\n        // Allow simple OR checks: \"permission:a|b|c\"\n        $keys = array_values(array_filter(array_map('trim', explode('|', $permissionKey))));\n        $allowed = $user && (\n            empty($keys)\n                ? false\n                : collect($keys)->some(fn ($k) => $user->canDo($k))\n        );\n\n        if (!$allowed) {\n            abort(403);\n        }\n\n        return $next($request);\n    }\n}",
+          "text_sha256": "86c037338e0601097e104ebad466c71d86249e18f834db324091438f2a81d293"
+        }
+      }
+    ],
+    "material_dependency_method_slice_count": 3,
+    "selected_frontend_submit_callsites": [
+      {
+        "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+        "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+        "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+        "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:85",
+        "source_line": "router.post(",
+        "source_line_sha256": "5db0ef3239634193cd5198efd52792b204e900f2ab78308836a7710158fd39d5",
+        "needle": "router.post("
+      },
+      {
+        "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+        "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+        "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+        "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:86",
+        "source_line": "'/fleet-assets/daily-check',",
+        "source_line_sha256": "800817277536626458157f76c2521bbd9c1164fe00b58ce5f5b64bfcb0e527ed",
+        "needle": "'/fleet-assets/daily-check',"
+      },
+      {
+        "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+        "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+        "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+        "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:88",
+        "source_line": "asset_id: vehicleId,",
+        "source_line_sha256": "af7da25d2de4b07f386df0f623767b3da300b8d788131e4f080fbe20b0d84601",
+        "needle": "asset_id: vehicleId,"
+      }
+    ],
+    "selected_route_and_permission_callsites": [
+      {
+        "source_file": "routes/fleet-assets.php",
+        "source_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "source_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_anchor": "routes/fleet-assets.php:40",
+        "source_line": "// Dashboard & Map - viewable if user can see fleet or assets",
+        "source_line_sha256": "d40df9981b855ce800c46843d6a765fd116e6d1a346a9d2d6973cf1e979adf69",
+        "needle": "// Dashboard & Map - viewable if user can see fleet or assets"
+      },
+      {
+        "source_file": "routes/fleet-assets.php",
+        "source_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "source_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_anchor": "routes/fleet-assets.php:46",
+        "source_line": "Route::post('/daily-check', [DailyCheckController::class, 'store'])->name('fleet-assets.daily-check.store');",
+        "source_line_sha256": "8cd008bf1e9fd063a7f7ded9d031e45403496782c5cd488e36a5d38b13cc795d",
+        "needle": "Route::post('/daily-check', [DailyCheckController::class, 'store'])"
+      }
+    ],
+    "known_excluded_expansion_candidates": [
+      "app/Http/Controllers/FleetAssets/InspectionController.php",
+      "app/Http/Controllers/FleetAssets/ChecklistController.php",
+      "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+      "app/Services/Fleet/FleetTimelineService.php",
+      "app/Models/FleetVehicleBooking.php"
+    ],
+    "source_review_complete": false,
+    "source_packet_completeness_claimed": false,
+    "material_dependency_semantics_complete": false,
+    "known_expansion_candidates_adjudicated": false,
+    "unexecuted_test_context_is_runtime_evidence": false,
+    "review_rule": "Review the exact selected POST action and expand the packet for every ownership-material dependency. Ownership identity is distinct from permission, approved-Site, canonical record, direct-object, privacy, mutation, concurrency, audit, runtime, database, browser, test, and completion correctness. Any unresolved ownership identity requires EVIDENCE_GAP; correctness gaps do not erase an otherwise direct static owner and receive no downstream credit.",
+    "source_review_packet_sha256": "9c36ffc8d02ab1b749931f9db5b8502c9d5e554c0e139074700ed22906e0ec27"
+  },
+  "excluded_preceding_reviewed_neighbor": {
+    "queue_index_zero_based": 79,
+    "queue_id": "RUN090-ROUTE-0080",
+    "route_record_id": "RUN077-ROUTE-0688",
+    "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "reviewed_owner_origin": "RUN-098",
+    "reviewed_outcome": "OWNER_ROUTE_ACTION",
+    "selected_for_run148": false,
+    "recredit_authorized": false,
+    "identity_or_outcome_inheritable": false
+  },
+  "next_pending_boundary": {
+    "queue_index_zero_based": 81,
+    "queue_id": "RUN090-ROUTE-0082",
+    "route_record_id": "RUN077-ROUTE-0690",
+    "candidate_feature_id": "CAP-FLEET-VEHICLE-REGISTER",
+    "review_state": "PENDING_FRESH_SEMANTIC_REVIEW",
+    "selected_for_run148": false,
+    "credit_awarded": false
+  },
+  "provisional_assurance_questions": [
+    {
+      "question_id": "RUN148-Q-OWNERSHIP-IDENTITY",
+      "question": "Does the exact POST action directly implement the matrix user job, or is a shared relation/evidence gap required?",
+      "outcome_material_to_static_ownership": true,
+      "resolved": false
+    },
+    {
+      "question_id": "RUN148-Q-MUTATION-PERMISSION",
+      "question": "Does a read-capability route group authorize this write, or is an exact mutation capability absent?",
+      "outcome_material_to_static_ownership": false,
+      "correctness_only": true,
+      "resolved": false
+    },
+    {
+      "question_id": "RUN148-Q-SITE-DIRECT-OBJECT",
+      "question": "Does raw exists validation enforce canonical vehicle identity, approved-Site reach, and foreign-Site direct-object denial before mutation?",
+      "outcome_material_to_static_ownership": false,
+      "correctness_only": true,
+      "resolved": false
+    },
+    {
+      "question_id": "RUN148-Q-DUPLICATE-CONCURRENCY",
+      "question": "Is one daily run per vehicle/template/day protected under concurrency rather than application-only first/update logic?",
+      "outcome_material_to_static_ownership": false,
+      "correctness_only": true,
+      "resolved": false
+    },
+    {
+      "question_id": "RUN148-Q-TEMPLATE-AUTHORITY",
+      "question": "Is first-or-create template creation governed, uniquely constrained, and authorised for the selected actor?",
+      "outcome_material_to_static_ownership": false,
+      "correctness_only": true,
+      "resolved": false
+    },
+    {
+      "question_id": "RUN148-Q-AUDIT-ASSURANCE",
+      "question": "Are mutation audit/event/durability and representative-role negative-path assertions present and executed?",
+      "outcome_material_to_static_ownership": false,
+      "correctness_only": true,
+      "resolved": false
+    }
+  ],
+  "provisional_assurance_question_count": 6,
+  "semantic_review_focus": [
+    "exact static route/action ownership identity",
+    "possible shared relation versus direct owner",
+    "ownership-material source-packet expansion",
+    "write capability boundary separated from route identity",
+    "canonical vehicle and approved-Site direct-object boundary separated from route identity",
+    "template/run concurrency and audit assurance separated from route identity"
+  ],
+  "stop_rules": [
+    "Stop on any checkpoint, tree, prompt, input, source blob, queue identity, or record digest mismatch.",
+    "Stop rather than inherit the preceding GET owner, page, caller, or any other route outcome.",
+    "Stop rather than assign OWNER when an ownership-material dependency is unresolved.",
+    "Do not convert correctness gaps into correctness findings or downstream credit in this cohort."
+  ],
+  "counts": {
+    "selected_route_actions": 1,
+    "selected_page_records": 0,
+    "selected_distinct_feature_ids": 1,
+    "fresh_semantic_reviews_completed": 0,
+    "owner_route_actions": 0,
+    "shared_relations": 0,
+    "evidence_gaps": 0,
+    "static_source_owner_records_authorized": 0,
+    "static_controller_action_bridges_authorized": 0
+  },
+  "identity": {
+    "queue_index_list_sha256": "48449a14a4ff7d79bb7a1b6f3d488eba397c36ef25634c111b49baf362511afc",
+    "queue_id_list_sha256": "bdba59d8d21c0e67aa19f5331850d380a4c9d164549455d20c5f77eba1ac4687",
+    "canonical_key_list_sha256": "678cee941d54f70f08c79de5776fe102cef888bef14b8e8c34e18a1a0ca5644a",
+    "source_key_list_sha256": "c6b21d9071b8cbf300a0813115327b3e6315887a4caf94757e0308b111a75bd5",
+    "route_record_id_list_sha256": "c2c194e721473e95b2e86a2b3518ec57f6aa10086b038f65d3f8d7ba8c72f63e",
+    "action_key_list_sha256": "1888ca89f7fe176e757b3b8bec3d566924fde07edfb3bd1d0dfd4a6e68a14856",
+    "candidate_record_sha256_list_sha256": "748a4ac8ce1566f2e3e9878ab62087f075f533bb27959f1dbba94bc638117fab",
+    "records_sha256": "6fa308ae2947b171d970a5158f72af663d9b36d588246e062cc4bb6133663da4"
+  },
+  "records": [
+    {
+      "candidate_id": "RUN148-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-01",
+      "action_key": "RUN077-ROUTE-0689|app/Http/Controllers/FleetAssets/DailyCheckController.php:store|CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "run090_original_partition": "A",
+      "queue_index_zero_based": 80,
+      "queue_id": "RUN090-ROUTE-0081",
+      "queue_canonical_key": "route|RUN077-ROUTE-0689",
+      "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "name_only_identity": {
+        "lane": "EXACT_LITERAL_ROUTE_NAME",
+        "source_field": "literal_route_name",
+        "source_value": "fleet-assets.daily-check.store",
+        "matrix_field": "route_names",
+        "matrix_token": "fleet-assets.daily-check.store",
+        "case_sensitive_exact_equality": true,
+        "candidate_cardinality": 1
+      },
+      "route_source": {
+        "route_record_id": "RUN077-ROUTE-0689",
+        "route_file": "routes/fleet-assets.php",
+        "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+        "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+        "source_key": "routes/fleet-assets.php:46:9:post:6",
+        "source_anchor": "routes/fleet-assets.php:46",
+        "source_locator": "routes/fleet-assets.php:46:9:post",
+        "route_method": "post",
+        "literal_uri": "/daily-check",
+        "literal_route_name": "fleet-assets.daily-check.store",
+        "action_expression": "[DailyCheckController::class, 'store']",
+        "statement_excerpt": "Route::post('/daily-check', [DailyCheckController::class, 'store'])->name('fleet-assets.daily-check.store');",
+        "statement_sha256": "2811e26b388bcf4402eee8164d4ea1b15ed7fa79b73c17b82ccc6866b4d5db3e"
+      },
+      "controller_action": {
+        "resolved_fqcn": "App\\Http\\Controllers\\FleetAssets\\DailyCheckController",
+        "source_file": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+        "source_file_sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7",
+        "source_file_blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+        "method": "store",
+        "definition_line": 134,
+        "definition_anchor": "app/Http/Controllers/FleetAssets/DailyCheckController.php:134",
+        "review_slice": {
+          "start_line": 134,
+          "end_line": 191,
+          "next_method_definition_line": null,
+          "line_count": 58,
+          "text": "    public function store(Request $request)\n    {\n        $data = $request->validate([\n            'asset_id' => ['required', 'integer', 'exists:assets,id'],\n            'condition' => ['required', 'string', 'in:good,issue'],\n            'notes' => ['nullable', 'string', 'max:2000'],\n        ]);\n\n        // Find or create the daily_check template\n        $template = FleetChecklistTemplate::firstOrCreate(\n            ['type' => 'daily_check'],\n            [\n                'name' => 'Daily Vehicle Check',\n                'type' => 'daily_check',\n                'items' => [\n                    ['label' => 'Visual Condition', 'type' => 'select', 'options' => ['good', 'issue']],\n                    ['label' => 'Notes', 'type' => 'text'],\n                ],\n                'is_active' => true,\n            ]\n        );\n\n        // Check if already checked today\n        $today = now()->startOfDay();\n        $existing = FleetChecklistRun::query()\n            ->where('asset_id', $data['asset_id'])\n            ->where('template_id', $template->id)\n            ->where('completed_at', '>=', $today)\n            ->first();\n\n        if ($existing) {\n            // Update existing check\n            $existing->update([\n                'responses' => [\n                    'condition' => $data['condition'],\n                ],\n                'passed' => $data['condition'] === 'good',\n                'notes' => $data['notes'] ?? null,\n                'user_id' => $request->user()->id,\n                'completed_at' => now(),\n            ]);\n        } else {\n            FleetChecklistRun::create([\n                'template_id' => $template->id,\n                'asset_id' => $data['asset_id'],\n                'user_id' => $request->user()->id,\n                'responses' => [\n                    'condition' => $data['condition'],\n                ],\n                'passed' => $data['condition'] === 'good',\n                'notes' => $data['notes'] ?? null,\n                'completed_at' => now(),\n            ]);\n        }\n\n        return back()->with('success', 'Daily check recorded.');\n    }\n}",
+          "text_sha256": "532915dacc635e8b448dcb9351e3971b5f27458fc27e037c72c0e6435d49206a"
+        }
+      },
+      "feature_identity_projection": {
+        "feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+        "feature_class": "H",
+        "module": "Fleet & Assets",
+        "user_job": "Record a daily vehicle check against its authorised template",
+        "route_names": "fleet-assets.daily-check.index; fleet-assets.daily-check.store",
+        "route_paths": "routes/fleet-assets.php:45-46",
+        "page_files": "resources/js/pages/fleet-assets/daily-check.tsx:59-87",
+        "backend_anchors": "app/Http/Controllers/FleetAssets/DailyCheckController.php:15-189",
+        "feature_identity_status": "STATIC_CANONICAL_IDENTITY_FROZEN"
+      },
+      "frontend_submit_context": [
+        {
+          "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+          "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+          "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+          "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:85",
+          "source_line": "router.post(",
+          "source_line_sha256": "5db0ef3239634193cd5198efd52792b204e900f2ab78308836a7710158fd39d5",
+          "needle": "router.post("
+        },
+        {
+          "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+          "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+          "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+          "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:86",
+          "source_line": "'/fleet-assets/daily-check',",
+          "source_line_sha256": "800817277536626458157f76c2521bbd9c1164fe00b58ce5f5b64bfcb0e527ed",
+          "needle": "'/fleet-assets/daily-check',"
+        },
+        {
+          "source_file": "resources/js/pages/fleet-assets/daily-check.tsx",
+          "source_file_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+          "source_file_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+          "source_anchor": "resources/js/pages/fleet-assets/daily-check.tsx:88",
+          "source_line": "asset_id: vehicleId,",
+          "source_line_sha256": "af7da25d2de4b07f386df0f623767b3da300b8d788131e4f080fbe20b0d84601",
+          "needle": "asset_id: vehicleId,"
+        }
+      ],
+      "fresh_review_state": {
+        "status": "PENDING_FRESH_SEMANTIC_REVIEW",
+        "allowed_outcomes": [
+          "OWNER",
+          "SHARED_RELATION",
+          "EVIDENCE_GAP"
+        ],
+        "ownership_credit": false,
+        "controller_action_bridge_credit": false,
+        "correctness_credit": false,
+        "runtime_credit": false,
+        "application_browser_credit": false,
+        "executed_test_credit": false,
+        "completion_credit": false
+      },
+      "evidence_digests": {
+        "run_082_candidate_record_sha256": "cd5a5817e4b3abd9a496d540ecbbb80e587e9bfceb122b30db0b298497380bc9",
+        "run_077_manifest_record_sha256": "1bd72b77507532ec9c1e09c4d49728fa477569c501f8d747c6842b8e1d6429ca",
+        "feature_identity_projection_sha256": "4bc62d8c9c22c70dcf664dec8ae0d5917a62c16d246f950a417cda4c7b784121",
+        "joined_candidate_evidence_sha256": "5198abf29036a2541483d5a135dfef884a290daca5fa04caa0431e43add9f510",
+        "run090_queue_record_sha256": "b73b6a2cf4340520554c6725d701e26f1b313334e8025d6db4f5e7de51392fda",
+        "controller_action_slice_sha256": "532915dacc635e8b448dcb9351e3971b5f27458fc27e037c72c0e6435d49206a",
+        "task_contract_sha256": "48c79c9c220d1ddfa9ab063ed8e3196d64259eb3389b171a93fc48c404604b34"
+      },
+      "candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2"
+    }
+  ],
+  "fresh_review_contract": {
+    "required_reviewers": [
+      "fresh semantic reviewer independent of the producer",
+      "independent integration reviewer after any accepted decision"
+    ],
+    "allowed_outcomes": [
+      "OWNER",
+      "SHARED_RELATION",
+      "EVIDENCE_GAP"
+    ],
+    "required_decision_fields": [
+      "candidate_id",
+      "candidate_record_sha256",
+      "review_outcome",
+      "ownership_material_expansion",
+      "review_rationale",
+      "denied_alternatives",
+      "credit_boundary",
+      "decision_record_sha256"
+    ],
+    "reviewers_must_not_treat_provisional_questions_as_findings": true,
+    "reviewers_must_separate_ownership_from_correctness": true
+  },
+  "outcome_neutral_conservation_contract": {
+    "ownership_credit_before_review": 0,
+    "bridge_credit_before_review": 0,
+    "page_credit_before_review": 0,
+    "correctness_credit_before_review": 0,
+    "runtime_credit_before_review": 0,
+    "application_browser_credit_before_review": 0,
+    "executed_test_credit_before_review": 0,
+    "completion_credit_before_review": 0
+  },
+  "denominator_boundary": {
+    "bounded_static_source_denominator": 3929,
+    "direct_exact_queue_records": 507,
+    "queue_rows_selected": 1,
+    "wholesale_queue_ownership_authorized": false,
+    "full_crosswalk_complete": false
+  },
+  "credit_boundary": {
+    "outcome_neutral_source_packet": true,
+    "static_source_ownership": false,
+    "static_controller_action_bridge": false,
+    "page_ownership": false,
+    "correctness": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/build-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/root-run-148-outcome-neutral-fleet-daily-vehicle-check-store-route-action-cohort-wave-25.json"
+  ]
+}
