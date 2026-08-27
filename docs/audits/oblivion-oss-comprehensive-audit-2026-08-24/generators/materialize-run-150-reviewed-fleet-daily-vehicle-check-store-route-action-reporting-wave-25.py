@@ -16,8 +16,8 @@ PREFIX = AUDIT.relative_to(ROOT).as_posix()
 RUN_ID = "RUN-150-REVIEWED-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-REPORTING-WAVE-25"
 MATERIALIZER = "generators/materialize-run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25.py"
 OUTPUT = "evidence/source/current-run-150-reviewed-fleet-daily-vehicle-check-store-route-action-reporting-wave-25.json"
-HEAD = "198ac398589891c6c58aa334c1b0a11f11277de3"
-TREE = "2deb006a1a4be647e4ea7d1a29b459b6f45bae2c"
+HEAD = "dd4b57d45afbd1a16e7e7d6eaaf650a58e32541d"
+TREE = "cf9aa7cdcb19801e2bf3fc142d7611770792f4d1"
 APPLICATION_COMMIT = "a0493442b9e392d324055c35bf25b69421dc2d35"
 APPLICATION_TREE = "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
 MATRIX_SHA256 = "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0"
@@ -38,11 +38,11 @@ SURFACES = (
 )
 
 BASELINE_SHA256 = {
-    "00-executive-summary.md": "616fd626dc1292896955e657812404ccbdbb4e425b736f68b9ccb8f87e63d8ab",
-    "01-repository-module-map.md": "242b03dfa2f1c09eb7cb2860bf02047d9cc9886f655d060a0dac0843881dc763",
-    "13-unresolved-questions-and-evidence-gaps.md": "ada6ad349bb29d9168b7e93e5fc7d494d8701254b8fe10faa2df28afb0725965",
-    "findings.json": "9848a8edd8c7fa56cc753a77746f66434912ac0bafe42110f999457a7c43da5c",
-    "generators/build-current-audit-dashboard.py": "3eab383b5203ae9a3108f94ff67a276393f57afa39c00790da715e64f5247024",
+    "00-executive-summary.md": "c8b1885704825e69112af6f7830d01be2c34b9e9d97754e0c0986112d0488eb2",
+    "01-repository-module-map.md": "3512e7dde9f08ce6cbc59a10c3e5c97c30c053704f87ebe4c3fb10cab7ea4c3a",
+    "13-unresolved-questions-and-evidence-gaps.md": "753210c92a2438975b9aadff3d3ae72ea336a8e870b3faa7f204cd9bddcb7efa",
+    "findings.json": "4d82edbe7595b20fd6cb3fba4f55e4e4a6fd2a202aa30c67d3e117280ad46621",
+    "generators/build-current-audit-dashboard.py": "4ae8533890771f7e281e4e0da40afc0d6ee0cb89f257517d8bea998e380f3adc",
 }
 
 PRESERVED = {
@@ -410,6 +410,14 @@ assert sha256_file("evidence/source/raw-run-148r-independent-outcome-neutral-fle
 assert sha256_file("evidence/source/current-run-149-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-wave-25.json") == "12a52c434ecd18a5c6a644378070aa5ab046f5e7080726b983ded8d9c7377a55"
 assert sha256_file("evidence/source/current-run-149r-independent-reviewed-outcome-neutral-fleet-daily-vehicle-check-store-route-action-ownership-overlay-review-wave-25.json") == "545694fc1b7bd5f4af244617fb421ece1265fe6e6f2cad2ca834115e7a9e75a2"'''
     text = replace_exact(text, hash_old, hash_new, "dashboard lineage hashes")
+    stale_run_146_live_hash = 'assert all(sha256_file(path) == record["sha256"] for path, record in run_146_reporting["outputs"].items())'
+    historical_run_146_closure = '''assert run_146_reporting["baseline_report_sha256"]["00-executive-summary.md"] == "45f92926a50814f57f64fba1d72ff87ebe700df3ddfdab41192f9c5997f66468"
+assert run_146_reporting["outputs"]["00-executive-summary.md"]["sha256"] == "616fd626dc1292896955e657812404ccbdbb4e425b736f68b9ccb8f87e63d8ab"
+assert run_146_reporting["outputs"]["13-unresolved-questions-and-evidence-gaps.md"]["sha256"] == "ada6ad349bb29d9168b7e93e5fc7d494d8701254b8fe10faa2df28afb0725965"
+assert run_146_reporting["outputs"]["findings.json"]["sha256"] == "9848a8edd8c7fa56cc753a77746f66434912ac0bafe42110f999457a7c43da5c"
+# RUN-146 output hashes close that immutable historical receipt. They must not
+# be compared to live reporting surfaces intentionally advanced by RUN-150.'''
+    text = replace_exact(text, stale_run_146_live_hash, historical_run_146_closure, "historical RUN146 output closure")
     validation_anchor = "assert 413 == 391 + 10 + 5 + 0 + 7"
     validation_block = validation_anchor + '''\nfleet_counts = reviewed_fleet_daily_check_overlay["combined_counts"]
 fleet_queue = reviewed_fleet_daily_check_overlay["queue_accounting"]
@@ -618,8 +626,12 @@ def validate_outputs() -> None:
     for relative in (*SURFACES, MATERIALIZER, OUTPUT):
         payload = (AUDIT / relative).read_bytes()
         assert payload.endswith(b"\n") and b"\r\n" not in payload and not payload.startswith(b"\xef\xbb\xbf")
-    expected = {f"M {PREFIX}/{relative}" for relative in SURFACES}
-    expected |= {f"?? {PREFIX}/{MATERIALIZER}", f"?? {PREFIX}/{OUTPUT}"}
+    expected = {
+        f"M {PREFIX}/generators/build-current-audit-dashboard.py",
+        f"M {PREFIX}/findings.json",
+        f"M {PREFIX}/{MATERIALIZER}",
+        f"M {PREFIX}/{OUTPUT}",
+    }
     assert {line.lstrip() for line in git("status", "--porcelain").splitlines()} == expected
     assert not list(AUDIT.rglob("__pycache__"))
 

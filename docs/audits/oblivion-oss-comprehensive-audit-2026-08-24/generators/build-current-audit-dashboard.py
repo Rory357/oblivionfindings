@@ -1416,7 +1416,12 @@ assert run_146_reporting["pins"]["benchmark_register_sha256"] == CURRENT_RUN_145
 assert run_146_reporting["counts"]["benchmark_mapped"] == 2
 assert run_146_reporting["counts"]["final_no_matches_or_NCMs"] == 0
 assert run_146_reporting["counts"]["unresolved"] == 338
-assert all(sha256_file(path) == record["sha256"] for path, record in run_146_reporting["outputs"].items())
+assert run_146_reporting["baseline_report_sha256"]["00-executive-summary.md"] == "45f92926a50814f57f64fba1d72ff87ebe700df3ddfdab41192f9c5997f66468"
+assert run_146_reporting["outputs"]["00-executive-summary.md"]["sha256"] == "616fd626dc1292896955e657812404ccbdbb4e425b736f68b9ccb8f87e63d8ab"
+assert run_146_reporting["outputs"]["13-unresolved-questions-and-evidence-gaps.md"]["sha256"] == "ada6ad349bb29d9168b7e93e5fc7d494d8701254b8fe10faa2df28afb0725965"
+assert run_146_reporting["outputs"]["findings.json"]["sha256"] == "9848a8edd8c7fa56cc753a77746f66434912ac0bafe42110f999457a7c43da5c"
+# RUN-146 output hashes close that immutable historical receipt. They must not
+# be compared to live reporting surfaces intentionally advanced by RUN-150.
 linkage_sentinel = "NOT_ESTABLISHED_CURRENT_AUDIT"
 live_gap_ids = {
     field: sorted(row["feature_id"] for row in live_matrix_rows if row[field] == linkage_sentinel)
