@@ -17,6 +17,8 @@ class MedicationsReportController extends Controller
     public function index(Request $request)
     {
         // Access is permission-gated at the route level (reports.viewAny)
+        $canViewControlled = $request->user()?->canDo('medications.controlled.view') ?? false;
+
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
@@ -84,58 +86,61 @@ class MedicationsReportController extends Controller
             })
             ->values();
 
-        $discQ = ClientControlledDrugDiscrepancy::query()
-            ->with([
-                'client:id,first_name,last_name',
-                'medication:id,client_id,name,controlled_drug',
-                'reportedBy:id,name,email',
-                'witnessedBy:id,name,email',
-                'resolvedBy:id,name,email',
-                'serviceContext:id,name,type',
-            ])
-            ->whereBetween('reported_at', [$dateFrom, $dateTo]);
+        $discrepancies = collect();
+        if ($canViewControlled) {
+            $discQ = ClientControlledDrugDiscrepancy::query()
+                ->with([
+                    'client:id,first_name,last_name',
+                    'medication:id,client_id,name,controlled_drug',
+                    'reportedBy:id,name,email',
+                    'witnessedBy:id,name,email',
+                    'resolvedBy:id,name,email',
+                    'serviceContext:id,name,type',
+                ])
+                ->whereBetween('reported_at', [$dateFrom, $dateTo]);
 
-        if (! empty($filters['client_id'])) {
-            $discQ->where('client_id', (int) $filters['client_id']);
-        }
-        if (! empty($filters['service_context_id'])) {
-            $discQ->where('service_context_id', (int) $filters['service_context_id']);
-        }
-        if (! empty($filters['discrepancy_status'])) {
-            $discQ->where('status', $filters['discrepancy_status']);
-        }
+            if (! empty($filters['client_id'])) {
+                $discQ->where('client_id', (int) $filters['client_id']);
+            }
+            if (! empty($filters['service_context_id'])) {
+                $discQ->where('service_context_id', (int) $filters['service_context_id']);
+            }
+            if (! empty($filters['discrepancy_status'])) {
+                $discQ->where('status', $filters['discrepancy_status']);
+            }
 
-        $discrepancies = $discQ
-            ->orderByRaw("status = 'open' desc, status = 'under_review' desc")
-            ->orderByDesc('reported_at')
-            ->orderByDesc('id')
-            ->limit(500)
-            ->get()
-            ->map(function (ClientControlledDrugDiscrepancy $d) {
-                return [
-                    'id' => $d->id,
-                    'status' => $d->status,
-                    'difference' => $d->difference,
-                    'on_hand_before' => $d->on_hand_before,
-                    'on_hand_after' => $d->on_hand_after,
-                    'reason' => $d->reason,
-                    'notes' => $d->notes,
-                    'reported_at' => $d->reported_at,
-                    'resolved_at' => $d->resolved_at,
-                    'resolution_notes' => $d->resolution_notes,
-                    'client' => $d->client,
-                    'medication' => $d->medication,
-                    'reportedBy' => $d->reportedBy,
-                    'witnessedBy' => $d->witnessedBy,
-                    'resolvedBy' => $d->resolvedBy,
-                    'serviceContext' => $d->serviceContext ? [
-                        'id' => $d->serviceContext->id,
-                        'name' => $d->serviceContext->name,
-                        'type' => (string) ($d->serviceContext->type?->value ?? $d->serviceContext->type),
-                    ] : null,
-                ];
-            })
-            ->values();
+            $discrepancies = $discQ
+                ->orderByRaw("status = 'open' desc, status = 'under_review' desc")
+                ->orderByDesc('reported_at')
+                ->orderByDesc('id')
+                ->limit(500)
+                ->get()
+                ->map(function (ClientControlledDrugDiscrepancy $d) {
+                    return [
+                        'id' => $d->id,
+                        'status' => $d->status,
+                        'difference' => $d->difference,
+                        'on_hand_before' => $d->on_hand_before,
+                        'on_hand_after' => $d->on_hand_after,
+                        'reason' => $d->reason,
+                        'notes' => $d->notes,
+                        'reported_at' => $d->reported_at,
+                        'resolved_at' => $d->resolved_at,
+                        'resolution_notes' => $d->resolution_notes,
+                        'client' => $d->client,
+                        'medication' => $d->medication,
+                        'reportedBy' => $d->reportedBy,
+                        'witnessedBy' => $d->witnessedBy,
+                        'resolvedBy' => $d->resolvedBy,
+                        'serviceContext' => $d->serviceContext ? [
+                            'id' => $d->serviceContext->id,
+                            'name' => $d->serviceContext->name,
+                            'type' => (string) ($d->serviceContext->type?->value ?? $d->serviceContext->type),
+                        ] : null,
+                    ];
+                })
+                ->values();
+        }
 
         $clients = Client::query()
             ->orderBy('first_name')
@@ -172,6 +177,7 @@ class MedicationsReportController extends Controller
             'service_contexts' => $serviceContexts,
             'administrations' => $administrations,
             'discrepancies' => $discrepancies,
+            'can_view_controlled' => $canViewControlled,
         ]);
     }
 
@@ -254,6 +260,8 @@ class MedicationsReportController extends Controller
 
     public function exportDiscrepanciesCsv(Request $request)
     {
+        abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+
         $filters = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],

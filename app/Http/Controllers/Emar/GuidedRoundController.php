@@ -54,6 +54,44 @@ class GuidedRoundController extends Controller
     }
 
     /**
+     * Explicitly start an assigned frontline round.
+     *
+     * Starting used to happen as a side effect of loading the rounds page. Keep
+     * the state transition behind POST and the same canonical Site, assignment,
+     * and covering-shift decision used by every guided-round action.
+     */
+    public function start(Request $request, MedicationRound $round)
+    {
+        $user = $request->user();
+        abort_unless($this->canWork($user), 403);
+
+        return $this->medicationScope->forRound(
+            $user,
+            $round,
+            now(),
+            function (MedicationScopeDecision $scope) use ($user) {
+                if ($scope->round->status === 'pending') {
+                    $scope->round->forceFill([
+                        'status' => 'in_progress',
+                        'started_by' => $user->id,
+                        'started_at' => now(),
+                    ])->save();
+                }
+
+                $dateStr = $scope->round->round_date instanceof \DateTimeInterface
+                    ? $scope->round->round_date->format('Y-m-d')
+                    : (string) $scope->round->round_date;
+
+                return redirect()->route('emar.rounds', [
+                    'date' => $dateStr,
+                    'guided' => $scope->round->id,
+                ]);
+            },
+            ['pending', 'in_progress'],
+        );
+    }
+
+    /**
      * Record one administration from inside the guided flow.
      *
      * Uses EnhancedMarService so all existing safety checks, witness rules,
@@ -66,6 +104,10 @@ class GuidedRoundController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
+        abort_if(
+            $medication->controlled_drug && ! $user->canDo('medications.controlled.record'),
+            403,
+        );
 
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,held'],
@@ -320,10 +362,6 @@ class GuidedRoundController extends Controller
 
     private function canWork($user): bool
     {
-        return (bool) $user && (
-            $user->canDo('medications.administer.record')
-            || $user->canDo('clients.update')
-            || $user->canDo('medications.orders.manage')
-        );
+        return (bool) $user && $user->canDo('medications.administer.record');
     }
 }

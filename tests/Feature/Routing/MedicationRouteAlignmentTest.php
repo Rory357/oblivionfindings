@@ -10,9 +10,9 @@ class MedicationRouteAlignmentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_medication_administration_write_routes_use_the_same_permission_or_list(): void
+    public function test_medication_administration_write_routes_use_the_exact_record_permission(): void
     {
-        $expected = 'permission:medications.administer.record|clients.update|medications.orders.manage';
+        $expected = 'permission:medications.administer.record';
 
         foreach ([
             'meds.round.administer',

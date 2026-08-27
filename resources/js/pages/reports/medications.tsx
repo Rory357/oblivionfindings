@@ -26,6 +26,7 @@ type Props = {
     service_contexts: Array<{ id: number; name: string; type: string }>;
     administrations: Array<any>;
     discrepancies: Array<any>;
+    can_view_controlled: boolean;
 };
 
 export default function MedicationsReport(props: Props) {
@@ -35,6 +36,7 @@ export default function MedicationsReport(props: Props) {
         service_contexts,
         administrations,
         discrepancies,
+        can_view_controlled: canViewControlled,
     } = props;
     const { auth } = usePage().props as any;
 
@@ -189,29 +191,33 @@ export default function MedicationsReport(props: Props) {
                             </Select>
                         </div>
 
-                        <div>
-                            <Label>Controlled discrepancy status</Label>
-                            <Select
-                                value={filters.discrepancy_status ?? 'all'}
-                                onValueChange={(v) =>
-                                    setFilter(
-                                        'discrepancy_status',
-                                        v === 'all' ? null : v,
-                                    )
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="open">Open</SelectItem>
-                                    <SelectItem value="closed">
-                                        Closed
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        {canViewControlled && (
+                            <div>
+                                <Label>Controlled discrepancy status</Label>
+                                <Select
+                                    value={filters.discrepancy_status ?? 'all'}
+                                    onValueChange={(v) =>
+                                        setFilter(
+                                            'discrepancy_status',
+                                            v === 'all' ? null : v,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All</SelectItem>
+                                        <SelectItem value="open">
+                                            Open
+                                        </SelectItem>
+                                        <SelectItem value="closed">
+                                            Closed
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         <div className="flex items-end gap-2">
                             <Button
@@ -222,14 +228,16 @@ export default function MedicationsReport(props: Props) {
                             >
                                 Export MAR (CSV)
                             </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    window.location.href = `/reports/medications/export-controlled-discrepancies?${buildQuery()}`;
-                                }}
-                            >
-                                Export discrepancies (CSV)
-                            </Button>
+                            {canViewControlled && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        window.location.href = `/reports/medications/export-controlled-discrepancies?${buildQuery()}`;
+                                    }}
+                                >
+                                    Export discrepancies (CSV)
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -295,72 +303,74 @@ export default function MedicationsReport(props: Props) {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Controlled drug discrepancies
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {discrepancies.length === 0 && (
-                                <div className="text-sm text-muted-foreground">
-                                    No discrepancies found for the selected
-                                    filters.
-                                </div>
-                            )}
-                            {discrepancies.map((d) => (
-                                <div
-                                    key={d.id}
-                                    className="rounded-md border p-3"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-sm font-medium">
-                                            {d.client?.first_name}{' '}
-                                            {d.client?.last_name} —{' '}
-                                            {d.medication?.name}
-                                        </div>
-                                        <div
-                                            className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}
-                                        >
-                                            {d.status}
-                                        </div>
+                    {canViewControlled && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Controlled drug discrepancies
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {discrepancies.length === 0 && (
+                                    <div className="text-sm text-muted-foreground">
+                                        No discrepancies found for the selected
+                                        filters.
                                     </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        {d.reported_at} ·{' '}
-                                        {d.reportedBy?.name ?? 'Unknown'}
-                                        {d.serviceContext?.name
-                                            ? ` · ${d.serviceContext.name}`
-                                            : ''}
-                                    </div>
-                                    <Separator className="my-2" />
-                                    <div className="text-sm">
-                                        <div>
-                                            <span className="font-medium">
-                                                Before:
-                                            </span>{' '}
-                                            {d.on_hand_before ?? '-'} ·{' '}
-                                            <span className="font-medium">
-                                                After:
-                                            </span>{' '}
-                                            {d.on_hand_after ?? '-'} ·{' '}
-                                            <span className="font-medium">
-                                                Diff:
-                                            </span>{' '}
-                                            {d.difference ?? '-'}
-                                        </div>
-                                        {d.reason ? (
-                                            <div className="mt-1">
-                                                <span className="font-medium">
-                                                    Reason:
-                                                </span>{' '}
-                                                {d.reason}
+                                )}
+                                {discrepancies.map((d) => (
+                                    <div
+                                        key={d.id}
+                                        className="rounded-md border p-3"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-medium">
+                                                {d.client?.first_name}{' '}
+                                                {d.client?.last_name} —{' '}
+                                                {d.medication?.name}
                                             </div>
-                                        ) : null}
+                                            <div
+                                                className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}
+                                            >
+                                                {d.status}
+                                            </div>
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {d.reported_at} ·{' '}
+                                            {d.reportedBy?.name ?? 'Unknown'}
+                                            {d.serviceContext?.name
+                                                ? ` · ${d.serviceContext.name}`
+                                                : ''}
+                                        </div>
+                                        <Separator className="my-2" />
+                                        <div className="text-sm">
+                                            <div>
+                                                <span className="font-medium">
+                                                    Before:
+                                                </span>{' '}
+                                                {d.on_hand_before ?? '-'} ·{' '}
+                                                <span className="font-medium">
+                                                    After:
+                                                </span>{' '}
+                                                {d.on_hand_after ?? '-'} ·{' '}
+                                                <span className="font-medium">
+                                                    Diff:
+                                                </span>{' '}
+                                                {d.difference ?? '-'}
+                                            </div>
+                                            {d.reason ? (
+                                                <div className="mt-1">
+                                                    <span className="font-medium">
+                                                        Reason:
+                                                    </span>{' '}
+                                                    {d.reason}
+                                                </div>
+                                            ) : null}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </AppLayout>

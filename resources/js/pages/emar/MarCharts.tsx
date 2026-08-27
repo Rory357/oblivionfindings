@@ -117,6 +117,7 @@ type Props = {
         name: string;
         role_label: string | null;
         med_competent: boolean;
+        controlled_record: boolean;
         cd_witness: boolean;
     };
     site_brand_colour: string | null;
@@ -142,6 +143,7 @@ type Props = {
     pendingCorrections: PendingCorrection[];
     can: {
         record: boolean;
+        record_controlled: boolean;
         correct?: boolean;
         verify_orders?: boolean;
         manage_inr?: boolean;
@@ -313,9 +315,18 @@ export default function MarCharts(props: Props) {
         null;
     const awaitingCount = marData.awaiting_verification?.length ?? 0;
 
-    const onRecord = (row: ScheduleRow) =>
-        setRecordTarget({ row, outcome: 'given' });
-    const onGivePrn = (med: PrnMedication) => setPrnMedId(med.id);
+    const canRecordMedication = (isControlled: boolean) =>
+        can.record && (!isControlled || can.record_controlled);
+    const onRecord = (row: ScheduleRow) => {
+        if (canRecordMedication(row.is_controlled)) {
+            setRecordTarget({ row, outcome: 'given' });
+        }
+    };
+    const onGivePrn = (med: PrnMedication) => {
+        if (canRecordMedication(med.is_controlled)) {
+            setPrnMedId(med.id);
+        }
+    };
 
     // ── No viewable resident with active meds: the server defaults onto a chart
     // whenever one exists, so this is the genuinely-empty state (not a picker).
@@ -566,6 +577,7 @@ export default function MarCharts(props: Props) {
                             <PrnCard
                                 prn={prn}
                                 canRecord={can.record}
+                                canRecordControlled={can.record_controlled}
                                 onGive={onGivePrn}
                             />
                         ) : (
@@ -573,6 +585,8 @@ export default function MarCharts(props: Props) {
                                 <MarGrid
                                     meds={visibleMeds}
                                     schedule={schedule}
+                                    canRecord={can.record}
+                                    canRecordControlled={can.record_controlled}
                                     onRecord={onRecord}
                                     onContext={(e, row) => {
                                         e.preventDefault();
@@ -593,6 +607,7 @@ export default function MarCharts(props: Props) {
                                 <PrnCard
                                     prn={prn}
                                     canRecord={can.record}
+                                    canRecordControlled={can.record_controlled}
                                     onGive={onGivePrn}
                                 />
                             </>
@@ -626,7 +641,8 @@ export default function MarCharts(props: Props) {
                 </div>
             </div>
 
-            {recordTarget && (
+            {recordTarget &&
+            canRecordMedication(recordTarget.row.is_controlled) ? (
                 <RecordDoseWizard
                     row={recordTarget.row}
                     client={info}
@@ -637,13 +653,16 @@ export default function MarCharts(props: Props) {
                     initialOutcome={recordTarget.outcome}
                     onClose={() => setRecordTarget(null)}
                 />
-            )}
+            ) : null}
 
             <DoseContextMenu
                 target={ctxTarget}
                 date={date}
                 isToday={isToday}
-                canRecord={can.record}
+                canRecord={
+                    !!ctxTarget &&
+                    canRecordMedication(ctxTarget.row.is_controlled)
+                }
                 onRecordFull={(row) => {
                     setCtxTarget(null);
                     setRecordTarget({ row, outcome: 'given' });

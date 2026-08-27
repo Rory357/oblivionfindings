@@ -5,14 +5,13 @@ use Illuminate\Support\Facades\Route;
 
 /**
  * Medication Management API Routes
- * 
+ *
  * These routes provide the enhanced medication management system API endpoints.
  */
-
 Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(function () {
     // Dashboard
     Route::get('/dashboard/widgets', [MedicationsApiController::class, 'getDashboardWidgets'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.dashboard.widgets');
 
     // MAR
@@ -29,35 +28,35 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.scan_code.svg');
 
     Route::post('/clients/{client}/medications/{medication}/scan-verify', [MedicationsApiController::class, 'verifyScan'])
-        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
+        ->middleware('permission:medications.administer.record')
         ->name('api.medications.scan.verify');
 
     Route::post('/clients/{client}/medications/{medication}/administrations', [MedicationsApiController::class, 'recordAdministration'])
-        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
+        ->middleware('permission:medications.administer.record')
         ->name('api.medications.administrations.record');
 
     Route::post('/clients/{client}/administrations/{administration}/attachments', [MedicationsApiController::class, 'uploadAdministrationAttachment'])
-        ->middleware('permission:medications.administer.record|medications.administer.correct|clients.update')
+        ->middleware('permission:medications.administer.record|medications.administer.correct')
         ->name('api.medications.attachments.upload');
 
     Route::post('/clients/{client}/attachments', [MedicationsApiController::class, 'uploadSupportingAttachment'])
-        ->middleware('permission:medications.administer.record|medications.administer.correct|medications.controlled.record|clients.update')
+        ->middleware('permission:medications.administer.record|medications.administer.correct|medications.controlled.record')
         ->name('api.medications.supporting_attachments.upload');
 
     Route::get('/clients/{client}/administrations/{administration}/attachments/{attachment}/download', [MedicationsApiController::class, 'downloadAdministrationAttachment'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.attachments.download');
 
     Route::get('/clients/{client}/attachments/{attachment}/download', [MedicationsApiController::class, 'downloadSupportingAttachment'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.supporting_attachments.download');
 
     Route::delete('/clients/{client}/administrations/{administration}/attachments/{attachment}', [MedicationsApiController::class, 'deleteAdministrationAttachment'])
-        ->middleware('permission:medications.administer.record|medications.administer.correct|clients.update')
+        ->middleware('permission:medications.administer.correct')
         ->name('api.medications.attachments.delete');
 
     Route::delete('/clients/{client}/attachments/{attachment}', [MedicationsApiController::class, 'deleteSupportingAttachment'])
-        ->middleware('permission:medications.administer.record|medications.administer.correct|medications.controlled.record|clients.update')
+        ->middleware('permission:medications.administer.correct|medications.controlled.record')
         ->name('api.medications.supporting_attachments.delete');
 
     Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationsApiController::class, 'correctAdministration'])
@@ -75,7 +74,7 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     // Alerts
     Route::get('/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.alerts.index');
 
     Route::get('/clients/{client}/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
@@ -90,7 +89,8 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->middleware('permission:medications.administer.correct|clients.update')
         ->name('api.medications.alerts.resolve');
 
-    // Reports
+    // Mixed report endpoints stay available for ordinary report types. The
+    // controller conjunctively exact-gates controlled selectors.
     Route::get('/reports', [MedicationsApiController::class, 'getReports'])
         ->middleware('permission:medications.reports.export|reports.viewAny')
         ->name('api.medications.reports');
@@ -101,7 +101,7 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     // Shift summary
     Route::get('/shifts/{shiftId}/medication-summary', [MedicationsApiController::class, 'getShiftSummary'])
-        ->middleware('permission:medications.view|shifts.viewAny|shifts.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.shift.summary');
 
     // Allergies
@@ -120,20 +120,20 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     // Scheduled Stock Counts
     Route::get('/clients/{client}/medications/{medication}/scheduled-counts', [MedicationsApiController::class, 'getScheduledStockCounts'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->middleware('permission:medications.view')
         ->name('api.medications.scheduled_counts.index');
 
     Route::post('/clients/{client}/medications/{medication}/scheduled-counts', [MedicationsApiController::class, 'createScheduledStockCount'])
-        ->middleware('permission:medications.stock.update|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('api.medications.scheduled_counts.store');
 
     Route::post('/clients/{client}/scheduled-counts/{count}/complete', [MedicationsApiController::class, 'completeScheduledStockCount'])
-        ->middleware('permission:medications.stock.update|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('api.medications.scheduled_counts.complete');
 
     // Drug Interactions Admin
     Route::get('/interactions', [MedicationsApiController::class, 'getDrugInteractions'])
-        ->middleware('permission:medications.view|clients.viewAny')
+        ->middleware('permission:medications.view')
         ->name('api.medications.interactions.index');
 
     Route::post('/interactions', [MedicationsApiController::class, 'createDrugInteraction'])

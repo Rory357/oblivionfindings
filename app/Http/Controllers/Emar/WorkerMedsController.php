@@ -21,6 +21,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,9 +47,8 @@ use Inertia\Response;
  *     checks, witness rules, CD register entries and audit run identically to
  *     the admin recording path.
  *
- * Entry is gated by `medications.administer.record|clients.update|medications.orders.manage`
- * so that both frontline workers and manager/leads who also want the
- * operational view can load it.
+ * Reads are gated by a medication read/record capability. Every administration
+ * write is separately gated by `medications.administer.record`.
  */
 class WorkerMedsController extends Controller
 {
@@ -60,12 +60,17 @@ class WorkerMedsController extends Controller
         protected MarScheduleService $scheduleService,
         protected MedsBoardPayloadService $boardPayload,
         protected MedicationScopeDecisionService $medicationScope,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     public function today(Request $request): Response
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless(
+            $user->canDo('medications.view') || $user->canDo('medications.administer.record'),
+            403,
+        );
 
         $timezone = $this->scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
@@ -146,6 +151,12 @@ class WorkerMedsController extends Controller
             'board_can' => [
                 'view_emar' => $user->canDo('medications.view'),
                 'view_audit' => $user->canDo('medications.audit.view'),
+                'record_administration' => $user->canDo('medications.administer.record'),
+                'record_controlled' => $user->canDo('medications.controlled.record'),
+                'view_controlled' => $user->canDo('medications.view')
+                    && $user->canDo('medications.controlled.view'),
+                'manage_stock' => $user->canDo('medications.view')
+                    && $user->canDo('medications.stock.update'),
             ],
             'has_shift_context' => ! empty($assignedClientIds),
         ]);
@@ -166,7 +177,7 @@ class WorkerMedsController extends Controller
         abort_unless($user, 403);
 
         abort_unless(
-            $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            $user->canDo('medications.administer.record'),
             403,
             'You do not have permission to record medication administrations.'
         );
@@ -295,7 +306,7 @@ class WorkerMedsController extends Controller
         abort_unless($user, 403);
 
         abort_unless(
-            $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            $user->canDo('medications.administer.record'),
             403,
             'You do not have permission to record medication administrations.'
         );
@@ -396,7 +407,7 @@ class WorkerMedsController extends Controller
         abort_unless($user, 403);
 
         abort_unless(
-            $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            $user->canDo('medications.administer.record'),
             403,
             'You do not have permission to record medication administrations.'
         );
@@ -423,7 +434,7 @@ class WorkerMedsController extends Controller
         //   TODO(G5): structured "who was notified" (GP/family/senior)
         //   TODO(G6): follow-up due time
         //   TODO(G7): link to care/behaviour plan
-        $administration = ClientMedicationAdministration::with(['medication:id,name,is_prn', 'prnEffectiveness'])
+        $administration = ClientMedicationAdministration::with(['medication:id,name,is_prn,controlled_drug', 'prnEffectiveness'])
             ->findOrFail($data['client_medication_administration_id']);
 
         return $this->medicationScope->forPrnEffectiveness(
@@ -431,6 +442,11 @@ class WorkerMedsController extends Controller
             $administration,
             now(),
             function (MedicationScopeDecision $scope) use ($data, $user) {
+                abort_if(
+                    $scope->medication->controlled_drug
+                        && ! $user->canDo('medications.controlled.record'),
+                    403,
+                );
                 $administration = $scope->administration;
                 $administration->loadMissing('prnEffectiveness');
                 $reviewMinutes = $data['review_minutes_after']
@@ -480,9 +496,18 @@ class WorkerMedsController extends Controller
      */
     private function assignedClientIdsFor(User $user, Carbon $from, Carbon $to): array
     {
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            ['clinical.accessAllSites', 'sites.viewAll'],
+        );
+        if ($siteIds === []) {
+            return [];
+        }
+
         try {
             $shiftClientIds = Shift::where('user_id', $user->id)
                 ->whereBetween('starts_at', [$from, $to])
+                ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
                 ->pluck('client_id')
                 ->filter()
                 ->unique()
@@ -497,24 +522,28 @@ class WorkerMedsController extends Controller
             // fall through
         }
 
-        // Fallback: a manager / medication lead with no shift today still gets
-        // a useful worker view across every client currently on a medication.
-        if ($user->canDo('medications.orders.manage') || $user->canDo('medications.view')) {
-            try {
-                return ClientMedication::active()
-                    ->pluck('client_id')
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->all();
-            } catch (\Throwable $e) {
-                report($e);
-
-                return [];
-            }
+        // Administration authority is assignment-bound. Only a medication
+        // reader/lead may expand an empty shift context to all approved-Site
+        // medication clients.
+        if (! $user->canDo('medications.view')) {
+            return [];
         }
 
-        return [];
+        // A medication lead with no shift today still gets a useful board, but
+        // only for clients at Sites that are currently approved for them.
+        try {
+            return ClientMedication::active()
+                ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
+                ->pluck('client_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**
@@ -577,6 +606,7 @@ class WorkerMedsController extends Controller
                         'administration_id' => $a->id,
                         'client_id' => $a->client_id,
                         'medication_name' => $a->medication?->name,
+                        'is_controlled' => (bool) ($a->medication?->controlled_drug ?? false),
                         'dose_given' => $a->dose_given,
                         'given_at' => $givenAt?->toIso8601String(),
                         'given_time' => $givenAt?->format('g:i a'),
@@ -760,15 +790,22 @@ class WorkerMedsController extends Controller
      */
     private function activeRound(User $user, Carbon $now): ?array
     {
-        if (! $user->canDo('medications.administer.record')
-            && ! $user->canDo('clients.update')
-            && ! $user->canDo('medications.orders.manage')) {
+        if (! $user->canDo('medications.administer.record')) {
+            return null;
+        }
+
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            ['clinical.accessAllSites', 'sites.viewAll'],
+        );
+        if ($siteIds === []) {
             return null;
         }
 
         try {
             $round = MedicationRound::query()
                 ->whereDate('round_date', $now->toDateString())
+                ->whereIn('site_id', $siteIds)
                 ->where(function ($q) use ($user) {
                     $q->where('assigned_to', $user->id)
                         ->orWhere('started_by', $user->id);
@@ -813,13 +850,21 @@ class WorkerMedsController extends Controller
      */
     private function roundsForDate(User $user, Carbon $date): array
     {
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            ['clinical.accessAllSites', 'sites.viewAll'],
+        );
+        if ($siteIds === []) {
+            return [];
+        }
+
         try {
             $rounds = MedicationRound::query()
                 ->whereDate('round_date', $date->toDateString())
+                ->whereIn('site_id', $siteIds)
                 ->where(function ($q) use ($user) {
                     $q->where('assigned_to', $user->id)
-                        ->orWhere('started_by', $user->id)
-                        ->orWhereNull('assigned_to');
+                        ->orWhere('started_by', $user->id);
                 })
                 ->orderBy('scheduled_time')
                 ->limit(12)

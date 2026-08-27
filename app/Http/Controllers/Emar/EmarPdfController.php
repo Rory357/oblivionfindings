@@ -81,6 +81,8 @@ class EmarPdfController extends Controller
      */
     public function controlledDrugRegister(Request $request)
     {
+        abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+
         $request->validate([
             'client_id' => 'required|exists:clients,id',
             'date_from' => 'nullable|date',

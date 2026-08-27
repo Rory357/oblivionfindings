@@ -3,6 +3,7 @@
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -175,9 +176,48 @@ it('matches every dose slot with a single administration query (no N+1)', functi
     expect($adminQueries)->toBe(1);
 })->group('my-day');
 
+it('does not disclose shift medications without an exact medication capability', function () {
+    $worker = User::factory()->frontlineWorker()->create();
+    $client = Client::factory()->create();
+    Shift::factory()->assignedToday($worker)->published()->create([
+        'client_id' => $client->id,
+    ]);
+    ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Private shift medication',
+        'is_prn' => false,
+        'active' => true,
+        'state' => 'active',
+        'start_date' => '2026-05-01',
+        'end_date' => null,
+        'dose_times' => ['09:00'],
+    ]);
+
+    $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('my-day/index')
+            ->has('medications_due', 0)
+            ->where('stats.meds_due', 0)
+            ->where('stats.meds_overdue', 0)
+            ->where('can_view_medications', false)
+            ->where('can_record_medications', false)
+            ->where('can_record_controlled_medications', false)
+            ->where('active_round', null)
+        );
+})->group('my-day');
+
 function makeWorkerWithMyDayMedicationClient(): array
 {
     $worker = User::factory()->frontlineWorker()->create();
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'medications.view'],
+        ['description' => 'medications.view'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
     $client = Client::factory()->create();
 
     // A visible shift today routes this client into the medications-due

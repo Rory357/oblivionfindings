@@ -147,7 +147,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
-        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
         $localOtherDriver = $this->siteUser($siteA);
         $otherDriver = $this->siteUser($siteB);
         $clientA = Client::factory()->create(['site_id' => $siteA->id]);
@@ -179,7 +179,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
-        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'fleet.medication.manage']);
         $otherDriver = $this->siteUser($siteB);
         $localOtherDriver = $this->siteUser($siteA);
         $clientA = Client::factory()->create(['site_id' => $siteA->id]);
@@ -261,7 +261,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $siteA = Site::factory()->create();
         $siteB = Site::factory()->create();
-        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($siteA, ['fleet.viewAny', 'fleet.medication.manage']);
         $clientA = Client::factory()->create(['site_id' => $siteA->id]);
         $clientB = Client::factory()->create(['site_id' => $siteB->id]);
         $vehicleA = $this->vehicle($siteA, 'Integrity vehicle A');
@@ -388,7 +388,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_pack_is_durable_replay_safe_and_rejects_uuid_payload_reuse(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $vehicle = $this->vehicle($site, 'Replay vehicle');
         $transport = $this->transport($site, $client, $vehicle, $actor);
@@ -502,6 +502,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, [
             'fleet.viewAny',
+            'fleet.medication.manage',
             'medications.administer.record',
             'medications.controlled.record',
         ]);
@@ -578,6 +579,24 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->assertSame(1, ClientControlledDrugEntry::query()->where('client_medication_id', $medication->id)->count());
         $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
 
+        $medication->forceFill(['controlled_drug' => false])->save();
+        $controlledRecordPermission = Permission::query()
+            ->where('key', 'medications.controlled.record')
+            ->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $controlledRecordPermission->id => ['allowed' => false],
+        ]);
+        $actor->unsetRelation('permissionOverrides');
+        $actor->unsetRelation('roles');
+
+        $this->actingAs($actor)
+            ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", $payload)
+            ->assertForbidden();
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame(4.0, (float) $stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertSame(1, FleetResidentTransportEvent::query()->where('action', 'medication_administered')->count());
+
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/return", [
                 ...$this->scanPayload($client, $medication),
@@ -592,8 +611,8 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $siteA = Site::factory()->create(['name' => 'Witness Site A']);
         $siteB = Site::factory()->create(['name' => 'Witness Site B']);
-        $restrictedActor = $this->siteUser($siteA, ['medications.administer.record']);
-        $globalActor = $this->siteUser($siteA, ['fleet.manage', 'medications.administer.record']);
+        $restrictedActor = $this->siteUser($siteA, ['fleet.medication.manage']);
+        $globalActor = $this->siteUser($siteA, ['fleet.manage', 'fleet.medication.manage']);
         $clientB = Client::factory()->create(['site_id' => $siteB->id]);
         $transportB = $this->transport(
             $siteB,
@@ -702,7 +721,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_refusal_unavailability_and_correction_append_provenance_without_erasure(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Attestation history vehicle'), $actor);
         $medication = $this->medication($client, 'Attestation history medication', true);
@@ -832,7 +851,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_packing_attestation_late_failure_rolls_back_log_event_and_verified_witness_together(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Packing rollback vehicle'), $actor);
         $medication = $this->medication($client, 'Packing rollback medication', true);
@@ -869,7 +888,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_legacy_label_only_packing_blocks_completion_until_an_authenticated_correction_is_appended(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport(
             $site,
@@ -926,7 +945,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_return_is_an_actor_attributed_terminal_alternative_and_replays_once(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Return vehicle'), $actor);
         $medication = $this->medication($client, 'Return medication');
@@ -962,7 +981,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_late_failure_rolls_back_custody_emar_stock_and_provenance_together(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['medications.administer.record']);
         $this->recordCompetency($actor);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Rollback vehicle'), $actor);
@@ -1002,7 +1021,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->assertSame('mysql', $connection->getDriverName());
 
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $vehicle = $this->vehicle($site, 'Concurrent replay vehicle');
         $transport = $this->transport($site, $client, $vehicle, $actor);
@@ -1124,7 +1143,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->assertSame('mysql', $connection->getDriverName());
 
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['medications.administer.record']);
+        $actor = $this->siteUser($site, ['fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $vehicle = $this->vehicle($site, 'Concurrent packing vehicle');
         $transport = $this->transport($site, $client, $vehicle, $actor);

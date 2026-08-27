@@ -252,7 +252,12 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     //     to the client via the support_workers pivot below)
     //   - medications.administer.record so the controller's canDo() check passes
     $overrides = [];
-    foreach (['clients.viewAssigned', 'medications.administer.record'] as $key) {
+    $permissionKeys = ['clients.viewAssigned', 'medications.administer.record'];
+    if ((bool) ($medicationOverrides['controlled_drug'] ?? false)) {
+        $permissionKeys[] = 'medications.controlled.record';
+    }
+
+    foreach ($permissionKeys as $key) {
         $permission = Permission::query()->firstOrCreate(
             ['key' => $key],
             ['description' => $key],

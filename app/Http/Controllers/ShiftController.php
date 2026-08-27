@@ -308,10 +308,10 @@ class ShiftController extends Controller
         ]);
 
         $canViewMedications = $auth->canDo('medications.view')
-            || $auth->canDo('medications.administer.record')
-            || $auth->canDo('clients.update');
-        $canRecordMedications = $auth->canDo('medications.administer.record')
-            || $auth->canDo('clients.update');
+            || $auth->canDo('medications.administer.record');
+        $canRecordMedications = $auth->canDo('medications.administer.record');
+        $canRecordControlledMedications = $canRecordMedications
+            && $auth->canDo('medications.controlled.record');
         $canViewForms = $auth->canDo('custom_forms.viewAny')
             || $auth->canDo('custom_forms.submit');
         $canSubmitForms = $auth->canDo('custom_forms.submit');
@@ -676,6 +676,7 @@ class ShiftController extends Controller
                 'submit_form' => $canSubmitForms,
                 'view_medication' => $canViewMedications,
                 'record_medication' => $canRecordMedications,
+                'record_controlled_medication' => $canRecordControlledMedications,
                 'request_replacement' => $this->canRequestReplacement($auth, $shift),
                 'cancel_replacement' => $latestReplacement ? $this->canCancelReplacement($auth, $latestReplacement) : false,
                 'assign_shift' => $auth->canDo('shifts.manageAny'),

@@ -21,7 +21,7 @@ type Props = {
     round: RoundSummary;
     canExport: boolean;
     onClose: () => void;
-    onOpenGuided: (id: number) => void;
+    onOpenGuided?: (id: number) => void;
     onPrint: () => void;
 };
 
@@ -118,10 +118,12 @@ export default function RoundAuditDialog({
                             Print round sheet
                         </Button>
                     ) : null}
-                    <Button onClick={() => onOpenGuided(round.id)}>
-                        <ArrowRight className="h-4 w-4" />
-                        Open guided round
-                    </Button>
+                    {onOpenGuided ? (
+                        <Button onClick={() => onOpenGuided(round.id)}>
+                            <ArrowRight className="h-4 w-4" />
+                            Open guided round
+                        </Button>
+                    ) : null}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

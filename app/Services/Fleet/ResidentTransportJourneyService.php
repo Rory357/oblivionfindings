@@ -41,11 +41,25 @@ class ResidentTransportJourneyService
         private readonly MedicationIncidentIntegrationService $incidents,
     ) {}
 
+    private function assertCanManageMedicationTransit(User $actor): void
+    {
+        abort_unless($actor->canDo('fleet.medication.manage'), 403);
+    }
+
+    private function assertCanAdministerMedication(User $actor): void
+    {
+        abort_unless($actor->canDo('medications.administer.record'), 403);
+    }
+
     /**
      * @return array{transport: FleetResidentTransport, replayed: bool}
      */
     public function create(User $actor, array $data): array
     {
+        if (! empty($data['medications'])) {
+            $this->assertCanManageMedicationTransit($actor);
+        }
+
         $requestUuid = $this->requestUuid($data);
         $requestHash = $this->requestHash('created', [
             'asset_id' => $data['asset_id'] ?? null,
@@ -316,6 +330,8 @@ class ResidentTransportJourneyService
     /** @return array{log: ?FleetMedicationTransitLog, replayed: bool, attestation_state: string} */
     public function packMedication(User $actor, int $transportId, array $data): array
     {
+        $this->assertCanManageMedicationTransit($actor);
+
         $attestationState = (string) ($data['attestation_state'] ?? 'accepted');
         if (! in_array($attestationState, ['accepted', 'refused', 'unavailable'], true)) {
             throw ValidationException::withMessages([
@@ -408,6 +424,8 @@ class ResidentTransportJourneyService
     /** @return array{log: FleetMedicationTransitLog, replayed: bool} */
     public function administerMedication(User $actor, int $logId, array $data): array
     {
+        $this->assertCanAdministerMedication($actor);
+
         return $this->resolveMedicationCustody(
             $actor,
             $logId,
@@ -419,6 +437,8 @@ class ResidentTransportJourneyService
     /** @return array{log: FleetMedicationTransitLog, replayed: bool} */
     public function returnMedication(User $actor, int $logId, array $data): array
     {
+        $this->assertCanManageMedicationTransit($actor);
+
         return $this->resolveMedicationCustody(
             $actor,
             $logId,
@@ -430,6 +450,8 @@ class ResidentTransportJourneyService
     /** @return array{log: FleetMedicationTransitLog, replayed: bool} */
     public function correctPackingAttestation(User $actor, int $logId, array $data): array
     {
+        $this->assertCanManageMedicationTransit($actor);
+
         $requestUuid = $this->requestUuid($data);
         $requestHash = $this->requestHash('medication_packing_attestation_corrected', [
             'log_id' => $logId,
@@ -578,6 +600,26 @@ class ResidentTransportJourneyService
 
             if ($event = $this->replayedEvent($actor, $requestUuid, $action, $requestHash)) {
                 abort_unless((int) $event->transport_id === $transport->id && (int) $event->medication_transit_log_id === $log->id, 409);
+
+                if ($action === 'medication_administered') {
+                    $resident = $this->scope->clientFor($actor, (int) $transport->resident_id, true);
+                    $medication = ClientMedication::query()
+                        ->whereKey($log->medication_id)
+                        ->where('client_id', $resident->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    abort_unless(
+                        (int) $log->client_id === (int) $resident->id
+                            && (int) $log->site_id === (int) $resident->site_id
+                            && (int) $transport->site_id === (int) $resident->site_id,
+                        404,
+                    );
+                    abort_if(
+                        ($log->is_controlled_drug || $medication->controlled_drug)
+                            && ! $actor->canDo('medications.controlled.record'),
+                        403,
+                    );
+                }
 
                 return ['log' => $log->fresh(), 'replayed' => true];
             }

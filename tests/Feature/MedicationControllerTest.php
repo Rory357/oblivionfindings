@@ -2498,6 +2498,11 @@ class MedicationControllerTest extends TestCase
         // But the test needs a user who can do medications.controlled.record but not
         // medications.controlled.override and not clients.update
         // Use a support worker (who has medications.controlled.record but not override and not clients.update)
+        $stockPermission = Permission::query()->where('key', 'medications.stock.update')->firstOrFail();
+        $this->supportWorker->permissionOverrides()->syncWithoutDetaching([
+            $stockPermission->id => ['allowed' => true],
+        ]);
+        $this->supportWorker->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($this->supportWorker)
             ->put("/clients/{$this->client->id}/medical/medications/{$med->id}/stock", [
                 'on_hand' => 8,

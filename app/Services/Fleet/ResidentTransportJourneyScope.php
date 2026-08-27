@@ -275,17 +275,13 @@ class ResidentTransportJourneyScope
     {
         return (bool) $user && (
             $user->canDo('medications.view')
+            || $user->canDo('medications.administer.record')
             || $this->canManageMedicationTransit($user)
         );
     }
 
     public function canManageMedicationTransit(?User $user): bool
     {
-        return (bool) $user && collect([
-            'fleet.medication.manage',
-            'medications.administer.record',
-            'medications.stock.update',
-            'clients.update',
-        ])->contains(fn (string $permission): bool => $user->canDo($permission));
+        return (bool) $user && $user->canDo('fleet.medication.manage');
     }
 }

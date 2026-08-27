@@ -76,6 +76,10 @@ type Props = {
     clients: ClientInfo[];
     witnesses: { id: number; name: string }[];
     board_user: { name: string; role_label: string | null };
+    can: {
+        record: boolean;
+        record_controlled: boolean;
+    };
     date: string;
     today: string;
     is_today: boolean;
@@ -127,6 +131,7 @@ function adminToFollowUp(a: PrnAdministration): PrnFollowUp {
         administration_id: a.id,
         client_id: a.client_id,
         medication_name: a.medication_name,
+        is_controlled: a.controlled_drug,
         dose_given: a.dose_given,
         given_at: a.administered_at,
         given_time: a.given_time,
@@ -287,6 +292,22 @@ export default function PrnRecords(props: Props) {
     );
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const canRecord = props.can.record;
+    const canRecordControlled = props.can.record_controlled;
+    const canRecordMedication = (isControlled: boolean) =>
+        canRecord && (!isControlled || canRecordControlled);
+    const canRecordFollowUp = (followUp: PrnFollowUp) =>
+        canRecordMedication(Boolean(followUp.is_controlled));
+    const recordablePrnMeds = useMemo(
+        () =>
+            canRecord
+                ? prnMeds.filter(
+                      (medication) =>
+                          !medication.is_controlled || canRecordControlled,
+                  )
+                : [],
+        [canRecord, canRecordControlled, prnMeds],
+    );
 
     // History tab is server-filtered (paginated archive); these chips drive
     // router.get, unlike the register's client-side search/status chips.
@@ -360,6 +381,7 @@ export default function PrnRecords(props: Props) {
         e.preventDefault();
         const t = effCtxTag(a.effectiveness, a.effectiveness_label);
         const reviewDue = !a.effectiveness;
+        const canMutate = canRecordMedication(a.controlled_drug);
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -368,7 +390,7 @@ export default function PrnRecords(props: Props) {
                 tone: 'primary',
                 onClick: () => setModal({ type: 'detail', admin: a }),
             },
-            ...(reviewDue
+            ...(reviewDue && canMutate
                 ? [
                       {
                           icon: <Stethoscope className="h-3.5 w-3.5" />,
@@ -382,15 +404,19 @@ export default function PrnRecords(props: Props) {
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            {
-                icon: <RotateCcw className="h-3.5 w-3.5" />,
-                label: 'Re-record / correct dose',
-                onClick: () =>
-                    setModal({
-                        type: 'record',
-                        initialMedId: a.client_medication_id,
-                    }),
-            },
+            ...(canMutate
+                ? [
+                      {
+                          icon: <RotateCcw className="h-3.5 w-3.5" />,
+                          label: 'Re-record / correct dose',
+                          onClick: () =>
+                              setModal({
+                                  type: 'record',
+                                  initialMedId: a.client_medication_id,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
             { sep: true },
             {
                 icon: <User className="h-3.5 w-3.5" />,
@@ -661,13 +687,15 @@ export default function PrnRecords(props: Props) {
                     description="Record as-needed doses, track daily limits and complete effectiveness reviews — every action stays on this page."
                     stats={heroStats}
                     actions={
-                        <Button
-                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                            onClick={() => setModal({ type: 'record' })}
-                        >
-                            <Plus className="h-4 w-4" />
-                            Record PRN dose
-                        </Button>
+                        canRecord ? (
+                            <Button
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                onClick={() => setModal({ type: 'record' })}
+                            >
+                                <Plus className="h-4 w-4" />
+                                Record PRN dose
+                            </Button>
+                        ) : null
                     }
                     footer={
                         <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
@@ -978,17 +1006,19 @@ export default function PrnRecords(props: Props) {
                                                 given {r.given_time}
                                             </span>
                                         </span>
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                setModal({
-                                                    type: 'effect',
-                                                    followUp: r,
-                                                })
-                                            }
-                                        >
-                                            Record effectiveness
-                                        </Button>
+                                        {canRecordFollowUp(r) ? (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setModal({
+                                                        type: 'effect',
+                                                        followUp: r,
+                                                    })
+                                                }
+                                            >
+                                                Record effectiveness
+                                            </Button>
+                                        ) : null}
                                     </li>
                                 ))}
                             </ul>
@@ -1553,9 +1583,9 @@ export default function PrnRecords(props: Props) {
                 )}
             </div>
 
-            {modal?.type === 'record' && (
+            {canRecord && modal?.type === 'record' && (
                 <PrnWizard
-                    medications={prnMeds}
+                    medications={recordablePrnMeds}
                     clients={clientsMap}
                     date={date}
                     witnesses={witnesses}
@@ -1567,7 +1597,7 @@ export default function PrnRecords(props: Props) {
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'effect' && (
+            {modal?.type === 'effect' && canRecordFollowUp(modal.followUp) && (
                 <PrnEffectivenessDialog
                     followUp={modal.followUp}
                     client={clientsMap.get(modal.followUp.client_id)}
@@ -1579,17 +1609,24 @@ export default function PrnRecords(props: Props) {
                     admin={modal.admin}
                     med={medCountById.get(modal.admin.client_medication_id)}
                     onClose={() => setModal(null)}
-                    onRecordEffectiveness={() =>
-                        setModal({
-                            type: 'effect',
-                            followUp: adminToFollowUp(modal.admin),
-                        })
+                    onRecordEffectiveness={
+                        canRecordMedication(modal.admin.controlled_drug)
+                            ? () =>
+                                  setModal({
+                                      type: 'effect',
+                                      followUp: adminToFollowUp(modal.admin),
+                                  })
+                            : undefined
                     }
-                    onReRecordDose={() =>
-                        setModal({
-                            type: 'record',
-                            initialMedId: modal.admin.client_medication_id,
-                        })
+                    onReRecordDose={
+                        canRecordMedication(modal.admin.controlled_drug)
+                            ? () =>
+                                  setModal({
+                                      type: 'record',
+                                      initialMedId:
+                                          modal.admin.client_medication_id,
+                                  })
+                            : undefined
                     }
                 />
             )}
@@ -1598,11 +1635,20 @@ export default function PrnRecords(props: Props) {
                     med={modal.med}
                     client={clientsMap.get(modal.med.client_id)}
                     onClose={() => setModal(null)}
-                    onRecordDose={() =>
-                        setModal({ type: 'record', initialMedId: modal.med.id })
+                    onRecordDose={
+                        canRecordMedication(modal.med.is_controlled)
+                            ? () =>
+                                  setModal({
+                                      type: 'record',
+                                      initialMedId: modal.med.id,
+                                  })
+                            : undefined
                     }
-                    onRecordEffectiveness={(followUp) =>
-                        setModal({ type: 'effect', followUp })
+                    onRecordEffectiveness={
+                        canRecordMedication(modal.med.is_controlled)
+                            ? (followUp) =>
+                                  setModal({ type: 'effect', followUp })
+                            : undefined
                     }
                 />
             )}

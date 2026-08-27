@@ -27,7 +27,7 @@ class ClientMarController extends Controller
             return redirect()->route('emar.emergency_access', ['request_client' => $client->id]);
         }
 
-        abort_unless($user && ($user->canDo('medications.view') || $user->canDo('medications.administer.record') || $user->canDo('clients.update')), 403);
+        abort_unless($user && $user->canDo('medications.view'), 403);
 
         $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
 
@@ -38,7 +38,7 @@ class ClientMarController extends Controller
     {
         $this->authorize('viewMedications', $client);
         $user = $request->user();
-        abort_unless($user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny') || $user->canDo('clients.update')), 403);
+        abort_unless($user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')), 403);
 
         $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
         $payload = app(EnhancedMarService::class)->build($client, $date);

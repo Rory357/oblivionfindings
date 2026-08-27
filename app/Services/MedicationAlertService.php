@@ -6,10 +6,10 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ControlRoomAlert;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
 use App\Services\Medication\MedicationSignalService;
-use Carbon\Carbon;
 
 /**
  * Medication alert generation and dashboard widget service.
@@ -32,8 +32,8 @@ use Carbon\Carbon;
  * Do NOT treat MedicationDashboardAlert as the authority for whether an alert
  * has been triaged, escalated, or resolved — that lives on ControlRoomAlert.
  *
- * @see \App\Services\Medication\MedicationSignalService — canonical signal emission
- * @see \App\Models\ControlRoomAlert — canonical operational alert record
+ * @see MedicationSignalService — canonical signal emission
+ * @see ControlRoomAlert — canonical operational alert record
  */
 class MedicationAlertService
 {
@@ -123,7 +123,7 @@ class MedicationAlertService
                 $client->id,
                 'med_admin_alerts_suppressed',
                 'info',
-                trim('Medication administration due alerts are suppressed' . ($client->med_alerts_suppressed_reason ? ': ' . $client->med_alerts_suppressed_reason : '.')),
+                trim('Medication administration due alerts are suppressed'.($client->med_alerts_suppressed_reason ? ': '.$client->med_alerts_suppressed_reason : '.')),
             )->toArray();
         }
 
@@ -158,7 +158,7 @@ class MedicationAlertService
                 };
 
                 $severity = $clientAlert->prompt_on_open ? 'warning' : 'info';
-                $message = trim($clientAlert->title . ($clientAlert->detail ? ': ' . $clientAlert->detail : ''));
+                $message = trim($clientAlert->title.($clientAlert->detail ? ': '.$clientAlert->detail : ''));
 
                 return MedicationDashboardAlert::createOrUpdateAlert(
                     $client->id,
@@ -318,6 +318,7 @@ class MedicationAlertService
                 "{$medication->name}: PRN near limit ({$count}/{$maxPerDay})",
                 $medication->id
             );
+
             return $alert->toArray();
         }
 
@@ -330,7 +331,7 @@ class MedicationAlertService
      */
     private function checkExpiryAlert(Client $client, ClientMedication $medication): ?array
     {
-        if (!$medication->end_date) {
+        if (! $medication->end_date) {
             return null;
         }
 
@@ -372,6 +373,7 @@ class MedicationAlertService
                 "{$medication->name}: Expires in {$daysRemaining} days ({$medication->end_date->format('d/m/Y')})",
                 $medication->id
             );
+
             return $alert->toArray();
         }
 
@@ -386,7 +388,7 @@ class MedicationAlertService
     {
         $stock = $medication->stock;
 
-        if (!$stock || $stock->on_hand === null) {
+        if (! $stock || $stock->on_hand === null) {
             return null;
         }
 
@@ -426,6 +428,7 @@ class MedicationAlertService
                 "{$medication->name}: Low stock ({$stock->on_hand} {$stock->unit} remaining)",
                 $medication->id
             );
+
             return $alert->toArray();
         }
 
@@ -462,7 +465,7 @@ class MedicationAlertService
                         ])
                         ->exists();
 
-                    if (!$recorded) {
+                    if (! $recorded) {
                         $overdueCount++;
                         $overdueMeds[] = $medication->name;
                     }
@@ -471,7 +474,7 @@ class MedicationAlertService
         }
 
         if ($overdueCount > 0) {
-            $message = "{$overdueCount} overdue dose(s): " . implode(', ', array_unique($overdueMeds));
+            $message = "{$overdueCount} overdue dose(s): ".implode(', ', array_unique($overdueMeds));
 
             // Dashboard alert (UI compat)
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
@@ -548,16 +551,21 @@ class MedicationAlertService
     // Dashboard widgets — unchanged, read from MedicationDashboardAlert / domain models
     // -----------------------------------------------------------------------
 
-    public function getGlobalDashboardWidgets(?int $clientId = null): array
+    public function getGlobalDashboardWidgets(?int $clientId = null, bool $canViewControlled = false): array
     {
-        return [
+        $widgets = [
             'overdue_meds' => $this->getOverdueMedsWidget($clientId),
             'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId),
-            'controlled_discrepancies' => $this->getControlledDiscrepanciesWidget($clientId),
             'expiring_medications' => $this->getExpiringMedicationsWidget($clientId),
             'high_risk_medications' => $this->getHighRiskMedicationsWidget($clientId),
             'todays_summary' => $this->getTodaysSummaryWidget($clientId),
         ];
+
+        if ($canViewControlled) {
+            $widgets['controlled_discrepancies'] = $this->getControlledDiscrepanciesWidget($clientId);
+        }
+
+        return $widgets;
     }
 
     private function getOverdueMedsWidget(?int $clientId = null): array
@@ -777,11 +785,12 @@ class MedicationAlertService
     {
         $alert = MedicationDashboardAlert::find($alertId);
 
-        if (!$alert || $alert->status !== 'active') {
+        if (! $alert || $alert->status !== 'active') {
             return false;
         }
 
         $alert->acknowledge($userId);
+
         return true;
     }
 
@@ -789,11 +798,12 @@ class MedicationAlertService
     {
         $alert = MedicationDashboardAlert::find($alertId);
 
-        if (!$alert) {
+        if (! $alert) {
             return false;
         }
 
         $alert->resolve($notes);
+
         return true;
     }
 
@@ -807,7 +817,7 @@ class MedicationAlertService
 
         foreach ($prnAlerts as $alert) {
             $medication = ClientMedication::find($alert->client_medication_id);
-            if ($medication && !$medication->isPrnNearLimit()) {
+            if ($medication && ! $medication->isPrnNearLimit()) {
                 $alert->resolve('Auto-resolved: PRN count below threshold');
                 $count++;
             }
@@ -819,7 +829,7 @@ class MedicationAlertService
 
         foreach ($expiryAlerts as $alert) {
             $medication = ClientMedication::find($alert->client_medication_id);
-            if (!$medication || $medication->state === 'ceased' || $medication->superseded_by) {
+            if (! $medication || $medication->state === 'ceased' || $medication->superseded_by) {
                 $alert->resolve('Auto-resolved: Medication ceased or updated');
                 $count++;
             }

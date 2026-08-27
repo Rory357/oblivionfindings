@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicationScheduledStockCount extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'client_id',
@@ -40,7 +40,9 @@ class MedicationScheduledStockCount extends Model
 
     public function medication(): BelongsTo
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        // Pending counts survive medication discontinuation. Authorization
+        // must still see the historical controlled-drug classification.
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function completedBy(): BelongsTo

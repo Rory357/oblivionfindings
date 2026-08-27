@@ -281,12 +281,16 @@ function buildMedMenu(
     }
     return [
         [
-            {
-                icon: Check,
-                label: 'Mark as given',
-                action: 'give-med',
-                shortcut: '⏎',
-            },
+            ...(m.can_give
+                ? [
+                      {
+                          icon: Check,
+                          label: 'Mark as given',
+                          action: 'give-med',
+                          shortcut: '⏎',
+                      } as MenuEntry,
+                  ]
+                : []),
             { icon: Clock, label: 'Snooze 15 min', action: 'snooze-med' },
             { icon: StickyNote, label: 'Add note', action: 'add-note' },
         ],
@@ -299,14 +303,18 @@ function buildMedMenu(
                 disabled: true,
             },
         ],
-        [
-            {
-                icon: AlertTriangle,
-                label: 'Refuse / not given',
-                action: 'refuse-med',
-                tone: 'danger',
-            },
-        ],
+        ...(m.can_record
+            ? [
+                  [
+                      {
+                          icon: AlertTriangle,
+                          label: 'Refuse / not given',
+                          action: 'refuse-med',
+                          tone: 'danger',
+                      } as MenuEntry,
+                  ],
+              ]
+            : []),
     ];
 }
 

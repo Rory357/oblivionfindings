@@ -52,7 +52,11 @@ type Props = {
     guided: GuidedRound;
     witnesses: StaffOption[];
     notGivenReasons: NotGivenReason[];
-    signer: { med_competent: boolean; cd_witness: boolean };
+    signer: {
+        med_competent: boolean;
+        controlled_record: boolean;
+        cd_witness: boolean;
+    };
     canExport: boolean;
     onPrint: () => void;
     onClose: () => void;
@@ -101,6 +105,8 @@ export default function GuidedRoundDialog({
     const [pulse, setPulse] = useState('');
     const [saving, setSaving] = useState(false);
     const [reRecording, setReRecording] = useState<Record<number, boolean>>({});
+    const canRecordRound = guided.can_record && signer.med_competent;
+    const canStartRound = guided.can_start && signer.med_competent;
 
     const isSummary = stepIndex >= items.length;
     const item: RoundItem | undefined = items[stepIndex];
@@ -174,6 +180,12 @@ export default function GuidedRoundDialog({
 
     const submit = async () => {
         if (!item || !pending) return;
+        if (
+            !canRecordRound ||
+            (item.is_controlled && !signer.controlled_record)
+        ) {
+            return;
+        }
         const medicationId = item.medication_id;
         const payload = {
             status: pending,
@@ -249,6 +261,7 @@ export default function GuidedRoundDialog({
     };
 
     const finish = () => {
+        if (!canRecordRound) return;
         setSaving(true);
         router.post(
             `/emar/rounds/${round.id}/guided/complete`,
@@ -269,53 +282,88 @@ export default function GuidedRoundDialog({
         goTo(idx === -1 ? items.length : idx);
     };
 
+    const startRound = () => {
+        if (!canStartRound) return;
+        setSaving(true);
+        router.post(
+            `/emar/rounds/${round.id}/guided/start`,
+            {},
+            {
+                preserveScroll: true,
+                onError: () => toast.error('Could not start this round'),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
     // ── Footer ──────────────────────────────────────────────────────────────
-    const footer = isSummary ? (
-        <>
-            {canExport ? (
-                <Button variant="outline" onClick={onPrint}>
-                    <Printer className="h-4 w-4" />
-                    Print round sheet
+    const footer =
+        round.status === 'pending' ? (
+            <>
+                <Button variant="ghost" onClick={onClose} disabled={saving}>
+                    Close
                 </Button>
-            ) : (
-                <span />
-            )}
-            {progress.pending === 0 ? (
-                <Button onClick={finish} disabled={saving}>
+                {canStartRound ? (
+                    <Button onClick={startRound} disabled={saving}>
+                        <ArrowRight className="h-4 w-4" />
+                        Start round
+                    </Button>
+                ) : (
+                    <span />
+                )}
+            </>
+        ) : isSummary ? (
+            <>
+                {canExport ? (
+                    <Button variant="outline" onClick={onPrint}>
+                        <Printer className="h-4 w-4" />
+                        Print round sheet
+                    </Button>
+                ) : (
+                    <span />
+                )}
+                {canRecordRound ? (
+                    progress.pending === 0 ? (
+                        <Button onClick={finish} disabled={saving}>
+                            <Check className="h-4 w-4" />
+                            Finish round
+                        </Button>
+                    ) : (
+                        <Button onClick={goToFirstDue}>
+                            <ArrowRight className="h-4 w-4" />
+                            Go to next due
+                        </Button>
+                    )
+                ) : (
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                )}
+            </>
+        ) : pending ? (
+            <>
+                <Button variant="ghost" onClick={resetPanel} disabled={saving}>
+                    Cancel
+                </Button>
+                <Button onClick={submit} disabled={!confirmValid || saving}>
                     <Check className="h-4 w-4" />
-                    Finish round
+                    Confirm
                 </Button>
-            ) : (
-                <Button onClick={goToFirstDue}>
-                    <ArrowRight className="h-4 w-4" />
-                    Go to next due
+            </>
+        ) : (
+            <>
+                <Button
+                    variant="ghost"
+                    onClick={() => goTo(Math.max(0, stepIndex - 1))}
+                    disabled={stepIndex === 0}
+                >
+                    Previous
                 </Button>
-            )}
-        </>
-    ) : pending ? (
-        <>
-            <Button variant="ghost" onClick={resetPanel} disabled={saving}>
-                Cancel
-            </Button>
-            <Button onClick={submit} disabled={!confirmValid || saving}>
-                <Check className="h-4 w-4" />
-                Confirm
-            </Button>
-        </>
-    ) : (
-        <>
-            <Button
-                variant="ghost"
-                onClick={() => goTo(Math.max(0, stepIndex - 1))}
-                disabled={stepIndex === 0}
-            >
-                Previous
-            </Button>
-            <Button variant="outline" onClick={() => goTo(stepIndex + 1)}>
-                {stepIndex >= items.length - 1 ? 'Summary' : 'Next'}
-            </Button>
-        </>
-    );
+                <Button variant="outline" onClick={() => goTo(stepIndex + 1)}>
+                    {stepIndex >= items.length - 1 ? 'Summary' : 'Next'}
+                </Button>
+            </>
+        );
 
     return (
         <MedsWizardDialog
@@ -336,7 +384,18 @@ export default function GuidedRoundDialog({
             onStepClick={(i) => goTo(i)}
             footer={footer}
         >
-            {isSummary ? (
+            {round.status === 'pending' ? (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted/30 p-8 text-center">
+                    <Clock className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                        <div className="font-semibold">Ready to start</div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Start this assigned round before recording its
+                            doses.
+                        </p>
+                    </div>
+                </div>
+            ) : isSummary ? (
                 <SummaryPane
                     round={round}
                     progress={progress}
@@ -347,7 +406,12 @@ export default function GuidedRoundDialog({
                 showRecorded ? (
                     <RecordedPane
                         item={item}
-                        onReRecord={() => startReRecord(item.medication_id)}
+                        onReRecord={
+                            canRecordRound &&
+                            (!item.is_controlled || signer.controlled_record)
+                                ? () => startReRecord(item.medication_id)
+                                : undefined
+                        }
                     />
                 ) : (
                     <DosePane
@@ -356,7 +420,10 @@ export default function GuidedRoundDialog({
                         setIdentity={setIdentity}
                         pending={pending}
                         setPending={setPending}
-                        canRecord={signer.med_competent}
+                        canRecord={
+                            canRecordRound &&
+                            (!item.is_controlled || signer.controlled_record)
+                        }
                         reasonCode={reasonCode}
                         setReasonCode={setReasonCode}
                         reason={reason}
@@ -744,7 +811,7 @@ function RecordedPane({
     onReRecord,
 }: {
     item: RoundItem;
-    onReRecord: () => void;
+    onReRecord?: () => void;
 }) {
     const a = item.administration!;
     const meta = doseStatusMeta(a.status);
@@ -822,12 +889,14 @@ function RecordedPane({
                         “{a.reason}”
                     </div>
                 ) : null}
-                <div className="mt-3">
-                    <Button variant="ghost" size="sm" onClick={onReRecord}>
-                        <Pencil className="h-4 w-4" />
-                        Re-record
-                    </Button>
-                </div>
+                {onReRecord ? (
+                    <div className="mt-3">
+                        <Button variant="ghost" size="sm" onClick={onReRecord}>
+                            <Pencil className="h-4 w-4" />
+                            Re-record
+                        </Button>
+                    </div>
+                ) : null}
             </div>
         </div>
     );

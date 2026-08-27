@@ -26,6 +26,8 @@ export type MarGridMed = {
 type Props = {
     meds: MarGridMed[];
     schedule: ScheduleRow[];
+    canRecord: boolean;
+    canRecordControlled: boolean;
     onRecord: (row: ScheduleRow) => void;
     onContext: (event: ReactMouseEvent, row: ScheduleRow) => void;
 };
@@ -111,6 +113,8 @@ function LegendItem({
 export default function MarGrid({
     meds,
     schedule,
+    canRecord,
+    canRecordControlled,
     onRecord,
     onContext,
 }: Props) {
@@ -248,6 +252,10 @@ export default function MarGrid({
                                             );
                                         }
                                         const cell = STATUS_CELL[row.status];
+                                        const isRecordable =
+                                            canRecord &&
+                                            (!row.is_controlled ||
+                                                canRecordControlled);
                                         const recordedTime =
                                             row.recorded?.time ?? row.time;
                                         return (
@@ -258,9 +266,11 @@ export default function MarGrid({
                                                 <button
                                                     type="button"
                                                     data-cell={`${med.id}|${time}`}
-                                                    onClick={() =>
-                                                        onRecord(row)
-                                                    }
+                                                    disabled={!isRecordable}
+                                                    onClick={() => {
+                                                        if (isRecordable)
+                                                            onRecord(row);
+                                                    }}
                                                     onContextMenu={(event) =>
                                                         onContext(event, row)
                                                     }
@@ -268,6 +278,8 @@ export default function MarGrid({
                                                     aria-label={`${med.name}, ${cell.label} at ${recordedTime} — record dose (right-click for quick actions)`}
                                                     className={cn(
                                                         'mx-auto flex h-[46px] w-[84px] flex-col items-center justify-center rounded-lg border text-[11px] font-semibold transition hover:ring-2 hover:ring-primary/30',
+                                                        !isRecordable &&
+                                                            'cursor-default opacity-70 hover:ring-0',
                                                         cell.className,
                                                     )}
                                                 >

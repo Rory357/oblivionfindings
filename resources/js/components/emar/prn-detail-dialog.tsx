@@ -109,9 +109,9 @@ export function PrnDetailDialog({
     med: PrnMedication | undefined;
     onClose: () => void;
     /** Open the effectiveness wizard for this administration (in place). */
-    onRecordEffectiveness: () => void;
+    onRecordEffectiveness?: () => void;
     /** Open the Record-PRN wizard pre-filled to this med (in place). */
-    onReRecordDose: () => void;
+    onReRecordDose?: () => void;
 }) {
     const [section, setSection] = useState(0);
     const eff = admin.effectiveness_detail;
@@ -152,12 +152,12 @@ export function PrnDetailDialog({
             }
             footerEnd={
                 <>
-                    {reviewDue ? (
+                    {onRecordEffectiveness && reviewDue ? (
                         <Button type="button" onClick={onRecordEffectiveness}>
                             <Stethoscope className="h-4 w-4" /> Record
                             effectiveness
                         </Button>
-                    ) : (
+                    ) : onRecordEffectiveness ? (
                         <Button
                             type="button"
                             variant="outline"
@@ -166,14 +166,16 @@ export function PrnDetailDialog({
                             <Stethoscope className="h-4 w-4" /> Re-record
                             effectiveness
                         </Button>
-                    )}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onReRecordDose}
-                    >
-                        <Pill className="h-4 w-4" /> Re-record dose
-                    </Button>
+                    ) : null}
+                    {onReRecordDose ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onReRecordDose}
+                        >
+                            <Pill className="h-4 w-4" /> Re-record dose
+                        </Button>
+                    ) : null}
                     <Button
                         type="button"
                         variant="ghost"

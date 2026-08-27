@@ -106,6 +106,8 @@ export function EmarRecordDialog({
     clientId,
     clientLabel,
     medications,
+    canRecord,
+    canRecordControlled,
     staffOptions,
     initialMedicationId,
 }: {
@@ -114,6 +116,8 @@ export function EmarRecordDialog({
     clientId: number;
     clientLabel: string;
     medications: EmarMedication[];
+    canRecord: boolean;
+    canRecordControlled: boolean;
     staffOptions: { value: string; label: string }[];
     initialMedicationId?: number;
 }) {
@@ -125,6 +129,7 @@ export function EmarRecordDialog({
     const [prnReason, setPrnReason] = useState('');
     const [administeredAt, setAdministeredAt] = useState(nowLocal());
     const [witnessedBy, setWitnessedBy] = useState('');
+    const [witnessCredential, setWitnessCredential] = useState('');
     const [notes, setNotes] = useState('');
     const [busy, setBusy] = useState(false);
 
@@ -138,26 +143,56 @@ export function EmarRecordDialog({
             setPrnReason('');
             setAdministeredAt(nowLocal());
             setWitnessedBy('');
+            setWitnessCredential('');
             setNotes('');
             setBusy(false);
         }
     }, [open, initialMedicationId]);
 
+    const recordableMedications = useMemo(
+        () =>
+            medications.filter(
+                (candidate) =>
+                    !candidate.controlled_drug || canRecordControlled,
+            ),
+        [canRecordControlled, medications],
+    );
     const medication = useMemo(
-        () => medications.find((m) => String(m.id) === medicationId) ?? null,
-        [medications, medicationId],
+        () =>
+            recordableMedications.find(
+                (candidate) => String(candidate.id) === medicationId,
+            ) ?? null,
+        [medicationId, recordableMedications],
     );
 
     const needsReason = outcome !== 'given';
     const needsWitness = Boolean(
+        outcome === 'given' &&
         medication &&
         (medication.controlled_drug || medication.witness_required),
     );
     const isPrn = Boolean(medication?.is_prn);
 
+    useEffect(() => {
+        if (!needsWitness) {
+            setWitnessedBy('');
+            setWitnessCredential('');
+        }
+    }, [needsWitness]);
+
     const submit = () => {
+        if (!canRecord) {
+            toast.error('You are not authorised to record medication.');
+            return;
+        }
         if (!medication) {
             toast.error('Select a medication first.');
+            return;
+        }
+        if (medication.controlled_drug && !canRecordControlled) {
+            toast.error(
+                'You are not authorised to record controlled medication.',
+            );
             return;
         }
         if (needsReason && !reasonCode) {
@@ -166,6 +201,14 @@ export function EmarRecordDialog({
         }
         if (isPrn && outcome === 'given' && !prnReason.trim()) {
             toast.error('Provide the PRN indication (reason).');
+            return;
+        }
+        if (needsWitness && !witnessedBy) {
+            toast.error('Select the authorised witness.');
+            return;
+        }
+        if (needsWitness && !witnessCredential.trim()) {
+            toast.error('Enter the witness password or PIN.');
             return;
         }
         setBusy(true);
@@ -179,8 +222,11 @@ export function EmarRecordDialog({
                 administered_at: administeredAt
                     ? new Date(administeredAt).toISOString()
                     : undefined,
-                witnessed_by: witnessedBy
+                witnessed_by: needsWitness
                     ? parseInt(witnessedBy, 10)
+                    : undefined,
+                witness_credential: needsWitness
+                    ? witnessCredential
                     : undefined,
                 notes: notes.trim() || undefined,
             },
@@ -242,7 +288,7 @@ export function EmarRecordDialog({
                                     <SelectValue placeholder="Select medication…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {medications.map((m) => (
+                                    {recordableMedications.map((m) => (
                                         <SelectItem
                                             key={m.id}
                                             value={String(m.id)}
@@ -383,31 +429,52 @@ export function EmarRecordDialog({
                             />
                         </div>
                         {needsWitness ? (
-                            <div>
-                                <Label className="mb-1.5 block">
-                                    Witnessed by{' '}
-                                    <span className="text-status-critical">
-                                        *
-                                    </span>
-                                </Label>
-                                <Select
-                                    value={witnessedBy}
-                                    onValueChange={setWitnessedBy}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Second signature…" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {staffOptions.map((s) => (
-                                            <SelectItem
-                                                key={s.value}
-                                                value={s.value}
-                                            >
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <div className="space-y-3">
+                                <div>
+                                    <Label className="mb-1.5 block">
+                                        Witnessed by{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
+                                    <Select
+                                        value={witnessedBy}
+                                        onValueChange={setWitnessedBy}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Second signature…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {staffOptions.map((s) => (
+                                                <SelectItem
+                                                    key={s.value}
+                                                    value={s.value}
+                                                >
+                                                    {s.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="mb-1.5 block">
+                                        Witness password / PIN{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
+                                    <Input
+                                        type="password"
+                                        autoComplete="off"
+                                        value={witnessCredential}
+                                        onChange={(event) =>
+                                            setWitnessCredential(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Witness confirms identity"
+                                    />
+                                </div>
                             </div>
                         ) : null}
                     </div>

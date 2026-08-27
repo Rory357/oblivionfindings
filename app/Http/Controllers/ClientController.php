@@ -694,11 +694,21 @@ class ClientController extends Controller
                 ->forClient($client)
             : null;
         $canCreateClientNote = $request->user()?->can('create', ClientNote::class) ?? false;
-        $canRecordMedicationAdministration = $sectionAccess['medical'] && (
-            ($request->user()?->canDo('clients.update') ?? false)
-            || ($request->user()?->canDo('medications.administer.record') ?? false)
-            || ($request->user()?->canDo('medications.orders.manage') ?? false)
-        );
+        $canRecordMedicationAdministration = $sectionAccess['medical']
+            && ($request->user()?->canDo('medications.administer.record') ?? false);
+        $canRecordControlledMedication = $canRecordMedicationAdministration
+            && ($request->user()?->canDo('medications.controlled.record') ?? false);
+        $pendingMedicationAlerts = MedicationDashboardAlert::query()
+            ->where('client_id', $client->id)
+            ->where('status', 'active');
+        if (! ($request->user()?->canDo('medications.controlled.view') ?? false)) {
+            $pendingMedicationAlerts->whereNotIn('alert_type', [
+                'controlled_discrepancy',
+                'controlled_overdue_check',
+                'controlled_loss',
+            ]);
+        }
+        $pendingMedicationAlertsCount = $pendingMedicationAlerts->count();
         $dailyNotesTotal = $dailyNotesBase
             ? (clone $dailyNotesBase)->dailyNotes()->count()
             : 0;
@@ -1429,6 +1439,7 @@ class ClientController extends Controller
                 'view_family_chat' => $canViewFamilyChat,
                 'send_family_chat' => $canManageFamilyNotes,
                 'record_medication_administration' => $canRecordMedicationAdministration,
+                'record_controlled_medication' => $canRecordControlledMedication,
                 'update_risk_level' => $canEditClientAssets,
                 'navigate_daily_notes' => (bool) $sectionAccess['notes'],
                 'navigate_care_plans' => (bool) $sectionAccess['care_plans'],
@@ -1565,9 +1576,7 @@ class ClientController extends Controller
                 'last_administration' => ClientMedicationAdministration::where('client_id', $client->id)
                     ->whereNotNull('administered_at')
                     ->max('administered_at'),
-                'pending_alerts_count' => MedicationDashboardAlert::where('client_id', $client->id)
-                    ->where('status', 'active')
-                    ->count(),
+                'pending_alerts_count' => $pendingMedicationAlertsCount,
                 'next_review_date' => MedicationReview::where('client_id', $client->id)
                     ->where('status', '!=', 'completed')
                     ->whereNotNull('scheduled_date')

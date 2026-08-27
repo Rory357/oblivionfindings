@@ -27,7 +27,11 @@ class StockManagementTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage']);
+        $this->grantPermissions($user, [
+            'medications.view',
+            'medications.stock.update',
+            'medications.controlled.record',
+        ]);
 
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);

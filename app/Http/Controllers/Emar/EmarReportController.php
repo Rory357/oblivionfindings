@@ -33,6 +33,10 @@ class EmarReportController extends Controller
             'care_level' => ['nullable', 'string', 'max:60'],
             'report_type' => ['nullable', 'string'],
         ]);
+        $canViewControlled = $request->user()?->canDo('medications.controlled.view') ?? false;
+        if (($filters['report_type'] ?? null) === 'controlled') {
+            abort_unless($canViewControlled, 403);
+        }
 
         // §3b: a site filter scopes the client-linked panels (administration,
         // reasons, PRN, controlled, errors) and themes the hero. Stock / rounds /
@@ -197,44 +201,50 @@ class EmarReportController extends Controller
             ->values();
 
         // ─── Controlled Drugs ────────────────────────────────
-        $cdAdminCount = ClientMedicationAdministration::query()
-            ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
-            ->where('client_medications.controlled_drug', true)
-            ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
-            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
-            ->count();
+        $cdAdminCount = 0;
+        $destructionsCount = 0;
+        $discrepancyCount = 0;
+        $cdByMedication = collect();
+        if ($canViewControlled) {
+            $cdAdminCount = ClientMedicationAdministration::query()
+                ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
+                ->where('client_medications.controlled_drug', true)
+                ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
+                ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
+                ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+                ->count();
 
-        $destructionsCount = MedicationDestruction::query()
-            ->where('is_controlled_drug', true)
-            ->whereBetween('destroyed_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
-            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
-            ->count();
+            $destructionsCount = MedicationDestruction::query()
+                ->where('is_controlled_drug', true)
+                ->whereBetween('destroyed_at', [$dateFrom, $dateTo])
+                ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+                ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+                ->count();
 
-        $discrepancyQuery = ClientControlledDrugDiscrepancy::query()
-            ->whereBetween('reported_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
-            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
+            $discrepancyQuery = ClientControlledDrugDiscrepancy::query()
+                ->whereBetween('reported_at', [$dateFrom, $dateTo])
+                ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+                ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
 
-        $discrepancyCount = (clone $discrepancyQuery)->count();
+            $discrepancyCount = (clone $discrepancyQuery)->count();
 
-        $cdByMedication = ClientMedicationAdministration::query()
-            ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
-            ->where('client_medications.controlled_drug', true)
-            ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
-            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
-            ->selectRaw('client_medications.name as medication_name, COUNT(*) as admin_count')
-            ->groupBy('client_medications.name')
-            ->orderByDesc('admin_count')
-            ->limit(20)
-            ->get()
-            ->map(fn ($row) => [
-                'medication' => $row->medication_name,
-                'administrations' => (int) $row->admin_count,
-            ])
-            ->values();
+            $cdByMedication = ClientMedicationAdministration::query()
+                ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
+                ->where('client_medications.controlled_drug', true)
+                ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
+                ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
+                ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+                ->selectRaw('client_medications.name as medication_name, COUNT(*) as admin_count')
+                ->groupBy('client_medications.name')
+                ->orderByDesc('admin_count')
+                ->limit(20)
+                ->get()
+                ->map(fn ($row) => [
+                    'medication' => $row->medication_name,
+                    'administrations' => (int) $row->admin_count,
+                ])
+                ->values();
+        }
 
         // ─── Staff Compliance ────────────────────────────────
         $today = Carbon::today();
@@ -430,25 +440,27 @@ class EmarReportController extends Controller
 
         // Controlled medications in the CdMedication shape, so the Controlled-drugs
         // tab can reuse the shared ReportLossDialog (Page 6) for "Report CD loss".
-        $cdMedications = ClientMedication::query()
-            ->active()
-            ->controlled()
-            ->with(['client:id,first_name,last_name', 'stock'])
-            ->orderBy('name')
-            ->get()
-            ->map(fn (ClientMedication $m) => [
-                'id' => $m->id,
-                'name' => $m->name,
-                'controlled_drug' => (bool) $m->controlled_drug,
-                'client_id' => $m->client_id,
-                'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
-                'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
-                    'unit' => $m->stock->unit,
-                    'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
-                ] : null,
-            ])
-            ->values();
+        $cdMedications = $canViewControlled
+            ? ClientMedication::query()
+                ->active()
+                ->controlled()
+                ->with(['client:id,first_name,last_name', 'stock'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (ClientMedication $m) => [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'controlled_drug' => (bool) $m->controlled_drug,
+                    'client_id' => $m->client_id,
+                    'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
+                    'stock' => $m->stock ? [
+                        'on_hand' => $m->stock->on_hand,
+                        'unit' => $m->stock->unit,
+                        'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
+                    ] : null,
+                ])
+                ->values()
+            : collect();
 
         $activeSite = $siteId ? Site::find($siteId) : null;
 
@@ -464,6 +476,8 @@ class EmarReportController extends Controller
             'clients' => $clients,
             'careLevels' => $careLevels,
             'cdMedications' => $cdMedications,
+            'can_view_controlled' => $canViewControlled,
+            'can_record_controlled' => $request->user()?->canDo('medications.controlled.record') ?? false,
             'reasonBreakdown' => $reasonBreakdown,
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
@@ -532,6 +546,9 @@ class EmarReportController extends Controller
         $clientId = $filters['client_id'] ?? null;
         $careLevel = $filters['care_level'] ?? null;
         $type = $filters['report_type'] ?? 'administration';
+        if ($type === 'controlled') {
+            abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+        }
 
         $filename = "emar_{$type}_report_".now()->format('Ymd_His').'.csv';
 

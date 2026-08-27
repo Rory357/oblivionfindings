@@ -125,6 +125,8 @@ export interface RoundProgress {
 }
 
 export interface GuidedRound {
+    can_record: boolean;
+    can_start: boolean;
     round: {
         id: number;
         name: string;

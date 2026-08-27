@@ -68,6 +68,7 @@ type OrderRow = {
     medication_id: number | null;
     client_name: string;
     medication_name: string | null;
+    controlled: boolean;
     pharmacy_name: string | null;
     order_type: string | null;
     status: string;
@@ -81,6 +82,8 @@ type OrderRow = {
 };
 
 type Props = {
+    can_record_controlled: boolean;
+    can_view_controlled: boolean;
     stockItems: StockRow[];
     lowStockCount: number;
     expiringCount: number;
@@ -136,6 +139,8 @@ const initials = (name: string) =>
         .toUpperCase() || '?';
 
 export default function StockManagement({
+    can_record_controlled: canRecordControlled,
+    can_view_controlled: canViewControlled,
     stockItems,
     lowStockCount,
     expiringCount,
@@ -164,6 +169,16 @@ export default function StockManagement({
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<string[]>([]);
+
+    const controlledGovernedMedications = useMemo(
+        () =>
+            canRecordControlled
+                ? activeMedications
+                : activeMedications.filter(
+                      (medication) => !medication.controlled,
+                  ),
+        [activeMedications, canRecordControlled],
+    );
 
     const openOrders = pharmacyOrders.filter((o) => o.status !== 'delivered');
     const cdDiscrepancies = controlledRegister.filter(
@@ -231,12 +246,14 @@ export default function StockManagement({
               }
             : null;
     };
-    const runCount = (s: StockRow) =>
+    const runCount = (s: StockRow) => {
+        if (s.controlled && !canRecordControlled) return;
         setModal({
             type: 'count',
             medId: s.medication_id,
             controlledOnly: s.controlled,
         });
+    };
 
     // Header tag colours for the row context menu — semantic tokens (CSS vars).
     const ctxTagStyle = (s: StockRow) => {
@@ -268,6 +285,7 @@ export default function StockManagement({
     const openStockCtx = (e: ReactMouseEvent, s: StockRow) => {
         e.preventDefault();
         const order = openOrderFor(s.medication_id);
+        const canGovernBalance = !s.controlled || canRecordControlled;
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -276,16 +294,22 @@ export default function StockManagement({
                 tone: 'primary',
                 onClick: () => setModal({ type: 'detail', item: s }),
             },
-            {
-                icon: <Pencil className="h-3.5 w-3.5" />,
-                label: 'Adjust stock',
-                onClick: () => setModal({ type: 'adjust', item: s }),
-            },
-            {
-                icon: <ClipboardCheck className="h-3.5 w-3.5" />,
-                label: s.controlled ? 'Run CD balance check' : 'Run count',
-                onClick: () => runCount(s),
-            },
+            ...(canGovernBalance
+                ? [
+                      {
+                          icon: <Pencil className="h-3.5 w-3.5" />,
+                          label: 'Adjust stock',
+                          onClick: () => setModal({ type: 'adjust', item: s }),
+                      } satisfies ShiftCtxItem,
+                      {
+                          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+                          label: s.controlled
+                              ? 'Run CD balance check'
+                              : 'Run count',
+                          onClick: () => runCount(s),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
             {
                 icon: <ShoppingCart className="h-3.5 w-3.5" />,
                 label: 'Order more',
@@ -296,7 +320,7 @@ export default function StockManagement({
                         medId: s.medication_id,
                     }),
             },
-            ...(order
+            ...(order && canGovernBalance
                 ? [
                       {
                           icon: <Truck className="h-3.5 w-3.5" />,
@@ -331,7 +355,7 @@ export default function StockManagement({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            ...(s.is_expired
+            ...(s.is_expired && canGovernBalance
                 ? [
                       { sep: true } satisfies ShiftCtxItem,
                       {
@@ -372,17 +396,21 @@ export default function StockManagement({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            {
-                icon: <ShieldCheck className="h-3.5 w-3.5" />,
-                label: 'Record CD balance check',
-                onClick: () =>
-                    setModal({
-                        type: 'count',
-                        medId: r.medication_id,
-                        controlledOnly: true,
-                    }),
-            },
-            ...(s
+            ...(canRecordControlled
+                ? [
+                      {
+                          icon: <ShieldCheck className="h-3.5 w-3.5" />,
+                          label: 'Record CD balance check',
+                          onClick: () =>
+                              setModal({
+                                  type: 'count',
+                                  medId: r.medication_id,
+                                  controlledOnly: true,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(s && canRecordControlled
                 ? [
                       {
                           icon: <Pencil className="h-3.5 w-3.5" />,
@@ -418,12 +446,16 @@ export default function StockManagement({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            {
-                icon: <FileText className="h-3.5 w-3.5" />,
-                label: 'Open CD register',
-                onClick: () => router.visit('/emar/controlled'),
-            },
-            ...(!reconciled
+            ...(canViewControlled
+                ? [
+                      {
+                          icon: <FileText className="h-3.5 w-3.5" />,
+                          label: 'Open CD register',
+                          onClick: () => router.visit('/emar/controlled'),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(!reconciled && canViewControlled
                 ? [
                       { sep: true } satisfies ShiftCtxItem,
                       {
@@ -572,13 +604,17 @@ export default function StockManagement({
             tone: 'critical',
             badge: expiredCount || undefined,
         },
-        {
-            id: 'controlled',
-            label: 'Controlled drugs',
-            icon: ShieldCheck,
-            tone: 'primary',
-            badge: controlledRegister.length || undefined,
-        },
+        ...(canViewControlled
+            ? [
+                  {
+                      id: 'controlled',
+                      label: 'Controlled drugs',
+                      icon: ShieldCheck,
+                      tone: 'primary' as const,
+                      badge: controlledRegister.length || undefined,
+                  },
+              ]
+            : []),
         {
             id: 'orders',
             label: 'Pharmacy orders',
@@ -663,13 +699,24 @@ export default function StockManagement({
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex flex-wrap items-center gap-2">
-                                {(
-                                    [
-                                        ['all', 'All items'],
-                                        ['controlled', 'Controlled only'],
-                                        ['cold_chain', 'Cold chain'],
-                                    ] as const
-                                ).map(([id, label]) => (
+                                {[
+                                    {
+                                        id: 'all' as const,
+                                        label: 'All items',
+                                    },
+                                    ...(canViewControlled
+                                        ? [
+                                              {
+                                                  id: 'controlled' as const,
+                                                  label: 'Controlled only',
+                                              },
+                                          ]
+                                        : []),
+                                    {
+                                        id: 'cold_chain' as const,
+                                        label: 'Cold chain',
+                                    },
+                                ].map(({ id, label }) => (
                                     <button
                                         key={id}
                                         onClick={() => setChip(id)}
@@ -929,14 +976,24 @@ export default function StockManagement({
                                                                 item: s,
                                                             })
                                                         }
-                                                        onCount={() =>
-                                                            runCount(s)
+                                                        onCount={
+                                                            !s.controlled ||
+                                                            canRecordControlled
+                                                                ? () =>
+                                                                      runCount(
+                                                                          s,
+                                                                      )
+                                                                : undefined
                                                         }
-                                                        onAdjust={() =>
-                                                            setModal({
-                                                                type: 'adjust',
-                                                                item: s,
-                                                            })
+                                                        onAdjust={
+                                                            !s.controlled ||
+                                                            canRecordControlled
+                                                                ? () =>
+                                                                      setModal({
+                                                                          type: 'adjust',
+                                                                          item: s,
+                                                                      })
+                                                                : undefined
                                                         }
                                                         onCtx={(e) =>
                                                             openStockCtx(e, s)
@@ -951,7 +1008,7 @@ export default function StockManagement({
                         </div>
                     ))}
 
-                {activeTab === 'controlled' && (
+                {canViewControlled && activeTab === 'controlled' && (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3">
                             <span className="text-sm text-status-critical">
@@ -960,18 +1017,20 @@ export default function StockManagement({
                                 investigated and witnessed before close of
                                 shift.
                             </span>
-                            <Button
-                                size="sm"
-                                onClick={() =>
-                                    setModal({
-                                        type: 'count',
-                                        controlledOnly: true,
-                                    })
-                                }
-                            >
-                                <ShieldCheck className="h-3.5 w-3.5" />
-                                Record CD balance check
-                            </Button>
+                            {canRecordControlled ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        setModal({
+                                            type: 'count',
+                                            controlledOnly: true,
+                                        })
+                                    }
+                                >
+                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                    Record CD balance check
+                                </Button>
+                            ) : null}
                         </div>
                         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                             {controlledRegister.length === 0 ? (
@@ -1094,37 +1153,40 @@ export default function StockManagement({
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) => {
-                                                                        e.stopPropagation();
-                                                                        setModal(
-                                                                            {
-                                                                                type: 'count',
-                                                                                medId: r.medication_id,
-                                                                                controlledOnly: true,
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    Count
-                                                                </Button>
-                                                                {!reconciled && (
-                                                                    <a
-                                                                        href="/emar/controlled"
+                                                                {canRecordControlled ? (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
                                                                         onClick={(
                                                                             e,
-                                                                        ) =>
-                                                                            e.stopPropagation()
-                                                                        }
-                                                                        className="text-xs font-medium text-status-critical underline"
+                                                                        ) => {
+                                                                            e.stopPropagation();
+                                                                            setModal(
+                                                                                {
+                                                                                    type: 'count',
+                                                                                    medId: r.medication_id,
+                                                                                    controlledOnly: true,
+                                                                                },
+                                                                            );
+                                                                        }}
                                                                     >
-                                                                        Investigate
-                                                                    </a>
-                                                                )}
+                                                                        Count
+                                                                    </Button>
+                                                                ) : null}
+                                                                {!reconciled &&
+                                                                    canViewControlled && (
+                                                                        <a
+                                                                            href="/emar/controlled"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                            className="text-xs font-medium text-status-critical underline"
+                                                                        >
+                                                                            Investigate
+                                                                        </a>
+                                                                    )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1162,7 +1224,13 @@ export default function StockManagement({
                                 <OrderCard
                                     key={o.id}
                                     o={o}
-                                    onAdvance={() => advance(o.id)}
+                                    onAdvance={
+                                        o.status !== 'dispensed' ||
+                                        !o.controlled ||
+                                        canRecordControlled
+                                            ? () => advance(o.id)
+                                            : undefined
+                                    }
                                 />
                             ))
                         )}
@@ -1182,14 +1250,14 @@ export default function StockManagement({
             )}
             {modal?.type === 'receive' && (
                 <ReceiveStockDialog
-                    medications={activeMedications}
+                    medications={controlledGovernedMedications}
                     defaultMedId={modal.medId}
                     onClose={() => setModal(null)}
                 />
             )}
             {modal?.type === 'count' && (
                 <StockCountDialog
-                    medications={activeMedications}
+                    medications={controlledGovernedMedications}
                     stockItems={stockItems}
                     witnesses={witnesses}
                     defaultMedId={modal.medId}
@@ -1197,21 +1265,32 @@ export default function StockManagement({
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'adjust' && (
-                <AdjustStockDialog
-                    item={modal.item}
-                    onClose={() => setModal(null)}
-                />
-            )}
+            {modal?.type === 'adjust' &&
+                (!modal.item.controlled || canRecordControlled) && (
+                    <AdjustStockDialog
+                        item={modal.item}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {modal?.type === 'detail' && (
                 <StockDetailDialog
                     item={modal.item}
                     openOrder={openOrderFor(modal.item.medication_id)}
                     onClose={() => setModal(null)}
-                    onAdjust={() =>
-                        setModal({ type: 'adjust', item: modal.item })
+                    onAdjust={
+                        !modal.item.controlled || canRecordControlled
+                            ? () =>
+                                  setModal({
+                                      type: 'adjust',
+                                      item: modal.item,
+                                  })
+                            : undefined
                     }
-                    onCount={() => runCount(modal.item)}
+                    onCount={
+                        !modal.item.controlled || canRecordControlled
+                            ? () => runCount(modal.item)
+                            : undefined
+                    }
                     onOrder={() =>
                         setModal({
                             type: 'order',
@@ -1236,8 +1315,8 @@ function StockRowView({
 }: {
     s: StockRow;
     onView: () => void;
-    onCount: () => void;
-    onAdjust: () => void;
+    onCount?: () => void;
+    onAdjust?: () => void;
     onCtx: (e: ReactMouseEvent) => void;
 }) {
     const reorder = s.reorder_level ?? 0;
@@ -1342,35 +1421,39 @@ function StockRowView({
             </td>
             <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onCount();
-                        }}
-                        title="Record count"
-                    >
-                        <ClipboardCheck className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onAdjust();
-                        }}
-                        title="Adjust / edit"
-                    >
-                        <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    {onCount ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onCount();
+                            }}
+                            title="Record count"
+                        >
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                        </Button>
+                    ) : null}
+                    {onAdjust ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAdjust();
+                            }}
+                            title="Adjust / edit"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                    ) : null}
                 </div>
             </td>
         </tr>
     );
 }
 
-function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance: () => void }) {
+function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance?: () => void }) {
     const stageIndex = Math.max(0, STAGES.indexOf(o.status));
     const typeTone =
         o.order_type === 'urgent'
@@ -1454,7 +1537,7 @@ function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance: () => void }) {
                     );
                 })}
             </div>
-            {nextLabel && (
+            {nextLabel && onAdvance ? (
                 <div className="mt-4 flex justify-end">
                     <Button size="sm" onClick={onAdvance}>
                         {o.status === 'dispensed' ? (
@@ -1465,7 +1548,7 @@ function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance: () => void }) {
                         {nextLabel}
                     </Button>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }

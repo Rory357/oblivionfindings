@@ -203,6 +203,22 @@ type ActivityItem = {
     administered_by: { name: string } | null;
 };
 
+type MedicationCapabilities = {
+    record: boolean;
+    record_controlled: boolean;
+    correct: boolean;
+    verify_orders: boolean;
+    manage_settings: boolean;
+    manage_inr: boolean;
+    manage_syringe_drivers: boolean;
+    manage_allergies: boolean;
+    manage_interactions: boolean;
+    manage_stock: boolean;
+    view_controlled: boolean;
+    revoke_break_glass: boolean;
+    export_reports: boolean;
+};
+
 type Props = {
     date: string;
     isToday: boolean;
@@ -224,6 +240,7 @@ type Props = {
     witnesses: WitnessOption[];
     notGivenReasons: NotGivenReasonOption[];
     signedAs: { name: string; role_label: string | null };
+    can: MedicationCapabilities;
     canManageSettings?: boolean;
 };
 
@@ -424,6 +441,7 @@ export default function EmarHome(props: Props) {
         witnesses,
         notGivenReasons,
         signedAs,
+        can,
         canManageSettings,
     } = props;
 
@@ -529,9 +547,24 @@ export default function EmarHome(props: Props) {
     const q = search.trim().toLowerCase();
     const inrOutOfRange = actionCentre.filter((i) => i.type === 'inr').length;
 
+    const permittedActionCentre = useMemo(
+        () =>
+            actionCentre.filter((item) => {
+                if (item.category === 'controlled') {
+                    return can.view_controlled;
+                }
+                if (item.category === 'stock') {
+                    return can.manage_stock;
+                }
+
+                return true;
+            }),
+        [actionCentre, can.manage_stock, can.view_controlled],
+    );
+
     /* Action-centre counts + filtered list. */
     const acCounts = useMemo(() => {
-        const live = actionCentre.filter((i) => !dismissed.has(i.id));
+        const live = permittedActionCentre.filter((i) => !dismissed.has(i.id));
         return {
             all: live.length,
             doses: live.filter((i) => i.category === 'doses').length,
@@ -539,9 +572,9 @@ export default function EmarHome(props: Props) {
             clinical: live.filter((i) => i.category === 'clinical').length,
             stock: live.filter((i) => i.category === 'stock').length,
         };
-    }, [actionCentre, dismissed]);
+    }, [dismissed, permittedActionCentre]);
 
-    const visibleActions = actionCentre
+    const visibleActions = permittedActionCentre
         .filter((i) => !dismissed.has(i.id))
         .filter((i) => acFilter === 'all' || i.category === acFilter)
         .filter(
@@ -556,14 +589,17 @@ export default function EmarHome(props: Props) {
         .filter((c) => !q || c.name.toLowerCase().includes(q));
 
     /* ── Hero pieces ── */
-    const heroMeta: PageHeroMetaItem[] = [
+    const heroMeta = [
         { icon: Clock, label: 'Oversight shift · 07:00–15:00' },
         {
             icon: MapPin,
             label: `${siteNames.length || 1} site${siteNames.length === 1 ? '' : 's'} · ${stats.activeClients} clients`,
         },
-        { icon: Shield, label: 'Medication lead · CD witness authorised' },
-    ];
+        can.view_controlled && {
+            icon: Shield,
+            label: 'Medication lead · CD witness authorised',
+        },
+    ].filter(Boolean) as PageHeroMetaItem[];
 
     const heroBadges: PageHeroBadge[] = [
         stats.overdue > 0 && {
@@ -571,11 +607,12 @@ export default function EmarHome(props: Props) {
             icon: AlertTriangle,
             label: `${stats.overdue} dose${stats.overdue === 1 ? '' : 's'} overdue`,
         },
-        stats.activeDiscrepancies > 0 && {
-            tone: 'critical' as const,
-            icon: Lock,
-            label: `${stats.activeDiscrepancies} CD discrepancy — investigate`,
-        },
+        can.view_controlled &&
+            stats.activeDiscrepancies > 0 && {
+                tone: 'critical' as const,
+                icon: Lock,
+                label: `${stats.activeDiscrepancies} CD discrepancy — investigate`,
+            },
         stats.overdueReviews > 0 && {
             tone: 'warning' as const,
             icon: Clock,
@@ -588,16 +625,16 @@ export default function EmarHome(props: Props) {
         },
     ].filter(Boolean) as PageHeroBadge[];
 
-    const heroStats: PageHeroStat[] = [
+    const heroStats = [
         { label: 'Admin rate', value: `${stats.adminRate}%` },
         {
             label: 'Due now',
             value: stats.dueNow,
             tone: stats.overdue > 0 ? 'critical' : undefined,
         },
-        { label: 'CD due', value: stats.cdDue },
+        can.view_controlled && { label: 'CD due', value: stats.cdDue },
         { label: 'Reviews', value: stats.reviewsDue },
-    ];
+    ].filter(Boolean) as PageHeroStat[];
 
     const heroFooter = (
         <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
@@ -655,7 +692,7 @@ export default function EmarHome(props: Props) {
         </div>
     );
 
-    const acTabs: RosterTabItem[] = [
+    const acTabs = [
         {
             id: 'all',
             label: 'All',
@@ -670,7 +707,7 @@ export default function EmarHome(props: Props) {
             tone: 'critical',
             badge: acCounts.doses,
         },
-        {
+        can.view_controlled && {
             id: 'controlled',
             label: 'Controlled',
             icon: Lock,
@@ -684,14 +721,20 @@ export default function EmarHome(props: Props) {
             tone: 'warning',
             badge: acCounts.clinical,
         },
-        {
+        can.manage_stock && {
             id: 'stock',
             label: 'Stock',
             icon: Package,
             tone: 'warning',
             badge: acCounts.stock,
         },
-    ];
+    ].filter(Boolean) as RosterTabItem[];
+
+    const heroTabs = HERO_TABS.filter(
+        (tab) =>
+            (tab.id !== 'cd' || can.view_controlled) &&
+            (tab.id !== 'stock' || can.manage_stock),
+    );
 
     const donutSegments = outcomeBreakdown.segments
         .filter((s) => s.count > 0)
@@ -755,8 +798,13 @@ export default function EmarHome(props: Props) {
                                 ? ` (${stats.overdue} overdue)`
                                 : ''}{' '}
                             and {stats.adminRate}% recorded so far.{' '}
-                            {stats.activeDiscrepancies} controlled-drug
-                            discrepancy and {stats.overdueReviews} review
+                            {can.view_controlled ? (
+                                <>
+                                    {stats.activeDiscrepancies} controlled-drug
+                                    discrepancy and{' '}
+                                </>
+                            ) : null}
+                            {stats.overdueReviews} review
                             {stats.overdueReviews === 1 ? '' : 's'} need a
                             clinician.
                         </span>
@@ -766,23 +814,29 @@ export default function EmarHome(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
-                            <Button
-                                size="sm"
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() => setModal('generate-rounds')}
-                            >
-                                <Clock className="h-4 w-4" />
-                                Generate today&rsquo;s rounds
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                onClick={() => setModal('reports')}
-                            >
-                                <Printer className="h-4 w-4" />
-                                Export MAR &amp; CD register
-                            </Button>
+                            {can.record ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    onClick={() => setModal('generate-rounds')}
+                                >
+                                    <Clock className="h-4 w-4" />
+                                    Generate today&rsquo;s rounds
+                                </Button>
+                            ) : null}
+                            {can.export_reports ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                    onClick={() => setModal('reports')}
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    {can.view_controlled
+                                        ? 'Export MAR & CD register'
+                                        : 'Export MAR'}
+                                </Button>
+                            ) : null}
                         </>
                     }
                     footer={heroFooter}
@@ -793,10 +847,10 @@ export default function EmarHome(props: Props) {
                     ariaLabel="eMAR views"
                     value="overview"
                     onChange={(id) => {
-                        const t = HERO_TABS.find((x) => x.id === id);
+                        const t = heroTabs.find((x) => x.id === id);
                         if (t?.href) router.visit(t.href);
                     }}
-                    items={HERO_TABS.map((t) => ({
+                    items={heroTabs.map((t) => ({
                         id: t.id,
                         label: t.label,
                         icon:
@@ -890,21 +944,23 @@ export default function EmarHome(props: Props) {
                             </div>
                         }
                     />
-                    <KpiCard
-                        icon={Lock}
-                        tone="primary"
-                        value={stats.controlledCount}
-                        label="Controlled drugs active"
-                        pill={
-                            stats.activeDiscrepancies > 0
-                                ? {
-                                      label: `${stats.activeDiscrepancies} discrepancy`,
-                                      tone: 'critical',
-                                  }
-                                : null
-                        }
-                        sub={`${stats.activeDiscrepancies} discrepancy open`}
-                    />
+                    {can.view_controlled ? (
+                        <KpiCard
+                            icon={Lock}
+                            tone="primary"
+                            value={stats.controlledCount}
+                            label="Controlled drugs active"
+                            pill={
+                                stats.activeDiscrepancies > 0
+                                    ? {
+                                          label: `${stats.activeDiscrepancies} discrepancy`,
+                                          tone: 'critical',
+                                      }
+                                    : null
+                            }
+                            sub={`${stats.activeDiscrepancies} discrepancy open`}
+                        />
+                    ) : null}
                     <KpiCard
                         icon={ClipboardCheck}
                         tone="warning"
@@ -928,21 +984,23 @@ export default function EmarHome(props: Props) {
                         pill={{ label: '30 days', tone: 'neutral' }}
                         sub="med-competent staff"
                     />
-                    <KpiCard
-                        icon={Package}
-                        tone="warning"
-                        value={stats.stockAlerts}
-                        label="Stock alerts"
-                        pill={
-                            stats.expiredStock > 0
-                                ? {
-                                      label: `${stats.expiredStock} expired`,
-                                      tone: 'critical',
-                                  }
-                                : null
-                        }
-                        sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
-                    />
+                    {can.manage_stock ? (
+                        <KpiCard
+                            icon={Package}
+                            tone="warning"
+                            value={stats.stockAlerts}
+                            label="Stock alerts"
+                            pill={
+                                stats.expiredStock > 0
+                                    ? {
+                                          label: `${stats.expiredStock} expired`,
+                                          tone: 'critical',
+                                      }
+                                    : null
+                            }
+                            sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
+                        />
+                    ) : null}
                 </div>
 
                 {/* ── Main grid: Action centre + right rail ── */}
@@ -1038,37 +1096,63 @@ export default function EmarHome(props: Props) {
                                             </p>
                                         </div>
                                         {it.action_type === 'cd_balance' ? (
-                                            <Button
-                                                size="sm"
-                                                className={cn(
-                                                    'shrink-0',
-                                                    SEVERITY_BTN[it.severity],
-                                                )}
-                                                onClick={() =>
-                                                    openModal(
-                                                        'cd-register',
-                                                        it.client_id,
-                                                    )
-                                                }
-                                            >
-                                                {it.action}
-                                            </Button>
+                                            can.view_controlled &&
+                                            can.record_controlled ? (
+                                                <Button
+                                                    size="sm"
+                                                    className={cn(
+                                                        'shrink-0',
+                                                        SEVERITY_BTN[
+                                                            it.severity
+                                                        ],
+                                                    )}
+                                                    onClick={() =>
+                                                        openModal(
+                                                            'cd-register',
+                                                            it.client_id,
+                                                        )
+                                                    }
+                                                >
+                                                    {it.action}
+                                                </Button>
+                                            ) : can.view_controlled ? (
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    className={cn(
+                                                        'shrink-0',
+                                                        SEVERITY_BTN[
+                                                            it.severity
+                                                        ],
+                                                    )}
+                                                >
+                                                    <Link href="/emar/controlled">
+                                                        {it.action}
+                                                    </Link>
+                                                </Button>
+                                            ) : null
                                         ) : it.action_type === 'record' &&
                                           it.record ? (
-                                            <Button
-                                                size="sm"
-                                                className={cn(
-                                                    'shrink-0',
-                                                    SEVERITY_BTN[it.severity],
-                                                )}
-                                                onClick={() =>
-                                                    setRecordWizard(
-                                                        it.record ?? null,
-                                                    )
-                                                }
-                                            >
-                                                {it.action}
-                                            </Button>
+                                            can.record &&
+                                            (!it.record.row.is_controlled ||
+                                                can.record_controlled) ? (
+                                                <Button
+                                                    size="sm"
+                                                    className={cn(
+                                                        'shrink-0',
+                                                        SEVERITY_BTN[
+                                                            it.severity
+                                                        ],
+                                                    )}
+                                                    onClick={() =>
+                                                        setRecordWizard(
+                                                            it.record ?? null,
+                                                        )
+                                                    }
+                                                >
+                                                    {it.action}
+                                                </Button>
+                                            ) : null
                                         ) : (
                                             <Button
                                                 asChild
@@ -1625,58 +1709,60 @@ export default function EmarHome(props: Props) {
                 {/* ── Ops row ── */}
                 <div className="grid gap-3.5 lg:grid-cols-3">
                     {/* Stock & pharmacy */}
-                    <Card className="rounded-[18px]">
-                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 pb-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
-                                    <Package className="h-4 w-4" />
-                                </span>
-                                <CardTitle className="text-sm">
-                                    Stock &amp; pharmacy
-                                </CardTitle>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 shrink-0 px-2.5 text-xs"
-                                onClick={() => openModal('stock-movement')}
-                            >
-                                Record stock
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-1.5 text-xs">
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    Low stock
-                                </span>
-                                <span className="font-semibold">
-                                    {stats.lowStock}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    Expiring soon
-                                </span>
-                                <span className="font-semibold text-status-warning">
-                                    {stats.expiringStock}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    Expired
-                                </span>
-                                <span className="font-semibold text-status-critical">
-                                    {stats.expiredStock}
-                                </span>
-                            </div>
-                            <Link
-                                href="/emar/stock"
-                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
-                            >
-                                Manage stock &amp; reorders →
-                            </Link>
-                        </CardContent>
-                    </Card>
+                    {can.manage_stock ? (
+                        <Card className="rounded-[18px]">
+                            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 pb-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                                        <Package className="h-4 w-4" />
+                                    </span>
+                                    <CardTitle className="text-sm">
+                                        Stock &amp; pharmacy
+                                    </CardTitle>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 shrink-0 px-2.5 text-xs"
+                                    onClick={() => openModal('stock-movement')}
+                                >
+                                    Record stock
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="space-y-1.5 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">
+                                        Low stock
+                                    </span>
+                                    <span className="font-semibold">
+                                        {stats.lowStock}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">
+                                        Expiring soon
+                                    </span>
+                                    <span className="font-semibold text-status-warning">
+                                        {stats.expiringStock}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">
+                                        Expired
+                                    </span>
+                                    <span className="font-semibold text-status-critical">
+                                        {stats.expiredStock}
+                                    </span>
+                                </div>
+                                <Link
+                                    href="/emar/stock"
+                                    className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                                >
+                                    Manage stock &amp; reorders →
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
                     {/* Medication errors */}
                     <Card className="rounded-[18px]">
@@ -1805,24 +1891,32 @@ export default function EmarHome(props: Props) {
                                     icon: Pill,
                                     tone: 'primary' as KpiTone,
                                 },
-                                {
-                                    title: 'CD register',
-                                    href: '/emar/controlled',
-                                    icon: Lock,
-                                    tone: 'critical' as KpiTone,
-                                },
+                                ...(can.view_controlled
+                                    ? [
+                                          {
+                                              title: 'CD register',
+                                              href: '/emar/controlled',
+                                              icon: Lock,
+                                              tone: 'critical' as KpiTone,
+                                          },
+                                      ]
+                                    : []),
                                 {
                                     title: 'Reviews',
                                     href: '/emar/reviews',
                                     icon: ClipboardCheck,
                                     tone: 'warning' as KpiTone,
                                 },
-                                {
-                                    title: 'Reports',
-                                    href: '/emar/reports',
-                                    icon: Printer,
-                                    tone: 'primary' as KpiTone,
-                                },
+                                ...(can.export_reports
+                                    ? [
+                                          {
+                                              title: 'Reports',
+                                              href: '/emar/reports',
+                                              icon: Printer,
+                                              tone: 'primary' as KpiTone,
+                                          },
+                                      ]
+                                    : []),
                                 {
                                     title: 'Handovers',
                                     href: '/emar/handovers',
@@ -1867,11 +1961,13 @@ export default function EmarHome(props: Props) {
             </div>
 
             {/* ── Modals ── */}
-            <GenerateRoundsModal
-                open={modal === 'generate-rounds'}
-                onClose={() => setModal(null)}
-                defaultDate={date}
-            />
+            {can.record ? (
+                <GenerateRoundsModal
+                    open={modal === 'generate-rounds'}
+                    onClose={() => setModal(null)}
+                    defaultDate={date}
+                />
+            ) : null}
             <ReportErrorModal
                 open={modal === 'report-error'}
                 onClose={() => setModal(null)}
@@ -1887,34 +1983,42 @@ export default function EmarHome(props: Props) {
                 onClose={() => setModal(null)}
                 clients={clientOptions}
             />
-            <CdRegisterModal
-                open={modal === 'cd-register'}
-                onClose={() => setModal(null)}
-                clients={clientOptions}
-                medications={medicationOptions}
-                witnesses={witnesses}
-                currentUserId={currentUserId}
-                initialClientId={modalClientId}
-            />
-            <StockMovementModal
-                open={modal === 'stock-movement'}
-                onClose={() => setModal(null)}
-                clients={clientOptions}
-                medications={medicationOptions}
-                initialClientId={modalClientId}
-            />
-            <ReportsModal
-                open={modal === 'reports'}
-                onClose={() => setModal(null)}
-                clients={clientOptions}
-                defaultDate={date}
-            />
+            {can.view_controlled && can.record_controlled ? (
+                <CdRegisterModal
+                    open={modal === 'cd-register'}
+                    onClose={() => setModal(null)}
+                    clients={clientOptions}
+                    medications={medicationOptions}
+                    witnesses={witnesses}
+                    currentUserId={currentUserId}
+                    initialClientId={modalClientId}
+                />
+            ) : null}
+            {can.manage_stock ? (
+                <StockMovementModal
+                    open={modal === 'stock-movement'}
+                    onClose={() => setModal(null)}
+                    clients={clientOptions}
+                    medications={medicationOptions}
+                    initialClientId={modalClientId}
+                />
+            ) : null}
+            {can.export_reports ? (
+                <ReportsModal
+                    open={modal === 'reports'}
+                    onClose={() => setModal(null)}
+                    clients={clientOptions}
+                    defaultDate={date}
+                />
+            ) : null}
             <AuditLogModal
                 open={modal === 'audit-log'}
                 onClose={() => setModal(null)}
                 activity={recentActivity}
             />
-            {recordWizard ? (
+            {recordWizard &&
+            can.record &&
+            (!recordWizard.row.is_controlled || can.record_controlled) ? (
                 <RecordDoseWizard
                     row={recordWizard.row}
                     client={recordWizard.client}

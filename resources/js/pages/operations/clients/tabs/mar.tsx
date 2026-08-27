@@ -27,6 +27,9 @@ export type MarTabProps = {
         pending_alerts_count?: number;
         next_review_date?: string | null;
     } | null;
+    canRecord: boolean;
+    canRecordControlled: boolean;
+    canViewControlled: boolean;
     onRecordDose: (medicationId?: number) => void;
 };
 
@@ -37,6 +40,9 @@ export function MarTab({
     medications,
     allergies,
     emarSummary,
+    canRecord,
+    canRecordControlled,
+    canViewControlled,
     onRecordDose,
 }: MarTabProps) {
     const meds = medications ?? [];
@@ -73,13 +79,15 @@ export function MarTab({
                             Full MAR chart
                         </Link>
                     </Button>
-                    <Button
-                        onClick={() => onRecordDose()}
-                        data-test="mar-record-dose"
-                    >
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        Record dose
-                    </Button>
+                    {canRecord ? (
+                        <Button
+                            onClick={() => onRecordDose()}
+                            data-test="mar-record-dose"
+                        >
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Record dose
+                        </Button>
+                    ) : null}
                 </div>
             </div>
 
@@ -137,7 +145,9 @@ export function MarTab({
 
             {/* Stats */}
             {emarSummary && (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div
+                    className={`grid grid-cols-2 gap-3 ${canViewControlled ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}
+                >
                     <div className="rounded-xl border bg-status-info-bg p-4 text-center">
                         <div className="text-3xl font-bold text-status-info">
                             {emarSummary.active_medications_count}
@@ -163,18 +173,20 @@ export function MarTab({
                             Last Administration
                         </div>
                     </div>
-                    <div
-                        className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-status-critical-bg' : ''}`}
-                    >
+                    {canViewControlled ? (
                         <div
-                            className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                            className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-status-critical-bg' : ''}`}
                         >
-                            {controlledMeds.length}
+                            <div
+                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                            >
+                                {controlledMeds.length}
+                            </div>
+                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                Controlled Drugs
+                            </div>
                         </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Controlled Drugs
-                        </div>
-                    </div>
+                    ) : null}
                     <div className="rounded-xl border bg-primary/10 p-4 text-center">
                         <div className="text-sm font-bold text-primary">
                             {emarSummary.next_review_date
@@ -211,12 +223,14 @@ export function MarTab({
                         eMAR Dashboard
                     </Link>
                 </Button>
-                <Button variant="outline" className="gap-1.5" asChild>
-                    <Link href={`/emar/controlled?client_id=${clientId}`}>
-                        <Shield className="h-3.5 w-3.5" />
-                        Controlled Drugs
-                    </Link>
-                </Button>
+                {canViewControlled ? (
+                    <Button variant="outline" className="gap-1.5" asChild>
+                        <Link href={`/emar/controlled?client_id=${clientId}`}>
+                            <Shield className="h-3.5 w-3.5" />
+                            Controlled Drugs
+                        </Link>
+                    </Button>
+                ) : null}
                 <Button variant="outline" className="gap-1.5" asChild>
                     <Link href={`/emar/reviews?client_id=${clientId}`}>
                         <BookOpen className="h-3.5 w-3.5" />
@@ -351,14 +365,18 @@ export function MarTab({
                                             </p>
                                         )}
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="shrink-0"
-                                        onClick={() => onRecordDose(m.id)}
-                                    >
-                                        Sign
-                                    </Button>
+                                    {canRecord &&
+                                    (!m.controlled_drug ||
+                                        canRecordControlled) ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            onClick={() => onRecordDose(m.id)}
+                                        >
+                                            Sign
+                                        </Button>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
@@ -428,13 +446,17 @@ export function MarTab({
                                             </p>
                                         )}
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        className="shrink-0"
-                                        onClick={() => onRecordDose(m.id)}
-                                    >
-                                        Give PRN
-                                    </Button>
+                                    {canRecord &&
+                                    (!m.controlled_drug ||
+                                        canRecordControlled) ? (
+                                        <Button
+                                            size="sm"
+                                            className="shrink-0"
+                                            onClick={() => onRecordDose(m.id)}
+                                        >
+                                            Give PRN
+                                        </Button>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>

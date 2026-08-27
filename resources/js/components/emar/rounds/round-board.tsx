@@ -25,6 +25,7 @@ type Props = {
     rounds: RoundSummary[];
     view: 'cards' | 'list';
     expanded: Record<number, boolean>;
+    canRecord: boolean;
     onToggleExpand: (id: number) => void;
     onOpen: (id: number) => void;
     onAudit: (round: RoundSummary) => void;
@@ -136,6 +137,7 @@ export default function RoundBoard({
     rounds,
     view,
     expanded,
+    canRecord,
     onToggleExpand,
     onOpen,
     onAudit,
@@ -176,6 +178,12 @@ export default function RoundBoard({
                         <tbody>
                             {rounds.map((r) => {
                                 const counts = roundCounts(r.cells);
+                                const completed =
+                                    r.status === 'completed' ||
+                                    (counts.total > 0 &&
+                                        counts.due === 0 &&
+                                        counts.recorded > 0);
+                                const canOpen = canRecord || completed;
                                 const { variant } = primaryMeta(r.status);
                                 return (
                                     <tr
@@ -238,13 +246,21 @@ export default function RoundBoard({
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5">
-                                                <Button
-                                                    size="sm"
-                                                    variant={variant}
-                                                    onClick={() => onOpen(r.id)}
-                                                >
-                                                    {roundActionLabel(r.status)}
-                                                </Button>
+                                                {canOpen ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant={variant}
+                                                        onClick={() =>
+                                                            onOpen(r.id)
+                                                        }
+                                                    >
+                                                        {completed
+                                                            ? 'Review round'
+                                                            : roundActionLabel(
+                                                                  r.status,
+                                                              )}
+                                                    </Button>
+                                                ) : null}
                                                 <Button
                                                     size="icon"
                                                     variant="outline"
@@ -270,6 +286,12 @@ export default function RoundBoard({
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
             {rounds.map((r) => {
                 const counts = roundCounts(r.cells);
+                const completed =
+                    r.status === 'completed' ||
+                    (counts.total > 0 &&
+                        counts.due === 0 &&
+                        counts.recorded > 0);
+                const canOpen = canRecord || completed;
                 const { variant, Icon } = primaryMeta(r.status);
                 const isOpen = !!expanded[r.id];
                 return (
@@ -345,13 +367,17 @@ export default function RoundBoard({
                         </div>
 
                         <div className="mt-auto flex items-center gap-2 border-t p-3">
-                            <Button
-                                variant={variant}
-                                onClick={() => onOpen(r.id)}
-                            >
-                                <Icon className="h-4 w-4" />
-                                {roundActionLabel(r.status)}
-                            </Button>
+                            {canOpen ? (
+                                <Button
+                                    variant={variant}
+                                    onClick={() => onOpen(r.id)}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {completed
+                                        ? 'Review round'
+                                        : roundActionLabel(r.status)}
+                                </Button>
+                            ) : null}
                             <Button
                                 variant="outline"
                                 onClick={() => onToggleExpand(r.id)}

@@ -66,14 +66,15 @@ class HandleInertiaRequests extends Middleware
             // workers — managers get the eMAR sub-panel instead), and cached
             // briefly because the dose-slot maths isn't free.
             $showsWorkerMedsItem = ! (
-                ($can['medications']['ordersManage'] ?? false)
+                (($can['medications']['view'] ?? false) && ($can['medications']['ordersManage'] ?? false))
+                || (($can['medications']['view'] ?? false) && ($can['medications']['stockUpdate'] ?? false))
+                || (($can['medications']['view'] ?? false) && ($can['medications']['controlledView'] ?? false))
                 || ($can['medications']['auditView'] ?? false)
                 || ($can['medications']['reportsExport'] ?? false)
                 || ($can['reports']['viewAny'] ?? false)
             ) && (
                 ($can['medications']['administerRecord'] ?? false)
                 || ($can['medications']['view'] ?? false)
-                || ($can['clients']['update'] ?? false)
             );
 
             if ($showsWorkerMedsItem && isset($can['medications'])) {
@@ -518,6 +519,7 @@ class HandleInertiaRequests extends Middleware
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
                 'reportsExport' => $user->canDo('medications.reports.export'),
+                'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),
                 'controlledWitness' => $user->canDo('medications.controlled.witness'),

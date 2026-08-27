@@ -43,6 +43,7 @@ import {
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
+    can_record: boolean;
     destructions: DestructionRow[];
     medications: CdMedication[];
     staff: StaffOption[];
@@ -179,6 +180,7 @@ function exportCsv(rows: DestructionRow[]) {
 }
 
 export default function Destructions({
+    can_record: canRecord,
     destructions,
     medications,
     staff,
@@ -351,7 +353,7 @@ export default function Destructions({
                 label: 'Export this record',
                 onClick: () => exportCsv([d]),
             },
-            ...(d.is_voided
+            ...(d.is_voided || !canRecord
                 ? []
                 : [
                       { sep: true } as ShiftCtxItem,
@@ -462,13 +464,15 @@ export default function Destructions({
                     stats={heroStats}
                     actions={
                         <>
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() => setModal({ type: 'record' })}
-                            >
-                                <Plus className="h-4 w-4" />
-                                Record destruction
-                            </Button>
+                            {canRecord ? (
+                                <Button
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    onClick={() => setModal({ type: 'record' })}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Record destruction
+                                </Button>
+                            ) : null}
                             <Button
                                 variant="outline"
                                 className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
@@ -587,8 +591,14 @@ export default function Destructions({
                                 key={d.id}
                                 d={d}
                                 rowProps={rowProps(d)}
-                                onVoid={() =>
-                                    setModal({ type: 'void', row: d })
+                                onVoid={
+                                    canRecord
+                                        ? () =>
+                                              setModal({
+                                                  type: 'void',
+                                                  row: d,
+                                              })
+                                        : undefined
                                 }
                             />
                         ))}
@@ -660,7 +670,7 @@ export default function Destructions({
                                             label="Voided"
                                             tone="bg-muted text-muted-foreground"
                                         />
-                                    ) : (
+                                    ) : canRecord ? (
                                         <Button
                                             size="sm"
                                             variant="ghost"
@@ -674,7 +684,7 @@ export default function Destructions({
                                         >
                                             Void
                                         </Button>
-                                    )}
+                                    ) : null}
                                 </td>
                             </tr>
                         ))}
@@ -750,7 +760,7 @@ export default function Destructions({
                 )}
             </div>
 
-            {modal?.type === 'record' && (
+            {canRecord && modal?.type === 'record' && (
                 <RecordDestructionDialog
                     medications={medications}
                     staff={staff}
@@ -759,7 +769,7 @@ export default function Destructions({
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'void' && (
+            {canRecord && modal?.type === 'void' && (
                 <VoidDestructionDialog
                     destruction={modal.row}
                     onClose={() => setModal(null)}
@@ -769,7 +779,11 @@ export default function Destructions({
                 <DestructionDetailDialog
                     record={modal.row}
                     onClose={() => setModal(null)}
-                    onVoid={() => setModal({ type: 'void', row: modal.row })}
+                    onVoid={
+                        canRecord
+                            ? () => setModal({ type: 'void', row: modal.row })
+                            : undefined
+                    }
                     onExport={() => exportCsv([modal.row])}
                 />
             )}
@@ -791,7 +805,7 @@ function LogRow({
 }: {
     d: DestructionRow;
     rowProps: React.HTMLAttributes<HTMLTableRowElement> & { tabIndex: number };
-    onVoid: () => void;
+    onVoid?: () => void;
 }) {
     return (
         <tr {...rowProps}>
@@ -848,7 +862,7 @@ function LogRow({
                     <span className="text-xs text-muted-foreground">
                         {fmtDate(d.voided_at)}
                     </span>
-                ) : (
+                ) : onVoid ? (
                     <Button
                         size="sm"
                         variant="ghost"
@@ -859,7 +873,7 @@ function LogRow({
                     >
                         Void
                     </Button>
-                )}
+                ) : null}
             </td>
         </tr>
     );

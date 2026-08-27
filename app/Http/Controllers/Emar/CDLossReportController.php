@@ -8,6 +8,7 @@ use App\Models\ControlledDrugLossReport;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CDLossReportController extends Controller
 {
@@ -15,6 +16,9 @@ class CDLossReportController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless($request->user()?->canDo('medications.view'), 403);
+        abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+
         $reports = ControlledDrugLossReport::with([
             'client:id,first_name,last_name',
             'discoveredBy:id,name',
@@ -27,6 +31,8 @@ class CDLossReportController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('medications.controlled.record'), 403);
+
         $validated = $request->validate([
             'client_id' => ['nullable', 'exists:clients,id'],
             'client_medication_id' => ['nullable', 'exists:client_medications,id'],
@@ -50,11 +56,25 @@ class CDLossReportController extends Controller
         ]);
 
         $scope = 'emar-controlled-loss-report';
+        $idempotencyBinding = $this->lossReportSyncBinding(
+            $validated,
+            (int) $request->user()->id,
+        );
 
         if (
             $this->medicationSyncRequested($validated)
             && ($cached = $this->getCachedMedicationSyncResponse($scope, $validated))
         ) {
+            if (data_get($cached, 'idempotency_binding') !== $idempotencyBinding) {
+                return response()->json(
+                    $this->buildMedicationConflictPayload(
+                        $validated,
+                        'This controlled drug loss request was already used for a different reporter, target, or report. Please submit it again with a new request identifier.',
+                    ),
+                    409,
+                );
+            }
+
             return response()->json($cached);
         }
 
@@ -83,6 +103,7 @@ class CDLossReportController extends Controller
 
         $payload = [
             'success' => true,
+            'idempotency_binding' => $idempotencyBinding,
             'report' => [
                 'id' => $report->id,
                 'client_id' => $report->client_id,
@@ -112,8 +133,48 @@ class CDLossReportController extends Controller
         return redirect()->back()->with('success', 'Controlled drug loss report submitted.');
     }
 
+    /**
+     * Bind an offline retry to the accepted reporter, supplied target, and
+     * complete persisted report semantics. Canonical ownership reconciliation
+     * remains the responsibility of the medication scope workflow.
+     */
+    private function lossReportSyncBinding(array $validated, int $actorId): array
+    {
+        $semanticInputs = [
+            'quantity_lost' => number_format((float) $validated['quantity_lost'], 2, '.', ''),
+            'unit' => Str::lower(trim((string) ($validated['unit'] ?? 'tablets'))),
+            'circumstances' => (string) $validated['circumstances'],
+            'immediate_action_taken' => (string) $validated['immediate_action_taken'],
+            'accountable_officer_name' => trim((string) ($validated['accountable_officer_name'] ?? '')),
+            'reported_to_police' => (bool) ($validated['reported_to_police'] ?? false),
+            'police_reference' => trim((string) ($validated['police_reference'] ?? '')),
+            'reported_to_pharmacy' => (bool) ($validated['reported_to_pharmacy'] ?? false),
+            'pharmacy_name' => trim((string) ($validated['pharmacy_name'] ?? '')),
+            'reported_to_regulator' => (bool) ($validated['reported_to_regulator'] ?? false),
+            'regulator_name' => trim((string) ($validated['regulator_name'] ?? '')),
+            'regulator_reference' => trim((string) ($validated['regulator_reference'] ?? '')),
+        ];
+
+        return [
+            'version' => 1,
+            'operation' => 'controlled_loss_report',
+            'actor_id' => $actorId,
+            'client_id' => isset($validated['client_id']) ? (int) $validated['client_id'] : null,
+            'client_medication_id' => isset($validated['client_medication_id'])
+                ? (int) $validated['client_medication_id']
+                : null,
+            'medication_name' => Str::lower(trim((string) $validated['medication_name'])),
+            'request_fingerprint' => hash(
+                'sha256',
+                json_encode($semanticInputs, JSON_THROW_ON_ERROR),
+            ),
+        ];
+    }
+
     public function investigate(Request $request, ControlledDrugLossReport $report)
     {
+        abort_unless($request->user()?->canDo('medications.controlled.record'), 403);
+
         $validated = $request->validate([
             'investigation_notes' => ['required', 'string'],
         ]);
@@ -128,6 +189,8 @@ class CDLossReportController extends Controller
 
     public function resolve(Request $request, ControlledDrugLossReport $report)
     {
+        abort_unless($request->user()?->canDo('medications.controlled.record'), 403);
+
         $validated = $request->validate([
             'resolution_outcome' => ['required', 'string'],
         ]);

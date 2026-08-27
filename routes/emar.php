@@ -32,25 +32,26 @@ use Illuminate\Support\Facades\Route;
 // `/emar` dashboard ever being their default destination. Gated by the
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
-Route::middleware([
-    'auth',
-    'permission:medications.administer.record|clients.update|medications.orders.manage',
-])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/meds/today', [WorkerMedsController::class, 'today'])
+        ->middleware('permission:medications.view|medications.administer.record')
         ->name('meds.today');
 
     // PR 13 — PRN (as-needed) quick-entry flow. Delegates to the same
     // EnhancedMarService used everywhere else so audit/safety logic runs
     // untouched; this is just a fast, frontline-shaped surface for it.
     Route::post('/meds/today/prn', [WorkerMedsController::class, 'recordPrn'])
+        ->middleware('permission:medications.administer.record')
         ->name('meds.today.prn');
 
     // Desktop medication board — scheduled-dose recording (Record Dose
     // wizard) and the PRN follow-up effect check. Both delegate to the same
     // services as the admin paths; no second administration pipeline.
     Route::post('/meds/today/record', [WorkerMedsController::class, 'recordDose'])
+        ->middleware('permission:medications.administer.record')
         ->name('meds.today.record');
     Route::post('/meds/today/prn/effect', [WorkerMedsController::class, 'recordPrnEffect'])
+        ->middleware('permission:medications.administer.record')
         ->name('meds.today.prn_effect');
 });
 
@@ -77,7 +78,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Controlled Drugs
     Route::get('/controlled', [EmarController::class, 'controlled'])
-        ->middleware('permission:medications.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.controlled.view',
+        ])
         ->name('emar.controlled');
 
     // Medications Database
@@ -92,7 +96,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Stock Management
     Route::get('/stock', [EmarController::class, 'stock'])
-        ->middleware('permission:medications.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.stock.update',
+        ])
         ->name('emar.stock');
 
     // Prescriptions & Prescriber Orders
@@ -116,14 +123,16 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Medication Rounds
     Route::get('/rounds', [EmarController::class, 'rounds'])
-        ->middleware('permission:medications.view')
+        ->middleware('permission:medications.view|medications.administer.record')
         ->name('emar.rounds');
 
     // Frontline Guided Round flow — worker-facing, gated by administer/record
     // rather than orders.manage so support workers can walk a round safely.
-    Route::middleware('permission:medications.administer.record|clients.update|medications.orders.manage')->group(function () {
+    Route::middleware('permission:medications.administer.record')->group(function () {
         Route::get('/rounds/{round}/guided', [GuidedRoundController::class, 'show'])
             ->name('meds.round.show');
+        Route::post('/rounds/{round}/guided/start', [GuidedRoundController::class, 'start'])
+            ->name('meds.round.start');
         Route::post('/rounds/{round}/guided/items/{medication}', [GuidedRoundController::class, 'administer'])
             ->name('meds.round.administer');
         Route::post('/rounds/{round}/guided/complete', [GuidedRoundController::class, 'complete'])
@@ -137,7 +146,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Destruction / Disposal Records
     Route::get('/destructions', [EmarController::class, 'destructions'])
-        ->middleware('permission:medications.view')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.controlled.view',
+        ])
         ->name('emar.destructions');
 
     // Medication Handovers
@@ -208,6 +220,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
         Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
 
+    }); // end medications.orders.manage middleware group
+
+    Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])
+        ->middleware('permission:medications.administer.record')
+        ->name('emar.prn_effectiveness.store');
+
+    Route::middleware('permission:medications.controlled.record')->group(function () {
         // Controlled Drug Entries
         Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
         Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
@@ -216,7 +235,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         // Destructions — the register is immutable; erroneous records are voided, not deleted (MoD Regs 1977)
         Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
         Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
+    });
 
+    Route::middleware('permission:medications.stock.update')->group(function () {
         // Pharmacy Orders + Stock
         Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
         Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
@@ -224,11 +245,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::patch('/stock/{stock}', [EmarController::class, 'updateStockItem'])->name('emar.stock.update');
         Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
         Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
-
-        // PRN Effectiveness
-        Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
-
-    }); // end medications.orders.manage middleware group
+    });
 
     Route::middleware('permission:medications.orders.verify')->group(function () {
         Route::post('/medications/{medication}/verify', [EmarController::class, 'verifyMedication'])->name('emar.medications.verify');
@@ -333,6 +350,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::get('/reports/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
             ->name('emar.reports.export_mar');
         Route::get('/reports/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
+            ->middleware('permission:medications.controlled.view')
             ->name('emar.reports.export_discrepancies');
     });
 
@@ -349,16 +367,19 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── Controlled Drug Loss Reports ─────────────────────
     Route::get('/controlled/loss-reports', [CDLossReportController::class, 'index'])
-        ->middleware('permission:medications.controlled.view|clients.update')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.controlled.view',
+        ])
         ->name('emar.cd_loss.index');
     Route::post('/controlled/loss-reports', [CDLossReportController::class, 'store'])
-        ->middleware('permission:medications.controlled.record|clients.update')
+        ->middleware('permission:medications.controlled.record')
         ->name('emar.cd_loss.store');
     Route::post('/controlled/loss-reports/{report}/investigate', [CDLossReportController::class, 'investigate'])
-        ->middleware('permission:medications.controlled.record|clients.update')
+        ->middleware('permission:medications.controlled.record')
         ->name('emar.cd_loss.investigate');
     Route::post('/controlled/loss-reports/{report}/resolve', [CDLossReportController::class, 'resolve'])
-        ->middleware('permission:medications.controlled.record|clients.update')
+        ->middleware('permission:medications.controlled.record')
         ->name('emar.cd_loss.resolve');
 
     // ─── Medication Errors ──────────────────────────────────
@@ -390,7 +411,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
         Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
-        Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])->name('emar.pdf.cd_register');
+        Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])
+            ->middleware('permission:medications.controlled.view')
+            ->name('emar.pdf.cd_register');
         Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
     });
 });

@@ -563,6 +563,13 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        $actor = User::query()->find($userId);
+        abort_unless($actor?->canDo('medications.administer.record'), 403);
+        abort_if(
+            $medication->controlled_drug && ! $actor->canDo('medications.controlled.record'),
+            403,
+        );
+
         $overrideValidation = $this->validateSafetyOverrideRequest($data, $userId);
         if ($overrideValidation !== null) {
             return $overrideValidation;

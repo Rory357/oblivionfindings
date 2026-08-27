@@ -509,6 +509,7 @@ type Props = {
         view_family_chat?: boolean;
         send_family_chat?: boolean;
         record_medication_administration?: boolean;
+        record_controlled_medication?: boolean;
         update_risk_level?: boolean;
         navigate_daily_notes?: boolean;
         navigate_care_plans?: boolean;
@@ -2394,6 +2395,10 @@ export default function ClientShow({
                     }}
                     flowContext={flowContext}
                     medications={(medical?.medications ?? []) as any[]}
+                    canRecord={Boolean(can.record_medication_administration)}
+                    canRecordControlled={Boolean(
+                        can.record_controlled_medication,
+                    )}
                 />
 
                 {tab === 'profile' &&
@@ -3658,6 +3663,15 @@ export default function ClientShow({
                                 : []
                         }
                         emarSummary={emarSummary}
+                        canRecord={Boolean(
+                            can.record_medication_administration,
+                        )}
+                        canRecordControlled={Boolean(
+                            can.record_controlled_medication,
+                        )}
+                        canViewControlled={Boolean(
+                            auth?.can?.medications?.controlledView,
+                        )}
                         onRecordDose={(medicationId) =>
                             openProfileDialog(
                                 'emar',

@@ -183,7 +183,7 @@ class RbacSeeder extends Seeder
             ['key' => 'fleet.bookings.approve', 'description' => 'Approve/reject vehicle bookings', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.incidents.manage', 'description' => 'Manage fleet incidents', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.maintenance.manage', 'description' => 'Manage fleet maintenance', 'group' => 'fleet', 'module' => 'Resources'],
-            ['key' => 'fleet.medication.manage', 'description' => 'Pack/administer medications during transport', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.medication.manage', 'description' => 'Pack, correct, and return medications during transport', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.mileage.approve', 'description' => 'Approve/reject mileage claims', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.outings.manage', 'description' => 'Manage fleet outings', 'group' => 'fleet', 'module' => 'Resources'],
 

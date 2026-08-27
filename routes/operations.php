@@ -568,12 +568,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.clients.medical.medications.discontinue');
 
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
-        ->middleware('permission:medications.stock.update|medications.controlled.record|clients.update')
+        ->middleware('permission:medications.stock.update')
         ->name('operations.clients.medical.medications.stock.update');
 
     // Medication administration
     Route::post('/clients/{client}/medical/medications/{medication}/administrations', [ClientMedicalController::class, 'storeAdministration'])
-        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
+        ->middleware('permission:medications.administer.record')
         ->name('operations.clients.medical.medications.administrations.store');
 
     // Medication administration corrections

@@ -13,6 +13,7 @@ import { roundCounts, roundStatusMeta, type RoundSummary } from './types';
 type Props = {
     rounds: RoundSummary[];
     dateTitle: string;
+    canRecord: boolean;
     onOpen: (id: number) => void;
     onContext: (e: MouseEvent, round: RoundSummary) => void;
 };
@@ -35,6 +36,7 @@ function shortName(name: string): string {
 export default function RoundTimeline({
     rounds,
     dateTitle,
+    canRecord,
     onOpen,
     onContext,
 }: Props) {
@@ -99,7 +101,10 @@ export default function RoundTimeline({
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">Round timeline</h2>
                 <span className="text-xs text-muted-foreground">
-                    — {dateTitle} · tap a round to walk it
+                    — {dateTitle} ·{' '}
+                    {canRecord
+                        ? 'tap a round to walk it'
+                        : 'review completed rounds'}
                 </span>
             </div>
 
@@ -130,6 +135,12 @@ export default function RoundTimeline({
                         {/* nodes */}
                         {rounds.map((r) => {
                             const counts = roundCounts(r.cells);
+                            const completed =
+                                r.status === 'completed' ||
+                                (counts.total > 0 &&
+                                    counts.due === 0 &&
+                                    counts.recorded > 0);
+                            const canOpen = canRecord || completed;
                             const left = layout.nodeLeft.get(r.id) ?? 0;
                             const col = roundArcColor(r.status);
                             const Glyph =
@@ -143,11 +154,12 @@ export default function RoundTimeline({
                                     key={r.id}
                                     type="button"
                                     title={`${r.name} · ${r.scheduled_time}`}
-                                    aria-label={`${r.name}, ${r.scheduled_time}, ${roundStatusMeta(r.status).label}, ${counts.pct}% recorded — open guided round`}
-                                    onClick={() => onOpen(r.id)}
+                                    aria-label={`${r.name}, ${r.scheduled_time}, ${roundStatusMeta(r.status).label}, ${counts.pct}% recorded — ${completed ? 'review round' : canRecord ? 'open guided round' : 'recording unavailable'}`}
+                                    onClick={() => canOpen && onOpen(r.id)}
+                                    disabled={!canOpen}
                                     onContextMenu={(e) => onContext(e, r)}
                                     onKeyDown={(e) => openMenuFromKey(e, r)}
-                                    className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1 bg-transparent"
+                                    className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1 bg-transparent disabled:cursor-default disabled:opacity-60"
                                     style={{ left: `${left}%` }}
                                 >
                                     <span

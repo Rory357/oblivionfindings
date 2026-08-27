@@ -203,9 +203,18 @@ function MedRow({
             <button
                 type="button"
                 onClick={() =>
-                    !resolved && onGiveMed(med.medication_id, med.scheduled_for)
+                    !resolved &&
+                    med.can_give &&
+                    onGiveMed(med.medication_id, med.scheduled_for)
                 }
-                title={resolved ? resolvedLabel : 'Mark as given'}
+                disabled={!resolved && !med.can_give}
+                title={
+                    resolved
+                        ? resolvedLabel
+                        : med.can_give
+                          ? 'Mark as given'
+                          : 'Open eMAR to record this dose'
+                }
                 aria-pressed={resolved}
                 className={cn(
                     'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px]',
@@ -308,14 +317,16 @@ function MedRow({
                         hover ? 'opacity-100' : 'pointer-events-none opacity-0',
                     )}
                 >
-                    <HoverAction
-                        icon={Check}
-                        label="Mark as given"
-                        tone="success"
-                        onClick={() =>
-                            onGiveMed(med.medication_id, med.scheduled_for)
-                        }
-                    />
+                    {med.can_give ? (
+                        <HoverAction
+                            icon={Check}
+                            label="Mark as given"
+                            tone="success"
+                            onClick={() =>
+                                onGiveMed(med.medication_id, med.scheduled_for)
+                            }
+                        />
+                    ) : null}
                     <HoverAction
                         icon={Clock}
                         label="Snooze 15m"
@@ -323,14 +334,19 @@ function MedRow({
                             onSnoozeMed?.(med.medication_id, med.scheduled_for)
                         }
                     />
-                    <HoverAction
-                        icon={AlertTriangle}
-                        label="Refuse / not given"
-                        tone="danger"
-                        onClick={() =>
-                            onRefuseMed?.(med.medication_id, med.scheduled_for)
-                        }
-                    />
+                    {med.can_record ? (
+                        <HoverAction
+                            icon={AlertTriangle}
+                            label="Refuse / not given"
+                            tone="danger"
+                            onClick={() =>
+                                onRefuseMed?.(
+                                    med.medication_id,
+                                    med.scheduled_for,
+                                )
+                            }
+                        />
+                    ) : null}
                     <HoverAction
                         icon={MoreHorizontal}
                         label="More"

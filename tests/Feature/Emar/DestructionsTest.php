@@ -29,9 +29,15 @@ class DestructionsTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage']);
+        $this->grantPermissions($user, [
+            'medications.view',
+            'medications.controlled.view',
+            'medications.controlled.record',
+        ]);
         $w1 = $this->makeRoleUser('coordinator');
         $w2 = $this->makeRoleUser('coordinator');
+        $this->grantPermissions($w1, ['medications.controlled.witness']);
+        $this->grantPermissions($w2, ['medications.controlled.witness']);
 
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);

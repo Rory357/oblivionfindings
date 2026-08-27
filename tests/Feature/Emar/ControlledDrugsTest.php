@@ -31,7 +31,12 @@ class ControlledDrugsTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.controlled.record', 'medications.controlled.witness', 'clients.update']);
+        $this->grantPermissions($user, [
+            'medications.view',
+            'medications.controlled.view',
+            'medications.controlled.record',
+            'medications.controlled.witness',
+        ]);
         $witness = $this->makeRoleUser('coordinator');
         $this->grantPermissions($witness, ['medications.controlled.witness']);
 
@@ -185,6 +190,71 @@ class ControlledDrugsTest extends TestCase
             'The area was isolated, remaining stock was secured, and the client was checked.',
             $report->immediate_action_taken,
         );
+    }
+
+    public function test_loss_report_replay_is_bound_to_authority_target_and_report_semantics(): void
+    {
+        ['user' => $user, 'client' => $client, 'med' => $medication] = $this->setupCd();
+        $requestUuid = '2e8b577c-c474-43ca-a533-8a1ed1cb65fa';
+        $payload = [
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'medication_name' => $medication->name,
+            'quantity_lost' => 2,
+            'unit' => 'tablets',
+            'circumstances' => 'Count was short during handover.',
+            'immediate_action_taken' => 'Remaining stock was secured.',
+            'client_request_uuid' => $requestUuid,
+        ];
+
+        $first = $this->actingAs($user)
+            ->postJson(route('emar.cd_loss.store'), $payload)
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', false);
+        $reportId = $first->json('report.id');
+
+        $this->actingAs($user)
+            ->postJson(route('emar.cd_loss.store'), $payload)
+            ->assertOk()
+            ->assertJsonPath('sync.duplicate', true)
+            ->assertJsonPath('report.id', $reportId);
+        $this->assertDatabaseCount('controlled_drug_loss_reports', 1);
+
+        $recordPermission = Permission::query()
+            ->where('key', 'medications.controlled.record')
+            ->firstOrFail();
+        $user->permissionOverrides()->syncWithoutDetaching([
+            $recordPermission->id => ['allowed' => false],
+        ]);
+        $user->unsetRelation('permissionOverrides');
+        $user->unsetRelation('roles');
+
+        $this->actingAs($user)
+            ->postJson(route('emar.cd_loss.store'), $payload)
+            ->assertForbidden();
+
+        $user->permissionOverrides()->syncWithoutDetaching([
+            $recordPermission->id => ['allowed' => true],
+        ]);
+        $user->unsetRelation('permissionOverrides');
+        $user->unsetRelation('roles');
+
+        $this->actingAs($user)
+            ->postJson(route('emar.cd_loss.store'), [
+                ...$payload,
+                'quantity_lost' => 3,
+            ])
+            ->assertConflict()
+            ->assertJsonPath('sync.status', 'conflict');
+
+        $secondActor = $this->makeRoleUser('coordinator');
+        $this->grantPermissions($secondActor, ['medications.controlled.record']);
+        $this->actingAs($secondActor)
+            ->postJson(route('emar.cd_loss.store'), $payload)
+            ->assertConflict()
+            ->assertJsonPath('sync.status', 'conflict');
+
+        $this->assertDatabaseCount('controlled_drug_loss_reports', 1);
     }
 
     public function test_balance_check_mismatch_links_incident_to_discrepancy(): void

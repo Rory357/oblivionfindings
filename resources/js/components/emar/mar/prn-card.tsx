@@ -6,10 +6,16 @@ import { Plus, Syringe } from 'lucide-react';
 type Props = {
     prn: PrnMedication[];
     canRecord: boolean;
+    canRecordControlled: boolean;
     onGive: (med: PrnMedication) => void;
 };
 
-export default function PrnCard({ prn, canRecord, onGive }: Props) {
+export default function PrnCard({
+    prn,
+    canRecord,
+    canRecordControlled,
+    onGive,
+}: Props) {
     if (prn.length === 0) {
         return null;
     }
@@ -80,7 +86,8 @@ export default function PrnCard({ prn, canRecord, onGive }: Props) {
                                           : 'none today'}
                                 </div>
                             </div>
-                            {canRecord && (
+                            {canRecord &&
+                            (!med.is_controlled || canRecordControlled) ? (
                                 <Button
                                     size="sm"
                                     disabled={blocked}
@@ -89,7 +96,7 @@ export default function PrnCard({ prn, canRecord, onGive }: Props) {
                                     <Plus className="h-4 w-4" />
                                     Give
                                 </Button>
-                            )}
+                            ) : null}
                         </li>
                     );
                 })}

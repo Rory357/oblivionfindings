@@ -426,6 +426,7 @@ class MedsBoardPayloadService
             'name' => $user->name,
             'role_label' => $user->role ? Str::headline($user->role) : null,
             'med_competent' => $user->canDo('medications.administer.record'),
+            'controlled_record' => $user->canDo('medications.controlled.record'),
             'cd_witness' => $user->canDo('medications.controlled.witness'),
         ];
     }

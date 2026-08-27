@@ -89,6 +89,7 @@ type Props = {
         name: string;
         role_label: string | null;
         med_competent: boolean;
+        controlled_record: boolean;
         cd_witness: boolean;
     };
     can_manage: boolean;
@@ -247,6 +248,17 @@ export default function Rounds(props: Props) {
         auditRoundId != null
             ? (rounds.find((r) => r.id === auditRoundId) ?? null)
             : null;
+    const auditRoundCanOpen = auditRound
+        ? (() => {
+              const counts = roundCounts(auditRound.cells);
+
+              return (
+                  signer.med_competent ||
+                  auditRound.status === 'completed' ||
+                  (counts.total > 0 && counts.due === 0 && counts.recorded > 0)
+              );
+          })()
+        : false;
 
     // ── Right-click context menu ──
     const openContext = (e: MouseEvent, round: RoundSummary) => {
@@ -261,17 +273,21 @@ export default function Rounds(props: Props) {
         const tag = statusTag(original.status);
 
         const items: ShiftCtxItem[] = [
-            {
-                icon: <LayoutList className="h-3.5 w-3.5" />,
-                label: completed
-                    ? 'Review round'
-                    : inProgress
-                      ? 'Resume guided round'
-                      : 'Start guided round',
-                sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded`,
-                tone: 'primary',
-                onClick: () => openGuided(original.id),
-            },
+            ...(completed || signer.med_competent
+                ? [
+                      {
+                          icon: <LayoutList className="h-3.5 w-3.5" />,
+                          label: completed
+                              ? 'Review round'
+                              : inProgress
+                                ? 'Resume guided round'
+                                : 'Start guided round',
+                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded`,
+                          tone: 'primary',
+                          onClick: () => openGuided(original.id),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
             {
                 icon: <Activity className="h-3.5 w-3.5" />,
                 label: 'Audit & timeline',
@@ -560,6 +576,7 @@ export default function Rounds(props: Props) {
                 <RoundTimeline
                     rounds={filteredRounds}
                     dateTitle={dayTitle}
+                    canRecord={signer.med_competent}
                     onOpen={openGuided}
                     onContext={openContext}
                 />
@@ -587,6 +604,7 @@ export default function Rounds(props: Props) {
                             rounds={filteredRounds}
                             view={boardView}
                             expanded={expanded}
+                            canRecord={signer.med_competent}
                             onToggleExpand={toggleExpand}
                             onOpen={openGuided}
                             onAudit={(r) => setAuditRoundId(r.id)}
@@ -609,6 +627,7 @@ export default function Rounds(props: Props) {
                         <RoundChart
                             residents={filteredResidents}
                             rounds={filteredRounds}
+                            canRecord={signer.med_competent}
                             onOpen={openGuided}
                             onContext={openContext}
                         />
@@ -770,6 +789,7 @@ export default function Rounds(props: Props) {
                     notGivenReasons={notGivenReasons}
                     signer={{
                         med_competent: signer.med_competent,
+                        controlled_record: signer.controlled_record,
                         cd_witness: signer.cd_witness,
                     }}
                     canExport={canExport}
@@ -783,10 +803,14 @@ export default function Rounds(props: Props) {
                     round={auditRound}
                     canExport={canExport}
                     onClose={() => setAuditRoundId(null)}
-                    onOpenGuided={(id) => {
-                        setAuditRoundId(null);
-                        openGuided(id);
-                    }}
+                    onOpenGuided={
+                        auditRoundCanOpen
+                            ? (id) => {
+                                  setAuditRoundId(null);
+                                  openGuided(id);
+                              }
+                            : undefined
+                    }
                     onPrint={printRoundSheet}
                 />
             )}

@@ -45,7 +45,7 @@ interface Props {
     widgets: {
         overdue_meds: Widget;
         prn_near_limits: Widget;
-        controlled_discrepancies: Widget;
+        controlled_discrepancies?: Widget;
         expiring_medications: Widget;
         high_risk_medications: Widget;
         todays_summary: TodaysSummary;
@@ -221,10 +221,12 @@ export default function DashboardWidgets({ widgets }: Props) {
             <TodaySummaryCard summary={widgets.todays_summary} />
             <WidgetCard {...widgets.overdue_meds} icon={Clock} />
             <WidgetCard {...widgets.prn_near_limits} icon={Pill} />
-            <WidgetCard
-                {...widgets.controlled_discrepancies}
-                icon={ShieldAlert}
-            />
+            {widgets.controlled_discrepancies ? (
+                <WidgetCard
+                    {...widgets.controlled_discrepancies}
+                    icon={ShieldAlert}
+                />
+            ) : null}
             <WidgetCard {...widgets.expiring_medications} icon={Calendar} />
             <WidgetCard
                 {...widgets.high_risk_medications}

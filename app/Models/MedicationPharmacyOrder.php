@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicationPharmacyOrder extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'client_id',
@@ -49,7 +49,10 @@ class MedicationPharmacyOrder extends Model
 
     public function medication()
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        // Pharmacy orders are retained after a medication is discontinued.
+        // Keep the historical medication classification available so a soft
+        // delete cannot erase controlled-drug authorization requirements.
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function orderedByUser()

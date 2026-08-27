@@ -61,6 +61,11 @@ class MyTasksController extends Controller
 
         $user = $request->user();
         $userId = $user->id;
+        $canViewMedications = $user->canDo('medications.view')
+            || $user->canDo('medications.administer.record');
+        $canRecordMedications = $user->canDo('medications.administer.record');
+        $canRecordControlledMedications = $canRecordMedications
+            && $user->canDo('medications.controlled.record');
         $workerNow = Carbon::now($this->workerTimezone());
         $queryNow = $workerNow->copy()->utc();
         $today = $workerNow->copy()->startOfDay()->utc();
@@ -85,7 +90,14 @@ class MyTasksController extends Controller
         $clientIds = $activeSitePayload
             ? array_column($activeSitePayload['residents'], 'id')
             : $shifts->pluck('client.id')->filter()->unique()->values()->all();
-        $medicationsDue = $this->getMedicationsDue($clientIds, $workerNow);
+        $medicationsDue = $canViewMedications
+            ? $this->getMedicationsDue(
+                $clientIds,
+                $workerNow,
+                $canRecordMedications,
+                $canRecordControlledMedications,
+            )
+            : [];
 
         // 4. Timesheets
         $timesheets = $this->getTimesheets($userId);
@@ -191,6 +203,9 @@ class MyTasksController extends Controller
             // resolution lives behind canDo() and shouldn't round-trip.
             'can_record_observation' => $user->canDo('clinical.observations.record'),
             'can_record_clinical' => $user->canDo('clinical.observations.recordClinical'),
+            'can_view_medications' => $canViewMedications,
+            'can_record_medications' => $canRecordMedications,
+            'can_record_controlled_medications' => $canRecordControlledMedications,
             // Namespaced as `my_day_labels` so it does not collide with the
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
@@ -667,8 +682,12 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getMedicationsDue(array $clientIds, Carbon $now): array
-    {
+    private function getMedicationsDue(
+        array $clientIds,
+        Carbon $now,
+        bool $canRecord,
+        bool $canRecordControlled,
+    ): array {
         if (empty($clientIds)) {
             return [];
         }
@@ -753,6 +772,12 @@ class MyTasksController extends Controller
                             'dose' => $med->dosage,
                             'route' => $med->route ?? 'Oral',
                             'flag' => $med->is_prn ? 'PRN' : null,
+                            'is_controlled' => (bool) $med->controlled_drug,
+                            'can_record' => $canRecord
+                                && (! $med->controlled_drug || $canRecordControlled),
+                            // My Day has no authenticated second-checker flow;
+                            // controlled doses must be given from an eMAR surface.
+                            'can_give' => $canRecord && ! $med->controlled_drug,
                             'scheduled_for' => $scheduledIso,
                             'status' => $status,
                             'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
@@ -809,7 +834,12 @@ class MyTasksController extends Controller
                 ? (int) floor($workerNow->diffInMinutes($startsAt, false))
                 : null;
             $briefing['incoming_handover'] = $this->findIncomingHandover($user, $shift);
-            $briefing['medications_due_during_shift'] = $this->getShiftMedicationsDue($shift, $workerNow);
+            $briefing['medications_due_during_shift'] = (
+                $user->canDo('medications.view')
+                || $user->canDo('medications.administer.record')
+            )
+                ? $this->getShiftMedicationsDue($shift, $workerNow)
+                : [];
             $briefing['what_to_know'] = $shift->notes;
 
             return $briefing;
@@ -940,7 +970,7 @@ class MyTasksController extends Controller
      */
     private function getActiveRound(User $user, Carbon $now): ?array
     {
-        if (! $user->canDo('medications.administer.record') && ! $user->canDo('clients.update')) {
+        if (! $user->canDo('medications.administer.record')) {
             return null;
         }
 

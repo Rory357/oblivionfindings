@@ -334,9 +334,7 @@ class ClientMedicalController extends Controller
 
         $user = $request->user();
         abort_unless(
-            ($user?->canDo('clients.update') ?? false)
-            || ($user?->canDo('medications.stock.update') ?? false)
-            || ($user?->canDo('medications.controlled.record') ?? false),
+            $user?->canDo('medications.stock.update') ?? false,
             403
         );
 
@@ -363,17 +361,15 @@ class ClientMedicalController extends Controller
             $stock->last_counted_at = $data['last_counted_at'];
         }
 
-        // Controlled drug stock counts/adjustments: require permissions, a witness and a reason.
         if ($medication->controlled_drug) {
-            abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
+            abort_unless($user?->canDo('medications.controlled.record') ?? false, 403);
 
-            // Step 13: optional governance - block further controlled stock edits when an open discrepancy exists
             $hasOpen = ClientControlledDrugDiscrepancy::query()
                 ->where('client_id', $client->id)
                 ->where('client_medication_id', $medication->id)
                 ->whereIn('status', ['open', 'under_review'])
                 ->exists();
-            if ($hasOpen && ! ($user?->canDo('medications.controlled.override') ?? false) && ! ($user?->canDo('clients.update') ?? false)) {
+            if ($hasOpen && ! ($user?->canDo('medications.controlled.override') ?? false)) {
                 return back()->withInput()->with('error', 'There is an open controlled-drug discrepancy. Further stock edits are blocked unless you have override permission.');
             }
             if (empty($data['witnessed_by'])) {
@@ -423,7 +419,6 @@ class ClientMedicalController extends Controller
                         'witnessed_by' => (int) $data['witnessed_by'],
                     ]);
 
-                    // If the counted stock differs from the last known on-hand, flag a discrepancy for review.
                     if ($beforeOnHand !== null && $stock->on_hand !== null && (int) $stock->on_hand !== (int) $beforeOnHand) {
                         $discrepancy = ClientControlledDrugDiscrepancy::create([
                             'client_id' => $client->id,
@@ -469,9 +464,7 @@ class ClientMedicalController extends Controller
 
         $user = $request->user();
         abort_unless(
-            ($user?->canDo('clients.update') ?? false)
-            || ($user?->canDo('medications.administer.record') ?? false)
-            || ($user?->canDo('medications.orders.manage') ?? false),
+            $user?->canDo('medications.administer.record') ?? false,
             403
         );
 
@@ -553,7 +546,6 @@ class ClientMedicalController extends Controller
 
                     // Controlled drugs: require permission + witness when recording a "given" administration.
                     if ($medication->controlled_drug && (($data['status'] ?? 'given') === 'given')) {
-                        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
                         if (empty($data['witnessed_by'])) {
                             return back()->withInput()->with('error', 'A witness is required when administering a controlled drug.');
                         }
@@ -748,7 +740,7 @@ class ClientMedicalController extends Controller
         abort_unless($discrepancy->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
+        abort_unless($user?->canDo('medications.controlled.record') ?? false, 403);
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string'],

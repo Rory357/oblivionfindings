@@ -123,6 +123,7 @@ export interface PrnFollowUp {
     administration_id: number;
     client_id: number;
     medication_name: string | null;
+    is_controlled?: boolean;
     dose_given: string | null;
     given_at: string | null;
     given_time: string | null;
@@ -190,11 +191,16 @@ export interface MedsTodayProps {
         name: string;
         role_label: string | null;
         med_competent: boolean;
+        controlled_record: boolean;
         cd_witness: boolean;
     };
     board_can: {
         view_emar: boolean;
         view_audit: boolean;
+        record_administration: boolean;
+        record_controlled: boolean;
+        view_controlled: boolean;
+        manage_stock: boolean;
     };
     has_shift_context: boolean;
 }

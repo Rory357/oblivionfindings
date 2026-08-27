@@ -1,17 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsReportController;
-use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Support\EmarUrl;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Medication Management Routes
  *
  * Handles central medications module, audit logs, and compliance.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Central medications module - list view
     Route::get('/medications', function () {
@@ -35,6 +34,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/medications/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
             ->name('reports.medications.export_mar');
         Route::get('/reports/medications/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
+            ->middleware('permission:medications.controlled.view')
             ->name('reports.medications.export_discrepancies');
     });
 

@@ -29,6 +29,7 @@ use App\Services\MedicationReportingService;
 use App\Services\MedicationSafetyService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\Timeline\TimelineEmitter;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
@@ -44,6 +45,12 @@ use Illuminate\Validation\ValidationException;
 
 class MedicationsApiController extends Controller
 {
+    private const CONTROLLED_ALERT_TYPES = [
+        'controlled_discrepancy',
+        'controlled_overdue_check',
+        'controlled_loss',
+    ];
+
     public function __construct(
         protected EnhancedMarService $marService,
         protected MedicationSafetyService $safetyService,
@@ -53,11 +60,57 @@ class MedicationsApiController extends Controller
         protected MedicationScanVerificationService $scanVerificationService,
         protected MarScheduleService $scheduleService,
         protected MedicationScopeDecisionService $medicationScope,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     private function idempotencyKey(string $scope, string $requestUuid): string
     {
         return "emar:idempotency:{$scope}:{$requestUuid}";
+    }
+
+    private function constrainControlledAlertVisibility($query, bool $canViewControlled): void
+    {
+        if ($canViewControlled) {
+            return;
+        }
+
+        $query->whereNotIn('alert_type', self::CONTROLLED_ALERT_TYPES);
+    }
+
+    private function assertCanViewAlert(Request $request, MedicationDashboardAlert $alert): void
+    {
+        if ($request->user()?->canDo('medications.controlled.view')) {
+            return;
+        }
+
+        abort_if(
+            in_array($alert->alert_type, self::CONTROLLED_ALERT_TYPES, true),
+            403,
+        );
+    }
+
+    private function authorizeMedicationRecordingTarget(
+        User $user,
+        Client $client,
+        ClientMedication $medication,
+        Carbon $actionAt,
+    ): void {
+        abort_unless((int) $medication->client_id === (int) $client->id, 404);
+
+        if ($user->can('viewMedications', $client)) {
+            return;
+        }
+
+        // Exact record-only workers do not gain reader access. Resolve their
+        // action target through the canonical Site + covering-shift boundary.
+        $this->medicationScope->forMedication(
+            $user,
+            $medication,
+            $actionAt,
+            static fn (MedicationScopeDecision $scope) => null,
+            requireAdministrable: true,
+            submittedClientId: (int) $client->id,
+        );
     }
 
     private function syncPayload(array $data, string $status, bool $duplicate = false, ?string $message = null): array
@@ -126,7 +179,7 @@ class MedicationsApiController extends Controller
             ClientControlledDrugDiscrepancy::class => 'discrepancy',
             ControlledDrugLossReport::class => 'loss_report',
             MedicationError::class => 'error',
-            default => 'administration',
+            default => abort(404),
         };
     }
 
@@ -140,7 +193,7 @@ class MedicationsApiController extends Controller
             return $attachment->administration->is_correction ? 'correction' : 'administration';
         }
 
-        return 'administration';
+        abort(404);
     }
 
     private function resolveAttachmentTarget(Client $client, string $targetType, int $targetId): Model
@@ -169,6 +222,10 @@ class MedicationsApiController extends Controller
             abort_unless($target instanceof ClientMedicationAdministration && $target->is_correction, 404);
         }
 
+        if ($targetType === 'administration') {
+            abort_unless($target instanceof ClientMedicationAdministration && ! $target->is_correction, 404);
+        }
+
         return $target;
     }
 
@@ -177,12 +234,12 @@ class MedicationsApiController extends Controller
         $user = $request->user();
 
         $canManage = match ($targetType) {
-            'administration', 'correction', 'error' => $user->canDo('medications.administer.record')
-                || $user->canDo('medications.administer.correct')
-                || $user->canDo('clients.update'),
-            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record')
-                || $user->canDo('medications.controlled.view')
-                || $user->canDo('clients.update'),
+            'administration' => $user->canDo('medications.administer.record')
+                || $user->canDo('medications.administer.correct'),
+            'correction' => $user->canDo('medications.administer.correct'),
+            'error' => $user->canDo('medications.administer.record')
+                || $user->canDo('medications.administer.correct'),
+            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record'),
             default => false,
         };
 
@@ -194,15 +251,18 @@ class MedicationsApiController extends Controller
         $user = $request->user();
         $targetType = $this->attachmentTargetTypeForAttachment($attachment);
 
-        $canManage = match ($targetType) {
-            'administration', 'correction', 'error' => $user->canDo('medications.administer.correct')
-                || $user->canDo('clients.update'),
-            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record')
-                || $user->canDo('clients.update'),
+        return match ($targetType) {
+            'administration', 'correction', 'error' => $user->canDo('medications.administer.correct'),
+            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record'),
             default => false,
         };
+    }
 
-        return $canManage || (int) $attachment->uploaded_by === (int) $user->id;
+    private function assertCanViewSupportingAttachment(Request $request, MedicationMarAttachment $attachment): void
+    {
+        if (in_array($this->attachmentTargetTypeForAttachment($attachment), ['discrepancy', 'loss_report'], true)) {
+            abort_unless($request->user()->canDo('medications.controlled.view'), 403);
+        }
     }
 
     private function serializeAttachment(MedicationMarAttachment $attachment, bool $canDelete = false): array
@@ -317,20 +377,24 @@ class MedicationsApiController extends Controller
         // Add permissions
         $user = $request->user();
         $marData['can'] = [
-            'record' => $user->canDo('medications.administer.record')
-                || $user->canDo('clients.update')
-                || $user->canDo('medications.orders.manage'),
+            'record' => $user->canDo('medications.administer.record'),
+            'record_controlled' => $user->canDo('medications.controlled.record'),
+            'view_controlled' => $user->canDo('medications.controlled.view'),
             'override_safety' => $user->canDo('medications.administer.override_safety'),
             'correct' => $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
             'witness' => $user->canDo('medications.controlled.witness'),
         ];
 
         // Add active alerts for this client
-        $marData['alerts'] = MedicationDashboardAlert::where('client_id', $client->id)
+        $alerts = MedicationDashboardAlert::where('client_id', $client->id)
             ->where('status', 'active')
             ->orderByDesc('severity')
-            ->orderByDesc('created_at')
-            ->get()
+            ->orderByDesc('created_at');
+        $this->constrainControlledAlertVisibility(
+            $alerts,
+            $user->canDo('medications.controlled.view'),
+        );
+        $marData['alerts'] = $alerts->get()
             ->map(fn ($a) => [
                 'id' => $a->id,
                 'alert_type' => $a->alert_type,
@@ -340,17 +404,19 @@ class MedicationsApiController extends Controller
             ]);
 
         // Add controlled drug discrepancies
-        $marData['controlled_discrepancies'] = ClientControlledDrugDiscrepancy::where('client_id', $client->id)
-            ->whereIn('status', ['open', 'under_review'])
-            ->with('medication:id,name')
-            ->get()
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'medication_name' => $d->medication?->name,
-                'difference' => $d->difference,
-                'reason' => $d->reason,
-                'reported_at' => $d->reported_at?->toIso8601String(),
-            ]);
+        $marData['controlled_discrepancies'] = $user->canDo('medications.controlled.view')
+            ? ClientControlledDrugDiscrepancy::where('client_id', $client->id)
+                ->whereIn('status', ['open', 'under_review'])
+                ->with('medication:id,name')
+                ->get()
+                ->map(fn ($d) => [
+                    'id' => $d->id,
+                    'medication_name' => $d->medication?->name,
+                    'difference' => $d->difference,
+                    'reason' => $d->reason,
+                    'reported_at' => $d->reported_at?->toIso8601String(),
+                ])
+            : collect();
 
         return response()->json($marData);
     }
@@ -420,8 +486,9 @@ class MedicationsApiController extends Controller
 
     public function verifyScan(Request $request, Client $client, ClientMedication $medication)
     {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
+        $user = $request->user();
+        abort_unless($user instanceof User && $user->canDo('medications.administer.record'), 403);
+        $this->authorizeMedicationRecordingTarget($user, $client, $medication, now());
 
         $data = $request->validate([
             'code' => ['required', 'string', 'max:255'],
@@ -455,11 +522,9 @@ class MedicationsApiController extends Controller
         abort_unless($administration->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless(
-            $user->canDo('medications.administer.record')
-            || $user->canDo('medications.administer.correct')
-            || $user->canDo('clients.update'),
-            403
+        $this->assertCanManageSupportingAttachment(
+            $request,
+            $this->attachmentTargetTypeForModel($administration),
         );
 
         $data = $request->validate([
@@ -493,7 +558,10 @@ class MedicationsApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'attachment' => $this->serializeAttachment($attachment, true),
+            'attachment' => $this->serializeAttachment(
+                $attachment,
+                $this->canDeleteSupportingAttachment($request, $attachment),
+            ),
         ]);
     }
 
@@ -545,7 +613,10 @@ class MedicationsApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'attachment' => $this->serializeAttachment($attachment, true),
+            'attachment' => $this->serializeAttachment(
+                $attachment,
+                $this->canDeleteSupportingAttachment($request, $attachment),
+            ),
         ]);
     }
 
@@ -574,6 +645,7 @@ class MedicationsApiController extends Controller
         $attachment->loadMissing('attachable');
         abort_unless($attachment->attachable, 404);
         abort_unless((int) $attachment->attachable->client_id === (int) $client->id, 404);
+        $this->assertCanViewSupportingAttachment($request, $attachment);
 
         return Storage::download($attachment->file_path, $attachment->file_name);
     }
@@ -635,17 +707,13 @@ class MedicationsApiController extends Controller
         Client $client,
         ClientMedication $medication
     ) {
-        $this->authorize('viewMedications', $client);
-        abort_unless($medication->client_id === $client->id, 404);
         $user = $request->user();
-
         abort_unless(
-            $user->canDo('medications.administer.record')
-                || $user->canDo('clients.update')
-                || $user->canDo('medications.orders.manage'),
+            $user instanceof User && $user->canDo('medications.administer.record'),
             403,
             'You do not have permission to record medication administrations.'
         );
+        abort_unless((int) $medication->client_id === (int) $client->id, 404);
 
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,missed,withheld'],
@@ -688,6 +756,7 @@ class MedicationsApiController extends Controller
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
             $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
         ));
+        $this->authorizeMedicationRecordingTarget($user, $client, $medication, $actionAt);
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -1007,26 +1076,27 @@ class MedicationsApiController extends Controller
 
         if ($client) {
             $this->authorize('viewMedications', $client);
-            $alerts = MedicationDashboardAlert::forClient($client->id)
+            $alertsQuery = MedicationDashboardAlert::forClient($client->id)
                 ->active()
                 ->with(['medication:id,name', 'client:id,first_name,last_name'])
                 ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-                ->orderByDesc('created_at')
-                ->get();
+                ->orderByDesc('created_at');
         } else {
             // Global alerts - check permissions
-            abort_unless(
-                $user->canDo('medications.view') || $user->canDo('clients.viewAny'),
-                403
-            );
+            abort_unless($user->canDo('medications.view'), 403);
 
-            $alerts = MedicationDashboardAlert::active()
+            $alertsQuery = MedicationDashboardAlert::active()
                 ->with(['medication:id,name', 'client:id,first_name,last_name'])
                 ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
                 ->orderByDesc('created_at')
-                ->limit(50)
-                ->get();
+                ->limit(50);
         }
+
+        $this->constrainControlledAlertVisibility(
+            $alertsQuery,
+            $user->canDo('medications.controlled.view'),
+        );
+        $alerts = $alertsQuery->get();
 
         return response()->json([
             'alerts' => $alerts->map(fn ($a) => [
@@ -1058,6 +1128,7 @@ class MedicationsApiController extends Controller
         $user = $request->user();
 
         $alert = MedicationDashboardAlert::findOrFail($alertId);
+        $this->assertCanViewAlert($request, $alert);
 
         // Verify user can access this client's medication data
         $client = Client::findOrFail($alert->client_id);
@@ -1083,6 +1154,7 @@ class MedicationsApiController extends Controller
         );
 
         $alert = MedicationDashboardAlert::findOrFail($alertId);
+        $this->assertCanViewAlert($request, $alert);
 
         // Verify user can access this client's medication data
         $client = Client::findOrFail($alert->client_id);
@@ -1106,10 +1178,7 @@ class MedicationsApiController extends Controller
     {
         $user = $request->user();
 
-        abort_unless(
-            $user->canDo('medications.view') || $user->canDo('clients.viewAny'),
-            403
-        );
+        abort_unless($user->canDo('medications.view'), 403);
 
         $clientId = $request->input('client_id');
 
@@ -1121,7 +1190,10 @@ class MedicationsApiController extends Controller
             }
         }
 
-        $widgets = $this->alertService->getGlobalDashboardWidgets($clientId);
+        $widgets = $this->alertService->getGlobalDashboardWidgets(
+            $clientId,
+            $user->canDo('medications.controlled.view'),
+        );
 
         return response()->json($widgets);
     }
@@ -1139,6 +1211,9 @@ class MedicationsApiController extends Controller
         );
 
         $reportType = $request->input('type', 'mar');
+        if (in_array($reportType, ['controlled_balance', 'controlled_discrepancies'], true)) {
+            abort_unless($user->canDo('medications.controlled.view'), 403);
+        }
         $clientId = $request->input('client_id');
         $dateFrom = $request->input('date_from') ? Carbon::parse($request->input('date_from')) : null;
         $dateTo = $request->input('date_to') ? Carbon::parse($request->input('date_to')) : null;
@@ -1172,6 +1247,9 @@ class MedicationsApiController extends Controller
         );
 
         $reportType = $request->input('type', 'mar');
+        if ($reportType === 'controlled_discrepancies') {
+            abort_unless($user->canDo('medications.controlled.view'), 403);
+        }
         $clientId = $request->input('client_id');
         $dateFrom = $request->input('date_from') ? Carbon::parse($request->input('date_from')) : null;
         $dateTo = $request->input('date_to') ? Carbon::parse($request->input('date_to')) : null;
@@ -1196,15 +1274,20 @@ class MedicationsApiController extends Controller
      */
     public function getShiftSummary(Request $request, int $shiftId)
     {
+        abort_unless($request->user()?->canDo('medications.view'), 403);
+
         $user = $request->user();
 
-        $shift = Shift::findOrFail($shiftId);
+        $shift = $this->siteAccess
+            ->applyShiftScope(
+                Shift::query(),
+                $user,
+                ['clinical.accessAllSites', 'sites.viewAll'],
+            )
+            ->findOrFail($shiftId);
 
-        // Check permissions
-        if (! $user->canDo('shifts.viewAny')) {
-            if ($shift->staff_id !== $user->id) {
-                abort(403, 'You can only view summaries for your own shifts.');
-            }
+        if (! $user->canDo('shifts.viewAny') && (int) $shift->user_id !== (int) $user->id) {
+            abort(404);
         }
 
         $summary = $this->marService->getShiftSummary($shiftId);
@@ -1316,6 +1399,9 @@ class MedicationsApiController extends Controller
     {
         $this->authorize('viewMedications', $client);
         abort_unless($medication->client_id === $client->id, 404);
+        if ($medication->controlled_drug) {
+            abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
+        }
 
         $counts = MedicationScheduledStockCount::where('client_medication_id', $medication->id)
             ->orderByDesc('scheduled_date')
@@ -1357,7 +1443,10 @@ class MedicationsApiController extends Controller
         abort_unless($medication->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless($user->canDo('medications.stock.update') || $user->canDo('clients.update'), 403);
+        abort_unless($user->canDo('medications.stock.update'), 403);
+        if ($medication->controlled_drug) {
+            abort_unless($user->canDo('medications.controlled.record'), 403);
+        }
 
         $data = $request->validate([
             'scheduled_date' => ['required', 'date'],
@@ -1371,6 +1460,19 @@ class MedicationsApiController extends Controller
         ]);
 
         if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:create', $data)) {
+            if (
+                (int) data_get($cached, 'count.client_id') !== (int) $client->id
+                || (int) data_get($cached, 'count.client_medication_id') !== (int) $medication->id
+            ) {
+                return response()->json(
+                    $this->buildConflictPayload(
+                        $data,
+                        'This scheduled count request was already used for a different client or medication. Please schedule this count again with a new request identifier.',
+                    ),
+                    409,
+                );
+            }
+
             return response()->json($cached);
         }
 
@@ -1388,6 +1490,8 @@ class MedicationsApiController extends Controller
             'success' => true,
             'count' => [
                 'id' => $count->id,
+                'client_id' => $count->client_id,
+                'client_medication_id' => $count->client_medication_id,
                 'scheduled_date' => $count->scheduled_date->toDateString(),
                 'status' => $count->status,
             ],
@@ -1407,11 +1511,18 @@ class MedicationsApiController extends Controller
         abort_unless($count->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless($user->canDo('medications.stock.update') || $user->canDo('clients.update'), 403);
+        abort_unless($user->canDo('medications.stock.update'), 403);
 
-        // Controlled drugs require witness
+        // Controlled stock counts require the dedicated controlled action too.
         $medication = $count->medication;
-        $requiresWitness = $medication && $medication->controlled_drug;
+        abort_unless(
+            $medication && (int) $medication->client_id === (int) $client->id,
+            404,
+        );
+        $requiresWitness = (bool) $medication->controlled_drug;
+        if ($requiresWitness) {
+            abort_unless($user->canDo('medications.controlled.record'), 403);
+        }
 
         $data = $request->validate([
             'actual_quantity' => ['required', 'integer', 'min:0'],
@@ -1427,7 +1538,33 @@ class MedicationsApiController extends Controller
             'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
 
+        if ($requiresWitness && (int) $data['witnessed_by'] === (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Witness must be a different user.',
+            ], 422);
+        }
+
+        if ($requiresWitness) {
+            $witness = User::query()->find((int) $data['witnessed_by']);
+            if (! $witness?->canDo('medications.controlled.witness')) {
+                throw ValidationException::withMessages([
+                    'witnessed_by' => 'The selected witness is not authorised to witness controlled drug records.',
+                ]);
+            }
+        }
+
         if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:complete', $data)) {
+            if ((int) data_get($cached, 'count.id') !== (int) $count->id) {
+                return response()->json(
+                    $this->buildConflictPayload(
+                        $data,
+                        'This stock count completion request was already used for a different count. Please submit this completion again with a new request identifier.',
+                    ),
+                    409,
+                );
+            }
+
             return response()->json($cached);
         }
 
@@ -1439,13 +1576,6 @@ class MedicationsApiController extends Controller
                 ),
                 409
             );
-        }
-
-        if ($requiresWitness && $data['witnessed_by'] === $user->id) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Witness must be a different user.',
-            ], 422);
         }
 
         $scanAudit = $medication
@@ -1497,8 +1627,9 @@ class MedicationsApiController extends Controller
      */
     public function getDrugInteractions(Request $request)
     {
+        abort_unless($request->user()?->canDo('medications.view'), 403);
+
         $user = $request->user();
-        abort_unless($user->canDo('medications.view') || $user->canDo('clients.viewAny'), 403);
 
         $interactions = MedicationInteraction::active()
             ->orderByRaw("FIELD(severity, 'contraindicated', 'major', 'moderate', 'minor')")

@@ -58,6 +58,8 @@ type MedicationContext = {
     }>;
     witnesses: Array<{ id: number; name: string }>;
     can_manage: boolean;
+    can_administer: boolean;
+    can_record_controlled: boolean;
 };
 
 type Props = {
@@ -195,6 +197,8 @@ export default function TransportShow({
                 packing_attestation_history: [],
                 witnesses: [],
                 can_manage: false,
+                can_administer: false,
+                can_record_controlled: false,
             },
         [medication_context],
     );
@@ -210,6 +214,9 @@ export default function TransportShow({
         medicationContext.packing_attestation_history ?? [];
     const safeWitnesses = medicationContext.witnesses ?? [];
     const canManageMedicationTransit = !!medicationContext.can_manage;
+    const canAdministerMedicationTransit = !!medicationContext.can_administer;
+    const canRecordControlledMedication =
+        !!medicationContext.can_record_controlled;
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const packDialogTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -852,58 +859,64 @@ export default function TransportShow({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {canManageMedicationTransit &&
+                                                        {(canManageMedicationTransit ||
+                                                            canAdministerMedicationTransit) &&
                                                             t.status ===
                                                                 'in_progress' && (
                                                                 <div className="flex flex-wrap gap-2">
-                                                                    {log.status ===
-                                                                        'packed' && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() =>
-                                                                                openAdministerDialog(
-                                                                                    log,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                                                            Administer
-                                                                        </Button>
-                                                                    )}
-                                                                    {(log.status ===
-                                                                        'packed' ||
+                                                                    {canAdministerMedicationTransit &&
+                                                                        (!log.is_controlled_drug ||
+                                                                            canRecordControlledMedication) &&
                                                                         log.status ===
-                                                                            'administered') && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() =>
-                                                                                openReturnDialog(
-                                                                                    log,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <ArrowLeftRight className="mr-2 h-4 w-4" />
-                                                                            Return
-                                                                        </Button>
-                                                                    )}
-                                                                    {(log.witness_required ||
-                                                                        log.is_controlled_drug) && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            onClick={() =>
-                                                                                openPackingCorrectionDialog(
-                                                                                    log,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <ShieldCheck className="mr-2 h-4 w-4" />
-                                                                            Correct
-                                                                            witness
-                                                                        </Button>
-                                                                    )}
+                                                                            'packed' && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    openAdministerDialog(
+                                                                                        log,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                                                Administer
+                                                                            </Button>
+                                                                        )}
+                                                                    {canManageMedicationTransit &&
+                                                                        (log.status ===
+                                                                            'packed' ||
+                                                                            log.status ===
+                                                                                'administered') && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    openReturnDialog(
+                                                                                        log,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                                                                Return
+                                                                            </Button>
+                                                                        )}
+                                                                    {canManageMedicationTransit &&
+                                                                        (log.witness_required ||
+                                                                            log.is_controlled_drug) && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                onClick={() =>
+                                                                                    openPackingCorrectionDialog(
+                                                                                        log,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                                                                Correct
+                                                                                witness
+                                                                            </Button>
+                                                                        )}
                                                                 </div>
                                                             )}
                                                     </div>
@@ -1181,27 +1194,35 @@ export default function TransportShow({
                     if (!queued) refreshMedicationContext();
                 }}
             />
-            <CorrectPackingAttestationWizard
-                log={correctingPackingLog}
-                witnesses={safeWitnesses}
-                onClose={closePackingCorrectionDialog}
-                onCompleted={() => refreshMedicationContext()}
-            />
-            <AdministerTransportMedicationWizard
-                log={administeringLog}
-                witnesses={safeWitnesses}
-                onClose={closeAdministerDialog}
-                onCompleted={(queued) => {
-                    if (!queued) refreshMedicationContext();
-                }}
-            />
-            <ReturnTransportMedicationWizard
-                log={returningLog}
-                onClose={closeReturnDialog}
-                onCompleted={(queued) => {
-                    if (!queued) refreshMedicationContext();
-                }}
-            />
+            {canManageMedicationTransit ? (
+                <>
+                    <CorrectPackingAttestationWizard
+                        log={correctingPackingLog}
+                        witnesses={safeWitnesses}
+                        onClose={closePackingCorrectionDialog}
+                        onCompleted={() => refreshMedicationContext()}
+                    />
+                    <ReturnTransportMedicationWizard
+                        log={returningLog}
+                        onClose={closeReturnDialog}
+                        onCompleted={(queued) => {
+                            if (!queued) refreshMedicationContext();
+                        }}
+                    />
+                </>
+            ) : null}
+            {canAdministerMedicationTransit &&
+            (!administeringLog?.is_controlled_drug ||
+                canRecordControlledMedication) ? (
+                <AdministerTransportMedicationWizard
+                    log={administeringLog}
+                    witnesses={safeWitnesses}
+                    onClose={closeAdministerDialog}
+                    onCompleted={(queued) => {
+                        if (!queued) refreshMedicationContext();
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

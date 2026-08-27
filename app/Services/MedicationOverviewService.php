@@ -458,7 +458,7 @@ class MedicationOverviewService
                 $q->whereColumn('on_hand', '<=', 'reorder_level')
                     ->orWhere('expiry_date', '<=', today()->copy()->addDays(30)->toDateString());
             })
-            ->with('medication:id,client_id,name', 'medication.client:id,first_name,last_name')
+            ->with('medication:id,client_id,name,controlled_drug', 'medication.client:id,first_name,last_name')
             ->limit(12)
             ->get()
             ->map(function ($stock) {
@@ -473,6 +473,7 @@ class MedicationOverviewService
                     'severity' => $expired ? 'critical' : 'warning',
                     'client' => $this->clientName($stock->medication?->client),
                     'client_id' => $stock->medication?->client_id,
+                    'is_controlled' => (bool) $stock->medication?->controlled_drug,
                     'title' => ($stock->medication->name ?? 'Stock').' — '.($expired ? 'expired stock' : ($expiring ? 'expiring soon' : 'low stock')),
                     'status' => $expired ? 'Expired' : ($expiring ? 'Expiring' : 'Low stock'),
                     'summary' => 'On hand '.(float) $stock->on_hand.($stock->unit ? ' '.$stock->unit : '')
@@ -766,7 +767,12 @@ class MedicationOverviewService
     public function activeAlertsList(): Collection
     {
         return MedicationDashboardAlert::active()
-            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name'])
+            ->with([
+                'client:id,first_name,last_name',
+                'medication' => fn ($query) => $query
+                    ->withTrashed()
+                    ->select(['id', 'client_id', 'name', 'controlled_drug']),
+            ])
             ->latest()
             ->limit(10)
             ->get();

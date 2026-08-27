@@ -473,6 +473,55 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->count('prn_follow_ups', 0));
     }
 
+    public function test_controlled_prn_effect_requires_the_exact_controlled_record_capability(): void
+    {
+        $prn = ClientMedication::query()->create([
+            'client_id' => $this->client->id,
+            'name' => 'Controlled PRN follow-up',
+            'dosage' => '5mg',
+            'frequency' => 'As needed',
+            'dose_times' => [],
+            'is_prn' => true,
+            'controlled_drug' => true,
+            'prn_reason' => 'Breakthrough pain',
+            'max_per_day' => 4,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        $administration = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subHour(),
+            'status' => 'given',
+        ]);
+        $payload = [
+            'client_medication_administration_id' => $administration->id,
+            'effectiveness' => 'effective',
+            'observations' => 'Pain settled after the dose.',
+        ];
+
+        $this->actingAs($this->worker)
+            ->post('/meds/today/prn/effect', $payload)
+            ->assertForbidden();
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+
+        $this->grantPermissions($this->worker, ['medications.controlled.record']);
+        $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/prn/effect', $payload)
+            ->assertRedirect('/meds/today')
+            ->assertSessionHas('success');
+        $this->assertDatabaseHas('medication_prn_effectiveness', [
+            'client_medication_administration_id' => $administration->id,
+            'effectiveness' => 'effective',
+            'reviewed_by' => $this->worker->id,
+        ]);
+    }
+
     public function test_board_payload_includes_schedule_and_supports_date_navigation(): void
     {
         $this->scheduledMedication(['08:00', '16:00']);

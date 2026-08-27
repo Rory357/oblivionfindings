@@ -63,6 +63,7 @@ import {
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
+    can_record: boolean;
     medications: CdMedication[];
     recentEntries: CdEntry[];
     discrepancies: CdDiscrepancy[];
@@ -165,6 +166,7 @@ export default function ControlledDrugs(props: Props) {
         date,
         today,
         is_today: isToday,
+        can_record: canRecord,
     } = props;
 
     const [activeTab, setActiveTab] = useState('register');
@@ -550,16 +552,17 @@ export default function ControlledDrugs(props: Props) {
                 });
         }
 
-        const items: ShiftCtxItem[] = readOnly
-            ? [view, ...nav]
-            : [
-                  view,
-                  ...actions,
-                  ...nav,
-                  ...(critical.length
-                      ? [{ sep: true } as ShiftCtxItem, ...critical]
-                      : []),
-              ];
+        const items: ShiftCtxItem[] =
+            readOnly || !canRecord
+                ? [view, ...nav]
+                : [
+                      view,
+                      ...actions,
+                      ...nav,
+                      ...(critical.length
+                          ? [{ sep: true } as ShiftCtxItem, ...critical]
+                          : []),
+                  ];
         const t = CTX_TAG[tone];
         setCtx({
             x: event.clientX,
@@ -653,36 +656,36 @@ export default function ControlledDrugs(props: Props) {
 
     // Per-tab primary create actions (Add-Client style) — reused in each panel
     // header and its empty-state CTA.
-    const btnEntry = (
+    const btnEntry = canRecord ? (
         <Button size="sm" onClick={() => setModal({ type: 'entry' })}>
             <Plus className="h-4 w-4" />
             Record CD entry
         </Button>
-    );
-    const btnBalance = (
+    ) : null;
+    const btnBalance = canRecord ? (
         <Button size="sm" onClick={() => setModal({ type: 'balance' })}>
             <ClipboardCheck className="h-4 w-4" />
             Balance check
         </Button>
-    );
-    const btnReportDisc = (
+    ) : null;
+    const btnReportDisc = canRecord ? (
         <Button size="sm" onClick={() => setModal({ type: 'balance' })}>
             <AlertTriangle className="h-4 w-4" />
             Report discrepancy
         </Button>
-    );
-    const btnDestruction = (
+    ) : null;
+    const btnDestruction = canRecord ? (
         <Button size="sm" onClick={() => setModal({ type: 'destruction' })}>
             <Trash2 className="h-4 w-4" />
             Record destruction
         </Button>
-    );
-    const btnLoss = (
+    ) : null;
+    const btnLoss = canRecord ? (
         <Button size="sm" onClick={() => setModal({ type: 'loss' })}>
             <FileWarning className="h-4 w-4" />
             Report loss
         </Button>
-    );
+    ) : null;
 
     return (
         <AppLayout
@@ -727,31 +730,35 @@ export default function ControlledDrugs(props: Props) {
                     description="Running balances, two-person witness, reconciliation, discrepancies, destructions and loss investigations — append-only and audit-ready."
                     stats={heroStats}
                     actions={
-                        <>
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() => setModal({ type: 'entry' })}
-                            >
-                                <Plus className="h-4 w-4" />
-                                Record CD entry
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => setModal({ type: 'balance' })}
-                            >
-                                <ClipboardCheck className="h-4 w-4" />
-                                Balance check
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => setModal({ type: 'loss' })}
-                            >
-                                <FileWarning className="h-4 w-4" />
-                                Report loss
-                            </Button>
-                        </>
+                        canRecord ? (
+                            <>
+                                <Button
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    onClick={() => setModal({ type: 'entry' })}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Record CD entry
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() =>
+                                        setModal({ type: 'balance' })
+                                    }
+                                >
+                                    <ClipboardCheck className="h-4 w-4" />
+                                    Balance check
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => setModal({ type: 'loss' })}
+                                >
+                                    <FileWarning className="h-4 w-4" />
+                                    Report loss
+                                </Button>
+                            </>
+                        ) : undefined
                     }
                     footer={
                         <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
@@ -927,20 +934,22 @@ export default function ControlledDrugs(props: Props) {
                                         )}
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setModal({
-                                                    type: 'balanceMed',
-                                                    medId: m.id,
-                                                });
-                                            }}
-                                        >
-                                            <ClipboardCheck className="h-3.5 w-3.5" />
-                                            Check balance
-                                        </Button>
+                                        {canRecord ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setModal({
+                                                        type: 'balanceMed',
+                                                        medId: m.id,
+                                                    });
+                                                }}
+                                            >
+                                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                                Check balance
+                                            </Button>
+                                        ) : null}
                                     </td>
                                 </tr>
                             );
@@ -1152,18 +1161,20 @@ export default function ControlledDrugs(props: Props) {
                                             label={d.status}
                                             tone={statusTone(d.status)}
                                         />
-                                        <Button
-                                            size="sm"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setModal({
-                                                    type: 'resolveDisc',
-                                                    disc: d,
-                                                });
-                                            }}
-                                        >
-                                            Resolve
-                                        </Button>
+                                        {canRecord ? (
+                                            <Button
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setModal({
+                                                        type: 'resolveDisc',
+                                                        disc: d,
+                                                    });
+                                                }}
+                                            >
+                                                Resolve
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </div>
                             ))
@@ -1325,39 +1336,41 @@ export default function ControlledDrugs(props: Props) {
                                                 l.investigation_status,
                                             )}
                                         />
-                                        {l.investigation_status ===
-                                            'reported' && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setModal({
-                                                        type: 'lossAction',
-                                                        report: l,
-                                                        action: 'investigate',
-                                                    });
-                                                }}
-                                            >
-                                                Investigate
-                                            </Button>
-                                        )}
-                                        {l.investigation_status !==
-                                            'resolved' && (
-                                            <Button
-                                                size="sm"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setModal({
-                                                        type: 'lossAction',
-                                                        report: l,
-                                                        action: 'resolve',
-                                                    });
-                                                }}
-                                            >
-                                                Resolve
-                                            </Button>
-                                        )}
+                                        {canRecord &&
+                                            l.investigation_status ===
+                                                'reported' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setModal({
+                                                            type: 'lossAction',
+                                                            report: l,
+                                                            action: 'investigate',
+                                                        });
+                                                    }}
+                                                >
+                                                    Investigate
+                                                </Button>
+                                            )}
+                                        {canRecord &&
+                                            l.investigation_status !==
+                                                'resolved' && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setModal({
+                                                            type: 'lossAction',
+                                                            report: l,
+                                                            action: 'resolve',
+                                                        });
+                                                    }}
+                                                >
+                                                    Resolve
+                                                </Button>
+                                            )}
                                     </div>
                                 </div>
                             ))
@@ -1432,7 +1445,7 @@ export default function ControlledDrugs(props: Props) {
                 )}
             </div>
 
-            {modal?.type === 'entry' && (
+            {canRecord && modal?.type === 'entry' && (
                 <RecordCdEntryDialog
                     medications={medications}
                     staff={staff}
@@ -1440,7 +1453,7 @@ export default function ControlledDrugs(props: Props) {
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'balance' && (
+            {canRecord && modal?.type === 'balance' && (
                 <BalanceCheckDialog
                     medications={medications}
                     staff={staff}
@@ -1448,7 +1461,7 @@ export default function ControlledDrugs(props: Props) {
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'balanceMed' && (
+            {canRecord && modal?.type === 'balanceMed' && (
                 <BalanceCheckDialog
                     medications={medications}
                     staff={staff}
@@ -1457,13 +1470,13 @@ export default function ControlledDrugs(props: Props) {
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'loss' && (
+            {canRecord && modal?.type === 'loss' && (
                 <ReportLossDialog
                     medications={medications}
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'destruction' && (
+            {canRecord && modal?.type === 'destruction' && (
                 <RecordDestructionDialog
                     medications={medications}
                     staff={staff}
@@ -1471,13 +1484,13 @@ export default function ControlledDrugs(props: Props) {
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'resolveDisc' && (
+            {canRecord && modal?.type === 'resolveDisc' && (
                 <ResolveDiscrepancyDialog
                     discrepancy={modal.disc}
                     onClose={() => setModal(null)}
                 />
             )}
-            {modal?.type === 'lossAction' && (
+            {canRecord && modal?.type === 'lossAction' && (
                 <LossActionDialog
                     report={modal.report}
                     action={modal.action}
@@ -1488,15 +1501,30 @@ export default function ControlledDrugs(props: Props) {
                 <CdDetailDialog
                     subject={modal.subject}
                     onClose={() => setModal(null)}
-                    onCheckBalance={(medId) =>
-                        setModal({ type: 'balanceMed', medId })
+                    onCheckBalance={
+                        canRecord
+                            ? (medId) => setModal({ type: 'balanceMed', medId })
+                            : undefined
                     }
-                    onRecordMovement={() => setModal({ type: 'entry' })}
-                    onResolveDiscrepancy={(disc) =>
-                        setModal({ type: 'resolveDisc', disc })
+                    onRecordMovement={
+                        canRecord
+                            ? () => setModal({ type: 'entry' })
+                            : undefined
                     }
-                    onLossAction={(report, action) =>
-                        setModal({ type: 'lossAction', report, action })
+                    onResolveDiscrepancy={
+                        canRecord
+                            ? (disc) => setModal({ type: 'resolveDisc', disc })
+                            : undefined
+                    }
+                    onLossAction={
+                        canRecord
+                            ? (report, action) =>
+                                  setModal({
+                                      type: 'lossAction',
+                                      report,
+                                      action,
+                                  })
+                            : undefined
                     }
                 />
             )}

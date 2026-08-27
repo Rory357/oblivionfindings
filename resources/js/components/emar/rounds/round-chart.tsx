@@ -4,11 +4,17 @@ import { ClientAvatar } from '@/components/meds/board-bits';
 import { cn } from '@/lib/utils';
 import type { MouseEvent } from 'react';
 import { DoseDot } from './round-bits';
-import type { Resident, RoundCell, RoundSummary } from './types';
+import {
+    roundCounts,
+    type Resident,
+    type RoundCell,
+    type RoundSummary,
+} from './types';
 
 type Props = {
     residents: Resident[];
     rounds: RoundSummary[];
+    canRecord: boolean;
     onOpen: (id: number) => void;
     onContext: (e: MouseEvent, round: RoundSummary) => void;
 };
@@ -20,6 +26,7 @@ function shortName(name: string): string {
 export default function RoundChart({
     residents,
     rounds,
+    canRecord,
     onOpen,
     onContext,
 }: Props) {
@@ -73,6 +80,13 @@ export default function RoundChart({
                                 </div>
                             </td>
                             {rounds.map((r) => {
+                                const counts = roundCounts(r.cells);
+                                const completed =
+                                    r.status === 'completed' ||
+                                    (counts.total > 0 &&
+                                        counts.due === 0 &&
+                                        counts.recorded > 0);
+                                const canOpen = canRecord || completed;
                                 const cells: RoundCell[] = r.cells.filter(
                                     (c) => c.resident_id === res.id,
                                 );
@@ -92,9 +106,12 @@ export default function RoundChart({
                                 return (
                                     <td
                                         key={r.id}
-                                        onClick={() => onOpen(r.id)}
+                                        onClick={() => canOpen && onOpen(r.id)}
                                         onContextMenu={(e) => onContext(e, r)}
-                                        className="cursor-pointer border-l p-1.5"
+                                        className={cn(
+                                            'border-l p-1.5',
+                                            canOpen && 'cursor-pointer',
+                                        )}
                                     >
                                         <div
                                             className={cn(

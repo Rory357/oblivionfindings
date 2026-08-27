@@ -191,15 +191,24 @@ function ActiveRoundBanner({ round }: { round: RoundInfo }) {
 function DoseRow({
     row,
     client,
+    canRecord,
+    canRecordControlled,
+    canViewMar,
     onRecord,
     onCtx,
 }: {
     row: ScheduleRow;
     client: ClientInfo | undefined;
+    canRecord: boolean;
+    canRecordControlled: boolean;
+    canViewMar: boolean;
     onRecord: (row: ScheduleRow) => void;
     onCtx: (e: ReactMouseEvent, row: ScheduleRow) => void;
 }) {
-    const actionable = row.recorded === null;
+    const actionable =
+        row.recorded === null &&
+        canRecord &&
+        (!row.is_controlled || canRecordControlled);
     return (
         <tr
             data-test="meds-due-row"
@@ -238,12 +247,18 @@ function DoseRow({
             </td>
             <td className="py-3 pr-3 align-middle">
                 <div className="flex items-center gap-2">
-                    <Link
-                        href={row.mar_url}
-                        className="truncate text-sm hover:underline"
-                    >
-                        {row.medication_name}
-                    </Link>
+                    {canViewMar ? (
+                        <Link
+                            href={row.mar_url}
+                            className="truncate text-sm hover:underline"
+                        >
+                            {row.medication_name}
+                        </Link>
+                    ) : (
+                        <span className="truncate text-sm">
+                            {row.medication_name}
+                        </span>
+                    )}
                     {row.is_controlled ? <CdBadge /> : null}
                 </div>
                 {row.dose ? (
@@ -270,7 +285,7 @@ function DoseRow({
                     >
                         Record <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
-                ) : (
+                ) : row.recorded ? (
                     <div className="inline-flex flex-col items-end">
                         <span
                             className={`inline-flex items-center gap-1 text-[13px] font-semibold ${
@@ -293,6 +308,10 @@ function DoseRow({
                                 : ''}
                         </span>
                     </div>
+                ) : (
+                    <span className="text-xs text-muted-foreground">
+                        View only
+                    </span>
                 )}
             </td>
         </tr>
@@ -304,6 +323,9 @@ function ScheduleCard({
     clientById,
     search,
     onSearchChange,
+    canRecord,
+    canRecordControlled,
+    canViewMar,
     onRecord,
     onCtx,
 }: {
@@ -311,6 +333,9 @@ function ScheduleCard({
     clientById: Map<number, ClientInfo>;
     search: string;
     onSearchChange: (next: string) => void;
+    canRecord: boolean;
+    canRecordControlled: boolean;
+    canViewMar: boolean;
     onRecord: (row: ScheduleRow) => void;
     onCtx: (e: ReactMouseEvent, row: ScheduleRow) => void;
 }) {
@@ -442,6 +467,9 @@ function ScheduleCard({
                                 key={row.key}
                                 row={row}
                                 client={clientById.get(row.client_id)}
+                                canRecord={canRecord}
+                                canRecordControlled={canRecordControlled}
+                                canViewMar={canViewMar}
                                 onRecord={onRecord}
                                 onCtx={onCtx}
                             />
@@ -567,10 +595,14 @@ function PrnQuickCard({
 function FollowUpsCard({
     followUps,
     clientById,
+    canRecord,
+    canRecordControlled,
     onRecordEffect,
 }: {
     followUps: PrnFollowUp[];
     clientById: Map<number, ClientInfo>;
+    canRecord: boolean;
+    canRecordControlled: boolean;
     onRecordEffect: (followUp: PrnFollowUp) => void;
 }) {
     if (followUps.length === 0) return null;
@@ -602,13 +634,16 @@ function FollowUpsCard({
                                     {f.check_at ? ` at ${f.check_at}` : ''}
                                 </div>
                             </div>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onRecordEffect(f)}
-                            >
-                                Record effect
-                            </Button>
+                            {canRecord &&
+                            (!f.is_controlled || canRecordControlled) ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onRecordEffect(f)}
+                                >
+                                    Record effect
+                                </Button>
+                            ) : null}
                         </div>
                     );
                 })}
@@ -617,7 +652,13 @@ function FollowUpsCard({
     );
 }
 
-function RoundsCard({ rounds }: { rounds: RoundInfo[] }) {
+function RoundsCard({
+    rounds,
+    canRecord,
+}: {
+    rounds: RoundInfo[];
+    canRecord: boolean;
+}) {
     if (rounds.length === 0) return null;
     return (
         <Card className="gap-2 py-4">
@@ -667,7 +708,7 @@ function RoundsCard({ rounds }: { rounds: RoundInfo[] }) {
                                 <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-status-success">
                                     <CheckCircle2 className="h-4 w-4" /> Done
                                 </span>
-                            ) : (
+                            ) : canRecord ? (
                                 <Button
                                     size="sm"
                                     variant={isActive ? 'default' : 'outline'}
@@ -680,7 +721,7 @@ function RoundsCard({ rounds }: { rounds: RoundInfo[] }) {
                                         {verb}
                                     </Link>
                                 </Button>
-                            )}
+                            ) : null}
                         </div>
                     );
                 })}
@@ -854,10 +895,12 @@ function RoundsTab({
     rounds,
     schedule,
     clientById,
+    canRecord,
 }: {
     rounds: RoundInfo[];
     schedule: ScheduleRow[];
     clientById: Map<number, ClientInfo>;
+    canRecord: boolean;
 }) {
     return (
         <Card>
@@ -942,7 +985,7 @@ function RoundsTab({
                                         className="mt-2 h-1.5 max-w-sm"
                                     />
                                 </div>
-                                {!isDone ? (
+                                {!isDone && canRecord ? (
                                     <Button
                                         size="sm"
                                         variant={
@@ -995,12 +1038,16 @@ function PrnTab({
     medications,
     followUps,
     clientById,
+    canRecord,
+    canRecordControlled,
     onGive,
     onRecordEffect,
 }: {
     medications: MedsTodayProps['prn_medications'];
     followUps: PrnFollowUp[];
     clientById: Map<number, ClientInfo>;
+    canRecord: boolean;
+    canRecordControlled: boolean;
     onGive: (medId: number) => void;
     onRecordEffect: (followUp: PrnFollowUp) => void;
 }) {
@@ -1009,6 +1056,8 @@ function PrnTab({
             <FollowUpsCard
                 followUps={followUps}
                 clientById={clientById}
+                canRecord={canRecord}
+                canRecordControlled={canRecordControlled}
                 onRecordEffect={onRecordEffect}
             />
             <Card>
@@ -1060,19 +1109,22 @@ function PrnTab({
                                         .join(' · ')}
                                 </div>
                             </div>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onGive(m.id)}
-                                disabled={m.over_limit}
-                                title={
-                                    m.over_limit
-                                        ? 'At the 24-hour limit — talk to your supervisor'
-                                        : undefined
-                                }
-                            >
-                                <Zap className="h-3.5 w-3.5" /> Give now
-                            </Button>
+                            {canRecord &&
+                            (!m.is_controlled || canRecordControlled) ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onGive(m.id)}
+                                    disabled={m.over_limit}
+                                    title={
+                                        m.over_limit
+                                            ? 'At the 24-hour limit — talk to your supervisor'
+                                            : undefined
+                                    }
+                                >
+                                    <Zap className="h-3.5 w-3.5" /> Give now
+                                </Button>
+                            ) : null}
                         </div>
                     ))}
                 </CardContent>
@@ -1171,6 +1223,10 @@ export default function MedsToday(props: MedsTodayProps) {
         date,
         is_today,
     } = props;
+    const canRecord = board_can.record_administration;
+    const canRecordControlled = board_can.record_controlled;
+    const canRecordMedication = (isControlled: boolean) =>
+        canRecord && (!isControlled || canRecordControlled);
 
     const [tab, setTab] = useState('schedule');
     const [search, setSearch] = useState('');
@@ -1279,19 +1335,24 @@ export default function MedsToday(props: MedsTodayProps) {
         e.preventDefault();
         const client = clientById.get(row.client_id);
         const meta = DOSE_STATUS_META[row.status] ?? DOSE_STATUS_META.upcoming;
-        const actionable = row.recorded === null;
+        const actionable =
+            row.recorded === null && canRecordMedication(row.is_controlled);
         const preferred = client?.preferred ?? row.client_name.split(' ')[0];
         const isMac =
             typeof navigator !== 'undefined' &&
             navigator.platform.toUpperCase().includes('MAC');
 
         const common: ShiftCtxItem[] = [
-            {
-                icon: <FileText className="h-3.5 w-3.5" />,
-                label: 'View MAR chart',
-                sub: `Full history · ${row.medication_name}`,
-                onClick: () => router.visit(row.mar_url),
-            },
+            ...(board_can.view_emar
+                ? [
+                      {
+                          icon: <FileText className="h-3.5 w-3.5" />,
+                          label: 'View MAR chart',
+                          sub: `Full history · ${row.medication_name}`,
+                          onClick: () => router.visit(row.mar_url),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
             {
                 icon: <User className="h-3.5 w-3.5" />,
                 label: `View ${preferred}'s profile`,
@@ -1344,17 +1405,19 @@ export default function MedsToday(props: MedsTodayProps) {
                           }),
                   },
               ]
-            : [
-                  {
-                      icon: <Eye className="h-3.5 w-3.5" />,
-                      label: 'View record',
-                      sub: `${row.recorded?.time ?? ''}${row.recorded?.by ? ` · ${row.recorded.by}` : ''}`,
-                      tone: 'primary',
-                      onClick: () => setRecordedDetail(row),
-                  },
-                  { sep: true },
-                  ...common,
-              ];
+            : row.recorded
+              ? [
+                    {
+                        icon: <Eye className="h-3.5 w-3.5" />,
+                        label: 'View record',
+                        sub: `${row.recorded?.time ?? ''}${row.recorded?.by ? ` · ${row.recorded.by}` : ''}`,
+                        tone: 'primary',
+                        onClick: () => setRecordedDetail(row),
+                    },
+                    { sep: true },
+                    ...common,
+                ]
+              : common;
 
         setCtxRow(row);
         setCtxMenu({
@@ -1380,6 +1443,7 @@ export default function MedsToday(props: MedsTodayProps) {
         const handler = (event: KeyboardEvent) => {
             if (
                 event.key.toLowerCase() === 'r' &&
+                canRecordMedication(ctxRow.is_controlled) &&
                 !event.ctrlKey &&
                 !event.metaKey &&
                 !event.altKey &&
@@ -1400,7 +1464,7 @@ export default function MedsToday(props: MedsTodayProps) {
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- copyNhi/closeCtx are stable per render; ctxMenu+ctxRow gate the listener.
-    }, [ctxMenu, ctxRow]);
+    }, [canRecord, canRecordControlled, ctxMenu, ctxRow]);
 
     /* ── Hero content ────────────────────────────────────────────── */
 
@@ -1663,7 +1727,7 @@ export default function MedsToday(props: MedsTodayProps) {
                     stats={heroStats}
                     actions={
                         <>
-                            {active_round ? (
+                            {active_round && canRecord ? (
                                 <Button
                                     size="sm"
                                     className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
@@ -1715,15 +1779,20 @@ export default function MedsToday(props: MedsTodayProps) {
                                 Don&rsquo;t skip a dose without recording why.
                             </p>
                         </div>
-                        <Button
-                            size="sm"
-                            className="ml-auto shrink-0"
-                            onClick={() =>
-                                setWizard({ type: 'dose', row: firstOverdue })
-                            }
-                        >
-                            Record now
-                        </Button>
+                        {canRecordMedication(firstOverdue.is_controlled) ? (
+                            <Button
+                                size="sm"
+                                className="ml-auto shrink-0"
+                                onClick={() =>
+                                    setWizard({
+                                        type: 'dose',
+                                        row: firstOverdue,
+                                    })
+                                }
+                            >
+                                Record now
+                            </Button>
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -1737,7 +1806,7 @@ export default function MedsToday(props: MedsTodayProps) {
                 {tab === 'schedule' ? (
                     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                         <div className="space-y-4">
-                            {active_round ? (
+                            {active_round && canRecord ? (
                                 <ActiveRoundBanner round={active_round} />
                             ) : null}
                             <ScheduleCard
@@ -1745,6 +1814,9 @@ export default function MedsToday(props: MedsTodayProps) {
                                 clientById={clientById}
                                 search={search}
                                 onSearchChange={setSearch}
+                                canRecord={canRecord}
+                                canRecordControlled={canRecordControlled}
+                                canViewMar={board_can.view_emar}
                                 onRecord={(row) =>
                                     setWizard({ type: 'dose', row })
                                 }
@@ -1752,19 +1824,23 @@ export default function MedsToday(props: MedsTodayProps) {
                             />
                         </div>
                         <div className="space-y-4">
-                            <PrnQuickCard
-                                count={prn_medications.length}
-                                onOpen={() => setWizard({ type: 'prn' })}
-                            />
+                            {canRecord ? (
+                                <PrnQuickCard
+                                    count={prn_medications.length}
+                                    onOpen={() => setWizard({ type: 'prn' })}
+                                />
+                            ) : null}
                             <FollowUpsCard
                                 followUps={prn_follow_ups}
                                 clientById={clientById}
+                                canRecord={canRecord}
+                                canRecordControlled={canRecordControlled}
                                 onRecordEffect={setEffectFollowUp}
                             />
-                            <RoundsCard rounds={rounds} />
+                            <RoundsCard rounds={rounds} canRecord={canRecord} />
                             <StockCard
                                 alerts={stock_alerts}
-                                canManage={board_can.view_emar}
+                                canManage={board_can.manage_stock}
                             />
                             <ActivityCard
                                 activity={activity}
@@ -1779,6 +1855,7 @@ export default function MedsToday(props: MedsTodayProps) {
                         rounds={rounds}
                         schedule={schedule}
                         clientById={clientById}
+                        canRecord={canRecord}
                     />
                 ) : null}
                 {tab === 'prn' ? (
@@ -1786,6 +1863,8 @@ export default function MedsToday(props: MedsTodayProps) {
                         medications={prn_medications}
                         followUps={prn_follow_ups}
                         clientById={clientById}
+                        canRecord={canRecord}
+                        canRecordControlled={canRecordControlled}
                         onGive={(medId) => setWizard({ type: 'prn', medId })}
                         onRecordEffect={setEffectFollowUp}
                     />
@@ -1793,7 +1872,7 @@ export default function MedsToday(props: MedsTodayProps) {
                 {tab === 'stock' ? (
                     <StockTab
                         alerts={stock_alerts}
-                        canManage={board_can.view_emar}
+                        canManage={board_can.manage_stock}
                     />
                 ) : null}
                 {tab === 'activity' ? (
@@ -1830,19 +1909,23 @@ export default function MedsToday(props: MedsTodayProps) {
                                     >
                                         PRN Records
                                     </Link>
-                                    <Link
-                                        href="/emar/controlled"
-                                        className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-                                    >
-                                        Controlled Drugs
-                                    </Link>
-                                    <Link
-                                        href="/emar/stock"
-                                        className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-                                    >
-                                        Stock Management
-                                    </Link>
                                 </>
+                            ) : null}
+                            {board_can.view_controlled ? (
+                                <Link
+                                    href="/emar/controlled"
+                                    className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                                >
+                                    Controlled Drugs
+                                </Link>
+                            ) : null}
+                            {board_can.manage_stock ? (
+                                <Link
+                                    href="/emar/stock"
+                                    className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                                >
+                                    Stock Management
+                                </Link>
                             ) : null}
                             {board_can.view_audit ? (
                                 <Link
@@ -1866,7 +1949,8 @@ export default function MedsToday(props: MedsTodayProps) {
             </div>
 
             {/* ── Overlays ── */}
-            {wizard?.type === 'dose' ? (
+            {wizard?.type === 'dose' &&
+            canRecordMedication(wizard.row.is_controlled) ? (
                 <RecordDoseWizard
                     row={wizard.row}
                     client={clientById.get(wizard.row.client_id)}
@@ -1878,9 +1962,12 @@ export default function MedsToday(props: MedsTodayProps) {
                     onClose={() => setWizard(null)}
                 />
             ) : null}
-            {wizard?.type === 'prn' ? (
+            {canRecord && wizard?.type === 'prn' ? (
                 <PrnWizard
-                    medications={prn_medications}
+                    medications={prn_medications.filter(
+                        (medication) =>
+                            !medication.is_controlled || canRecordControlled,
+                    )}
                     clients={clientById}
                     date={date}
                     witnesses={witnesses}
@@ -1889,7 +1976,8 @@ export default function MedsToday(props: MedsTodayProps) {
                     onClose={() => setWizard(null)}
                 />
             ) : null}
-            {effectFollowUp ? (
+            {effectFollowUp &&
+            canRecordMedication(Boolean(effectFollowUp.is_controlled)) ? (
                 <PrnEffectDialog
                     followUp={effectFollowUp}
                     client={clientById.get(effectFollowUp.client_id)}

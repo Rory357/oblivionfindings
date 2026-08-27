@@ -404,6 +404,7 @@ type Props = {
         submit_form: boolean;
         view_medication: boolean;
         record_medication: boolean;
+        record_controlled_medication: boolean;
         request_replacement: boolean;
         cancel_replacement: boolean;
         assign_shift?: boolean;
@@ -2708,6 +2709,9 @@ export default function ShiftShow({
                                     shiftId={shift.id}
                                     shiftStatus={shift.status}
                                     canRecord={can.record_medication}
+                                    canRecordControlled={
+                                        can.record_controlled_medication
+                                    }
                                     summary={medications}
                                     witnesses={medicationWitnesses}
                                 />

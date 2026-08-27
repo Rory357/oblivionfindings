@@ -80,6 +80,9 @@ export interface MyDayMedDue {
     medication_name: string;
     dose: string;
     route?: string;
+    is_controlled: boolean;
+    can_record: boolean;
+    can_give: boolean;
     scheduled_for: string;
     status: 'overdue' | 'due' | 'upcoming' | 'given' | 'refused' | 'withheld';
     flag?: string | null;
@@ -450,6 +453,9 @@ export interface MyDayPageProps {
     handover?: MyDayHandover | null;
     hr_tasks?: MyDayHrTask[];
     notifications?: MyDayNotification[];
+    can_view_medications?: boolean;
+    can_record_medications?: boolean;
+    can_record_controlled_medications?: boolean;
     labels?: Record<string, string>;
 }
 

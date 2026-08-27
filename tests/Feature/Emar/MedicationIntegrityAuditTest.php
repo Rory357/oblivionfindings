@@ -8,6 +8,7 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationCovertAuthorisation;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -97,9 +98,10 @@ class MedicationIntegrityAuditTest extends TestCase
     public function test_cd_destruction_writes_disposal_register_entry(): void
     {
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupClinic();
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage']);
+        $this->grantPermissions($user, ['medications.view', 'medications.controlled.record']);
         $medication = $this->makeControlledMedication($client, 10);
         $witness2 = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->grantPermissions($witness2, ['medications.controlled.witness']);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -131,9 +133,10 @@ class MedicationIntegrityAuditTest extends TestCase
     public function test_cd_destruction_cannot_exceed_stock_on_hand(): void
     {
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupClinic();
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage']);
+        $this->grantPermissions($user, ['medications.view', 'medications.controlled.record']);
         $medication = $this->makeControlledMedication($client, 3);
         $witness2 = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->grantPermissions($witness2, ['medications.controlled.witness']);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -307,7 +310,7 @@ class MedicationIntegrityAuditTest extends TestCase
             'approval_status' => 'verified',
         ]);
 
-        \App\Models\MedicationCovertAuthorisation::create([
+        MedicationCovertAuthorisation::create([
             'client_id' => $client->id,
             'client_medication_id' => $medication->id,
             'authorised_by_name' => 'Dr Smith',
@@ -326,7 +329,7 @@ class MedicationIntegrityAuditTest extends TestCase
         $this->assertStringContainsString('Covert administration is not authorised', $result['error']);
 
         // A current covert authorisation permits administration.
-        \App\Models\MedicationCovertAuthorisation::query()->update(['review_date' => now()->addMonths(3)->toDateString()]);
+        MedicationCovertAuthorisation::query()->update(['review_date' => now()->addMonths(3)->toDateString()]);
 
         $ok = app(EnhancedMarService::class)->recordAdministration($client, $medication->fresh(), [
             'status' => 'given',

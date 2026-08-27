@@ -173,6 +173,8 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    can_view_controlled: boolean;
+    can_record_controlled: boolean;
 };
 
 type Modal =
@@ -220,6 +222,8 @@ export default function Reports(props: Props) {
         sites,
         active_site: activeSite,
         site_brand_colour: brandColour,
+        can_view_controlled: canViewControlled,
+        can_record_controlled: canRecordControlled,
     } = props;
     const [tab, setTab] = useState('administration');
     const [modal, setModal] = useState<Modal>(null);
@@ -373,13 +377,17 @@ export default function Reports(props: Props) {
                     reasonBreakdown.by_class.omission || undefined,
         },
         { id: 'prn', label: 'PRN usage', icon: Pill, tone: 'primary' },
-        {
-            id: 'controlled',
-            label: 'Controlled drugs',
-            icon: Lock,
-            tone: 'primary',
-            badge: controlledDrugs.discrepancies || undefined,
-        },
+        ...(canViewControlled
+            ? [
+                  {
+                      id: 'controlled',
+                      label: 'Controlled drugs',
+                      icon: Lock,
+                      tone: 'primary' as const,
+                      badge: controlledDrugs.discrepancies || undefined,
+                  },
+              ]
+            : []),
         {
             id: 'staff',
             label: 'Staff compliance',
@@ -418,11 +426,18 @@ export default function Reports(props: Props) {
             value: errorSummary.open,
             tone: errorSummary.open > 0 ? 'warning' : 'neutral',
         },
-        {
-            label: 'CD variances',
-            value: controlledDrugs.discrepancies,
-            tone: controlledDrugs.discrepancies > 0 ? 'critical' : 'neutral',
-        },
+        ...(canViewControlled
+            ? [
+                  {
+                      label: 'CD variances',
+                      value: controlledDrugs.discrepancies,
+                      tone:
+                          controlledDrugs.discrepancies > 0
+                              ? ('critical' as const)
+                              : ('neutral' as const),
+                  },
+              ]
+            : []),
     ];
 
     const errorRate =
@@ -465,13 +480,13 @@ export default function Reports(props: Props) {
                             </span>
                         </span>
                     }
-                    description={`${adminSummary.total} doses recorded · ${adminSummary.compliance_rate}% compliance · ${adminSummary.missed} missed / ${adminSummary.refused} refused · ${controlledDrugs.discrepancies} CD variance${controlledDrugs.discrepancies === 1 ? '' : 's'} and ${errorSummary.open} open error${errorSummary.open === 1 ? '' : 's'}.`}
+                    description={`${adminSummary.total} doses recorded · ${adminSummary.compliance_rate}% compliance · ${adminSummary.missed} missed / ${adminSummary.refused} refused · ${canViewControlled ? `${controlledDrugs.discrepancies} CD variance${controlledDrugs.discrepancies === 1 ? '' : 's'} and ` : ''}${errorSummary.open} open error${errorSummary.open === 1 ? '' : 's'}.`}
                     stats={heroStats}
                     actions={
                         <>
                             <a
                                 href={exportUrl(
-                                    tab === 'controlled'
+                                    canViewControlled && tab === 'controlled'
                                         ? 'controlled'
                                         : tab === 'prn'
                                           ? 'prn'
@@ -884,19 +899,21 @@ export default function Reports(props: Props) {
                     </Panel>
                 )}
 
-                {tab === 'controlled' && (
+                {canViewControlled && tab === 'controlled' && (
                     <Panel
                         title="Controlled drugs"
                         subtitle="CD administrations, destructions and variances"
                         exportHref={exportUrl('controlled')}
                         action={
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setModal({ type: 'cdloss' })}
-                            >
-                                Report CD loss
-                            </Button>
+                            canRecordControlled ? (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setModal({ type: 'cdloss' })}
+                                >
+                                    Report CD loss
+                                </Button>
+                            ) : undefined
                         }
                     >
                         <div className="grid gap-3 sm:grid-cols-3">
@@ -1272,12 +1289,14 @@ export default function Reports(props: Props) {
                                 desc="Every dose with reason code, witness and observations."
                                 href={exportUrl('administration')}
                             />
-                            <PackCard
-                                icon={Lock}
-                                title="Controlled-drug CSV"
-                                desc="CD administrations with witness and dose."
-                                href={exportUrl('controlled')}
-                            />
+                            {canViewControlled && (
+                                <PackCard
+                                    icon={Lock}
+                                    title="Controlled-drug CSV"
+                                    desc="CD administrations with witness and dose."
+                                    href={exportUrl('controlled')}
+                                />
+                            )}
                             <PackCard
                                 icon={AlertOctagon}
                                 title="Errors CSV"
@@ -1290,12 +1309,14 @@ export default function Reports(props: Props) {
                                 desc="Printable MAR chart for the period."
                                 href="/emar/pdf/mar-chart"
                             />
-                            <PackCard
-                                icon={Lock}
-                                title="CD register PDF"
-                                desc="Controlled-drug register for inspectors."
-                                href="/emar/pdf/controlled-register"
-                            />
+                            {canViewControlled && (
+                                <PackCard
+                                    icon={Lock}
+                                    title="CD register PDF"
+                                    desc="Controlled-drug register for inspectors."
+                                    href="/emar/pdf/controlled-register"
+                                />
+                            )}
                             <PackCard
                                 icon={ClipboardCheck}
                                 title="Round sheet PDF"
@@ -1308,23 +1329,27 @@ export default function Reports(props: Props) {
                                 desc="Full MAR export (all residents)."
                                 href="/emar/reports/export-mar"
                             />
-                            <PackCard
-                                icon={AlertTriangle}
-                                title="CD discrepancies CSV"
-                                desc="Controlled-drug variances to reconcile."
-                                href="/emar/reports/export-controlled-discrepancies"
-                            />
+                            {canViewControlled && (
+                                <PackCard
+                                    icon={AlertTriangle}
+                                    title="CD discrepancies CSV"
+                                    desc="Controlled-drug variances to reconcile."
+                                    href="/emar/reports/export-controlled-discrepancies"
+                                />
+                            )}
                         </div>
                     </Panel>
                 )}
             </div>
 
-            {modal?.type === 'cdloss' && (
-                <ReportLossDialog
-                    medications={cdMedications}
-                    onClose={() => setModal(null)}
-                />
-            )}
+            {canViewControlled &&
+                canRecordControlled &&
+                modal?.type === 'cdloss' && (
+                    <ReportLossDialog
+                        medications={cdMedications}
+                        onClose={() => setModal(null)}
+                    />
+                )}
             {modal?.type === 'drill' && (
                 <DrillDialog row={modal.row} onClose={() => setModal(null)} />
             )}

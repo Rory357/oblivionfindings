@@ -505,19 +505,19 @@ function buildIconNavItems({
     // `/meds/today`. They never land on the admin-heavy eMAR dashboard by
     // default.
     //
-    // Managers / medication leads (orders-manage, audit, or reports) keep the
+    // Managers / medication leads (orders, stock, audit, or reports) keep the
     // full eMAR sub-panel for oversight, now rooted on the worker view so the
     // first click still matches the frontline experience, with Dashboard kept
     // one level deeper for compliance / management work.
     const canAdminEmar =
-        can?.medications?.ordersManage ||
+        (can?.medications?.view && can?.medications?.ordersManage) ||
+        (can?.medications?.view && can?.medications?.stockUpdate) ||
+        (can?.medications?.view && can?.medications?.controlledView) ||
         can?.medications?.auditView ||
         can?.medications?.reportsExport ||
         can?.reports?.viewAny;
     const canWorkerMeds =
-        can?.medications?.administerRecord ||
-        can?.medications?.view ||
-        can?.clients?.update;
+        can?.medications?.administerRecord || can?.medications?.view;
     if (canAdminEmar) {
         items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
     } else if (canWorkerMeds) {
@@ -1054,16 +1054,22 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     // Worker view (PR 12). Top of the panel so even admins can quickly drop
     // into the operational frontline surface before diving into compliance.
-    const workerItems: NavItem[] = [
-        { title: 'Meds today', href: '/meds/today', icon: Activity },
-    ];
-    groups.push({ label: 'Worker view', items: workerItems });
+    const workerItems: NavItem[] = [];
+    if (can?.medications?.administerRecord || can?.medications?.view)
+        workerItems.push({
+            title: 'Meds today',
+            href: '/meds/today',
+            icon: Activity,
+        });
+    if (workerItems.length > 0)
+        groups.push({ label: 'Worker view', items: workerItems });
 
     // Overview
-    groups.push({
-        label: 'Overview',
-        items: [{ title: 'Dashboard', href: '/emar', icon: LayoutGrid }],
-    });
+    if (can?.medications?.view)
+        groups.push({
+            label: 'Overview',
+            items: [{ title: 'Dashboard', href: '/emar', icon: LayoutGrid }],
+        });
 
     // Administration
     const admin: NavItem[] = [];
@@ -1081,7 +1087,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.medications?.view)
         admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.controlledView)
         admin.push({
             title: 'Controlled Drugs',
             href: '/emar/controlled',
@@ -1104,7 +1110,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/medications',
             icon: Pill,
         });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.stockUpdate)
         mgmt.push({
             title: 'Stock Management',
             href: '/emar/stock',
@@ -1150,7 +1156,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/emar/competency',
             icon: ClipboardCheck,
         });
-    if (can?.medications?.view)
+    if (can?.medications?.view && can?.medications?.controlledView)
         compliance.push({
             title: 'Destructions',
             href: '/emar/destructions',

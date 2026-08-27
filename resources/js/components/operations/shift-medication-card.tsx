@@ -92,6 +92,7 @@ type Props = {
     shiftId: number;
     shiftStatus: string;
     canRecord: boolean;
+    canRecordControlled: boolean;
     summary: MedicationSummary;
     witnesses: Array<{ id: number; name: string }>;
 };
@@ -119,6 +120,7 @@ export default function ShiftMedicationCard({
     shiftId,
     shiftStatus,
     canRecord,
+    canRecordControlled,
     summary,
     witnesses,
 }: Props) {
@@ -133,6 +135,9 @@ export default function ShiftMedicationCard({
     const [scanMatchSource, setScanMatchSource] = useState<string | null>(null);
     const [verifyingScan, setVerifyingScan] = useState(false);
     const canRecordOnShift = canRecord && shiftStatus !== 'completed';
+    const canRecordRow = (row: MedicationRow) =>
+        canRecordOnShift &&
+        (!row.medication.controlled_drug || canRecordControlled);
 
     const adminForm = useForm({
         status: 'given',
@@ -216,6 +221,7 @@ export default function ShiftMedicationCard({
     );
 
     const openAdministrationDialog = (row: MedicationRow) => {
+        if (!canRecordRow(row)) return;
         setActiveRow(row);
         adminForm.reset();
         adminForm.setData('status', 'given');
@@ -484,7 +490,7 @@ export default function ShiftMedicationCard({
                                                             : ''}
                                                     </div>
                                                 </div>
-                                                {canRecordOnShift &&
+                                                {canRecordRow(row) &&
                                                 row.can_record ? (
                                                     <Button
                                                         size="sm"
@@ -543,7 +549,7 @@ export default function ShiftMedicationCard({
                                                             'Dose not specified'}
                                                     </div>
                                                 </div>
-                                                {canRecordOnShift &&
+                                                {canRecordRow(row) &&
                                                 row.can_record ? (
                                                     <Button
                                                         size="sm"

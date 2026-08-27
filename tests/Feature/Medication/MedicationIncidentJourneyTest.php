@@ -16,6 +16,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
+use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
@@ -1343,6 +1344,17 @@ REGEX;
     private function medicationFixture(): array
     {
         $actor = User::factory()->create();
+        $permission = Permission::query()->firstOrCreate(
+            ['key' => 'medications.administer.record'],
+            [
+                'description' => 'Record medication administrations (MAR)',
+                'group' => 'medications',
+                'module' => 'Clinical',
+            ],
+        );
+        $actor->permissionOverrides()->syncWithoutDetaching([
+            $permission->id => ['allowed' => true],
+        ]);
         $site = Site::factory()->create();
         $client = Client::factory()->create(['site_id' => $site->id]);
         $medication = ClientMedication::factory()->create([

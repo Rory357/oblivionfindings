@@ -24,11 +24,15 @@ export function ProfileDialogs({
     onClose,
     flowContext,
     medications,
+    canRecord,
+    canRecordControlled,
 }: {
     dialog: ProfileDialogState;
     onClose: () => void;
     flowContext: Omit<ProfileFlowContext, 'dialog'>;
     medications: EmarMedication[];
+    canRecord: boolean;
+    canRecordControlled: boolean;
 }) {
     if (!dialog) return null;
 
@@ -93,6 +97,8 @@ export function ProfileDialogs({
     }
 
     if (dialog.key === 'emar') {
+        if (!canRecord) return null;
+
         return (
             <EmarRecordDialog
                 open
@@ -100,6 +106,8 @@ export function ProfileDialogs({
                 clientId={flowContext.clientId}
                 clientLabel={flowContext.clientLabel}
                 medications={medications}
+                canRecord={canRecord}
+                canRecordControlled={canRecordControlled}
                 staffOptions={flowContext.staffOptions}
                 initialMedicationId={
                     typeof dialog.ctx?.medicationId === 'number'

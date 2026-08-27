@@ -40,9 +40,7 @@ class MedicationErrorController extends Controller
                 'client' => $attachment->client_id,
                 'attachment' => $attachment->id,
             ]),
-            'can_delete' => $request->user()->canDo('medications.administer.correct')
-                || $request->user()->canDo('clients.update')
-                || (int) $attachment->uploaded_by === (int) $request->user()->id,
+            'can_delete' => $request->user()->canDo('medications.administer.correct'),
         ];
     }
 
@@ -156,8 +154,7 @@ class MedicationErrorController extends Controller
             'site_brand_colour' => $siteFilter ? Site::query()->whereKey($siteFilter)->value('brand_colour') : null,
             'can' => [
                 'manage_evidence' => $request->user()->canDo('medications.administer.record')
-                    || $request->user()->canDo('medications.administer.correct')
-                    || $request->user()->canDo('clients.update'),
+                    || $request->user()->canDo('medications.administer.correct'),
             ],
         ]);
     }

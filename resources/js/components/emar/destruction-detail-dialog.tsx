@@ -100,7 +100,7 @@ export function DestructionDetailDialog({
     record: DestructionRow;
     onClose: () => void;
     /** Open the void modal in place (offered only while the record is live). */
-    onVoid: () => void;
+    onVoid?: () => void;
     /** Export this single record (CSV). */
     onExport: () => void;
 }) {
@@ -160,7 +160,7 @@ export function DestructionDetailDialog({
                     <Button type="button" variant="ghost" onClick={onExport}>
                         <Download className="h-4 w-4" /> Export record
                     </Button>
-                    {!d.is_voided ? (
+                    {!d.is_voided && onVoid ? (
                         <Button
                             type="button"
                             variant="destructive"

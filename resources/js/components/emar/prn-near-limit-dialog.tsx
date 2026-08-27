@@ -66,9 +66,9 @@ export function PrnNearLimitDialog({
     client: ClientInfo | undefined;
     onClose: () => void;
     /** Open the Record-PRN wizard pre-filled to this med (in place). */
-    onRecordDose: () => void;
+    onRecordDose?: () => void;
     /** Open the effectiveness wizard for the most recent dose (in place). */
-    onRecordEffectiveness: (followUp: PrnFollowUp) => void;
+    onRecordEffectiveness?: (followUp: PrnFollowUp) => void;
 }) {
     const [section, setSection] = useState(0);
     const doses = med.today_doses ?? [];
@@ -87,6 +87,7 @@ export function PrnNearLimitDialog({
                   administration_id: lastDose.id,
                   client_id: med.client_id,
                   medication_name: med.name,
+                  is_controlled: med.is_controlled,
                   dose_given: lastDose.dose,
                   given_at: null,
                   given_time: lastDose.time,
@@ -118,20 +119,24 @@ export function PrnNearLimitDialog({
             }
             footerEnd={
                 <>
-                    <Button type="button" onClick={onRecordDose}>
-                        <Pill className="h-4 w-4" /> Record PRN dose
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!lastDose}
-                        onClick={() => {
-                            const fu = lastFollowUp();
-                            if (fu) onRecordEffectiveness(fu);
-                        }}
-                    >
-                        <Stethoscope className="h-4 w-4" /> Effectiveness
-                    </Button>
+                    {onRecordDose ? (
+                        <Button type="button" onClick={onRecordDose}>
+                            <Pill className="h-4 w-4" /> Record PRN dose
+                        </Button>
+                    ) : null}
+                    {onRecordEffectiveness ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!lastDose}
+                            onClick={() => {
+                                const fu = lastFollowUp();
+                                if (fu) onRecordEffectiveness(fu);
+                            }}
+                        >
+                            <Stethoscope className="h-4 w-4" /> Effectiveness
+                        </Button>
+                    ) : null}
                     <Button
                         type="button"
                         variant="ghost"

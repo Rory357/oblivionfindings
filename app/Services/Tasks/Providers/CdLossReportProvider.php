@@ -30,7 +30,8 @@ class CdLossReportProvider implements HasModelClass, SiteScopedTaskProvider, Tas
 
     public function canView(User $user): bool
     {
-        return $user->canDo('medications.controlled.view') || $user->canDo('clients.update');
+        return $user->canDo('medications.view')
+            && $user->canDo('medications.controlled.view');
     }
 
     public function authorizedTasks(User $user, array $filters = []): array

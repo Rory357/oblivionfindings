@@ -157,8 +157,8 @@ export function StockDetailDialog({
     /** Open pharmacy order for this medication, if one is in flight. */
     openOrder?: OpenOrderSummary | null;
     onClose: () => void;
-    onAdjust: () => void;
-    onCount: () => void;
+    onAdjust?: () => void;
+    onCount?: () => void;
     onOrder: () => void;
 }) {
     const [section, setSection] = useState(0);
@@ -197,12 +197,20 @@ export function StockDetailDialog({
             }
             footerEnd={
                 <>
-                    <Button type="button" onClick={onAdjust}>
-                        <Pencil className="h-4 w-4" /> Adjust stock
-                    </Button>
-                    <Button type="button" variant="outline" onClick={onCount}>
-                        <ClipboardCheck className="h-4 w-4" /> Run count
-                    </Button>
+                    {onAdjust ? (
+                        <Button type="button" onClick={onAdjust}>
+                            <Pencil className="h-4 w-4" /> Adjust stock
+                        </Button>
+                    ) : null}
+                    {onCount ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onCount}
+                        >
+                            <ClipboardCheck className="h-4 w-4" /> Run count
+                        </Button>
+                    ) : null}
                     <Button type="button" variant="outline" onClick={onOrder}>
                         <ShoppingCart className="h-4 w-4" /> Order more
                     </Button>

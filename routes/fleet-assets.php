@@ -241,13 +241,16 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::post('/transports/{transport}/pre-check', [ResidentTransportController::class, 'savePreCheck'])->whereNumber('transport')->name('fleet-assets.transports.pre-check.store');
     });
 
-    // Medication handling during transport (requires medication permission)
-    Route::middleware('permission:fleet.medication.manage|medications.administer.record|medications.stock.update|clients.update')->group(function () {
+    // Medication custody during transport has its own exact logistics authority.
+    Route::middleware('permission:fleet.medication.manage')->group(function () {
         Route::post('/transports/{transport}/pack-medication', [ResidentTransportController::class, 'packMedication'])->whereNumber('transport')->name('fleet-assets.transports.pack-medication');
         Route::post('/medication-transit/{log}/correct-packing-attestation', [ResidentTransportController::class, 'correctPackingAttestation'])->whereNumber('log')->name('fleet-assets.medication-transit.correct-packing-attestation');
-        Route::post('/medication-transit/{log}/administer', [ResidentTransportController::class, 'administerMedication'])->whereNumber('log')->name('fleet-assets.medication-transit.administer');
         Route::post('/medication-transit/{log}/return', [ResidentTransportController::class, 'returnMedication'])->whereNumber('log')->name('fleet-assets.medication-transit.return');
     });
+    Route::post('/medication-transit/{log}/administer', [ResidentTransportController::class, 'administerMedication'])
+        ->middleware('permission:medications.administer.record')
+        ->whereNumber('log')
+        ->name('fleet-assets.medication-transit.administer');
 
     // Shift Handovers — read
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {

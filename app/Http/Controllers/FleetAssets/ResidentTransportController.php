@@ -513,6 +513,8 @@ class ResidentTransportController extends Controller
         }
 
         $canManageMedicationTransit = $this->canManageMedicationTransit($request->user());
+        $canAdministerMedicationTransit = $request->user()->canDo('medications.administer.record');
+        $canRecordControlledMedication = $request->user()->canDo('medications.controlled.record');
         $canViewMedicationTransit = $this->journeyScope->canViewMedicationTransit($request->user());
         $transportClient = $transport->resident_id && $canViewMedicationTransit
             ? $this->journeyScope->clientFor($request->user(), (int) $transport->resident_id)
@@ -656,7 +658,7 @@ class ResidentTransportController extends Controller
             }
         }
 
-        $witnesses = $canManageMedicationTransit
+        $witnesses = ($canManageMedicationTransit || $canAdministerMedicationTransit)
             ? $this->transportWitnesses
                 ->eligibleWitnessesForSite((int) $transport->site_id, now(), (int) $request->user()->id)
                 ->map(fn ($user) => [
@@ -723,6 +725,8 @@ class ResidentTransportController extends Controller
                 'packing_attestation_history' => $packingAttestationHistory,
                 'witnesses' => $witnesses,
                 'can_manage' => $canManageMedicationTransit,
+                'can_administer' => $canAdministerMedicationTransit,
+                'can_record_controlled' => $canRecordControlledMedication,
             ],
         ]);
     }
@@ -952,6 +956,22 @@ class ResidentTransportController extends Controller
                 ]);
         }
 
+        $canManageMedicationTransit = $this->canManageMedicationTransit($request->user());
+        $canAdministerMedicationTransit = $request->user()->canDo('medications.administer.record');
+        $canRecordControlledMedication = $request->user()->canDo('medications.controlled.record');
+        $witnesses = ($canManageMedicationTransit || $canAdministerMedicationTransit)
+            ? $this->transportWitnesses->eligibleWitnessesForSites(
+                $selectedTransport
+                    ? [(int) $selectedTransport->site_id]
+                    : $this->journeyScope->accessibleSiteIds($request->user()),
+                now(),
+                (int) $request->user()->id,
+            )->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ])->values()
+            : [];
+
         return Inertia::render('fleet-assets/transports/medications', [
             'logs' => [
                 'data' => $logs->getCollection()->map(fn ($log) => [
@@ -1004,16 +1024,10 @@ class ResidentTransportController extends Controller
             ],
             'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
             'clients' => $clients,
-            'witnesses' => $this->transportWitnesses->eligibleWitnessesForSites(
-                $selectedTransport
-                    ? [(int) $selectedTransport->site_id]
-                    : $this->journeyScope->accessibleSiteIds($request->user()),
-                now(),
-                (int) $request->user()->id,
-            )->map(fn ($user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-            ])->values(),
+            'witnesses' => $witnesses,
+            'can_manage' => $canManageMedicationTransit,
+            'can_administer' => $canAdministerMedicationTransit,
+            'can_record_controlled' => $canRecordControlledMedication,
             'transport_scope' => $selectedTransport ? [
                 'id' => $selectedTransport->id,
                 'resident_name' => $selectedTransport->resident_name,
@@ -1136,7 +1150,7 @@ class ResidentTransportController extends Controller
 
     public function administerMedication(Request $request, FleetMedicationTransitLog $log)
     {
-        $this->assertCanManageMedicationTransit($request);
+        abort_unless($request->user()?->canDo('medications.administer.record'), 403);
         $log = $this->journeyScope->medicationTransitLogFor($request->user(), (int) $log->id);
 
         $rules = [
