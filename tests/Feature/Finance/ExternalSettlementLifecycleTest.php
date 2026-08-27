@@ -514,16 +514,41 @@ it('revalidates the locked source and settlement against the sequence mutex orga
     }
 });
 
-it('keeps the 000130 rollback foreign-key and unique-index dependency order explicit', function (): void {
+it('keeps the 000130 foreign-key supporting indexes in a MySQL-safe order', function (): void {
     $source = file_get_contents(database_path('migrations/2026_08_23_000130_create_external_settlement_lifecycle.php'));
-    $down = substr($source, strpos($source, 'public function down(): void'));
+    $upStart = strpos($source, 'public function up(): void');
+    $downStart = strpos($source, 'public function down(): void');
+    $up = substr($source, $upStart, $downStart - $upStart);
+    $down = substr($source, $downStart);
+    $replacementIndexPosition = strpos(
+        $up,
+        "index('settlement_bill_id', 'fin_payment_run_items_settlement_bill_index')",
+    );
+    $legacyUniqueDropPosition = strpos(
+        $up,
+        "dropUnique('fin_payment_run_items_settlement_bill_unique')",
+    );
+    $legacyUniqueRestorePosition = strpos(
+        $down,
+        "unique('settlement_bill_id', 'fin_payment_run_items_settlement_bill_unique')",
+    );
+    $replacementIndexDropPosition = strpos(
+        $down,
+        "dropIndex('fin_payment_run_items_settlement_bill_index')",
+    );
     $foreignPosition = strpos($down, "dropForeign(['active_settlement_bill_id'])");
     $uniquePosition = strpos($down, 'dropUnique(self::ACTIVE_BILL_UNIQUE)');
     $columnPosition = strpos($down, "dropColumn('active_settlement_bill_id')");
 
-    expect($foreignPosition)->not->toBeFalse()
+    expect($replacementIndexPosition)->not->toBeFalse()
+        ->and($legacyUniqueDropPosition)->not->toBeFalse()
+        ->and($legacyUniqueRestorePosition)->not->toBeFalse()
+        ->and($replacementIndexDropPosition)->not->toBeFalse()
+        ->and($foreignPosition)->not->toBeFalse()
         ->and($uniquePosition)->not->toBeFalse()
         ->and($columnPosition)->not->toBeFalse()
+        ->and($replacementIndexPosition)->toBeLessThan($legacyUniqueDropPosition)
+        ->and($legacyUniqueRestorePosition)->toBeLessThan($replacementIndexDropPosition)
         ->and($foreignPosition)->toBeLessThan($uniquePosition)
         ->and($uniquePosition)->toBeLessThan($columnPosition);
 });

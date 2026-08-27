@@ -117,8 +117,12 @@ return new class extends Migration
             ]);
 
         Schema::table('fin_payment_run_items', function (Blueprint $table): void {
-            $table->dropUnique('fin_payment_run_items_settlement_bill_unique');
             $table->index('settlement_bill_id', 'fin_payment_run_items_settlement_bill_index');
+        });
+        Schema::table('fin_payment_run_items', function (Blueprint $table): void {
+            // The settlement_bill_id foreign key needs a supporting index.
+            // Create its replacement before dropping the legacy unique index.
+            $table->dropUnique('fin_payment_run_items_settlement_bill_unique');
         });
     }
 
@@ -148,8 +152,12 @@ return new class extends Migration
         }
 
         Schema::table('fin_payment_run_items', function (Blueprint $table): void {
-            $table->dropIndex('fin_payment_run_items_settlement_bill_index');
             $table->unique('settlement_bill_id', 'fin_payment_run_items_settlement_bill_unique');
+        });
+        Schema::table('fin_payment_run_items', function (Blueprint $table): void {
+            // Keep a supporting index in place until the restored unique index
+            // exists, otherwise MySQL refuses to drop the non-unique index.
+            $table->dropIndex('fin_payment_run_items_settlement_bill_index');
             // MySQL may use the unique index to support this foreign key. Drop
             // the dependent constraint before removing its backing index.
             $table->dropForeign(['active_settlement_bill_id']);
