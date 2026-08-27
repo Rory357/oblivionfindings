@@ -1,0 +1,329 @@
+{
+  "schema_version": "sealed_run_145_agent_b_finance_invoice_fx_input_wave_24_v1",
+  "run_id": "RUN-145-B-INPUT-FINANCE-INVOICE-FX-WAVE-24",
+  "status": "IDENTITY_STRIPPED_OBSERVED_BEHAVIOR_ONLY",
+  "allowed_operation": "Derive source-independent user needs, states, safeguards, feedback, recovery, hand-off, output, and acceptance criteria while preserving every unknown and adjacency limit.",
+  "prohibited_context": [
+    "upstream repository, project, release, source path, source wording, implementation, licence, or edition identity",
+    "canonical target or product identity",
+    "current-product source or behavior",
+    "old comparisons, mappings, selections, NCM decisions, or credit",
+    "network, browser, filesystem, repository, runtime, tests, build, or database"
+  ],
+  "input_payloads": [
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 3670,
+        "sha256": "1f2a6953c4b0b49caf5105a019f73542701d23a6759e62dd990f9c7448ebc5a0"
+      },
+      "payload": {
+        "schema": "IDENTITY_STRIPPED_OBSERVED_BEHAVIOR_PACKET_V1",
+        "packet_id": "OBS-FX-145-A",
+        "capability_handle": "financial_exchange_rate_revaluation",
+        "observations": [
+          {
+            "id": "FX01",
+            "category": "entry_point",
+            "observation": "A financial revaluation record accepts an organisational ledger context and reporting/posting date before balances are fetched."
+          },
+          {
+            "id": "FX02",
+            "category": "role_authority",
+            "observation": "Creating revaluation journals requires separate journal-write authority; inspecting the record alone does not establish that authority."
+          },
+          {
+            "id": "FX03",
+            "category": "information",
+            "observation": "Eligible balance-sheet accounts held in a currency different from the base currency are enumerated, excluding group, stock, and same-currency accounts."
+          },
+          {
+            "id": "FX04",
+            "category": "information",
+            "observation": "Each row presents foreign-currency balance, current base-currency balance, current exchange rate, new exchange rate, new base-currency balance, and calculated gain or loss."
+          },
+          {
+            "id": "FX05",
+            "category": "step",
+            "observation": "The new base-currency balance is calculated from the unchanged foreign-currency amount and a date-effective exchange rate; gain/loss is the difference from the current base-currency balance."
+          },
+          {
+            "id": "FX06",
+            "category": "branch",
+            "observation": "Rows with no foreign-currency or base-currency balance are handled separately so residual carrying balances can be cleared rather than treated as ordinary revaluations."
+          },
+          {
+            "id": "FX07",
+            "category": "validation",
+            "observation": "Organisational ledger context and date are mandatory; rounding-loss allowance must be at least zero and below one."
+          },
+          {
+            "id": "FX08",
+            "category": "validation",
+            "observation": "Submission removes rows without gain/loss and fails if no gain/loss row remains."
+          },
+          {
+            "id": "FX09",
+            "category": "feedback",
+            "observation": "When no qualifying balances exist, the actor is told either that no outstanding items need revaluation or none were found."
+          },
+          {
+            "id": "FX10",
+            "category": "safeguard",
+            "observation": "A configured unrealised gain/loss account is required before journals can be created."
+          },
+          {
+            "id": "FX11",
+            "category": "output",
+            "observation": "The action creates attributable multi-currency journal entries linked back to the revaluation record and calculates balanced debit/credit totals."
+          },
+          {
+            "id": "FX12",
+            "category": "output_feedback",
+            "observation": "Successful creation reports links to the created ordinary revaluation journal and, where applicable, a zero-balance journal."
+          },
+          {
+            "id": "FX13",
+            "category": "recovery",
+            "observation": "The record can locate posted linked journals and determine whether their booked gain/loss equals the revaluation total, and separately whether reversals have posted."
+          },
+          {
+            "id": "FX14",
+            "category": "recovery",
+            "observation": "A reversal action creates draft reversals only for posted linked journals that do not already have reversals; an existing draft reversal blocks duplicate creation and is surfaced to the actor."
+          },
+          {
+            "id": "FX15",
+            "category": "state_unknown",
+            "observation": "Draft, submitted, linked-journal, and draft-reversal behavior is observed, but final posting orchestration, provider-rate provenance, idempotency across retries, concurrent execution, approval separation, durable recovery, accessibility, and full authorization scope are not established."
+          },
+          {
+            "id": "FX16",
+            "category": "boundary",
+            "observation": "The observed organisational ledger scope is not evidence of any site-level access model, direct-object concealment, privacy boundary, or supported-living workflow."
+          }
+        ],
+        "counts": {
+          "observations": 16,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "identity_stripped": true,
+          "observed_behavior_only": true,
+          "unknowns_retained": true,
+          "zero_credit": true
+        }
+      }
+    },
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 1507,
+        "sha256": "71d8a9cf0f2e84ccb3876ac234b10fe52b4f2299630f52c0a7f1db6b37264666"
+      },
+      "payload": {
+        "schema": "IDENTITY_STRIPPED_OBSERVED_BEHAVIOR_PACKET_V1",
+        "packet_id": "OBS-INV-145-A1",
+        "capability_handle": "invoice_lifecycle_candidate_one",
+        "observations": [
+          {
+            "id": "I101",
+            "category": "entry_point",
+            "observation": "An actor can create an invoice as a draft and later submit it."
+          },
+          {
+            "id": "I102",
+            "category": "states",
+            "observation": "Draft, Submitted, Unpaid, Partly Paid, Paid, Overdue, and Cancelled are explicitly represented."
+          },
+          {
+            "id": "I103",
+            "category": "safeguard_output",
+            "observation": "Submission applies approval control and produces accounting effects; stock effects may also apply for stock-bearing invoices."
+          },
+          {
+            "id": "I104",
+            "category": "branch",
+            "observation": "A submitted invoice offers payment capture and a payment-request action."
+          },
+          {
+            "id": "I105",
+            "category": "handoff_feedback",
+            "observation": "A payment request can send an attached invoice or payment link using a deduplicated after-commit job."
+          },
+          {
+            "id": "I106",
+            "category": "recovery",
+            "observation": "Cancellation reverses relevant effects, cancels ledger entries, and changes the invoice to Cancelled."
+          },
+          {
+            "id": "I107",
+            "category": "unknowns",
+            "observation": "The observed behavior does not establish target-specific site access, privacy, direct-object concealment, retry semantics beyond the send job, accessibility, or supported-living terminology."
+          }
+        ],
+        "counts": {
+          "observations": 7,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "identity_stripped": true,
+          "observed_behavior_only": true,
+          "unknowns_retained": true,
+          "zero_credit": true
+        }
+      }
+    },
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 1430,
+        "sha256": "75b0a69ac0cddb17ba624e090b15de3db646a053a15f82d76710a293dff5318f"
+      },
+      "payload": {
+        "schema": "IDENTITY_STRIPPED_OBSERVED_BEHAVIOR_PACKET_V1",
+        "packet_id": "OBS-INV-145-A2",
+        "capability_handle": "invoice_lifecycle_candidate_two",
+        "observations": [
+          {
+            "id": "I201",
+            "category": "states",
+            "observation": "Customer invoices have Draft, Validated, Closed, and Abandoned states."
+          },
+          {
+            "id": "I202",
+            "category": "entry_point",
+            "observation": "Creation begins in Draft."
+          },
+          {
+            "id": "I203",
+            "category": "payment",
+            "observation": "A paid invoice is explicitly closed."
+          },
+          {
+            "id": "I204",
+            "category": "cancellation",
+            "observation": "An unpaid invoice can be abandoned with a cancellation event; correction of a paid invoice is a distinct credit-note path rather than the same cancellation."
+          },
+          {
+            "id": "I205",
+            "category": "handoff_audit",
+            "observation": "Successful invoice email delivery increments a send counter and emits a delivery event."
+          },
+          {
+            "id": "I206",
+            "category": "payment",
+            "observation": "Payment creation distributes amounts across invoices and may close invoices that become paid."
+          },
+          {
+            "id": "I207",
+            "category": "unknowns",
+            "observation": "Exact equivalence between abandonment, cancellation, credit-note correction, and the target lifecycle is not established; site, privacy, direct-object, retry, and accessibility parity are also not established."
+          }
+        ],
+        "counts": {
+          "observations": 7,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "identity_stripped": true,
+          "observed_behavior_only": true,
+          "unknowns_retained": true,
+          "zero_credit": true
+        }
+      }
+    },
+    {
+      "payload_seal": {
+        "algorithm": "SHA-256",
+        "canonical_bytes": "UTF-8 compact JSON; no BOM; no terminal newline",
+        "bytes": 1584,
+        "sha256": "91e316b6473a227294f1f345fdc067764004e6b3e750c95b4518b844f05d3808"
+      },
+      "payload": {
+        "schema": "IDENTITY_STRIPPED_OBSERVED_BEHAVIOR_PACKET_V1",
+        "packet_id": "OBS-INV-145-ADJ",
+        "capability_handle": "adjacent_invoice_evidence_not_exact_match",
+        "observations": [
+          {
+            "id": "IA01",
+            "category": "safeguard",
+            "observation": "Create, mail, delete, deliver, write-off, and payment-history actions are permission guarded."
+          },
+          {
+            "id": "IA02",
+            "category": "output",
+            "observation": "Invoice creation and its related journal work share one unit of work."
+          },
+          {
+            "id": "IA03",
+            "category": "handoff_recovery",
+            "observation": "Invoice email is queued, may attach a PDF, and marks the invoice delivered only after transport succeeds."
+          },
+          {
+            "id": "IA04",
+            "category": "safeguard",
+            "observation": "Delivery locks the invoice and rejects duplicate delivery."
+          },
+          {
+            "id": "IA05",
+            "category": "payment",
+            "observation": "Payment allocation updates the invoice paid amount."
+          },
+          {
+            "id": "IA06",
+            "category": "safeguard",
+            "observation": "Deletion locks the invoice and rejects deletion when payments or applied credits exist."
+          },
+          {
+            "id": "IA07",
+            "category": "limitation",
+            "observation": "The observed slice proves deletion and write-off behavior, not a submitted-invoice cancellation or reversal lifecycle, so it is adjacent evidence only."
+          },
+          {
+            "id": "IA08",
+            "category": "boundary",
+            "observation": "Any upstream multi-organisation abstraction is excluded; no site, access, privacy, or supported-living semantics may be inferred."
+          }
+        ],
+        "counts": {
+          "observations": 8,
+          "identity_keys": 0,
+          "implementation_details": 0,
+          "mapping_or_credit_claims": 0
+        },
+        "attestation": {
+          "identity_stripped": true,
+          "observed_behavior_only": true,
+          "unknowns_retained": true,
+          "adjacent_only": true,
+          "zero_credit": true
+        }
+      }
+    }
+  ],
+  "counts": {
+    "payloads": 4,
+    "observations": 38,
+    "identity_keys": 0,
+    "implementation_details": 0,
+    "current_product_comparisons": 0,
+    "credit_awards": 0
+  },
+  "attestation": {
+    "source_reattachment_appendices_excluded": true,
+    "canonical_target_reattachment_excluded": true,
+    "identity_stripped": true,
+    "unknowns_retained": true,
+    "zero_credit": true
+  }
+}

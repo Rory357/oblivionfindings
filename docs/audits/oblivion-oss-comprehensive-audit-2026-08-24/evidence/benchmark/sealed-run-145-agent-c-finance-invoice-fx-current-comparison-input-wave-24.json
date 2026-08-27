@@ -1,0 +1,966 @@
+{
+  "schema_version": "sealed_run_145_agent_c_finance_invoice_fx_current_comparison_input_wave_24_v1",
+  "run_id": "RUN-145-C-INPUT-FINANCE-INVOICE-FX-WAVE-24",
+  "status": "NEUTRAL_SPECIFICATION_PLUS_PINNED_CURRENT_SOURCE_MANIFEST_ONLY",
+  "neutral_specification_seal": {
+    "path": "evidence/benchmark/raw-run-145-agent-b-finance-invoice-fx-neutral-requirements-wave-24.json",
+    "bytes": 24399,
+    "sha256": "8d75485a11b0c4fa0f634650062da3c54dacb31cef7f5a068477340a308cadeb"
+  },
+  "neutral_specification": {
+    "schema_version": "raw_run_145_agent_b_finance_invoice_fx_neutral_requirements_wave_24_v1",
+    "run_id": "RUN-145-B-FINANCE-INVOICE-FX-NEUTRAL-REQUIREMENTS-WAVE-24",
+    "status": "CLEAN_NEUTRAL_SPECIFICATION_COMPLETE_ZERO_CREDIT",
+    "generated_on": "2026-08-26",
+    "agent": {
+      "agent_id": "/root/run145_agent_b",
+      "role": "clean_room_neutral_requirements_writer",
+      "fresh_context": true,
+      "input_access": "SUPPLIED_IDENTITY_STRIPPED_OBSERVATIONS_ONLY"
+    },
+    "input_seal": {
+      "path": "evidence/benchmark/sealed-run-145-agent-b-finance-invoice-fx-input-wave-24.json",
+      "bytes": 13732,
+      "sha256": "98fcf8f7ac5e16c1aadd2b3902dcfb9a1991cf92f366ec1f411824b4e118ca03"
+    },
+    "root_materialization_provenance": {
+      "role": "ROOT_ONLY_MATERIALIZATION_AND_CANONICAL_TARGET_REATTACHMENT_NOT_AGENT_B_SEMANTIC_INPUT",
+      "canonical_matrix": {
+        "path": "03-feature-to-benchmark-matrix.csv",
+        "bytes": 555852,
+        "sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+        "content_embedded": false
+      },
+      "benchmark_register": {
+        "path": "06-open-source-benchmark-register.csv",
+        "bytes": 343076,
+        "sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+        "content_embedded": false,
+        "semantic_input_to_agent_b_or_agent_c": false
+      },
+      "canonical_target_cohort": {
+        "feature_ids": [
+          "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+          "CAP-FIN-FX-REVALUATION"
+        ],
+        "count": 2,
+        "canonical_bytes": "Sorted feature IDs joined by LF with terminal LF",
+        "bytes": 57,
+        "sha256": "f6522709277cadadabce1c01478fc7ed5f08e16cebc7fdf048a22a32149673e9",
+        "each_feature_id_occurs_exactly_once_in_pinned_matrix": true,
+        "matrix_target_rows": [
+          {
+            "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+            "module": "Finance",
+            "user_job": "Create, send, pay, and cancel invoices",
+            "feature_class": "H",
+            "benchmark_mapping_credit": "false",
+            "completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY"
+          },
+          {
+            "feature_id": "CAP-FIN-FX-REVALUATION",
+            "module": "Finance",
+            "user_job": "Preview, create, and post an FX revaluation to the general ledger.",
+            "feature_class": "H",
+            "benchmark_mapping_credit": "false",
+            "completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY"
+          }
+        ]
+      },
+      "generator": {
+        "path": "generators/materialize-run-145-agent-b-finance-invoice-fx-neutral-requirements-wave-24.py",
+        "bytes": 34398,
+        "sha256": "e1c999e229107e9512fd1227e054bf2e202fe4d5b3842efbc16efba01a6185df"
+      }
+    },
+    "normative_interpretation": {
+      "MUST": "Directly established behavior restated without source identity or implementation.",
+      "SHOULD": "Evidence-backed preference only; none was established.",
+      "NOT_ESTABLISHED": "Unknown, unproved, explicitly limited, or non-transferable behavior that must not be inferred."
+    },
+    "capabilities": [
+      {
+        "capability_id": "NEUTRAL-FX-145",
+        "input_packet_ids": [
+          "OBS-FX-145-A"
+        ],
+        "MUST": [
+          {
+            "id": "FX-M01",
+            "requirement": "The revaluation flow must capture an organisational ledger context and reporting or posting date before retrieving balances.",
+            "source_observation_ids": [
+              "FX01"
+            ]
+          },
+          {
+            "id": "FX-M02",
+            "requirement": "Creating revaluation journals must require journal-write authority distinct from permission to inspect the revaluation record.",
+            "source_observation_ids": [
+              "FX02"
+            ]
+          },
+          {
+            "id": "FX-M03",
+            "requirement": "The flow must enumerate balance-sheet accounts held in a currency different from the base currency, while excluding group, stock, and same-currency accounts.",
+            "source_observation_ids": [
+              "FX03"
+            ]
+          },
+          {
+            "id": "FX-M04",
+            "requirement": "Each eligible row must expose the foreign-currency balance, current base-currency balance, current exchange rate, new exchange rate, new base-currency balance, and calculated gain or loss.",
+            "source_observation_ids": [
+              "FX04"
+            ]
+          },
+          {
+            "id": "FX-M05",
+            "requirement": "The new base-currency balance must be calculated from the unchanged foreign-currency amount and an exchange rate effective for the selected date; gain or loss must equal the difference from the current base-currency balance.",
+            "source_observation_ids": [
+              "FX05"
+            ]
+          },
+          {
+            "id": "FX-M06",
+            "requirement": "A row with no foreign-currency balance or no base-currency balance must be handled separately so a residual carrying balance can be cleared instead of being processed as an ordinary revaluation.",
+            "source_observation_ids": [
+              "FX06"
+            ]
+          },
+          {
+            "id": "FX-M07",
+            "requirement": "Organisational ledger context and date must be present, and the rounding-loss allowance must satisfy 0 <= allowance < 1.",
+            "source_observation_ids": [
+              "FX07"
+            ]
+          },
+          {
+            "id": "FX-M08",
+            "requirement": "Submission must remove rows without a gain or loss and must fail when no gain-or-loss row remains.",
+            "source_observation_ids": [
+              "FX08"
+            ]
+          },
+          {
+            "id": "FX-M09",
+            "requirement": "When no qualifying balances exist, the actor must receive feedback stating either that no outstanding items require revaluation or that none were found.",
+            "source_observation_ids": [
+              "FX09"
+            ]
+          },
+          {
+            "id": "FX-M10",
+            "requirement": "Journal creation must be blocked unless an unrealised gain or loss account is configured.",
+            "source_observation_ids": [
+              "FX10"
+            ]
+          },
+          {
+            "id": "FX-M11",
+            "requirement": "Successful action must create attributable multi-currency journal entries linked to the revaluation record, with balanced debit and credit totals.",
+            "source_observation_ids": [
+              "FX11"
+            ]
+          },
+          {
+            "id": "FX-M12",
+            "requirement": "Success feedback must provide access to the ordinary revaluation journal and, when one was created, the zero-balance journal.",
+            "source_observation_ids": [
+              "FX12"
+            ]
+          },
+          {
+            "id": "FX-M13",
+            "requirement": "The record must locate posted linked journals, determine whether their booked gain or loss equals the revaluation total, and independently determine whether reversals have posted.",
+            "source_observation_ids": [
+              "FX13"
+            ]
+          },
+          {
+            "id": "FX-M14",
+            "requirement": "A reversal action must create draft reversals only for posted linked journals that have no reversal; an existing draft reversal must prevent duplicate creation and be surfaced to the actor.",
+            "source_observation_ids": [
+              "FX14"
+            ]
+          },
+          {
+            "id": "FX-M15",
+            "requirement": "The flow must distinguish the observed draft and submitted record conditions, linked-journal condition, and draft-reversal condition wherever their corresponding behavior is available; no additional transition ordering is implied.",
+            "source_observation_ids": [
+              "FX15"
+            ]
+          }
+        ],
+        "SHOULD": [],
+        "NOT_ESTABLISHED": [
+          {
+            "id": "FX-N01",
+            "requirement": "Final posting orchestration, exchange-rate provenance, retry idempotency, concurrent execution behavior, approval separation, durable recovery, accessibility, and the complete authorization scope are not established.",
+            "source_observation_ids": [
+              "FX15"
+            ]
+          },
+          {
+            "id": "FX-N02",
+            "requirement": "Organisational ledger scope does not establish any site-level access model, direct-object concealment, privacy boundary, or supported-living workflow.",
+            "source_observation_ids": [
+              "FX16"
+            ]
+          }
+        ],
+        "acceptance_criteria": [
+          {
+            "id": "FX-AC01",
+            "criterion": "Balance retrieval cannot proceed until both organisational ledger context and date are supplied; omission produces validation feedback.",
+            "source_observation_ids": [
+              "FX01",
+              "FX07"
+            ]
+          },
+          {
+            "id": "FX-AC02",
+            "criterion": "An actor able only to inspect the record cannot create its journals without the separately required journal-write authority.",
+            "source_observation_ids": [
+              "FX02"
+            ]
+          },
+          {
+            "id": "FX-AC03",
+            "criterion": "Given a mixture of eligible and excluded accounts, only foreign-currency balance-sheet accounts outside the group, stock, and same-currency exclusions appear.",
+            "source_observation_ids": [
+              "FX03"
+            ]
+          },
+          {
+            "id": "FX-AC04",
+            "criterion": "Every eligible row displays all six observed financial values, and recalculation preserves the foreign amount, uses the date-effective rate, and derives gain or loss from the current and new base amounts.",
+            "source_observation_ids": [
+              "FX04",
+              "FX05"
+            ]
+          },
+          {
+            "id": "FX-AC05",
+            "criterion": "A row lacking either observed balance is routed through the residual-clearing branch rather than ordinary revaluation handling.",
+            "source_observation_ids": [
+              "FX06"
+            ]
+          },
+          {
+            "id": "FX-AC06",
+            "criterion": "Negative and values greater than or equal to one are rejected for rounding-loss allowance; zero and values below one satisfy the stated numeric boundary when other mandatory inputs are present.",
+            "source_observation_ids": [
+              "FX07"
+            ]
+          },
+          {
+            "id": "FX-AC07",
+            "criterion": "Submission removes zero-gain-or-loss rows, and submission fails when that removal leaves no gain-or-loss row.",
+            "source_observation_ids": [
+              "FX08"
+            ]
+          },
+          {
+            "id": "FX-AC08",
+            "criterion": "An empty qualifying result produces one of the two observed no-work or no-results messages.",
+            "source_observation_ids": [
+              "FX09"
+            ]
+          },
+          {
+            "id": "FX-AC09",
+            "criterion": "Journal creation cannot proceed when the unrealised gain or loss account is absent.",
+            "source_observation_ids": [
+              "FX10"
+            ]
+          },
+          {
+            "id": "FX-AC10",
+            "criterion": "Successful creation yields linked, attributable, multi-currency entries whose debit and credit totals balance, and reports the ordinary journal plus any applicable zero-balance journal.",
+            "source_observation_ids": [
+              "FX11",
+              "FX12"
+            ]
+          },
+          {
+            "id": "FX-AC11",
+            "criterion": "For posted linked journals, the record can separately report gain-or-loss agreement with the revaluation total and posted-reversal status.",
+            "source_observation_ids": [
+              "FX13"
+            ]
+          },
+          {
+            "id": "FX-AC12",
+            "criterion": "A posted linked journal without a reversal can receive one draft reversal; a journal that is not posted or already has a reversal does not receive another, and an existing draft is disclosed as the duplication blocker.",
+            "source_observation_ids": [
+              "FX14"
+            ]
+          },
+          {
+            "id": "FX-AC13",
+            "criterion": "The observed draft, submitted, linked-journal, and draft-reversal conditions are distinguishable without implying unobserved final-posting states.",
+            "source_observation_ids": [
+              "FX15"
+            ]
+          }
+        ]
+      },
+      {
+        "capability_id": "NEUTRAL-INVOICE-145-A1",
+        "input_packet_ids": [
+          "OBS-INV-145-A1"
+        ],
+        "MUST": [
+          {
+            "id": "I1-M01",
+            "requirement": "An actor must be able to create an invoice in Draft and subsequently submit it.",
+            "source_observation_ids": [
+              "I101"
+            ]
+          },
+          {
+            "id": "I1-M02",
+            "requirement": "Draft, Submitted, Unpaid, Partly Paid, Paid, Overdue, and Cancelled must be represented as distinct states; no transition order beyond separately observed actions is inferred.",
+            "source_observation_ids": [
+              "I102"
+            ]
+          },
+          {
+            "id": "I1-M03",
+            "requirement": "Submission must apply an approval control and produce accounting effects; stock effects must also apply when the invoice bears stock.",
+            "source_observation_ids": [
+              "I103"
+            ]
+          },
+          {
+            "id": "I1-M04",
+            "requirement": "A submitted invoice must offer payment capture and payment-request actions.",
+            "source_observation_ids": [
+              "I104"
+            ]
+          },
+          {
+            "id": "I1-M05",
+            "requirement": "A payment request must support an attached invoice or payment link, must be handed off only after the initiating change commits, and must suppress duplicate outbound hand-offs for that observed request.",
+            "source_observation_ids": [
+              "I105"
+            ]
+          },
+          {
+            "id": "I1-M06",
+            "requirement": "Cancellation must reverse relevant effects, cancel associated ledger entries, and change the invoice state to Cancelled.",
+            "source_observation_ids": [
+              "I106"
+            ]
+          }
+        ],
+        "SHOULD": [],
+        "NOT_ESTABLISHED": [
+          {
+            "id": "I1-N01",
+            "requirement": "Target-specific site access, privacy, direct-object concealment, retry behavior beyond the observed send hand-off, accessibility, and supported-living terminology are not established.",
+            "source_observation_ids": [
+              "I107"
+            ]
+          }
+        ],
+        "acceptance_criteria": [
+          {
+            "id": "I1-AC01",
+            "criterion": "A newly created invoice is Draft, can later be submitted, and each of the seven observed states is distinguishable.",
+            "source_observation_ids": [
+              "I101",
+              "I102"
+            ]
+          },
+          {
+            "id": "I1-AC02",
+            "criterion": "Submission passes through the approval control, produces accounting effects, and applies stock effects only where stock is involved.",
+            "source_observation_ids": [
+              "I103"
+            ]
+          },
+          {
+            "id": "I1-AC03",
+            "criterion": "A submitted invoice exposes both payment capture and payment-request actions.",
+            "source_observation_ids": [
+              "I104"
+            ]
+          },
+          {
+            "id": "I1-AC04",
+            "criterion": "A payment request can carry either the invoice attachment or a payment link; no outbound hand-off occurs before commit, and duplicate hand-offs for that observed request are suppressed.",
+            "source_observation_ids": [
+              "I105"
+            ]
+          },
+          {
+            "id": "I1-AC05",
+            "criterion": "Cancellation reverses applicable effects, cancels associated ledger entries, and leaves the invoice in Cancelled.",
+            "source_observation_ids": [
+              "I106"
+            ]
+          }
+        ]
+      },
+      {
+        "capability_id": "NEUTRAL-INVOICE-145-A2",
+        "input_packet_ids": [
+          "OBS-INV-145-A2"
+        ],
+        "MUST": [
+          {
+            "id": "I2-M01",
+            "requirement": "Draft, Validated, Closed, and Abandoned must be represented as distinct customer-invoice states; no additional equivalence or transition ordering is implied.",
+            "source_observation_ids": [
+              "I201"
+            ]
+          },
+          {
+            "id": "I2-M02",
+            "requirement": "Invoice creation must begin in Draft.",
+            "source_observation_ids": [
+              "I202"
+            ]
+          },
+          {
+            "id": "I2-M03",
+            "requirement": "An invoice that is paid must be explicitly closed.",
+            "source_observation_ids": [
+              "I203"
+            ]
+          },
+          {
+            "id": "I2-M04",
+            "requirement": "An unpaid invoice must support abandonment with a cancellation event, while correction of a paid invoice must use a distinct credit-note path rather than that same cancellation path.",
+            "source_observation_ids": [
+              "I204"
+            ]
+          },
+          {
+            "id": "I2-M05",
+            "requirement": "Successful email delivery must increment the invoice send counter and emit a delivery event.",
+            "source_observation_ids": [
+              "I205"
+            ]
+          },
+          {
+            "id": "I2-M06",
+            "requirement": "Payment creation must distribute amounts across invoices and close each invoice that becomes paid.",
+            "source_observation_ids": [
+              "I206"
+            ]
+          }
+        ],
+        "SHOULD": [],
+        "NOT_ESTABLISHED": [
+          {
+            "id": "I2-N01",
+            "requirement": "Exact equivalence among abandonment, cancellation, credit-note correction, and any target lifecycle is not established.",
+            "source_observation_ids": [
+              "I207"
+            ]
+          },
+          {
+            "id": "I2-N02",
+            "requirement": "Site access, privacy, direct-object concealment, retry behavior, and accessibility parity are not established.",
+            "source_observation_ids": [
+              "I207"
+            ]
+          }
+        ],
+        "acceptance_criteria": [
+          {
+            "id": "I2-AC01",
+            "criterion": "A newly created invoice is Draft, and Draft, Validated, Closed, and Abandoned remain distinguishable states.",
+            "source_observation_ids": [
+              "I201",
+              "I202"
+            ]
+          },
+          {
+            "id": "I2-AC02",
+            "criterion": "When an invoice becomes paid, it is explicitly Closed.",
+            "source_observation_ids": [
+              "I203"
+            ]
+          },
+          {
+            "id": "I2-AC03",
+            "criterion": "An unpaid invoice can be abandoned and emits the observed cancellation event; a paid invoice is corrected through a separate credit-note path.",
+            "source_observation_ids": [
+              "I204"
+            ]
+          },
+          {
+            "id": "I2-AC04",
+            "criterion": "On successful email delivery, the send counter increments and a delivery event is emitted.",
+            "source_observation_ids": [
+              "I205"
+            ]
+          },
+          {
+            "id": "I2-AC05",
+            "criterion": "A payment can be distributed across multiple invoices, and every invoice made paid by that allocation is closed.",
+            "source_observation_ids": [
+              "I206"
+            ]
+          }
+        ]
+      },
+      {
+        "capability_id": "NEUTRAL-INVOICE-145-ADJACENT",
+        "input_packet_ids": [
+          "OBS-INV-145-ADJ"
+        ],
+        "relationship_boundary": "ADJACENT_ONLY_NOT_AN_EXACT_INVOICE_LIFECYCLE_MATCH",
+        "MUST": [
+          {
+            "id": "IA-M01",
+            "requirement": "Create, mail, delete, deliver, write-off, and payment-history actions must each be subject to an authorization check, without prescribing roles or an authorization model.",
+            "source_observation_ids": [
+              "IA01"
+            ]
+          },
+          {
+            "id": "IA-M02",
+            "requirement": "Invoice creation and its related journal work must succeed or fail as one unit.",
+            "source_observation_ids": [
+              "IA02"
+            ]
+          },
+          {
+            "id": "IA-M03",
+            "requirement": "Invoice email delivery must support later transport hand-off, may include a PDF attachment, and must mark the invoice delivered only after transport succeeds.",
+            "source_observation_ids": [
+              "IA03"
+            ]
+          },
+          {
+            "id": "IA-M04",
+            "requirement": "Only one delivery operation may proceed for an invoice at a time, and duplicate delivery attempts must be rejected.",
+            "source_observation_ids": [
+              "IA04"
+            ]
+          },
+          {
+            "id": "IA-M05",
+            "requirement": "Payment allocation must update the invoice paid amount.",
+            "source_observation_ids": [
+              "IA05"
+            ]
+          },
+          {
+            "id": "IA-M06",
+            "requirement": "Deletion must evaluate a stable invoice state and must be rejected when payments or applied credits exist.",
+            "source_observation_ids": [
+              "IA06"
+            ]
+          }
+        ],
+        "SHOULD": [],
+        "NOT_ESTABLISHED": [
+          {
+            "id": "IA-N01",
+            "requirement": "This adjacent slice does not establish a submitted-invoice cancellation or reversal lifecycle; it establishes only observed deletion and write-off behavior.",
+            "source_observation_ids": [
+              "IA07"
+            ]
+          },
+          {
+            "id": "IA-N02",
+            "requirement": "No organisational-partitioning abstraction, site, access, privacy, or supported-living semantics may be inferred from this packet.",
+            "source_observation_ids": [
+              "IA08"
+            ]
+          }
+        ],
+        "acceptance_criteria": [
+          {
+            "id": "IA-AC01",
+            "criterion": "Each of the six listed actions invokes its relevant authorization guard; no particular role structure is assumed.",
+            "source_observation_ids": [
+              "IA01"
+            ]
+          },
+          {
+            "id": "IA-AC02",
+            "criterion": "A failure in either invoice creation or related journal work leaves neither side partially completed.",
+            "source_observation_ids": [
+              "IA02"
+            ]
+          },
+          {
+            "id": "IA-AC03",
+            "criterion": "Delivery may be handed off for later transport and may include a PDF, but delivered status is recorded only following successful transport.",
+            "source_observation_ids": [
+              "IA03"
+            ]
+          },
+          {
+            "id": "IA-AC04",
+            "criterion": "A second delivery attempt is rejected while or after the protected delivery operation makes it a duplicate; no concurrent-execution model beyond this safeguard is inferred.",
+            "source_observation_ids": [
+              "IA04"
+            ]
+          },
+          {
+            "id": "IA-AC05",
+            "criterion": "Allocating a payment changes the invoice paid amount accordingly.",
+            "source_observation_ids": [
+              "IA05"
+            ]
+          },
+          {
+            "id": "IA-AC06",
+            "criterion": "Deletion is rejected, and the invoice retained, when a payment or applied credit exists.",
+            "source_observation_ids": [
+              "IA06"
+            ]
+          }
+        ]
+      }
+    ],
+    "counts": {
+      "input_packets": 4,
+      "capability_sections": 4,
+      "source_observations": 38,
+      "unique_source_observations_cited": 38,
+      "uncited_source_observations": 0,
+      "MUST": 33,
+      "SHOULD": 0,
+      "NOT_ESTABLISHED": 7,
+      "acceptance_criteria": 29,
+      "benchmark_selections": 0,
+      "cross_packet_equivalence_findings": 0,
+      "NCM_findings": 0,
+      "credit_awards": 0,
+      "writes_by_agent_b": 0
+    },
+    "attestation": {
+      "only_supplied_identity_stripped_packets_used": true,
+      "repository_filesystem_network_browser_runtime_test_build_database_git_access": false,
+      "upstream_and_target_identity_absent": true,
+      "source_implementation_absent": true,
+      "unknowns_retained": true,
+      "adjacent_invoice_packet_not_promoted": true,
+      "every_requirement_has_source_observation_ids": true,
+      "all_38_observations_cited": true,
+      "selection_mapping_NCM_benchmark_pass_runtime_browser_or_completion_credit_awarded": false,
+      "audit_artifact_writes_by_root_only": true
+    }
+  },
+  "root_reattachment_provenance": {
+    "role": "ROOT_ONLY_MATERIALIZATION_AND_CANONICAL_TARGET_REATTACHMENT_NOT_AGENT_B_SEMANTIC_INPUT",
+    "canonical_matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "bytes": 555852,
+      "sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+      "content_embedded": false
+    },
+    "benchmark_register": {
+      "path": "06-open-source-benchmark-register.csv",
+      "bytes": 343076,
+      "sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91",
+      "content_embedded": false,
+      "semantic_input_to_agent_b_or_agent_c": false
+    },
+    "canonical_target_cohort": {
+      "feature_ids": [
+        "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+        "CAP-FIN-FX-REVALUATION"
+      ],
+      "count": 2,
+      "canonical_bytes": "Sorted feature IDs joined by LF with terminal LF",
+      "bytes": 57,
+      "sha256": "f6522709277cadadabce1c01478fc7ed5f08e16cebc7fdf048a22a32149673e9",
+      "each_feature_id_occurs_exactly_once_in_pinned_matrix": true,
+      "matrix_target_rows": [
+        {
+          "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+          "module": "Finance",
+          "user_job": "Create, send, pay, and cancel invoices",
+          "feature_class": "H",
+          "benchmark_mapping_credit": "false",
+          "completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY"
+        },
+        {
+          "feature_id": "CAP-FIN-FX-REVALUATION",
+          "module": "Finance",
+          "user_job": "Preview, create, and post an FX revaluation to the general ledger.",
+          "feature_class": "H",
+          "benchmark_mapping_credit": "false",
+          "completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY"
+        }
+      ]
+    },
+    "generator": {
+      "path": "generators/materialize-run-145-agent-b-finance-invoice-fx-neutral-requirements-wave-24.py",
+      "bytes": 34398,
+      "sha256": "e1c999e229107e9512fd1227e054bf2e202fe4d5b3842efbc16efba01a6185df"
+    }
+  },
+  "application_source_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "read_mode": "PINNED_GIT_OBJECT_ONLY"
+  },
+  "canonical_targets": [
+    {
+      "feature_id": "CAP-FIN-FX-REVALUATION",
+      "feature_class": "H",
+      "module": "Finance",
+      "user_job": "Preview, create, and post an FX revaluation to the general ledger.",
+      "neutral_capability_ids": [
+        "NEUTRAL-FX-145"
+      ],
+      "current_mapping_credit": false,
+      "current_completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY",
+      "current_source_packet": {
+        "path": "evidence/source/current-run-130-reviewed-outcome-neutral-finance-fx-revaluation-route-action-ownership-overlay-wave-20.json",
+        "sha256": "f32b3d997a9e7dd932e041f5acf30dea02ee5b62fee3b0901cfbe5cc59f2ed0a",
+        "accepted_route_owner_ids": [
+          "RUN130-ROUTE-01",
+          "RUN130-ROUTE-02"
+        ],
+        "accepted_bridge_ids": [
+          "RUN130-BRIDGE-01",
+          "RUN130-BRIDGE-02"
+        ],
+        "credit_boundary": "STATIC_OWNER_CONTEXT_ONLY_NO_CORRECTNESS_RUNTIME_BROWSER_TEST_BENCHMARK_OR_COMPLETION_CREDIT"
+      },
+      "current_source_manifest": [
+        {
+          "path": "routes/finance.php",
+          "blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+          "sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+          "purpose": "route declarations and finance permission groups"
+        },
+        {
+          "path": "app/Domain/Finance/Http/Controllers/FxRevaluationController.php",
+          "blob_id": "adf4ad66c51f31167d97f76d7de3a886e70c4d3d",
+          "sha256": "1bc7062eeac5d36889fa058c476207919971c96beeda2dac72a60f75b797545b",
+          "purpose": "index, create, store, and post orchestration"
+        },
+        {
+          "path": "app/Domain/Finance/Services/FxRevaluationService.php",
+          "blob_id": "bc99401688ecbfcd3a69dab4661b8ae47389bc31",
+          "sha256": "bfdb84ddee4a99c3f0551e27d31a8d51c21348ecf14e56150346bdf382df6892",
+          "purpose": "calculation, draft creation, journal construction, and posting state"
+        },
+        {
+          "path": "app/Domain/Finance/Models/FinFxRevaluation.php",
+          "blob_id": "3ef73b98c0e5346829f5d140f7406a0c54f68911",
+          "sha256": "3d819eb5769837c78094f4adecc489f4b60201382779237db3bf7c47564f2395",
+          "purpose": "revaluation state and relationships"
+        },
+        {
+          "path": "app/Domain/Finance/Services/CurrencyService.php",
+          "blob_id": "123a98a164a435298acf83976a8bdde021ef2718",
+          "sha256": "9936ff104f596bf6fc222e7341d2ba907b34d44c998f99842689a1d3added25a",
+          "purpose": "rate lookup and fallback behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Services/JournalPostingService.php",
+          "blob_id": "4e7817681f3ca3453da1f87a698969d6d575f357",
+          "sha256": "092af77653c278507f2bdb10fdcf24b327d511c274b473bb081e813b66f65526",
+          "purpose": "journal validation, balance, locking, posting, and reversal"
+        },
+        {
+          "path": "resources/js/pages/finance/fx-revaluations/Index.tsx",
+          "blob_id": "681458ff85a07b247b9b463e4ad1e35c7f0a1121",
+          "sha256": "f16069b9ab7b30163d008145cbb674849079f446943020fa2492e23a76694115",
+          "purpose": "list and post interaction"
+        },
+        {
+          "path": "resources/js/pages/finance/fx-revaluations/Create.tsx",
+          "blob_id": "62572ebf719c17de86ebd6e717e61045e7282165",
+          "sha256": "34276b902e90da6bf8bbce9b5e902fe1d9c43c29340436d1d936c10e3cc0bce1",
+          "purpose": "preview and create interaction"
+        }
+      ]
+    },
+    {
+      "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "feature_class": "H",
+      "module": "Finance",
+      "user_job": "Create, send, pay, and cancel invoices",
+      "neutral_capability_ids": [
+        "NEUTRAL-INVOICE-145-A1",
+        "NEUTRAL-INVOICE-145-A2",
+        "NEUTRAL-INVOICE-145-ADJACENT"
+      ],
+      "adjacent_capability_id": "NEUTRAL-INVOICE-145-ADJACENT",
+      "current_mapping_credit": false,
+      "current_completion_status": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY",
+      "current_source_packet": {
+        "path": "evidence/source/current-run-138-reviewed-outcome-neutral-finance-invoice-index-route-action-ownership-overlay-wave-22.json",
+        "sha256": "005a55c952ec3f3b2a5bac9f3c99000fa4eae65a488764dfd1f4662063431701",
+        "accepted_route_owner_ids": [
+          "RUN138-ROUTE-01"
+        ],
+        "accepted_bridge_ids": [
+          "RUN138-BRIDGE-01"
+        ],
+        "credit_boundary": "STATIC_INDEX_OWNER_CONTEXT_ONLY_NO_CORRECTNESS_RUNTIME_BROWSER_TEST_BENCHMARK_OR_COMPLETION_CREDIT"
+      },
+      "current_source_manifest": [
+        {
+          "path": "routes/finance.php",
+          "blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+          "sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+          "purpose": "invoice route declarations and permission middleware"
+        },
+        {
+          "path": "app/Domain/Finance/Http/Controllers/InvoiceController.php",
+          "blob_id": "c6da7ae16135c852a0e2d735dca23d7b2846032c",
+          "sha256": "5ecb4b7e41641b2c709a24b20f1a9692dd583204f607d965f84444bedfb55db2",
+          "purpose": "create, update, send, pay, cancel, PDF, and response behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Models/FinInvoice.php",
+          "blob_id": "ef8de91c1afeb6740a634fb295af01eb9d2da82a",
+          "sha256": "3e3597605da19687657620e4bf44a31590422d2a887dd8c6068db6fa9a617d31",
+          "purpose": "invoice state, ownership context, and relationships"
+        },
+        {
+          "path": "app/Domain/Finance/Policies/FinInvoicePolicy.php",
+          "blob_id": "c7a3dc27737d422c08cf8fe26ea2fedc45f3770d",
+          "sha256": "31aef68ea81ebdf9d125976d6a854dc73d87908473eda0808addb1067d13ec3e",
+          "purpose": "invoice authorization policy"
+        },
+        {
+          "path": "app/Domain/Finance/Http/Requests/StoreInvoiceRequest.php",
+          "blob_id": "c6d4c8561874624f0e0f99e5c8fe7264d27b3ff1",
+          "sha256": "2dd6fc86f211bd98dc251e4d4d370b275d017abeddab441c490e1d09aba7bb4f",
+          "purpose": "creation validation"
+        },
+        {
+          "path": "app/Domain/Finance/Http/Requests/UpdateInvoiceRequest.php",
+          "blob_id": "58e296c5193113cb182e88547d2b1431d006ad54",
+          "sha256": "18e86d3895584a97c6513819f80d17801c3e4806aa3114efe8fe64ee8fc04d82",
+          "purpose": "update validation"
+        },
+        {
+          "path": "app/Domain/Finance/Services/FinInvoiceJournalService.php",
+          "blob_id": "f6d9f29d66df92646268455941ba06397c2aeef6",
+          "sha256": "fcd88e7f5ffef058795131c03cd1954d076335556eef055228a9ba1ddbd321e7",
+          "purpose": "issue and reversal journal behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Jobs/PostFinInvoiceJournalJob.php",
+          "blob_id": "0916cfd12fe9e82fb60f92d520e1c4f290aca7b8",
+          "sha256": "3dd18a01e5c9c525dc8336ccf8927ca43b7b1c69da8fecae639c9a6f7c9a60e3",
+          "purpose": "queued issue-journal behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Jobs/SendInvoiceEmailJob.php",
+          "blob_id": "5368573bf13be72842478b11d8b02688c9c70d5a",
+          "sha256": "158eba65a2f031c98a9356c93e854673c9a8e9a802fc562aa3789da7c76febfe",
+          "purpose": "queued email outcome and retry behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Notifications/InvoiceEmailNotification.php",
+          "blob_id": "239983e27333eef9b4a57fc46c9800ed4a2559cc",
+          "sha256": "43f16e2af862f2ec5060ecf3c8c8136982fdfecdcc75273e6da03d80e230ef35",
+          "purpose": "invoice mail content and attachment hand-off"
+        },
+        {
+          "path": "app/Domain/Finance/Services/AccountsReceivableService.php",
+          "blob_id": "10c4336129ae4e45eab81edca24970f020a9efa8",
+          "sha256": "d055790df95edc29e3f4c6a05279af94791c4e4e5e3ceb49154ca1a19b3e0fca",
+          "purpose": "receipt allocation, paid-state, and statement behavior"
+        },
+        {
+          "path": "app/Domain/Finance/Services/PaymentSettlementSiteScope.php",
+          "blob_id": "948a769757020ab5d404748e3ad957380ebb8a57",
+          "sha256": "cd837fbf242cb6d94307a141d2df7ce9ea0bd79c31c7de2f80b8517de243645f",
+          "purpose": "canonical Site scope for payment settlement"
+        },
+        {
+          "path": "app/Domain/Finance/Services/PaymentSettlementRecorder.php",
+          "blob_id": "a9dfcd90dfc73eba01a4ca987ce384e6a96b71a4",
+          "sha256": "bce86c79250bdd1d4b87bcdb9524684a0928971b718299f288e6c80125b8743a",
+          "purpose": "append-only settlement recording"
+        },
+        {
+          "path": "app/Domain/Finance/Services/InvoicePdfService.php",
+          "blob_id": "87db04111f5a108e0a96b143f2234d6d80ec1367",
+          "sha256": "8943adfc26e96ea001c4c2017da3acde8ab00f136d4313442d16b72d14acdbb5",
+          "purpose": "PDF generation and storage"
+        },
+        {
+          "path": "resources/js/pages/finance/invoices/Index.tsx",
+          "blob_id": "1b1b88b34c9eb877b248e5363ccfbdaf2fc3f606",
+          "sha256": "316c3abf37728ffadf1a40042714b84e196b2a91a83c512e833e4ae9af920a13",
+          "purpose": "invoice list states and actions"
+        },
+        {
+          "path": "resources/js/pages/finance/invoices/Create.tsx",
+          "blob_id": "20afaf04f37ed7742815c84623de5c686f82d3a7",
+          "sha256": "e2a5b309f489de58dc2a7ead4fc6d3217b39d77a385fd87dc8466336f35f1042",
+          "purpose": "invoice creation interaction"
+        },
+        {
+          "path": "resources/js/pages/finance/invoices/Edit.tsx",
+          "blob_id": "b6a2ad7495b5d60235cc97d45a1529fd856bcc73",
+          "sha256": "248f6b6cfbed9fdbae9ec59bed60bebb83623410abf19735501db6dcf2d959c6",
+          "purpose": "draft update interaction"
+        },
+        {
+          "path": "resources/js/pages/finance/invoices/Show.tsx",
+          "blob_id": "cf40bf3677cf820add6592fda0b38135acc6d325",
+          "sha256": "815ac5992fafa4c4026db4658d311e9505494ed610f48dab9da8082afec37c19",
+          "purpose": "invoice detail, send, pay, cancel, and feedback"
+        }
+      ]
+    }
+  ],
+  "architecture_rule": "Oblivion Findings is one operating organisation across multiple Sites. Compare against exact permissions, approved Sites, canonical ownership, direct-object concealment, privacy, supported-living terminology, native Laravel/Inertia/React workflow, and existing ownership direction. Do not introduce tenant concepts.",
+  "allowed_operation": "Read only the embedded neutral specification, the two named current-source owner packets, and the enumerated application files at the exact application commit. Compare every MUST, NOT_ESTABLISHED, and acceptance criterion to current source. Propose an original Oblivion-native workflow only where the neutral requirement exposes a gap or improvement opportunity.",
+  "prohibited_context": [
+    "RUN-145 Agent-A raw or sealed upstream inputs",
+    "upstream project, repository, release, source, licence, edition, wording, layout, or implementation identity",
+    "RUN-071 or any historical mapping-readiness conclusion",
+    "working-tree application source",
+    "unlisted application or audit files",
+    "network, browser, runtime, tests, build, database, or external state",
+    "benchmark selection, NCM, mapping, pass, release, or completion credit"
+  ],
+  "comparison_contract": {
+    "comparison_unit": "Each of 33 MUST requirements, 7 NOT_ESTABLISHED boundaries, and 29 acceptance criteria, evaluated against only the applicable same-target pinned current source.",
+    "allowed_outcomes": [
+      "MET",
+      "PARTIAL",
+      "GAP",
+      "CONTRADICTED",
+      "NOT_COMPARABLE"
+    ],
+    "unknowns_must_be_preserved": true,
+    "adjacent_invoice_requirements_must_remain_separate": true,
+    "current_source_static_only": true,
+    "source_presence_is_not_runtime_or_browser_proof": true,
+    "upstream_identity_withheld": true,
+    "project_selection_mapping_or_NCM_decision_allowed": false,
+    "credit_allowed": false
+  },
+  "counts": {
+    "canonical_targets": 2,
+    "neutral_capability_sections": 4,
+    "MUST": 33,
+    "NOT_ESTABLISHED": 7,
+    "acceptance_criteria": 29,
+    "comparison_rows_required": 69,
+    "FX_current_source_files": 8,
+    "invoice_current_source_files": 18,
+    "upstream_identity_records": 0,
+    "credit_awards": 0
+  },
+  "attestation": {
+    "upstream_identity_and_implementation_excluded": true,
+    "current_source_exact_commit_and_manifest_pinned": true,
+    "working_tree_source_prohibited": true,
+    "runtime_browser_test_network_evidence_excluded": true,
+    "zero_credit": true
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "schema_version": "sealed_run_145_corrected_matrix_register_integration_input_wave_24_v1",
+  "run_id": "RUN-145-CORRECTED-MATRIX-REGISTER-INTEGRATION-INPUT-WAVE-24",
+  "status": "CORRECTED_POST_MUTATION_BYTES_COMPUTED_NOT_APPLIED_ZERO_ADDITIONAL_CREDIT",
+  "generated_on": "2026-08-26",
+  "inputs": {
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "bytes": 555852,
+      "sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390"
+    },
+    "benchmark_register": {
+      "path": "06-open-source-benchmark-register.csv",
+      "bytes": 343076,
+      "sha256": "cc493cd1807e62a9ffa27192c658400e697391b7a0baa3f0014628145c6b7b91"
+    },
+    "agent_d_decision": {
+      "path": "evidence/benchmark/raw-run-145-agent-d-finance-invoice-fx-adjudication-wave-24.json",
+      "bytes": 29300,
+      "sha256": "f7149cc02849befa03013148e72e53b92048a53eac685de92018c46ea6f3f71d"
+    },
+    "pass_8_correction": {
+      "path": "evidence/benchmark/raw-run-145-p8-adversarial-integration-review-wave-24.json",
+      "bytes": 4213,
+      "sha256": "810b8bb2fe1ba94c265b51eaf2056acc6385fe503049a6ee40301e44c8ef3a14"
+    }
+  },
+  "proposed_outputs": {
+    "matrix": {
+      "path": "03-feature-to-benchmark-matrix.csv",
+      "bytes": 557989,
+      "sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+      "rows": 340,
+      "changed_rows": 2,
+      "changed_cells": 18
+    },
+    "benchmark_register": {
+      "path": "06-open-source-benchmark-register.csv",
+      "bytes": 350420,
+      "sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+      "rows": 98,
+      "changed_rows": 2,
+      "changed_cells": 30
+    }
+  },
+  "matrix_delta": [
+    {
+      "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "changed_fields": {
+        "benchmark_candidates": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "frappe/erpnext; Dolibarr/dolibarr; bigcapitalhq/bigcapital [ADJACENT_ONLY_NOT_SELECTION_ELIGIBLE]"
+        },
+        "selected_open_source_benchmark": {
+          "before": "NOT_SELECTED_CURRENT_AUDIT",
+          "after": "frappe/erpnext; Dolibarr/dolibarr"
+        },
+        "benchmark_url_and_sha": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "https://github.com/frappe/erpnext@b24c9eba551905e256e336ff170a91a92d197a2f; https://github.com/Dolibarr/dolibarr@769c7db907099643558e77d7002c109cfda919e5"
+        },
+        "verified_behaviour": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "ERPNext establishes Draft creation, submission, explicit outstanding and settlement states, approval and accounting effects, payment capture and request actions, after-commit duplicate-suppressed handoff, and cancellation reversal. Dolibarr establishes Draft, Validated, Closed and Abandoned states, paid closure, unpaid abandonment, a distinct paid-invoice credit-note correction path, successful-delivery audit, and payment distribution across invoices."
+        },
+        "neutral_requirements_extracted": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "Provide an explicit invoice lifecycle from Draft through issue or validation, outstanding and partial or full settlement, overdue handling, cancellation, and governed correction; apply approval and accounting controls; distinguish payment capture from payment request; commit delivery intent before duplicate-safe handoff; audit successful delivery; reverse applicable effects on cancellation; keep paid correction separate; and support auditable payment allocation and finalisation."
+        },
+        "no_match_evidence": {
+          "before": "NOT_DOCUMENTED_CURRENT_AUDIT",
+          "after": "NCM_NOT_AUTHORIZED_NO_TARGET_SPECIFIC_CATALOGUE_COMPLETE_SEARCH"
+        },
+        "benchmark_mapping_credit": {
+          "before": "false",
+          "after": "true"
+        },
+        "completion_status": {
+          "before": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY",
+          "after": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_PLUS_BENCHMARK_MAPPING_ONLY"
+        },
+        "evidence_limit": {
+          "before": "Static identity and source ownership only; no runtime, browser, executed-test, benchmark, ease, release, or completion credit.",
+          "after": "Static canonical identity plus two pinned direct static-source benchmark mappings only. BigCapital remains adjacent. No runtime, browser, executed-test, pass, release, ease, audit-completion, or feature-completion credit."
+        }
+      }
+    },
+    {
+      "feature_id": "CAP-FIN-FX-REVALUATION",
+      "changed_fields": {
+        "benchmark_candidates": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "frappe/erpnext"
+        },
+        "selected_open_source_benchmark": {
+          "before": "NOT_SELECTED_CURRENT_AUDIT",
+          "after": "frappe/erpnext"
+        },
+        "benchmark_url_and_sha": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "https://github.com/frappe/erpnext@b24c9eba551905e256e336ff170a91a92d197a2f"
+        },
+        "verified_behaviour": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "Pinned static source establishes ledger-context and date input, foreign-currency balance-sheet eligibility and exclusions, row-level exchange-rate and gain-or-loss calculation, residual-balance handling, validation and configured-account safeguards, linked balanced multi-currency journals, posted-result checks, and guarded reversal creation."
+        },
+        "neutral_requirements_extracted": {
+          "before": "NOT_ESTABLISHED_CURRENT_AUDIT",
+          "after": "Require canonical ledger context and date before retrieval; distinct journal-write authority; eligible foreign-currency balance-sheet exposure selection; complete rate and gain-or-loss values; residual clearing; bounded rounding allowance; removal and rejection of zero-gain work; no-work feedback; configured gain-or-loss account; attributable balanced linked journals; navigable results; independently reported agreement and reversal state; and duplicate-safe draft reversal handling."
+        },
+        "no_match_evidence": {
+          "before": "NOT_DOCUMENTED_CURRENT_AUDIT",
+          "after": "NCM_NOT_AUTHORIZED_NO_TARGET_SPECIFIC_CATALOGUE_COMPLETE_SEARCH"
+        },
+        "benchmark_mapping_credit": {
+          "before": "false",
+          "after": "true"
+        },
+        "completion_status": {
+          "before": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_ONLY",
+          "after": "INCOMPLETE_CANONICAL_STATIC_IDENTITY_PLUS_BENCHMARK_MAPPING_ONLY"
+        },
+        "evidence_limit": {
+          "before": "Static identity and source ownership only; no runtime, browser, executed-test, benchmark, ease, release, or completion credit.",
+          "after": "Static canonical identity plus pinned static-source benchmark mapping only; no runtime, browser, executed-test, pass, release, ease, audit-completion, or feature-completion credit."
+        }
+      }
+    }
+  ],
+  "benchmark_register_delta": [
+    {
+      "project": "Dolibarr/dolibarr",
+      "changed_fields": {
+        "inspected_ref": {
+          "before": "develop",
+          "after": "24.0.0"
+        },
+        "commit_sha": {
+          "before": "4d07abf199a682a444f16a25519257ab492de086",
+          "after": "769c7db907099643558e77d7002c109cfda919e5"
+        },
+        "inspected_date": {
+          "before": "2026-08-12",
+          "after": "2026-08-26"
+        },
+        "release_activity_signal": {
+          "before": "pushed_at=11/08/2026 5:48:41 pm; head_committed_at=11/08/2026 5:48:40 pm; archived=False",
+          "after": "pushed_at=11/08/2026 5:48:41 pm; head_committed_at=11/08/2026 5:48:40 pm; archived=False Prior catalogue evidence retained; supplemental wave-24 target-specific release 24.0.0 was published_at=2026-08-20T19:49:15Z and inspected at 769c7db907099643558e77d7002c109cfda919e5."
+        },
+        "root_licence": {
+          "before": "GPL-3.0",
+          "after": "Pinned root COPYING contains GNU General Public License version 3 text; inspected source headers separately state GPL-3.0-or-later; the root file alone does not establish an SPDX suffix."
+        },
+        "edition_boundary": {
+          "before": "Repository-root provenance only; module/open-core boundaries require behaviour-specific verification.",
+          "after": "Repository-root provenance only; module/open-core boundaries require behaviour-specific verification. Wave-24 boundary: [CAP-FIN-BILLING-INVOICE-LIFECYCLE] credits only the public Dolibarr core repository at 24.0.0#769c7db907099643558e77d7002c109cfda919e5; DoliStore modules, hosted services, and external payment providers are excluded."
+        },
+        "exact_behaviour_screen_workflow_inspected": {
+          "before": "Quotes have explicit lifecycle and accepted/signed-only downstream order/invoice conversion with origin linkage. Primary source: https://github.com/Dolibarr/dolibarr/blob/4d07abf199a682a444f16a25519257ab492de086/htdocs/comm/propal/card.php#L3667-L3736",
+          "after": "Quotes have explicit lifecycle and accepted/signed-only downstream order/invoice conversion with origin linkage. Primary source: https://github.com/Dolibarr/dolibarr/blob/4d07abf199a682a444f16a25519257ab492de086/htdocs/comm/propal/card.php#L3667-L3736 Wave-24: [CAP-FIN-BILLING-INVOICE-LIFECYCLE] Customer invoices have Draft, Validated, Closed and Abandoned states; paid invoices close; unpaid invoices may be abandoned; paid-invoice correction follows a separate credit-note path; successful delivery increments a send counter and emits an event; and payment creation distributes amounts and may close paid invoices. Primary sources: https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/compta/facture/class/facture.class.php#L408-L513; https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/compta/facture/class/facture.class.php#L3357-L3534; https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/compta/facture/class/facture.class.php#L5360-L5386; https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/compta/facture/card.php#L3644-L3658; https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/compta/paiement.php#L230-L312. Additional pinned successful-delivery counter and event source required by I205: https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/core/actions_sendmails.inc.php#L444-L503."
+        },
+        "related_feature_ids": {
+          "before": "FIN-QUOTE",
+          "after": "CAP-FIN-BILLING-INVOICE-LIFECYCLE | FIN-QUOTE"
+        },
+        "strengths": {
+          "before": "State-gated conversion and origin lineage.",
+          "after": "State-gated conversion and origin lineage. Wave-24: [CAP-FIN-BILLING-INVOICE-LIFECYCLE] explicit lifecycle states, successful-delivery audit, payment allocation, and a distinct paid-invoice correction path."
+        },
+        "limitations": {
+          "before": "Legacy/general CRM; internal signed status does not prove external assent.",
+          "after": "Legacy/general CRM; internal signed status does not prove external assent. Wave-24 limit: abandonment, cancellation, credit-note correction and Oblivion lifecycle states are not equivalent; Site, privacy, direct-object, retry and accessibility parity are unestablished."
+        },
+        "neutral_requirements_extracted": {
+          "before": "Distinct lifecycle/permissions, accepted-only conversion, durable origin and controlled reopen.",
+          "after": "Distinct lifecycle/permissions, accepted-only conversion, durable origin and controlled reopen. Wave-24: [CAP-FIN-BILLING-INVOICE-LIFECYCLE] preserve distinct Draft, validated, settled and cancelled conditions; explicitly finalise paid invoices; keep unpaid cancellation separate from paid correction; audit successful delivery; and distribute and finalise payment allocations."
+        },
+        "security_or_operational_caveat": {
+          "before": "Legacy/general CRM; internal signed status does not prove external assent. Benchmark only; no code, UI, schema, wording or distinctive layout may be copied.",
+          "after": "Legacy/general CRM; internal signed status does not prove external assent. Benchmark only; no code, UI, schema, wording or distinctive layout may be copied. Wave-24 target boundary: upstream organisational behavior does not establish Oblivion Site access, exact permissions, canonical ownership, concealment or privacy. Behavior comparison only; no source, asset, wording, layout, schema or implementation may be copied."
+        },
+        "reason_selected_or_excluded": {
+          "before": "Strong quote conversion comparison.",
+          "after": "Strong quote conversion comparison. Wave-24: Selected as one of two complementary direct Native benchmarks for CAP-FIN-BILLING-INVOICE-LIFECYCLE; no quote, sibling or module-wide inheritance."
+        },
+        "current_target_specific_mapping_credit": {
+          "before": "false",
+          "after": "true"
+        },
+        "current_evidence_limit": {
+          "before": "Official GitHub repository metadata only; root licence, edition boundary, maintenance quality, exact behavior, target parity, mapping, selection and completion were not established.",
+          "after": "Historical metadata, RUN-031 observer triage and quote scope remain independently bounded. Wave-24 target-specific mapping credit applies only to CAP-FIN-BILLING-INVOICE-LIFECYCLE at 24.0.0#769c7db907099643558e77d7002c109cfda919e5. Static behavior comparison only; no equivalence, copying, runtime, browser, test, pass, release, audit-completion or feature-completion credit."
+        }
+      }
+    },
+    {
+      "project": "frappe/erpnext",
+      "changed_fields": {
+        "inspected_ref": {
+          "before": "commit-pinned wave-4",
+          "after": "v16.33.0"
+        },
+        "commit_sha": {
+          "before": "c6d08979d3ffab119d1523ee2bdea2c8115a8bca",
+          "after": "b24c9eba551905e256e336ff170a91a92d197a2f"
+        },
+        "inspected_date": {
+          "before": "2026-08-13",
+          "after": "2026-08-26"
+        },
+        "release_activity_signal": {
+          "before": "pushed_at=11/08/2026 11:19:53 pm; head_committed_at=11/08/2026 10:02:19 pm; archived=False Prior catalogue activity evidence retained; supplemental target-specific snapshot inspected at c6d08979d3ffab119d1523ee2bdea2c8115a8bca.",
+          "after": "pushed_at=11/08/2026 11:19:53 pm; head_committed_at=11/08/2026 10:02:19 pm; archived=False Prior catalogue activity evidence retained; supplemental target-specific snapshot inspected at c6d08979d3ffab119d1523ee2bdea2c8115a8bca. Prior catalogue and wave-4 evidence retained; supplemental wave-24 target-specific release v16.33.0 was published_at=2026-08-25T17:04:34Z and inspected at b24c9eba551905e256e336ff170a91a92d197a2f."
+        },
+        "root_licence": {
+          "before": "GPL-3.0",
+          "after": "Root license.txt contains GPLv3 text; -only or -or-later semantics are not inferred from that root file alone."
+        },
+        "edition_boundary": {
+          "before": "Repository-root provenance only; module/open-core boundaries require behaviour-specific verification. Wave-4 boundary: Only the GPL ERPNext repository is credited; hosted services and private extensions are excluded. Only the GPL ERPNext repository is credited; hosted services and private integrations are excluded. Only the checked GPL report implementation is credited.",
+          "after": "Repository-root provenance only; module/open-core boundaries require behaviour-specific verification. Wave-4 boundary: Only the GPL ERPNext repository is credited; hosted services and private extensions are excluded. Only the GPL ERPNext repository is credited; hosted services and private integrations are excluded. Only the checked GPL report implementation is credited. Wave-24 boundary: [CAP-FIN-FX-REVALUATION] and [CAP-FIN-BILLING-INVOICE-LIFECYCLE] credit only the public ERPNext repository at v16.33.0#b24c9eba551905e256e336ff170a91a92d197a2f; Frappe Cloud, private extensions, payment providers, and uncited Frappe Framework behavior are excluded."
+        },
+        "exact_behaviour_screen_workflow_inspected": {
+          "before": "Submitted/cancelled source documents preserve GL/outstanding reversal; tax rows post separately; depreciation requires due unposted schedule and freeze checks. Primary source: https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py#L681-L709 Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] The report is configured for receivables, supports report-date or current-date ageing, configurable 30/60/90/120 ranges, and assigns outstanding amounts to the matching bucket. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.py#L41-L80; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.py#L802-L836; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.js#L94-L105. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] ERPNext implements purchase-order validation, submit/cancel hooks, approval-authority validation, permission-checked close/reopen operations and concrete states. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L195-L205; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L402-L468; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L585-L602; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.json#L890-L902. [CAP-FIN-QUOTE-LIFECYCLE] ERPNext implements quotation validation, validity dates, open/partially ordered/ordered computation, lost reasons, submit/cancel hooks, expiry and explicit states. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L143-L165; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L188-L204; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L266-L316; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L376-L404; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.json#L844-L855.",
+          "after": "Submitted/cancelled source documents preserve GL/outstanding reversal; tax rows post separately; depreciation requires due unposted schedule and freeze checks. Primary source: https://github.com/frappe/erpnext/blob/83e33b343cfac160f3811461d1737e67be82efd9/erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py#L681-L709 Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] The report is configured for receivables, supports report-date or current-date ageing, configurable 30/60/90/120 ranges, and assigns outstanding amounts to the matching bucket. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.py#L41-L80; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.py#L802-L836; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/accounts/report/accounts_receivable/accounts_receivable.js#L94-L105. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] ERPNext implements purchase-order validation, submit/cancel hooks, approval-authority validation, permission-checked close/reopen operations and concrete states. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L195-L205; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L402-L468; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.py#L585-L602; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/buying/doctype/purchase_order/purchase_order.json#L890-L902. [CAP-FIN-QUOTE-LIFECYCLE] ERPNext implements quotation validation, validity dates, open/partially ordered/ordered computation, lost reasons, submit/cancel hooks, expiry and explicit states. Primary sources: https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L143-L165; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L188-L204; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L266-L316; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.py#L376-L404; https://github.com/frappe/erpnext/blob/c6d08979d3ffab119d1523ee2bdea2c8115a8bca/erpnext/selling/doctype/quotation/quotation.json#L844-L855. Wave-24: [CAP-FIN-FX-REVALUATION] The pinned exchange-rate revaluation source establishes context/date input, eligible foreign-currency balance-sheet accounts, row calculations, validation, configured-account checks, linked balanced multi-currency journals, result checks, and guarded reversal creation. Primary source: https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/exchange_rate_revaluation/exchange_rate_revaluation.py#L42-L639. [CAP-FIN-BILLING-INVOICE-LIFECYCLE] The pinned sales-invoice sources establish Draft creation, submission, explicit settlement states, accounting effects, payment and payment-request actions, after-commit duplicate-suppressed handoff, and cancellation reversal. Primary sources: https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/sales_invoice/sales_invoice.py#L207-L220; https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/sales_invoice/sales_invoice.py#L469-L645; https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/sales_invoice/sales_invoice.js#L97-L145; https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/payment_request/payment_request.py#L438-L465. Additional pinned status source required by I101, I102, and I106: https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/sales_invoice/sales_invoice.py#L2271-L2312."
+        },
+        "related_feature_ids": {
+          "before": "ASSET-FIXED-ASSET | CAP-FIN-ACCOUNTS-RECEIVABLE-AGING | CAP-FIN-PURCHASE-ORDER-LIFECYCLE | CAP-FIN-QUOTE-LIFECYCLE | FIN-ACCOUNTING-INTEGRATION | FIN-ACCOUNTS-RECEIVABLE | FIN-BILL | FIN-BILLING | FIN-CHART-OF-ACCOUNTS | FIN-CREDIT-NOTE | FIN-FISCAL-PERIOD | FIN-INVOICE | FIN-LEDGER | FIN-PURCHASE-ORDER | FIN-TAX",
+          "after": "ASSET-FIXED-ASSET | CAP-FIN-ACCOUNTS-RECEIVABLE-AGING | CAP-FIN-BILLING-INVOICE-LIFECYCLE | CAP-FIN-FX-REVALUATION | CAP-FIN-PURCHASE-ORDER-LIFECYCLE | CAP-FIN-QUOTE-LIFECYCLE | FIN-ACCOUNTING-INTEGRATION | FIN-ACCOUNTS-RECEIVABLE | FIN-BILL | FIN-BILLING | FIN-CHART-OF-ACCOUNTS | FIN-CREDIT-NOTE | FIN-FISCAL-PERIOD | FIN-INVOICE | FIN-LEDGER | FIN-PURCHASE-ORDER | FIN-TAX"
+        },
+        "strengths": {
+          "before": "Source lifecycle, tax lines and asset occurrence lineage.",
+          "after": "Source lifecycle, tax lines and asset occurrence lineage. Wave-24: [CAP-FIN-FX-REVALUATION] complete source-level calculation, validation, journal-link and reversal comparison. [CAP-FIN-BILLING-INVOICE-LIFECYCLE] explicit submission, settlement-state, payment-request and cancellation-reversal comparison."
+        },
+        "limitations": {
+          "before": "General ERP; not NZ GST basis or supported-living funding proof. Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Local columns, summaries, filters, accounting basis, currency and visual presentation are not proved; no other receivables target inherits credit. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Submission/approval semantics, local fields, tax treatment, status vocabulary and page composition differ; bill conversion is excluded. [CAP-FIN-QUOTE-LIFECYCLE] State names, local send/accept endpoints, client selection, pricing and delivery are not equivalent; conversions are excluded.",
+          "after": "General ERP; not NZ GST basis or supported-living funding proof. Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Local columns, summaries, filters, accounting basis, currency and visual presentation are not proved; no other receivables target inherits credit. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Submission/approval semantics, local fields, tax treatment, status vocabulary and page composition differ; bill conversion is excluded. [CAP-FIN-QUOTE-LIFECYCLE] State names, local send/accept endpoints, client selection, pricing and delivery are not equivalent; conversions are excluded. Wave-24 limits: [CAP-FIN-FX-REVALUATION] organisational ledger context is not approved-Site scope; final orchestration, rate provenance, retry idempotency, concurrency, approval separation, durable recovery, accessibility and full authorization remain unestablished. [CAP-FIN-BILLING-INVOICE-LIFECYCLE] state labels are not equivalents; stock behavior applies only where Oblivion genuinely has stock-bearing invoices; Site, privacy, direct-object, accessibility and supported-living parity are unestablished."
+        },
+        "neutral_requirements_extracted": {
+          "before": "Explicit source lifecycle, tax metadata, due asset occurrence and correction lineage. Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Produce an accounts-receivable ageing view that calculates outstanding receivables as of a report date and allocates them into configurable age buckets. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Create, validate, review, submit or approve, cancel, close, reopen, and track purchase orders through explicit lifecycle states. [CAP-FIN-QUOTE-LIFECYCLE] Create and maintain quotations, validate validity periods, track progression, submit or cancel, and record ordered, lost, or expired outcomes.",
+          "after": "Explicit source lifecycle, tax metadata, due asset occurrence and correction lineage. Wave-4: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Produce an accounts-receivable ageing view that calculates outstanding receivables as of a report date and allocates them into configurable age buckets. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Create, validate, review, submit or approve, cancel, close, reopen, and track purchase orders through explicit lifecycle states. [CAP-FIN-QUOTE-LIFECYCLE] Create and maintain quotations, validate validity periods, track progression, submit or cancel, and record ordered, lost, or expired outcomes. Wave-24: [CAP-FIN-FX-REVALUATION] context/date validation, distinct journal authority, canonical exposure selection, rate and gain-or-loss calculations, residual handling, materiality and account safeguards, linked balanced journals, result reporting and duplicate-safe reversal. [CAP-FIN-BILLING-INVOICE-LIFECYCLE] explicit Draft-to-issue lifecycle, settlement states, approval/accounting effects, payment capture and request, committed duplicate-safe delivery handoff, and effect-reversing cancellation."
+        },
+        "security_or_operational_caveat": {
+          "before": "General ERP; not NZ GST basis or supported-living funding proof. Benchmark only; no code, UI, schema, wording or distinctive layout may be copied. Wave-4 target limits: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Local columns, summaries, filters, accounting basis, currency and visual presentation are not proved; no other receivables target inherits credit. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Submission/approval semantics, local fields, tax treatment, status vocabulary and page composition differ; bill conversion is excluded. [CAP-FIN-QUOTE-LIFECYCLE] State names, local send/accept endpoints, client selection, pricing and delivery are not equivalent; conversions are excluded. Benchmark behavior only; no implementation inheritance or copying.",
+          "after": "General ERP; not NZ GST basis or supported-living funding proof. Benchmark only; no code, UI, schema, wording or distinctive layout may be copied. Wave-4 target limits: [CAP-FIN-ACCOUNTS-RECEIVABLE-AGING] Local columns, summaries, filters, accounting basis, currency and visual presentation are not proved; no other receivables target inherits credit. [CAP-FIN-PURCHASE-ORDER-LIFECYCLE] Submission/approval semantics, local fields, tax treatment, status vocabulary and page composition differ; bill conversion is excluded. [CAP-FIN-QUOTE-LIFECYCLE] State names, local send/accept endpoints, client selection, pricing and delivery are not equivalent; conversions are excluded. Benchmark behavior only; no implementation inheritance or copying. Wave-24 target boundary: upstream Company or organisation concepts do not establish Oblivion Site access, exact permissions, canonical ownership, concealment or privacy. Behavior comparison only; no source, asset, wording, layout, schema or implementation may be copied."
+        },
+        "reason_selected_or_excluded": {
+          "before": "Strong GL/AP/tax/asset control comparison. Selected for fresh direct target-specific wave-4 evidence; no sibling or module-wide inheritance.",
+          "after": "Strong GL/AP/tax/asset control comparison. Selected for fresh direct target-specific wave-4 evidence; no sibling or module-wide inheritance. Wave-24: Selected as a direct Native benchmark for CAP-FIN-FX-REVALUATION and as one of two complementary direct Native benchmarks for CAP-FIN-BILLING-INVOICE-LIFECYCLE; no sibling or module-wide inheritance."
+        },
+        "current_target_specific_mapping_credit": {
+          "before": "false",
+          "after": "true"
+        },
+        "current_evidence_limit": {
+          "before": "Official GitHub repository metadata only; root licence, edition boundary, maintenance quality, exact behavior, target parity, mapping, selection and completion were not established.",
+          "after": "Historical metadata, RUN-031 observer triage and wave-4 scopes remain independently bounded. Wave-24 target-specific mapping credit applies only to CAP-FIN-FX-REVALUATION and CAP-FIN-BILLING-INVOICE-LIFECYCLE at v16.33.0#b24c9eba551905e256e336ff170a91a92d197a2f. Static behavior comparison only; no equivalence, copying, runtime, browser, test, pass, release, audit-completion or feature-completion credit."
+        }
+      }
+    }
+  ],
+  "post_mutation_counts": {
+    "benchmark_mappings": 2,
+    "final_no_matches_or_NCMs": 0,
+    "unresolved_targets": 338,
+    "project_rows_with_current_target_mapping_credit": 2
+  },
+  "invariants": {
+    "matrix_unaffected_rows_logically_identical": 338,
+    "register_unaffected_rows_logically_identical": 96,
+    "BigCapital_row_unchanged": true,
+    "matrix_header_and_row_order_preserved": true,
+    "register_header_and_row_order_preserved": true,
+    "utf8_no_BOM_LF_final_newline_csv_quote_minimal": true,
+    "NCM_not_authorized": true,
+    "application_source_changes": 0,
+    "runtime_browser_test_pass_release_completion_final_finding_or_audit_completion_credit": 0
+  },
+  "application_status": "NOT_APPLIED_REQUIRES_FRESH_INDEPENDENT_REVIEW_GO"
+}

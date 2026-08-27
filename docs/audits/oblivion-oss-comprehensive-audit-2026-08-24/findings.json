@@ -8,7 +8,7 @@
     "audit_checkpoint_parent": "35a5228b26c54684718495c33281b24c0992de02",
     "governing_prompt_sha256": "4a02284113c58f24bd4f695b672d39ff1912dc4b9126fc84fa9139072d18484f",
     "base_matrix_sha256": "00085d407433307e7f6798c0e8e04629b1746d4bfb1e18024c51ead1dc4f7afd",
-    "current_matrix_sha256": "dadc888b5069faf61cc0710418cd875ccbb868d9bfccbe05e55a637d0b64e390",
+    "current_matrix_sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
     "static_linkage_independent_review_sha256": "6ee2c0beb90ce8e9fec75190c1a2d87e44b7f7d7b0b7776d25df4832b73d20a0",
     "static_linkage_integration_sha256": "c0e6e78ede5a41e0214ce67eda69432ff5ca4034b53c731191cf2b57605f11bf",
     "route_page_manifest_sha256": "150fcff9b100ad85a7a2e998ed69c8dafdc2d0098e8ec2b4dbac7d3b404061be",
@@ -153,7 +153,9 @@
     "run_142_finance_site_portfolio_overview_overlay_sha256": "2d5228394090bcdad9ebfc3976be87260bf1dc5d110a8297974b00d908b63cdb",
     "run_142r_finance_site_portfolio_overview_overlay_review_materializer_sha256": "0e9e9ecfef802d17e56bff1282d460fccf91c10525902f4aa6993c4a5f4679f2",
     "run_142r_finance_site_portfolio_overview_overlay_review_sha256": "005cbe019f16d7705f7d632b97a8f2629bf7c5653ba3ff9b30c50bd10e2a44df",
-    "run_143_reporting_materializer_sha256": "f1a2f957208f7ab20a0b7dfcf68e2c09edd33c218c792168e79cb0f55efdc719"
+    "run_143_reporting_materializer_sha256": "f1a2f957208f7ab20a0b7dfcf68e2c09edd33c218c792168e79cb0f55efdc719",
+    "current_benchmark_register_sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+    "run_145_benchmark_mapping_receipt_sha256": "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9"
   },
   "architecture_rule": "One operating organisation across multiple Sites; Site access, exact action permissions, ownership, consent and privacy are the boundaries.",
   "denominators": {
@@ -169,7 +171,7 @@
     "final_P0": 0,
     "final_P1": 0,
     "complete_prompt_finding_schema": 0,
-    "benchmark_mapped": 0,
+    "benchmark_mapped": 2,
     "final_no_match": 0,
     "browser_observed": 0,
     "static_linkage_reviewed_gap_targets": 288,
@@ -231,7 +233,35 @@
     "direct_exact_queue_without_ownership": 413,
     "direct_exact_queue_alias": 5,
     "direct_exact_queue_dead_or_noncanonical": 0,
-    "direct_exact_queue_evidence_gap": 7
+    "direct_exact_queue_evidence_gap": 7,
+    "benchmark_unresolved": 338
+  },
+  "current_benchmark_mapping": {
+    "run_id": "RUN-145-FINANCE-INVOICE-FX-BENCHMARK-MAPPING-WAVE-24",
+    "receipt": "evidence/benchmark/current-run-145-finance-invoice-fx-benchmark-mapping-wave-24.json",
+    "receipt_sha256": "8306a8aefe0a490ebf206d0c4716d92930326988f19e0ed495a3c2d0002c7cf9",
+    "matrix_sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+    "benchmark_register_sha256": "5a3898855f1ffffb1a493496a57f6532bdc464552e4577c9e7c97f83c9793884",
+    "mapped_targets": 2,
+    "mapped_feature_ids": [
+      "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+      "CAP-FIN-FX-REVALUATION"
+    ],
+    "final_no_matches_or_NCMs": 0,
+    "unresolved_targets": 338,
+    "project_rows_with_current_target_mapping_credit": 2,
+    "bigcapital_adjacent_only_unselected": true,
+    "non_mapping_credit": {
+      "runtime": 0,
+      "browser": 0,
+      "executed_test": 0,
+      "ease": 0,
+      "release": 0,
+      "pass": 0,
+      "final_finding": 0,
+      "feature_completion": 0,
+      "audit_completion": 0
+    }
   },
   "credit_boundary": "Field presence and explicit null/sentinel values make the provisional records reviewable; they do not satisfy the final finding-quality gate.",
   "reconciliation": {

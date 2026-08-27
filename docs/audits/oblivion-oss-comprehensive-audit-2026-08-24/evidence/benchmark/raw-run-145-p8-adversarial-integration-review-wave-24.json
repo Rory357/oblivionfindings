@@ -1,0 +1,76 @@
+{
+  "schema_version": "raw_run_145_p8_adversarial_integration_review_wave_24_v1",
+  "run_id": "RUN-145-P8-ADVERSARIAL-INTEGRATION-REVIEW-WAVE-24",
+  "status": "NO_GO_FOR_PACKET_EXACT_INTEGRATION_BOUNDED_CORRECTIONS_REQUIRED",
+  "generated_on": "2026-08-26",
+  "agent": {
+    "agent_id": "/root/run145_p8_adversarial",
+    "role": "fresh_pass_8_adversarial_reviewer",
+    "fresh_context": true
+  },
+  "input_verification": {
+    "path": "evidence/benchmark/raw-run-145-agent-d-finance-invoice-fx-adjudication-wave-24.json",
+    "bytes": 29300,
+    "sha256": "f7149cc02849befa03013148e72e53b92048a53eac685de92018c46ea6f3f71d",
+    "exact_match": true
+  },
+  "passing_checks": {
+    "sealed_agent_d_input_exact": true,
+    "all_4_candidate_pairs_use_allowed_outcomes": true,
+    "all_A_packet_and_observation_ids_exact": true,
+    "all_B_capability_and_row_ids_exact": true,
+    "all_C_run_and_row_ids_exact": true,
+    "two_direct_target_selections_supported": true,
+    "two_mapping_credits_supported": true,
+    "NCM_forbidden_and_zero": true,
+    "BigCapital_no_mutation_and_adjacent_only": true,
+    "single_organisation_multiple_Sites_boundary_preserved": true,
+    "no_copy_boundary_preserved": true,
+    "runtime_browser_test_pass_release_completion_and_audit_completion_credit_zero": true,
+    "substantive_adjudication": "GO"
+  },
+  "blocking_corrections": {
+    "matrix_format_overrides": {
+      "CAP-FIN-FX-REVALUATION": {
+        "benchmark_candidates": "frappe/erpnext",
+        "selected_open_source_benchmark": "frappe/erpnext",
+        "benchmark_url_and_sha": "https://github.com/frappe/erpnext@b24c9eba551905e256e336ff170a91a92d197a2f"
+      },
+      "CAP-FIN-BILLING-INVOICE-LIFECYCLE": {
+        "benchmark_candidates": "frappe/erpnext; Dolibarr/dolibarr; bigcapitalhq/bigcapital [ADJACENT_ONLY_NOT_SELECTION_ELIGIBLE]",
+        "selected_open_source_benchmark": "frappe/erpnext; Dolibarr/dolibarr",
+        "benchmark_url_and_sha": "https://github.com/frappe/erpnext@b24c9eba551905e256e336ff170a91a92d197a2f; https://github.com/Dolibarr/dolibarr@769c7db907099643558e77d7002c109cfda919e5"
+      }
+    },
+    "matrix_format_reason": "The live 340-row matrix uses semicolon-space lists, project-only candidate and selection names, and immutable URL@commit strings. D's project@tag#commit identity remains preserved in the adjudication evidence but must not replace the live matrix convention.",
+    "register_traceability_additions": {
+      "frappe/erpnext": {
+        "field": "exact_behaviour_screen_workflow_inspected",
+        "operation": "append_once_after_agent_d_suffix",
+        "exact_suffix": " Additional pinned status source required by I101, I102, and I106: https://github.com/frappe/erpnext/blob/b24c9eba551905e256e336ff170a91a92d197a2f/erpnext/accounts/doctype/sales_invoice/sales_invoice.py#L2271-L2312."
+      },
+      "Dolibarr/dolibarr": {
+        "field": "exact_behaviour_screen_workflow_inspected",
+        "operation": "append_once_after_agent_d_suffix",
+        "exact_suffix": " Additional pinned successful-delivery counter and event source required by I205: https://github.com/Dolibarr/dolibarr/blob/769c7db907099643558e77d7002c109cfda919e5/htdocs/core/actions_sendmails.inc.php#L444-L503."
+      }
+    },
+    "traceability_reason": "Agent-D register prose omitted one immutable source locus required by each cited neutral lineage; both additions are already registered and pinned in Agent-A evidence."
+  },
+  "integration_contract_after_correction": {
+    "apply_agent_d_values_except_exact_overrides_above": true,
+    "append_both_traceability_additions_exactly_once": true,
+    "preserve_all_unlisted_matrix_and_register_fields": true,
+    "matrix_rows_changed": 2,
+    "register_rows_changed": 2,
+    "mapping_credit_after_integration": 2,
+    "NCM_after_integration": 0,
+    "unresolved_targets_after_integration": 338,
+    "BigCapital_row_byte_logically_unchanged": true,
+    "application_source_changes_allowed": false,
+    "all_non_mapping_credit_remains_zero": true,
+    "fresh_independent_corrected_integration_review_required": true
+  },
+  "verdict": "NO_GO_PACKET_EXACT_CORRECTABLE_WITHOUT_REOPENING_SUBSTANTIVE_ADJUDICATION",
+  "writes_by_reviewer": 0
+}

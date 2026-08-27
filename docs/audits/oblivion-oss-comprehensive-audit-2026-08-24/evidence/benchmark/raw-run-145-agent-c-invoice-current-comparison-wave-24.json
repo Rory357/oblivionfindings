@@ -1,0 +1,597 @@
+{
+  "schema_version": "raw_run_145_agent_c_invoice_current_comparison_wave_24_v1",
+  "run_id": "RUN-145-C-INVOICE-CURRENT-COMPARISON-WAVE-24",
+  "status": "PINNED_STATIC_COMPARISON_COMPLETE_ZERO_CREDIT",
+  "generated_on": "2026-08-26",
+  "agent": {
+    "agent_id": "/root/run145_agent_c_invoice",
+    "role": "clean_room_current_oblivion_invoice_comparator",
+    "fresh_context": true
+  },
+  "input_seal": {
+    "path": "evidence/benchmark/sealed-run-145-agent-c-finance-invoice-fx-current-comparison-input-wave-24.json",
+    "bytes": 41079,
+    "sha256": "722deceb2bf9a9462c5db69adcf700e9ce0cba62bffe0bef160e004ade82a032"
+  },
+  "target": {
+    "feature_id": "CAP-FIN-BILLING-INVOICE-LIFECYCLE",
+    "feature_class": "H",
+    "user_job": "Create, send, pay, and cancel invoices",
+    "neutral_capability_ids": [
+      "NEUTRAL-INVOICE-145-A1",
+      "NEUTRAL-INVOICE-145-A2",
+      "NEUTRAL-INVOICE-145-ADJACENT"
+    ],
+    "adjacent_capability_id": "NEUTRAL-INVOICE-145-ADJACENT"
+  },
+  "source_pin": {
+    "commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1"
+  },
+  "source_manifest_verification": {
+    "declared_files": 18,
+    "verified_blob_and_sha256_matches": 18,
+    "files_used": 18,
+    "rows": [
+      {
+        "path": "routes/finance.php",
+        "blob_id": "3823dded458ab0f2bf20fe9b5de992acb414a5eb",
+        "sha256": "cf6eed8437206aaf05feb541d031ce406382e13153a31bb831ef66b29994f1aa",
+        "purpose": "invoice route declarations and permission middleware"
+      },
+      {
+        "path": "app/Domain/Finance/Http/Controllers/InvoiceController.php",
+        "blob_id": "c6da7ae16135c852a0e2d735dca23d7b2846032c",
+        "sha256": "5ecb4b7e41641b2c709a24b20f1a9692dd583204f607d965f84444bedfb55db2",
+        "purpose": "create, update, send, pay, cancel, PDF, and response behavior"
+      },
+      {
+        "path": "app/Domain/Finance/Models/FinInvoice.php",
+        "blob_id": "ef8de91c1afeb6740a634fb295af01eb9d2da82a",
+        "sha256": "3e3597605da19687657620e4bf44a31590422d2a887dd8c6068db6fa9a617d31",
+        "purpose": "invoice state, ownership context, and relationships"
+      },
+      {
+        "path": "app/Domain/Finance/Policies/FinInvoicePolicy.php",
+        "blob_id": "c7a3dc27737d422c08cf8fe26ea2fedc45f3770d",
+        "sha256": "31aef68ea81ebdf9d125976d6a854dc73d87908473eda0808addb1067d13ec3e",
+        "purpose": "invoice authorization policy"
+      },
+      {
+        "path": "app/Domain/Finance/Http/Requests/StoreInvoiceRequest.php",
+        "blob_id": "c6d4c8561874624f0e0f99e5c8fe7264d27b3ff1",
+        "sha256": "2dd6fc86f211bd98dc251e4d4d370b275d017abeddab441c490e1d09aba7bb4f",
+        "purpose": "creation validation"
+      },
+      {
+        "path": "app/Domain/Finance/Http/Requests/UpdateInvoiceRequest.php",
+        "blob_id": "58e296c5193113cb182e88547d2b1431d006ad54",
+        "sha256": "18e86d3895584a97c6513819f80d17801c3e4806aa3114efe8fe64ee8fc04d82",
+        "purpose": "update validation"
+      },
+      {
+        "path": "app/Domain/Finance/Services/FinInvoiceJournalService.php",
+        "blob_id": "f6d9f29d66df92646268455941ba06397c2aeef6",
+        "sha256": "fcd88e7f5ffef058795131c03cd1954d076335556eef055228a9ba1ddbd321e7",
+        "purpose": "issue and reversal journal behavior"
+      },
+      {
+        "path": "app/Domain/Finance/Jobs/PostFinInvoiceJournalJob.php",
+        "blob_id": "0916cfd12fe9e82fb60f92d520e1c4f290aca7b8",
+        "sha256": "3dd18a01e5c9c525dc8336ccf8927ca43b7b1c69da8fecae639c9a6f7c9a60e3",
+        "purpose": "queued issue-journal behavior"
+      },
+      {
+        "path": "app/Domain/Finance/Jobs/SendInvoiceEmailJob.php",
+        "blob_id": "5368573bf13be72842478b11d8b02688c9c70d5a",
+        "sha256": "158eba65a2f031c98a9356c93e854673c9a8e9a802fc562aa3789da7c76febfe",
+        "purpose": "queued email outcome and retry behavior"
+      },
+      {
+        "path": "app/Domain/Finance/Notifications/InvoiceEmailNotification.php",
+        "blob_id": "239983e27333eef9b4a57fc46c9800ed4a2559cc",
+        "sha256": "43f16e2af862f2ec5060ecf3c8c8136982fdfecdcc75273e6da03d80e230ef35",
+        "purpose": "invoice mail content and attachment hand-off"
+      },
+      {
+        "path": "app/Domain/Finance/Services/AccountsReceivableService.php",
+        "blob_id": "10c4336129ae4e45eab81edca24970f020a9efa8",
+        "sha256": "d055790df95edc29e3f4c6a05279af94791c4e4e5e3ceb49154ca1a19b3e0fca",
+        "purpose": "receipt allocation, paid-state, and statement behavior"
+      },
+      {
+        "path": "app/Domain/Finance/Services/PaymentSettlementSiteScope.php",
+        "blob_id": "948a769757020ab5d404748e3ad957380ebb8a57",
+        "sha256": "cd837fbf242cb6d94307a141d2df7ce9ea0bd79c31c7de2f80b8517de243645f",
+        "purpose": "canonical Site scope for payment settlement"
+      },
+      {
+        "path": "app/Domain/Finance/Services/PaymentSettlementRecorder.php",
+        "blob_id": "a9dfcd90dfc73eba01a4ca987ce384e6a96b71a4",
+        "sha256": "bce86c79250bdd1d4b87bcdb9524684a0928971b718299f288e6c80125b8743a",
+        "purpose": "append-only settlement recording"
+      },
+      {
+        "path": "app/Domain/Finance/Services/InvoicePdfService.php",
+        "blob_id": "87db04111f5a108e0a96b143f2234d6d80ec1367",
+        "sha256": "8943adfc26e96ea001c4c2017da3acde8ab00f136d4313442d16b72d14acdbb5",
+        "purpose": "PDF generation and storage"
+      },
+      {
+        "path": "resources/js/pages/finance/invoices/Index.tsx",
+        "blob_id": "1b1b88b34c9eb877b248e5363ccfbdaf2fc3f606",
+        "sha256": "316c3abf37728ffadf1a40042714b84e196b2a91a83c512e833e4ae9af920a13",
+        "purpose": "invoice list states and actions"
+      },
+      {
+        "path": "resources/js/pages/finance/invoices/Create.tsx",
+        "blob_id": "20afaf04f37ed7742815c84623de5c686f82d3a7",
+        "sha256": "e2a5b309f489de58dc2a7ead4fc6d3217b39d77a385fd87dc8466336f35f1042",
+        "purpose": "invoice creation interaction"
+      },
+      {
+        "path": "resources/js/pages/finance/invoices/Edit.tsx",
+        "blob_id": "b6a2ad7495b5d60235cc97d45a1529fd856bcc73",
+        "sha256": "248f6b6cfbed9fdbae9ec59bed60bebb83623410abf19735501db6dcf2d959c6",
+        "purpose": "draft update interaction"
+      },
+      {
+        "path": "resources/js/pages/finance/invoices/Show.tsx",
+        "blob_id": "cf40bf3677cf820add6592fda0b38135acc6d325",
+        "sha256": "815ac5992fafa4c4026db4658d311e9505494ed610f48dab9da8082afec37c19",
+        "purpose": "invoice detail, send, pay, cancel, and feedback"
+      }
+    ]
+  },
+  "evidence_limit_legend": {
+    "S": "Pinned static source only; no runtime, browser, or test proof.",
+    "B": "Absence established only across the 18 enumerated invoice blobs.",
+    "D": "Downstream implementation was not in the invoice manifest; only the invocation or caller is established.",
+    "U": "Neutral unknown or adjacent-only boundary preserved; no equivalence inferred."
+  },
+  "comparison_rows": [
+    {
+      "id": "I1-M01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "app/Domain/Finance/Http/Controllers/InvoiceController.php::store 210-415; ::send 567-604",
+      "evidence": "Creation writes status=draft; later Send changes Draft to sent. There is no distinct submit action or Submitted state.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R1"
+      ]
+    },
+    {
+      "id": "I1-M02",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "resources/js/pages/finance/invoices/Index.tsx 301-321; app/Domain/Finance/Models/FinInvoice.php 29-72; app/Domain/Finance/Services/AccountsReceivableService.php 341-435",
+      "evidence": "Current vocabulary exposes Draft, Sent, Viewed, Paid, Overdue, Cancelled. Submitted, Unpaid and Partly Paid are not distinct; partial receipts leave the status receivable until full payment.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R1"
+      ]
+    },
+    {
+      "id": "I1-M03",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "routes/finance.php 683-709; InvoiceController.php::send 567-600; FinInvoiceJournalService.php::postInvoiceJournal 25-109",
+      "evidence": "finance.ar.manage and policy update authority guard Send, and a posting job is queued. No separate approval control or stock-bearing invoice effects are present.",
+      "evidence_limit": "S,B,D",
+      "improvement_ids": [
+        "R2"
+      ]
+    },
+    {
+      "id": "I1-M04",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "resources/js/pages/finance/invoices/Show.tsx 98-103, 186-200; Index.tsx 140-143, 195-201",
+      "evidence": "Sent receivables can expose Mark Paid or Record receipt. No distinct payment-request action is established; Send Email is invoice delivery, not proven equivalent.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R3",
+        "R6"
+      ]
+    },
+    {
+      "id": "I1-M05",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php::send 581-600; SendInvoiceEmailJob.php::handle 26-57; InvoiceEmailNotification.php::toMail 24-53",
+      "evidence": "Dispatch occurs after the local transaction returns and email may carry the generated PDF. Repeated Send calls dispatch repeated jobs; no request identity, payment link, unique job, or duplicate-handoff suppression exists.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R3",
+        "R5"
+      ]
+    },
+    {
+      "id": "I1-M06",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php::cancel 679-732; FinInvoiceJournalService.php::reverseInvoiceJournal 111-145; InvoiceController.php::store 405-408",
+      "evidence": "Cancellation locks the invoice, rejects paid or settled invoices, invokes journal reversal, and sets Cancelled. The reversal implementation is outside this slice, and delivery-bound billing entries changed to invoiced are not restored.",
+      "evidence_limit": "S,D",
+      "improvement_ids": [
+        "R4"
+      ]
+    },
+    {
+      "id": "I1-N01",
+      "outcome": "NOT_COMPARABLE",
+      "exact_current_locus": "FinInvoicePolicy.php 10-28; PaymentSettlementSiteScope.php 42-64, 111-122; InvoiceController.php 37-124, 418-604",
+      "evidence": "The neutral packet does not establish target Site, privacy, concealment, retry, or accessibility semantics. Current-source boundary findings are independent and cannot turn that unknown into parity.",
+      "evidence_limit": "U",
+      "improvement_ids": []
+    },
+    {
+      "id": "I1-AC01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 375-415, 581-588; Index.tsx 301-321",
+      "evidence": "New invoice is Draft and can later be sent, but only six current state labels are exposed and no Submitted, Unpaid, or Partly Paid distinction exists.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R1"
+      ]
+    },
+    {
+      "id": "I1-AC02",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "routes/finance.php 698-700; InvoiceController.php 569-600; FinInvoiceJournalService.php 40-105",
+      "evidence": "Manage authority and issue-journal construction exist; distinct approval and conditional stock effects do not. Posting is asynchronous after the state commit.",
+      "evidence_limit": "S,B,D",
+      "improvement_ids": [
+        "R2"
+      ]
+    },
+    {
+      "id": "I1-AC03",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "Show.tsx 98-103, 186-200; AccountsReceivableService.php::allocatePayment 296-440",
+      "evidence": "Payment capture exists for receivable states. No separate payment-request action is established. The Show page incorrectly offers Mark Paid on Draft even though the service rejects Draft.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R3",
+        "R6"
+      ]
+    },
+    {
+      "id": "I1-AC04",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 581-600; InvoiceEmailNotification.php 24-53; SendInvoiceEmailJob.php 26-57",
+      "evidence": "PDF delivery and post-transaction dispatch are present. Duplicate outbound handoffs are not suppressed.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R3",
+        "R5"
+      ]
+    },
+    {
+      "id": "I1-AC05",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 688-721; FinInvoiceJournalService.php 111-145",
+      "evidence": "Cancelled state and requested journal reversal exist, but full reversal of all originating effects and downstream ledger implementation are not established.",
+      "evidence_limit": "S,D",
+      "improvement_ids": [
+        "R4"
+      ]
+    },
+    {
+      "id": "I2-M01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "Index.tsx 301-321; FinInvoice.php 29-72",
+      "evidence": "Draft exists, but Validated, Closed and Abandoned are absent. Sent, Paid and Cancelled are not treated as equivalents.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R1"
+      ]
+    },
+    {
+      "id": "I2-M02",
+      "outcome": "MET",
+      "exact_current_locus": "InvoiceController.php 375-399; AccountsReceivableService.php::createInvoice 93-121",
+      "evidence": "Both native creation paths explicitly create Draft invoices.",
+      "evidence_limit": "S",
+      "improvement_ids": []
+    },
+    {
+      "id": "I2-M03",
+      "outcome": "GAP",
+      "exact_current_locus": "AccountsReceivableService.php 426-435; InvoiceController.php 663-669",
+      "evidence": "Full settlement sets status=paid and paid_at; no explicit close operation or Closed state exists.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R1",
+        "R6"
+      ]
+    },
+    {
+      "id": "I2-M04",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php::cancel 688-723; routes/finance.php 286-301",
+      "evidence": "Unsettled invoices can be cancelled and paid invoices are rejected. No cancellation event is emitted, and the separate AP credit-note routes do not establish a paid customer-invoice correction path.",
+      "evidence_limit": "S,B,D",
+      "improvement_ids": [
+        "R4"
+      ]
+    },
+    {
+      "id": "I2-M05",
+      "outcome": "GAP",
+      "exact_current_locus": "SendInvoiceEmailJob.php 26-57",
+      "evidence": "Successful notification updates sent_at or status and logs. There is no send counter or delivery domain event.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R5"
+      ]
+    },
+    {
+      "id": "I2-M06",
+      "outcome": "GAP",
+      "exact_current_locus": "AccountsReceivableService.php::allocatePayment 296-440",
+      "evidence": "Each request locks and allocates against one invoice only, then marks it Paid. No multi-invoice distribution or explicit closing exists.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R6"
+      ]
+    },
+    {
+      "id": "I2-N01",
+      "outcome": "NOT_COMPARABLE",
+      "exact_current_locus": "InvoiceController.php 567-732; routes/finance.php 286-301",
+      "evidence": "Neutral equivalence among abandonment, cancellation, correction and the target lifecycle remains unknown; no label equivalence was inferred.",
+      "evidence_limit": "U",
+      "improvement_ids": []
+    },
+    {
+      "id": "I2-N02",
+      "outcome": "NOT_COMPARABLE",
+      "exact_current_locus": "FinInvoicePolicy.php 10-28; PaymentSettlementSiteScope.php 42-64; InvoiceController.php 37-124, 418-604",
+      "evidence": "Neutral Site, privacy, concealment, retry, and accessibility parity remains unestablished despite independently observable current-source behavior.",
+      "evidence_limit": "U",
+      "improvement_ids": []
+    },
+    {
+      "id": "I2-AC01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 375-399; Index.tsx 301-321",
+      "evidence": "Draft creation is present; Validated, Closed and Abandoned are not distinguishable.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R1"
+      ]
+    },
+    {
+      "id": "I2-AC02",
+      "outcome": "GAP",
+      "exact_current_locus": "AccountsReceivableService.php 426-435",
+      "evidence": "Full payment records Paid, not Closed.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R1",
+        "R6"
+      ]
+    },
+    {
+      "id": "I2-AC03",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 688-723; routes/finance.php 286-301",
+      "evidence": "Unpaid cancellation exists and paid cancellation is blocked; no cancellation event or linked customer credit-note correction path is established.",
+      "evidence_limit": "S,B,D",
+      "improvement_ids": [
+        "R4"
+      ]
+    },
+    {
+      "id": "I2-AC04",
+      "outcome": "GAP",
+      "exact_current_locus": "SendInvoiceEmailJob.php 43-55",
+      "evidence": "Successful mail records timestamp and log only; no counter increment or delivery event.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R5"
+      ]
+    },
+    {
+      "id": "I2-AC05",
+      "outcome": "GAP",
+      "exact_current_locus": "AccountsReceivableService.php 296-440",
+      "evidence": "Allocation accepts one invoice_id and marks that invoice Paid when fully settled; no multi-invoice distribution or closure.",
+      "evidence_limit": "S,B",
+      "improvement_ids": [
+        "R6"
+      ]
+    },
+    {
+      "id": "IA-M01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "routes/finance.php 683-709; FinInvoicePolicy.php 10-28",
+      "evidence": "Create and Send have manage guards; Mark Paid and Cancel are also guarded. No invoice Delete, distinct Deliver, Write-off, or Payment-history actions exist in the bounded slice.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R7",
+        "R8"
+      ]
+    },
+    {
+      "id": "IA-M02",
+      "outcome": "CONTRADICTED",
+      "exact_current_locus": "InvoiceController.php::store 268-412; ::send 581-600",
+      "evidence": "Invoice creation commits without journal work; issuing later commits Sent and only then dispatches a separate journal job. Failure can leave an issued invoice without its journal.",
+      "evidence_limit": "S,U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-M03",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "InvoiceController.php 581-600; SendInvoiceEmailJob.php 26-57; InvoiceEmailNotification.php 24-53",
+      "evidence": "Later queued transport and optional PDF exist, but the controller records Sent and sent_at before transport succeeds.",
+      "evidence_limit": "S,U",
+      "improvement_ids": [
+        "R5"
+      ]
+    },
+    {
+      "id": "IA-M04",
+      "outcome": "CONTRADICTED",
+      "exact_current_locus": "InvoiceController.php::send 567-604; Show.tsx 98-101, 186-190",
+      "evidence": "No row lock, unique job, delivery token, or sent-state rejection exists. The UI and backend permit resending an already-sent invoice.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-M05",
+      "outcome": "MET",
+      "exact_current_locus": "PaymentSettlementRecorder.php 83-113; InvoiceController.php 82-96; AccountsReceivableService.php 426-435",
+      "evidence": "Allocation rows persist the amount; index projection recalculates amount_paid, and full allocation updates Paid.",
+      "evidence_limit": "S",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-M06",
+      "outcome": "GAP",
+      "exact_current_locus": "routes/finance.php 674-709; InvoiceController.php 418-732; FinInvoice.php 18-20",
+      "evidence": "Model supports soft deletes, but no invoice deletion action, stable-state deletion check, or payment or applied-credit rejection workflow is present.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R8"
+      ]
+    },
+    {
+      "id": "IA-N01",
+      "outcome": "NOT_COMPARABLE",
+      "exact_current_locus": "InvoiceController.php::cancel 679-732; FinInvoiceJournalService.php 111-145",
+      "evidence": "Adjacent deletion or write-off evidence does not establish target cancellation or reversal. Current cancellation is independently visible but does not promote the adjacent packet.",
+      "evidence_limit": "U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-N02",
+      "outcome": "NOT_COMPARABLE",
+      "exact_current_locus": "PaymentSettlementSiteScope.php 15-25, 42-64; InvoiceController.php 35-41",
+      "evidence": "No organisational-partitioning abstraction or target Site, privacy, or support semantics may be inferred from the adjacent packet.",
+      "evidence_limit": "U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-AC01",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "routes/finance.php 683-709; FinInvoicePolicy.php 10-28",
+      "evidence": "Only a subset of the six adjacent actions exists and invokes guards.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R7",
+        "R8"
+      ]
+    },
+    {
+      "id": "IA-AC02",
+      "outcome": "CONTRADICTED",
+      "exact_current_locus": "InvoiceController.php 268-412, 581-600",
+      "evidence": "Draft creation and issue-journal work are deliberately separated across commits and queue handoff.",
+      "evidence_limit": "S,U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-AC03",
+      "outcome": "PARTIAL",
+      "exact_current_locus": "SendInvoiceEmailJob.php 26-57; InvoiceEmailNotification.php 24-53; InvoiceController.php 584-600",
+      "evidence": "Deferred email and PDF attachment exist, but the delivery-like Sent timestamp is recorded before transport.",
+      "evidence_limit": "S,U",
+      "improvement_ids": [
+        "R5"
+      ]
+    },
+    {
+      "id": "IA-AC04",
+      "outcome": "CONTRADICTED",
+      "exact_current_locus": "InvoiceController.php 567-604; Show.tsx 98-101, 186-190",
+      "evidence": "A second delivery attempt is accepted and dispatches another job; no duplicate blocker is surfaced.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-AC05",
+      "outcome": "MET",
+      "exact_current_locus": "PaymentSettlementRecorder.php 85-102; InvoiceController.php 85-93",
+      "evidence": "Recording an allocation changes the derived paid amount accordingly.",
+      "evidence_limit": "S",
+      "improvement_ids": []
+    },
+    {
+      "id": "IA-AC06",
+      "outcome": "GAP",
+      "exact_current_locus": "routes/finance.php 674-709; InvoiceController.php 418-732",
+      "evidence": "No invoice delete endpoint or payments or applied-credit deletion guard exists.",
+      "evidence_limit": "S,B,U",
+      "improvement_ids": [
+        "R8"
+      ]
+    }
+  ],
+  "outcome_counts": {
+    "MET": 3,
+    "PARTIAL": 19,
+    "GAP": 8,
+    "CONTRADICTED": 4,
+    "NOT_COMPARABLE": 5
+  },
+  "native_improvement_requirements": {
+    "R1": "Define one auditable Oblivion invoice state machine that distinctly represents preparation, approval or issue, outstanding, partial settlement, full settlement, overdue handling, cancellation, and correction. Do not infer Submitted or Sent, Paid or Closed, or Cancelled or Abandoned equivalence without a root-owned mapping decision.",
+    "R2": "Make issue or submission an explicit action with its exact capability, approval rule, locked transition, accounting intent, and conditional stock effects where Oblivion invoices genuinely contain stock.",
+    "R3": "Distinguish receipt capture from requesting payment. Persist a request or version identity, support the native invoice PDF or an Oblivion payment link, commit the intent before handoff, and suppress duplicate handoffs.",
+    "R4": "Expose a native cancellation or correction workflow that locks state, rejects settlement conflicts, reverses the issue journal, restores applicable delivered-support or stock effects, records an event and audit trail, and gives paid invoices a separately governed correction path.",
+    "R5": "Make delivery idempotent and concurrency-safe; record delivery state, send count, and delivery event only after successful transport, with retry-safe failure recovery.",
+    "R6": "Retain invoice locking, Site scope, and replay binding while recording partial settlement explicitly; support a single receipt distributed over multiple selected invoices if adopted, and explicitly finalise every fully settled invoice.",
+    "R7": "Apply action-specific permission plus canonical target-Site policy checks to every list and direct-object read, write, download, and send route, returning concealed 404s outside approved Sites.",
+    "R8": "Keep delete, write-off, and payment-history separate from lifecycle mapping; if adopted, give each an exact permission, stable locked-state check, Site concealment, and payment or applied-credit safeguards."
+  },
+  "current_native_workflow": [
+    "Authenticated routes use finance.ar.view or finance.ar.manage.",
+    "Manager creation selects approved-Site Clients and delivered-support entries, then transactionally creates invoice plus lines in Draft and marks bound billing entries Invoiced.",
+    "Draft editing is allowed except for delivery-bound invoices.",
+    "Send changes Draft to Sent and records sent_at, commits, then separately dispatches the issue-journal job and email job.",
+    "The email job generates a PDF when needed and sends it as an attachment.",
+    "Receipt allocation locks the invoice, enforces the canonical Client Site, binds an idempotency key to the actor, invoice, and payload, posts a receipt journal, records append-only settlement provenance, and marks the invoice Paid when fully allocated.",
+    "Cancellation locks and Site-checks the invoice, rejects paid or settled invoices, requests linked-journal reversal, and records Cancelled.",
+    "The detail UI exposes Edit, Download PDF, Send Email, and Mark Paid. It does not expose the implemented Cancel action."
+  ],
+  "site_rbac_privacy_direct_object_boundary": {
+    "positive_static_evidence": [
+      "Exact AR route permissions are present.",
+      "Client and delivered-support choices during creation use UserSiteAccessService.",
+      "Mark Paid and Cancel use PaymentSettlementSiteScope, require an active canonical Client Site, and conceal denial with 404.",
+      "Settlement provenance binds Site, target, journal, actor, and source.",
+      "organization_id is the single-application storage context, not a tenant boundary."
+    ],
+    "unresolved_static_boundary": [
+      "Index and export use FinInvoice::forOrganization(1) without applyInvoiceScope; any actor with finance.ar.view can statically query all Sites.",
+      "Show, Edit, Update, Send, and PDF use direct route-model binding without canonical Site scope. The policy checks only AR permission, not record ownership or Site.",
+      "Show returns the invoice model and relations, including client contact and address, notes and email content, creator, and journal context, without Site-based minimisation.",
+      "Direct-ID concealment is established for Mark Paid and Cancel only, not read, edit, update, send, or PDF.",
+      "Funder-only invoices may have no Client, while settlement and cancellation require a canonical Client Site; those invoices are statically unscopeable for those actions.",
+      "Show renders Edit, Send, and Mark Paid based on status rather than canManage; view-only users can be shown actions that backend middleware rejects.",
+      "Show offers Mark Paid for Draft, while AccountsReceivableService accepts only Sent, Viewed, or Overdue."
+    ]
+  },
+  "counts": {
+    "comparison_rows": 39,
+    "MET": 3,
+    "PARTIAL": 19,
+    "GAP": 8,
+    "CONTRADICTED": 4,
+    "NOT_COMPARABLE": 5,
+    "source_files": 18,
+    "benchmark_selections": 0,
+    "NCM_findings": 0,
+    "credit_awards": 0,
+    "writes_by_agent_c": 0
+  },
+  "attestation": {
+    "invoice_slice_only": true,
+    "all_neutral_rows_reviewed_exactly_once": true,
+    "adjacent_capability_kept_separate": true,
+    "unknowns_preserved": true,
+    "upstream_identity_not_encountered": true,
+    "working_tree_application_source_read": false,
+    "network_browser_runtime_tests_build_database_or_package_tools_used": false,
+    "benchmark_selection_mapping_NCM_or_credit_awarded": false,
+    "audit_artifact_writes_by_root_only": true
+  }
+}
