@@ -1,0 +1,478 @@
+{
+  "schema_version": "run-148r-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25-v1",
+  "run_id": "RUN-148R-INDEPENDENT-OUTCOME-NEUTRAL-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-REVIEW-WAVE-25",
+  "status": "GO_ONE_STATIC_OWNER_AND_BRIDGE_AUTHORIZED_FOR_LATER_INTEGRATION_ZERO_CURRENT_OR_DOWNSTREAM_CREDIT",
+  "reviewed_on": "2026-08-27",
+  "decision": "GO",
+  "pins": {
+    "checkpoint_commit": "faca23e26044655d6fe869449100820deac7786c",
+    "checkpoint_tree": "4df4ef0ef1e5aff9fecd5277c1c830939cbf6468",
+    "application_commit": "a0493442b9e392d324055c35bf25b69421dc2d35",
+    "application_tree": "f8cdaf81d83c71e4f5d064fdf88872b908ffaaa1",
+    "app_tree": "92c8425a7cb15a92609c69a8c2f26bbda4f178b7",
+    "routes_tree": "9b7f78510d970db64ea3a6540e8a36b8700bf272",
+    "resources_js_tree": "1671a7551c004571c48bb00c34522928e6f1f173",
+    "resources_js_pages_tree": "e9e232ba6d6416e7dfdbdfd5875a4b6e95ddb55e",
+    "tests_tree": "fef0122b31fdccbe2f9f805f7515666c74e2880a",
+    "cohort_generator_sha256": "c8c6a9f1500fe088f6c61c3edff5351095518d14661a77af86b327a9ee253f65",
+    "cohort_generator_blob_id": "b9deb131d69a1770f5754675d0c773bf0ccb0f30",
+    "cohort_sha256": "621c1794a73e232b6fc9ff8d2b81ac9ae31ea2ccfe9f038ae77afe332b3ab28d",
+    "cohort_blob_id": "caa779f64c30dc653f243a85568bd3156b4764e1",
+    "cohort_candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2",
+    "cohort_source_packet_sha256": "9c36ffc8d02ab1b749931f9db5b8502c9d5e554c0e139074700ed22906e0ec27",
+    "generator": "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25.py",
+    "generator_sha256": "c41b37679763c0ea0eb4a08fc14368692c5b4cc0176167c4369b637c6f68f4b3"
+  },
+  "architecture_rule": "One operating organisation across multiple Sites; route ownership does not establish exact mutation permission, approved-Site reach, canonical record ownership, direct-object concealment, or privacy.",
+  "methods": {
+    "reviewers": 2,
+    "synthesizers": 1,
+    "static_source_only": true,
+    "application_executed": false,
+    "framework_routes_executed": false,
+    "database_used": false,
+    "build_used": false,
+    "browser_used": false,
+    "tests_executed": false
+  },
+  "verified_counts": {
+    "cohort_records": 1,
+    "independent_review_records": 2,
+    "owner_route_actions": 1,
+    "shared_relations": 0,
+    "evidence_gaps": 0,
+    "route_owners_authorized_for_later_overlay": 1,
+    "controller_action_bridges_authorized_for_later_overlay": 1,
+    "page_owners_authorized": 0,
+    "current_overlay_rows_written": 0,
+    "provisional_assurance_observations": 4,
+    "final_findings": 0
+  },
+  "independent_candidate_reviews": [
+    {
+      "review_id": "RUN148R-INDEPENDENT-REVIEW-A",
+      "reviewer_role": "fresh semantic route-action reviewer A",
+      "independent_from_cohort_producer": true,
+      "blinded_review": false,
+      "prior_outcome_visible_in_team_status": false,
+      "other_candidate_reviewer_consulted": false,
+      "independent_evidence_trace_completed": true,
+      "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+      "candidate_id": "RUN148-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-01",
+      "candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2",
+      "queue_index_zero_based": 80,
+      "queue_id": "RUN090-ROUTE-0081",
+      "queue_canonical_key": "route|RUN077-ROUTE-0689",
+      "route_record_id": "RUN077-ROUTE-0689",
+      "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "action_key": "RUN077-ROUTE-0689|app/Http/Controllers/FleetAssets/DailyCheckController.php:store|CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+      "identity_basis": "EXACT_LITERAL_ROUTE_PLUS_UNIQUE_CONTROLLER_ACTION_PLUS_DIRECT_SUBMITTER_PLUS_DIRECT_DAILY_CHECK_PERSISTENCE",
+      "source_loci": [
+        "03-feature-to-benchmark-matrix.csv:94",
+        "routes/web.php:340",
+        "routes/fleet-assets.php:34",
+        "routes/fleet-assets.php:40-47",
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php:134-190",
+        "resources/js/pages/fleet-assets/daily-check.tsx:83-100",
+        "app/Models/FleetChecklistRun.php:10-38",
+        "app/Models/FleetChecklistTemplate.php:13-27",
+        "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:11-33"
+      ],
+      "rationale": "The exact authenticated POST route resolves uniquely to DailyCheckController::store; the action validates the daily-check payload, obtains the daily_check template, updates today's asset/template run or creates FleetChecklistRun, and has one tracked direct submitter. Those semantics directly implement the canonical daily-vehicle-check job. Correctness gaps remain separate.",
+      "denied_alternatives": {
+        "SHARED_RELATION": "FleetChecklistTemplate and FleetChecklistRun are persistence dependencies, not co-owners; the selected action does not delegate the user job to InspectionController, ChecklistController, WorkOrderController, FleetTimelineService, FleetVehicleBooking, or the already-reviewed sibling GET action.",
+        "EVIDENCE_GAP": "The exact route identity, unique controller action, direct submitter, and direct update/create persistence close narrow static ownership without relying on runtime or sibling ownership."
+      },
+      "ownership_material_expansion": {
+        "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+        "paths": [],
+        "original_packet_completion_flags_preserved_false": true
+      },
+      "route_ownership_authorized_for_later_overlay": true,
+      "controller_action_bridge_authorized_for_later_overlay": true,
+      "owner_source_record_key": "route|RUN077-ROUTE-0689|CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "bridge_key": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+        "store",
+        "CAP-FLEET-DAILY-VEHICLE-CHECK"
+      ],
+      "page_ownership_authorized": false,
+      "prior_sibling_page_owner_inherited_or_recredited": false,
+      "current_overlay_credit_awarded": false,
+      "correctness_or_downstream_credit_authorized": false,
+      "reviewer_wrote_files": false,
+      "review_record_sha256": "431d0b7fbdc7734238ca489a0ac3044fd81e40cdc6d4dcd014b653c69fb21ec1"
+    },
+    {
+      "review_id": "RUN148R-INDEPENDENT-REVIEW-B",
+      "reviewer_role": "fresh semantic route-action reviewer B",
+      "independent_from_cohort_producer": true,
+      "blinded_review": false,
+      "prior_outcome_visible_in_team_status": true,
+      "other_candidate_reviewer_consulted": false,
+      "independent_evidence_trace_completed": true,
+      "review_method": "FRESH_PINNED_STATIC_SEMANTIC_TRACE_NO_EXECUTION",
+      "candidate_id": "RUN148-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-01",
+      "candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2",
+      "queue_index_zero_based": 80,
+      "queue_id": "RUN090-ROUTE-0081",
+      "queue_canonical_key": "route|RUN077-ROUTE-0689",
+      "route_record_id": "RUN077-ROUTE-0689",
+      "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "action_key": "RUN077-ROUTE-0689|app/Http/Controllers/FleetAssets/DailyCheckController.php:store|CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "outcome": "OWNER_ROUTE_ACTION",
+      "confidence": "HIGH_STATIC_IDENTITY_ONLY",
+      "identity_basis": "EXACT_LITERAL_ROUTE_PLUS_UNIQUE_CONTROLLER_ACTION_PLUS_DIRECT_SUBMITTER_PLUS_DIRECT_DAILY_CHECK_PERSISTENCE",
+      "source_loci": [
+        "03-feature-to-benchmark-matrix.csv:94",
+        "routes/web.php:340",
+        "routes/fleet-assets.php:34",
+        "routes/fleet-assets.php:40-47",
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php:134-190",
+        "resources/js/pages/fleet-assets/daily-check.tsx:83-100",
+        "app/Models/FleetChecklistRun.php:10-38",
+        "app/Models/FleetChecklistTemplate.php:13-27",
+        "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:11-33"
+      ],
+      "rationale": "The committed packet and frozen source form a complete narrow ownership trace: POST route, unique store method, exact payload, daily_check template resolution, same-day run update-or-create, confirmation, and the direct frontend caller all converge on CAP-FLEET-DAILY-VEHICLE-CHECK.",
+      "denied_alternatives": {
+        "SHARED_RELATION": "Generic checklist storage and adjacent Fleet workflows support the selected action but do not execute or co-own this exact daily-check recording job; sibling page context is explicitly non-inheritable.",
+        "EVIDENCE_GAP": "No ownership-material dependency is unresolved. Permission, Site, direct-object, template, concurrency, audit, and test gaps are correctness-only boundaries and cannot erase direct static identity."
+      },
+      "ownership_material_expansion": {
+        "status": "NONE_REQUIRED_FOR_NARROW_STATIC_OWNERSHIP",
+        "paths": [],
+        "original_packet_completion_flags_preserved_false": true
+      },
+      "route_ownership_authorized_for_later_overlay": true,
+      "controller_action_bridge_authorized_for_later_overlay": true,
+      "owner_source_record_key": "route|RUN077-ROUTE-0689|CAP-FLEET-DAILY-VEHICLE-CHECK",
+      "bridge_key": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+        "store",
+        "CAP-FLEET-DAILY-VEHICLE-CHECK"
+      ],
+      "page_ownership_authorized": false,
+      "prior_sibling_page_owner_inherited_or_recredited": false,
+      "current_overlay_credit_awarded": false,
+      "correctness_or_downstream_credit_authorized": false,
+      "reviewer_wrote_files": false,
+      "review_record_sha256": "3d7a67b8f1cde6d753ae0292e5aaf6e53f9312db1a9469ded8228c728257acd7"
+    }
+  ],
+  "question_dispositions": [
+    {
+      "question_id": "RUN148-Q-OWNERSHIP-IDENTITY",
+      "disposition": "RESOLVED_OWNER_ROUTE_ACTION",
+      "outcome_material_to_static_ownership": true,
+      "correctness_credit_authorized": false
+    },
+    {
+      "question_id": "RUN148-Q-MUTATION-PERMISSION",
+      "disposition": "UNRESOLVED_CORRECTNESS_ONLY_ZERO_CREDIT",
+      "outcome_material_to_static_ownership": false,
+      "correctness_credit_authorized": false
+    },
+    {
+      "question_id": "RUN148-Q-SITE-DIRECT-OBJECT",
+      "disposition": "UNRESOLVED_CORRECTNESS_ONLY_ZERO_CREDIT",
+      "outcome_material_to_static_ownership": false,
+      "correctness_credit_authorized": false
+    },
+    {
+      "question_id": "RUN148-Q-DUPLICATE-CONCURRENCY",
+      "disposition": "UNRESOLVED_CORRECTNESS_ONLY_ZERO_CREDIT",
+      "outcome_material_to_static_ownership": false,
+      "correctness_credit_authorized": false
+    },
+    {
+      "question_id": "RUN148-Q-TEMPLATE-AUTHORITY",
+      "disposition": "UNRESOLVED_CORRECTNESS_ONLY_ZERO_CREDIT",
+      "outcome_material_to_static_ownership": false,
+      "correctness_credit_authorized": false
+    },
+    {
+      "question_id": "RUN148-Q-AUDIT-ASSURANCE",
+      "disposition": "UNRESOLVED_CORRECTNESS_ONLY_ZERO_CREDIT",
+      "outcome_material_to_static_ownership": false,
+      "correctness_credit_authorized": false
+    }
+  ],
+  "synthesis_review": {
+    "synthesis_id": "RUN148R-INDEPENDENT-REVIEW-SYNTHESIS",
+    "verdict": "GO_ACCEPT_1_OWNER_ROUTE_ACTION_FOR_BOUNDED_LATER_INTEGRATION",
+    "accepted_independent_review_ids": [
+      "RUN148R-INDEPENDENT-REVIEW-A",
+      "RUN148R-INDEPENDENT-REVIEW-B"
+    ],
+    "accepted_independent_review_record_sha256s": [
+      "431d0b7fbdc7734238ca489a0ac3044fd81e40cdc6d4dcd014b653c69fb21ec1",
+      "3d7a67b8f1cde6d753ae0292e5aaf6e53f9312db1a9469ded8228c728257acd7"
+    ],
+    "accepted_candidate_id": "RUN148-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-01",
+    "accepted_candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2",
+    "outcome_variables": {
+      "O": 1,
+      "S": 0,
+      "E": 0
+    },
+    "independent_reviews_reconciled": true,
+    "outcome_discrepancies": 0,
+    "identity_or_key_discrepancies": 0,
+    "page_credit_discrepancies": 0,
+    "hard_stop_discrepancies": 0,
+    "ownership_material_expansion_required": false,
+    "correctness_only_expansion_manifest_sha256": "22288d8ac2bd3fa97086fd495ec6773cf40a062e1dec940892060599a4e513f5",
+    "provisional_assurance_observation_count": 4,
+    "provisional_assurance_observations_sha256": "c7900e6f024c923996ca6da2588776aeb3602945e7262e504ef12c7478654dc7",
+    "route_ownership_authorized": true,
+    "controller_action_bridge_authorized": true,
+    "page_ownership_authorized": false,
+    "current_overlay_credit_awarded": false,
+    "correctness_or_downstream_credit_authorized": false,
+    "synthesizer_wrote_files": false,
+    "synthesis_record_sha256": "c7c5dc9b5ebe2c9ee16105fa2c25b7be673fd3fb129055d87fc9f8fa93e36dbf"
+  },
+  "action_decisions": {
+    "candidate_id": "RUN148-FLEET-DAILY-VEHICLE-CHECK-STORE-ROUTE-ACTION-01",
+    "candidate_record_sha256": "589212109db42fd2e0b1611ea855ea76c469a492528d084949880d3601ac45b2",
+    "accepted_independent_review_ids": [
+      "RUN148R-INDEPENDENT-REVIEW-A",
+      "RUN148R-INDEPENDENT-REVIEW-B"
+    ],
+    "accepted_independent_review_record_sha256s": [
+      "431d0b7fbdc7734238ca489a0ac3044fd81e40cdc6d4dcd014b653c69fb21ec1",
+      "3d7a67b8f1cde6d753ae0292e5aaf6e53f9312db1a9469ded8228c728257acd7"
+    ],
+    "synthesis_record_sha256": "c7c5dc9b5ebe2c9ee16105fa2c25b7be673fd3fb129055d87fc9f8fa93e36dbf",
+    "queue_index_zero_based": 80,
+    "queue_id": "RUN090-ROUTE-0081",
+    "queue_canonical_key": "route|RUN077-ROUTE-0689",
+    "route_record_id": "RUN077-ROUTE-0689",
+    "source_key": "routes/fleet-assets.php:46:9:post:6",
+    "literal_route_name": "fleet-assets.daily-check.store",
+    "effective_route_name": "fleet-assets.daily-check.store",
+    "effective_uri": "/fleet-assets/daily-check",
+    "action_key": "RUN077-ROUTE-0689|app/Http/Controllers/FleetAssets/DailyCheckController.php:store|CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "candidate_feature_id": "CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "controller_file": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+    "controller_method": "store",
+    "outcome": "OWNER_ROUTE_ACTION",
+    "confidence": "HIGH_STATIC_IDENTITY_ONLY_2_OF_2_PLUS_SYNTHESIS",
+    "identity_basis": "EXACT_LITERAL_ROUTE_PLUS_UNIQUE_CONTROLLER_ACTION_PLUS_DIRECT_SUBMITTER_PLUS_DIRECT_DAILY_CHECK_PERSISTENCE",
+    "rationale": "Two independent reviews and a separate synthesis agree that the exact POST action directly records the canonical daily vehicle check. The four provisional correctness observations authorize no correctness, finding, runtime, test, or completion credit.",
+    "provisional_assurance_observation_ids": [
+      "RUN148R-ASSURANCE-MUTATION-CAPABILITY",
+      "RUN148R-ASSURANCE-SITE-DIRECT-OBJECT",
+      "RUN148R-ASSURANCE-TEMPLATE-DAY-CONCURRENCY",
+      "RUN148R-ASSURANCE-MUTATION-TEST-COVERAGE"
+    ],
+    "route_ownership_authorized": true,
+    "controller_action_bridge_authorized": true,
+    "owner_source_record_key": "route|RUN077-ROUTE-0689|CAP-FLEET-DAILY-VEHICLE-CHECK",
+    "bridge_key": [
+      "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+      "store",
+      "CAP-FLEET-DAILY-VEHICLE-CHECK"
+    ],
+    "page_ownership_authorized": false,
+    "prior_sibling_page_owner_inherited_or_recredited": false,
+    "next_queue_context_inherited_or_recredited": false,
+    "site_permission_privacy_direct_object_template_concurrency_audit_correctness_authorized": false,
+    "runtime_database_build_browser_test_benchmark_ease_release_pass_final_finding_completion_authorized": false,
+    "current_overlay_credit_awarded": false,
+    "reviewer_wrote_files": false,
+    "decision_record_sha256": "e28ab3b80b9de141bc3a958a79569f2145bff4a5da8f3bc39a24230cd7231f66"
+  },
+  "provisional_assurance_observations": [
+    {
+      "observation_id": "RUN148R-ASSURANCE-MUTATION-CAPABILITY",
+      "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+      "category": "exact_mutation_capability",
+      "loci": [
+        "routes/fleet-assets.php:40-47",
+        "app/Http/Middleware/EnsurePermission.php:11-27"
+      ],
+      "observation": "The selected POST sits inside a read-labelled OR permission group accepting fleet.viewAny, assets.viewAny, or assets.viewAssigned; an exact daily-check mutation capability is not established.",
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false,
+      "observation_record_sha256": "75e037324c539ef056da7017c67b2d7edd6b8ddcd6060825530a405d375e2259"
+    },
+    {
+      "observation_id": "RUN148R-ASSURANCE-SITE-DIRECT-OBJECT",
+      "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+      "category": "approved_site_canonical_vehicle_direct_object_concealment",
+      "loci": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php:136-140",
+        "app/Policies/AssetPolicy.php:17-21",
+        "app/Policies/AssetPolicy.php:74-87",
+        "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184"
+      ],
+      "observation": "The store action validates raw assets.id existence but does not resolve a canonical vehicle through approved Sites, AssetPolicy, or a concealment-aware access service before mutation.",
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false,
+      "observation_record_sha256": "2dd0f37e66d40ed1ec16f2e7206b2ec85f79ee96fab3f77081a12774c41a5c8a"
+    },
+    {
+      "observation_id": "RUN148R-ASSURANCE-TEMPLATE-DAY-CONCURRENCY",
+      "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+      "category": "template_authority_and_daily_run_concurrency",
+      "loci": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php:142-186",
+        "database/migrations/2026_03_22_100300_create_fleet_maintenance_tables.php:11-33"
+      ],
+      "observation": "Template first-or-create and same-day run check/update-or-create are not shown under an exact template authority, transaction, lock, or database uniqueness invariant.",
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false,
+      "observation_record_sha256": "7e412be31bb5a46d186988e1b8fed78e2a7515a1bfc311482af422f41e57d1f1"
+    },
+    {
+      "observation_id": "RUN148R-ASSURANCE-MUTATION-TEST-COVERAGE",
+      "status": "PROVISIONAL_SOURCE_OBSERVATION_NOT_FINAL_FINDING",
+      "category": "representative_role_site_negative_path_execution",
+      "loci": [
+        "tests/Feature/FleetAssets/FleetHeroRolloutContractTest.php:58-100",
+        "tests/Browser/Fleet/FleetTest.php:66-73"
+      ],
+      "observation": "Frozen tests cover GET rendering/compliance or a browser smoke only; no exact selected POST route-name/path mutation assertion was found or executed.",
+      "correctness_credit_authorized": false,
+      "final_finding_credit_authorized": false,
+      "observation_record_sha256": "a8ee50e527ec347ea8b17a4b6069988e9da77d723f72376c9b4042981d82ae7e"
+    }
+  ],
+  "source_packet_expansion": {
+    "original_source_review_complete": false,
+    "original_source_packet_completeness_claimed": false,
+    "original_material_dependency_semantics_complete": false,
+    "original_known_expansion_candidates_adjudicated": false,
+    "original_packet_retroactively_described_as_complete": false,
+    "ownership_material_expansion": [],
+    "ownership_material_expansion_required": false,
+    "narrow_ownership_decision_complete": true,
+    "correctness_only_expanded_files": [
+      {
+        "path": "routes/web.php",
+        "sha256": "5894a96a99997c984047b3aa9aef793c34c3d2d67fdac091e1022bcc3c05837e",
+        "head_blob_id": "cb6aec6dd2c44079a678ee1b92bcd1bddf2079fd",
+        "application_commit_blob_id": "cb6aec6dd2c44079a678ee1b92bcd1bddf2079fd",
+        "head_matches_application_commit_blob": true,
+        "review_loci": [
+          "routes/web.php:340"
+        ],
+        "reason": "confirm the Fleet route-file loader and composed /fleet-assets prefix",
+        "outcome_material": false,
+        "correctness_only": true,
+        "authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Policies/AssetPolicy.php",
+        "sha256": "5fd2040e66fcc0a761ba729c03db9602d0375f6a85c982b79ba92ef3354b79a0",
+        "head_blob_id": "ef4931d4c88542a85f7de7bf343da8d668e49f57",
+        "application_commit_blob_id": "ef4931d4c88542a85f7de7bf343da8d668e49f57",
+        "head_matches_application_commit_blob": true,
+        "review_loci": [
+          "app/Policies/AssetPolicy.php:17-21",
+          "app/Policies/AssetPolicy.php:74-87"
+        ],
+        "reason": "contrast the selected raw asset-id mutation with the existing canonical Asset policy boundary",
+        "outcome_material": false,
+        "correctness_only": true,
+        "authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+        "sha256": "c6ad39b72e659086e62a63e7510b8e8cb14e2a80192841cdddb5dc71436f9534",
+        "head_blob_id": "3737bf5327cd86e9b551ce86296005b1813c9616",
+        "application_commit_blob_id": "3737bf5327cd86e9b551ce86296005b1813c9616",
+        "head_matches_application_commit_blob": true,
+        "review_loci": [
+          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:312-315",
+          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1038-1042",
+          "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php:1125-1184"
+        ],
+        "reason": "contrast an existing canonical approved-Site vehicle and direct-object concealment path",
+        "outcome_material": false,
+        "correctness_only": true,
+        "authorizes_correctness_credit": false
+      },
+      {
+        "path": "app/Providers/AuthServiceProvider.php",
+        "sha256": "7bcbfb866f657f1e64665806b9f496f3994ba0e90f59686ef71fb97c458b47be",
+        "head_blob_id": "6a8a0d76b68f18ef5df613e41a7a97ba08431cb5",
+        "application_commit_blob_id": "6a8a0d76b68f18ef5df613e41a7a97ba08431cb5",
+        "head_matches_application_commit_blob": true,
+        "review_loci": [
+          "app/Providers/AuthServiceProvider.php:139-210"
+        ],
+        "reason": "confirm AssetPolicy registration and absence of checklist-model policy registration",
+        "outcome_material": false,
+        "correctness_only": true,
+        "authorizes_correctness_credit": false
+      }
+    ],
+    "correctness_only_expansion_manifest_sha256": "22288d8ac2bd3fa97086fd495ec6773cf40a062e1dec940892060599a4e513f5",
+    "all_expanded_files_match_application_commit_blobs": true,
+    "requested_but_not_fully_inspected": [
+      "app/Services/UserSiteAccessService.php approved-Site derivation beyond the selected store action",
+      "exact permission-definition and role-assignment source for a daily-check write capability",
+      "audit observer, event, or listener census for FleetChecklistRun mutations",
+      "exact selected-POST feature and architecture tests"
+    ],
+    "expansion_authorizes_action_outcome_change": false,
+    "expansion_authorizes_correctness_credit": false
+  },
+  "selected_action_evidence": {
+    "route_file_sha256": "68025ffa9447026ea9aa2d111278a86cf47a49c5d83a4d01fbcbdde70ff61ffd",
+    "route_file_blob_id": "c117901e96a026aba846ce3ccc35a1625dadf1bb",
+    "route_statement_sha256": "2811e26b388bcf4402eee8164d4ea1b15ed7fa79b73c17b82ccc6866b4d5db3e",
+    "controller_file_sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7",
+    "controller_file_blob_id": "28fec8f04cc41ab55d6b37d750c58f5bc773dec5",
+    "controller_store_slice_sha256": "532915dacc635e8b448dcb9351e3971b5f27458fc27e037c72c0e6435d49206a",
+    "frontend_page_sha256": "dab19a7f92f20548ef8a315f7e10c4a3ac992fb3e4388a277fe57d0faca3aab4",
+    "frontend_page_blob_id": "ca4a3b3ae1d1c72c636588ebcb96966c62d056bd",
+    "queue_record_sha256": "b73b6a2cf4340520554c6725d701e26f1b313334e8025d6db4f5e7de51392fda",
+    "matrix_sha256": "3f3b7bffdfa9464a111d1d65028d2660dd30e4541e429f6920987f7cae1448a0",
+    "task_contract_sha256": "48c79c9c220d1ddfa9ab063ed8e3196d64259eb3389b171a93fc48c404604b34"
+  },
+  "page_sibling_and_next_boundary_reconciliation": {
+    "preceding_queue_index": 79,
+    "preceding_queue_id": "RUN090-ROUTE-0080",
+    "preceding_owner_not_inherited_or_recredited": true,
+    "page_ownership_authorized": false,
+    "frontend_caller_ownership_authorized": false,
+    "next_queue_index": 81,
+    "next_queue_id": "RUN090-ROUTE-0082",
+    "next_queue_selected_or_credited": false
+  },
+  "credit_boundary": {
+    "REVIEWED_STATIC_ROUTE_FEATURE_OWNERSHIP_FOR_1_RECORD": true,
+    "REVIEWED_STATIC_CONTROLLER_ACTION_BRIDGE_FOR_1_ACTION": true,
+    "BOUNDED_OVERLAY_INTEGRATION_AUTHORIZED": true,
+    "CURRENT_OVERLAY_OWNERSHIP_CREDIT": false,
+    "STATIC_PAGE_FEATURE_OWNERSHIP": false,
+    "correctness": false,
+    "framework_route_reachability": false,
+    "runtime": false,
+    "database": false,
+    "build": false,
+    "application_browser": false,
+    "executed_tests": false,
+    "application_source_mutation": false,
+    "matrix_mutation": false,
+    "benchmark": false,
+    "ease": false,
+    "release": false,
+    "pass": false,
+    "final_finding": false,
+    "completion": false,
+    "audit_complete": false
+  },
+  "artifact_completion_test_met": false,
+  "audit_completion_test_met": false,
+  "wrote_files": [
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/generators/materialize-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25.py",
+    "docs/audits/oblivion-oss-comprehensive-audit-2026-08-24/evidence/source/raw-run-148r-independent-outcome-neutral-fleet-daily-vehicle-check-store-route-action-review-wave-25.json"
+  ]
+}
