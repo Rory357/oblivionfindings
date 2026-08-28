@@ -74,7 +74,7 @@ export function WhatsNextRail({
             : null);
 
     return (
-        <section data-test="my-day-whats-next">
+        <section className="min-w-0" data-test="my-day-whats-next">
             <div className="mb-3 flex flex-wrap items-baseline gap-3 px-1">
                 <h2 className="text-lg font-semibold tracking-tight">
                     {t('whats_next')}
@@ -162,7 +162,7 @@ function TimeBlock({
     return (
         <div
             className={cn(
-                'grid grid-cols-[76px_1fr] border-b border-border last:border-b-0',
+                'grid grid-cols-[76px_minmax(0,1fr)] border-b border-border last:border-b-0',
                 isNow && 'bg-accent',
             )}
         >
@@ -174,7 +174,7 @@ function TimeBlock({
             >
                 {time || '—'}
             </div>
-            <div>
+            <div className="min-w-0">
                 {items.map((item, i) => (
                     <StreamItemRow
                         key={`${item.kind}-${item.data.id ?? i}`}

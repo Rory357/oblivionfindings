@@ -831,27 +831,31 @@ export default function MyDay() {
             />
 
             <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                <WhatsNextRail
-                    stream={stream}
-                    residents={
-                        residents.length > 0
-                            ? residents
-                            : singleResident
-                              ? [singleResident]
-                              : []
-                    }
-                    activeResidentId={activeResidentId}
-                    onToggleTask={handleToggleTask}
-                    onGiveMed={handleGiveMed}
-                    onSnoozeMed={handleSnoozeMed}
-                    onRefuseMed={handleRefuseMed}
-                    onAddNote={(item) => handleAddNote(item.clientId ?? null)}
-                    onOpenContextMenu={(item, x, y) =>
-                        setCtxMenu({ item, x, y })
-                    }
-                />
+                <div className="min-w-0">
+                    <WhatsNextRail
+                        stream={stream}
+                        residents={
+                            residents.length > 0
+                                ? residents
+                                : singleResident
+                                  ? [singleResident]
+                                  : []
+                        }
+                        activeResidentId={activeResidentId}
+                        onToggleTask={handleToggleTask}
+                        onGiveMed={handleGiveMed}
+                        onSnoozeMed={handleSnoozeMed}
+                        onRefuseMed={handleRefuseMed}
+                        onAddNote={(item) =>
+                            handleAddNote(item.clientId ?? null)
+                        }
+                        onOpenContextMenu={(item, x, y) =>
+                            setCtxMenu({ item, x, y })
+                        }
+                    />
+                </div>
 
-                <aside className="flex flex-col gap-4">
+                <aside className="flex min-w-0 flex-col gap-4">
                     {props.active_lone_worker_session ? (
                         <LoneWorkerCheckInCard
                             session={props.active_lone_worker_session}

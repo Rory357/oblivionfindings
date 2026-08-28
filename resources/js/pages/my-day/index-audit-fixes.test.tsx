@@ -204,6 +204,17 @@ describe('My Day audit wiring', () => {
         );
     });
 
+    it('allows both My Day body columns to shrink below the desktop breakpoint', () => {
+        render(<MyDay />);
+
+        expect(screen.getByTestId('whats-next').parentElement).toHaveClass(
+            'min-w-0',
+        );
+        expect(screen.getByTestId('digest').closest('aside')).toHaveClass(
+            'min-w-0',
+        );
+    });
+
     it('toasts the server error when ensure-today reports no shift today (F2)', () => {
         render(<MyDay />);
 
